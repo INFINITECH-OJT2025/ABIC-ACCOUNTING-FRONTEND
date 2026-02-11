@@ -22,7 +22,15 @@ export default function LoginPage() {
       })
       const data = await res.json()
       if (res.ok && data.success) {
-        router.push('/')
+        // Redirect based on user role
+        const role = data.user?.role
+        if (role === 'super_admin') {
+          router.push('/admin')
+        } else if (role === 'accountant') {
+          router.push('/accountant')
+        } else {
+          router.push('/')
+        }
       } else {
         setError(data.message || 'Login failed')
       }

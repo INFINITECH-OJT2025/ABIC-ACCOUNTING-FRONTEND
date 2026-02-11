@@ -32,6 +32,13 @@ export async function POST(req: Request) {
       sameSite: 'lax',
     })
 
+    // Store role in a readable cookie for middleware
+    res.cookies.set('role', user?.role || '', {
+      maxAge,
+      path: '/',
+      sameSite: 'lax',
+    })
+
     return res
   } catch (err) {
     return NextResponse.json({ success: false, message: 'Internal server error' }, { status: 500 })

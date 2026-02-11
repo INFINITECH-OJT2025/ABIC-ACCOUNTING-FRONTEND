@@ -25,10 +25,15 @@ export async function POST() {
 
     const res = NextResponse.json({ success: backendRes.ok, message: data.message ?? (backendRes.ok ? 'Logout successful' : 'Logout failed') })
 
-    // Clear cookie
+    // Clear cookies
     res.cookies.set('token', '', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
+      maxAge: 0,
+      path: '/',
+      sameSite: 'lax',
+    })
+    res.cookies.set('role', '', {
       maxAge: 0,
       path: '/',
       sameSite: 'lax',
@@ -38,6 +43,7 @@ export async function POST() {
   } catch (err) {
     const res = NextResponse.json({ success: false, message: 'Internal server error' }, { status: 500 })
     res.cookies.set('token', '', { httpOnly: true, maxAge: 0, path: '/' })
+    res.cookies.set('role', '', { maxAge: 0, path: '/' })
     return res
   }
 }
