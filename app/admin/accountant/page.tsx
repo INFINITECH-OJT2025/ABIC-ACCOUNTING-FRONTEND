@@ -1,0 +1,1203 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+type Accountant = {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  account_status: 'active' | 'suspended' | 'expired' | 'pending';
+  password_expires_at?: string;
+  last_password_change?: string;
+  created_at: string;
+  updated_at: string;
+  suspended_at?: string;
+  suspended_reason?: string;
+};
+
+type ApiResponse = {
+  success: boolean;
+  message: string;
+  data?: Accountant | Accountant[] | { email_sent: boolean; password_updated?: boolean };
+  errors?: Record<string, string[]>;
+};
+
+export default function AccountantPage() {
+  const [items, setItems] = useState<Accountant[]>([]);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [sendNewPassword, setSendNewPassword] = useState(false);
+  const [editing, setEditing] = useState<Accountant | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [suspendReason, setSuspendReason] = useState("");
+  const [showSuspendDialog, setShowSuspendDialog] = useState<Accountant | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  const load = async () => {
+    try {
+      const res = await fetch("/api/accountant");
+      const json: ApiResponse = await res.json();
+      setItems(Array.isArray(json.data) ? json.data : []);
+    } catch (err) {
+      setError("Failed to load accountants");
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const create = async () => {
+    setLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const res = await fetch("/api/accountant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email }),
+      });
+
+      const data: ApiResponse = await res.json();
+
+      if (res.ok && data.success) {
+        setSuccess(data.message || "Accountant created successfully");
+        setName("");
+        setEmail("");
+        setShowCreateModal(false);
+        load();
+      } else {
+        setError(data.message || "Failed to create accountant");
+      }
+    } catch (err) {
+      setError("Network error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const update = async () => {
+    if (!editing) return;
+
+    setLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const body: any = { name, email };
+      if (password) {
+        body.password = password;
+        body.send_new_password = sendNewPassword;
+      }
+
+      const res = await fetch(`/api/accountant/${editing.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      const data: ApiResponse = await res.json();
+
+      if (res.ok && data.success) {
+        setSuccess(data.message || "Accountant updated successfully");
+        setEditing(null);
+        setName("");
+        setEmail("");
+        setPassword("");
+        setSendNewPassword(false);
+        setShowEditModal(false);
+        load();
+      } else {
+        setError(data.message || "Failed to update accountant");
+      }
+    } catch (err) {
+      setError("Network error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const remove = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this accountant?")) return;
+
+    setLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const res = await fetch(`/api/accountant/${id}`, {
+        method: "DELETE",
+      });
+
+      const data: ApiResponse = await res.json();
+
+      if (res.ok && data.success) {
+        setSuccess(data.message || "Accountant deleted successfully");
+        load();
+      } else {
+        setError(data.message || "Failed to delete accountant");
+      }
+    } catch (err) {
+      setError("Network error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resendCredentials = async (id: number) => {
+    if (!confirm("This will generate a new password and send it to the accountant's email. Continue?")) return;
+
+    setLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const res = await fetch(`/api/accountant/${id}/resend-credentials`, {
+        method: "POST",
+      });
+
+      const data: ApiResponse = await res.json();
+
+      if (res.ok && data.success) {
+        setSuccess(data.message || "Credentials sent successfully");
+        load();
+      } else {
+        setError(data.message || "Failed to resend credentials");
+      }
+    } catch (err) {
+      setError("Network error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const suspendAccount = async (accountant: Accountant) => {
+    if (!suspendReason.trim()) {
+      setError("Please provide a reason for suspension");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const res = await fetch(`/api/accountant/${accountant.id}/suspend`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: suspendReason }),
+      });
+
+      const data: ApiResponse = await res.json();
+
+      if (res.ok && data.success) {
+        setSuccess(data.message || "Account suspended successfully");
+        setShowSuspendDialog(null);
+        setSuspendReason("");
+        load();
+      } else {
+        setError(data.message || "Failed to suspend accountant");
+      }
+    } catch (err) {
+      setError("Network error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const unsuspendAccount = async (id: number) => {
+    if (!confirm("Are you sure you want to unsuspend this accountant?")) return;
+
+    setLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const res = await fetch(`/api/accountant/${id}/unsuspend`, {
+        method: "POST",
+      });
+
+      const data: ApiResponse = await res.json();
+
+      if (res.ok && data.success) {
+        setSuccess(data.message || "Account unsuspended successfully");
+        load();
+      } else {
+        setError(data.message || "Failed to unsuspend accountant");
+      }
+    } catch (err) {
+      setError("Network error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startEdit = (a: Accountant) => {
+    setEditing(a);
+    setName(a.name);
+    setEmail(a.email);
+    setPassword("");
+    setSendNewPassword(false);
+    setShowEditModal(true);
+  };
+
+  const cancelEdit = () => {
+    setEditing(null);
+    setName("");
+    setEmail("");
+    setPassword("");
+    setSendNewPassword(false);
+    setShowEditModal(false);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active': return '#059669';
+      case 'suspended': return '#dc2626';
+      case 'expired': return '#d97706';
+      case 'pending': return '#3b82f6';
+      default: return '#6b7280';
+    }
+  };
+
+  const getStatusBg = (status: string) => {
+    switch (status) {
+      case 'active': return 'linear-gradient(135deg, #d1fae5, #a7f3d0)';
+      case 'suspended': return 'linear-gradient(135deg, #fee2e2, #fecaca)';
+      case 'expired': return 'linear-gradient(135deg, #fed7aa, #fdba74)';
+      case 'pending': return 'linear-gradient(135deg, #dbeafe, #bfdbfe)';
+      default: return 'linear-gradient(135deg, #f3f4f6, #e5e7eb)';
+    }
+  };
+
+  const formatExpirationTime = (expiresAt: string) => {
+    const exp = new Date(expiresAt);
+    const now = new Date();
+    const diff = exp.getTime() - now.getTime();
+    
+    if (diff <= 0) return 'Expired';
+    
+    const minutes = Math.floor(diff / (1000 * 60));
+    if (minutes < 60) return `${minutes} min`;
+    
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ${minutes % 60}m`;
+    
+    const days = Math.floor(hours / 24);
+    return `${days}d ${hours % 24}h`;
+  };
+
+  return (
+    <div style={{ 
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #800020 0%, #4B0000 50%, #2D0000 100%)',
+      padding: '48px 20px'
+    }}>
+      <div style={{ 
+        maxWidth: '1400px',
+        margin: '0 auto',
+        background: 'rgba(255, 255, 255, 0.95)',
+        borderRadius: '16px',
+        padding: '32px',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+        backdropFilter: 'blur(10px)',
+        border: '1px solid rgba(255, 255, 255, 0.2)'
+      }}>
+        <div style={{ 
+          textAlign: 'center',
+          marginBottom: '32px'
+        }}>
+          <h1 style={{ 
+            margin: '0 0 8px 0',
+            fontSize: '32px',
+            fontWeight: '700',
+            background: 'linear-gradient(135deg, #800020, #4B0000)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text'
+          }}>
+            Accountant Management
+          </h1>
+          <div style={{ 
+            height: '4px',
+            width: '80px',
+            background: 'linear-gradient(90deg, #800020, #4B0000)',
+            margin: '0 auto',
+            borderRadius: '2px'
+          }}></div>
+        </div>
+
+        {/* Success/Error Messages */}
+        {success && (
+          <div style={{ 
+            padding: '12px 16px',
+            background: 'linear-gradient(135deg, #d1fae5, #a7f3d0)',
+            color: '#065f46',
+            borderRadius: '8px',
+            marginBottom: '24px',
+            border: '1px solid #6ee7b7',
+            fontSize: '14px',
+            fontWeight: '500'
+          }}>
+            {success}
+          </div>
+        )}
+
+        {error && (
+          <div style={{ 
+            padding: '12px 16px',
+            background: 'linear-gradient(135deg, #fee2e2, #fecaca)',
+            color: '#991b1b',
+            borderRadius: '8px',
+            marginBottom: '24px',
+            border: '1px solid #fca5a5',
+            fontSize: '14px',
+            fontWeight: '500'
+          }}>
+            {error}
+          </div>
+        )}
+
+        {/* Create Accountant Button */}
+        <div style={{ marginBottom: '32px', textAlign: 'right' }}>
+          <button 
+            onClick={() => setShowCreateModal(true)}
+            style={{
+              padding: '14px 28px',
+              background: 'linear-gradient(135deg, #059669, #047857)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '16px',
+              fontWeight: '600',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 4px 6px -1px rgba(5, 150, 105, 0.3)'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 8px 12px -1px rgba(5, 150, 105, 0.4)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(5, 150, 105, 0.3)';
+            }}
+          >
+            + Create Accountant
+          </button>
+        </div>
+
+        {/* TABLE */}
+        <div style={{ 
+          background: 'white',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          border: '1px solid #e5e7eb',
+          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+        }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ 
+                background: 'linear-gradient(135deg, #800020, #4B0000)',
+                color: 'white'
+              }}>
+                <th style={{ 
+                  padding: '16px',
+                  textAlign: 'left',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Name
+                </th>
+                <th style={{ 
+                  padding: '16px',
+                  textAlign: 'left',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Email
+                </th>
+                <th style={{ 
+                  padding: '16px',
+                  textAlign: 'left',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Status
+                </th>
+                <th style={{ 
+                  padding: '16px',
+                  textAlign: 'left',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Password Expires
+                </th>
+                <th style={{ 
+                  padding: '16px',
+                  textAlign: 'left',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Created
+                </th>
+                <th style={{ 
+                  padding: '16px',
+                  textAlign: 'center',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Actions
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {items.map((a, index) => (
+                <tr key={a.id} style={{ 
+                  background: index % 2 === 0 ? 'white' : '#f9fafb',
+                  transition: 'background-color 0.2s ease'
+                }}>
+                  <td style={{ 
+                    padding: '16px',
+                    borderBottom: '1px solid #e5e7eb',
+                    fontWeight: '500',
+                    color: '#1f2937'
+                  }}>
+                    {a.name}
+                  </td>
+                  <td style={{ 
+                    padding: '16px',
+                    borderBottom: '1px solid #e5e7eb',
+                    color: '#6b7280'
+                  }}>
+                    {a.email}
+                  </td>
+                  <td style={{ 
+                    padding: '16px',
+                    borderBottom: '1px solid #e5e7eb'
+                  }}>
+                    <div style={{
+                      display: 'inline-block',
+                      padding: '4px 12px',
+                      borderRadius: '20px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      textTransform: 'uppercase',
+                      background: getStatusBg(a.account_status),
+                      color: getStatusColor(a.account_status)
+                    }}>
+                      {a.account_status}
+                    </div>
+                    {a.suspended_reason && (
+                      <div style={{
+                        fontSize: '11px',
+                        color: '#991b1b',
+                        marginTop: '4px',
+                        fontStyle: 'italic'
+                      }}>
+                        {a.suspended_reason}
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ 
+                    padding: '16px',
+                    borderBottom: '1px solid #e5e7eb',
+                    color: '#6b7280',
+                    fontSize: '14px'
+                  }}>
+                    {a.password_expires_at ? formatExpirationTime(a.password_expires_at) : 'Never'}
+                  </td>
+                  <td style={{ 
+                    padding: '16px',
+                    borderBottom: '1px solid #e5e7eb',
+                    color: '#6b7280',
+                    fontSize: '14px'
+                  }}>
+                    {new Date(a.created_at).toLocaleDateString()}
+                  </td>
+                  <td style={{ 
+                    padding: '16px',
+                    borderBottom: '1px solid #e5e7eb',
+                    textAlign: 'center'
+                  }}>
+                    <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                      <button
+                        onClick={() => startEdit(a)}
+                        style={{
+                          padding: '6px 12px',
+                          background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          transition: 'all 0.3s ease',
+                          boxShadow: '0 2px 4px -1px rgba(245, 158, 11, 0.3)'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                          e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(245, 158, 11, 0.4)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 2px 4px -1px rgba(245, 158, 11, 0.3)';
+                        }}
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        onClick={() => resendCredentials(a.id)}
+                        disabled={loading}
+                        style={{
+                          padding: '6px 12px',
+                          background: loading 
+                            ? 'linear-gradient(135deg, #9ca3af, #6b7280)'
+                            : 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          transition: 'all 0.3s ease',
+                          boxShadow: loading ? 'none' : '0 2px 4px -1px rgba(59, 130, 246, 0.3)'
+                        }}
+                        onMouseOver={(e) => {
+                          if (!loading) {
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                            e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(59, 130, 246, 0.4)';
+                          }
+                        }}
+                        onMouseOut={(e) => {
+                          if (!loading) {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = '0 2px 4px -1px rgba(59, 130, 246, 0.3)';
+                          }
+                        }}
+                      >
+                        {loading ? 'Sending...' : 'Resend'}
+                      </button>
+
+                      {a.account_status === 'suspended' ? (
+                        <button
+                          onClick={() => unsuspendAccount(a.id)}
+                          disabled={loading}
+                          style={{
+                            padding: '6px 12px',
+                            background: loading 
+                              ? 'linear-gradient(135deg, #9ca3af, #6b7280)'
+                              : 'linear-gradient(135deg, #059669, #047857)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: loading ? 'not-allowed' : 'pointer',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            transition: 'all 0.3s ease',
+                            boxShadow: loading ? 'none' : '0 2px 4px -1px rgba(5, 150, 105, 0.3)'
+                          }}
+                          onMouseOver={(e) => {
+                            if (!loading) {
+                              e.currentTarget.style.transform = 'translateY(-1px)';
+                              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(5, 150, 105, 0.4)';
+                            }
+                          }}
+                          onMouseOut={(e) => {
+                            if (!loading) {
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.boxShadow = '0 2px 4px -1px rgba(5, 150, 105, 0.3)';
+                            }
+                          }}
+                        >
+                          {loading ? 'Unsuspending...' : 'Unsuspend'}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setShowSuspendDialog(a)}
+                          disabled={loading}
+                          style={{
+                            padding: '6px 12px',
+                            background: loading 
+                              ? 'linear-gradient(135deg, #9ca3af, #6b7280)'
+                              : 'linear-gradient(135deg, #dc2626, #991b1b)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: loading ? 'not-allowed' : 'pointer',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            transition: 'all 0.3s ease',
+                            boxShadow: loading ? 'none' : '0 2px 4px -1px rgba(220, 38, 38, 0.3)'
+                          }}
+                          onMouseOver={(e) => {
+                            if (!loading) {
+                              e.currentTarget.style.transform = 'translateY(-1px)';
+                              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(220, 38, 38, 0.4)';
+                            }
+                          }}
+                          onMouseOut={(e) => {
+                            if (!loading) {
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.boxShadow = '0 2px 4px -1px rgba(220, 38, 38, 0.3)';
+                            }
+                          }}
+                        >
+                          {loading ? 'Suspending...' : 'Suspend'}
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => remove(a.id)}
+                        disabled={loading}
+                        style={{
+                          padding: '6px 12px',
+                          background: loading 
+                            ? 'linear-gradient(135deg, #9ca3af, #6b7280)'
+                            : 'linear-gradient(135deg, #6b7280, #4b5563)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          transition: 'all 0.3s ease',
+                          boxShadow: loading ? 'none' : '0 2px 4px -1px rgba(107, 114, 128, 0.3)'
+                        }}
+                        onMouseOver={(e) => {
+                          if (!loading) {
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                            e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(107, 114, 128, 0.4)';
+                          }
+                        }}
+                        onMouseOut={(e) => {
+                          if (!loading) {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = '0 2px 4px -1px rgba(107, 114, 128, 0.3)';
+                          }
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          
+          {items.length === 0 && (
+            <div style={{ 
+              padding: '48px',
+              textAlign: 'center',
+              color: '#6b7280',
+              fontSize: '16px'
+            }}>
+              No accountants found. Create your first accountant above.
+            </div>
+          )}
+        </div>
+
+        {/* Suspend Dialog */}
+        {showSuspendDialog && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              background: 'white',
+              borderRadius: '12px',
+              padding: '32px',
+              maxWidth: '500px',
+              width: '90%',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+            }}>
+              <h3 style={{
+                margin: '0 0 16px 0',
+                color: '#800020',
+                fontSize: '20px',
+                fontWeight: '600'
+              }}>
+                Suspend Accountant
+              </h3>
+              
+              <p style={{
+                margin: '0 0 20px 0',
+                color: '#666',
+                fontSize: '14px'
+              }}>
+                Are you sure you want to suspend <strong>{showSuspendDialog.name}</strong> ({showSuspendDialog.email})?
+              </p>
+
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#800020',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  marginBottom: '8px'
+                }}>
+                  Reason for suspension
+                </label>
+                <textarea
+                  value={suspendReason}
+                  onChange={(e) => setSuspendReason(e.target.value)}
+                  placeholder="Enter the reason for suspension..."
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    transition: 'all 0.3s ease',
+                    background: 'white',
+                    resize: 'vertical'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#800020';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(128, 0, 32, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => {
+                    setShowSuspendDialog(null);
+                    setSuspendReason("");
+                  }}
+                  disabled={loading}
+                  style={{
+                    padding: '12px 24px',
+                    background: 'linear-gradient(135deg, #6b7280, #4b5563)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => suspendAccount(showSuspendDialog)}
+                  disabled={loading}
+                  style={{
+                    padding: '12px 24px',
+                    background: loading 
+                      ? 'linear-gradient(135deg, #9ca3af, #6b7280)'
+                      : 'linear-gradient(135deg, #dc2626, #991b1b)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    transition: 'all 0.3s ease',
+                    boxShadow: loading ? 'none' : '0 4px 6px -1px rgba(220, 38, 38, 0.3)'
+                  }}
+                >
+                  {loading ? 'Suspending...' : 'Suspend Account'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Create Accountant Modal */}
+        {showCreateModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              background: 'white',
+              borderRadius: '12px',
+              padding: '32px',
+              maxWidth: '500px',
+              width: '90%',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+            }}>
+              <h3 style={{
+                margin: '0 0 24px 0',
+                color: '#800020',
+                fontSize: '20px',
+                fontWeight: '600'
+              }}>
+                Create New Accountant
+              </h3>
+              
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#800020',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  marginBottom: '8px'
+                }}>
+                  Name
+                </label>
+                <input
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    transition: 'all 0.3s ease',
+                    background: 'white'
+                  }}
+                  placeholder="Enter accountant name"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  disabled={loading}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#800020';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(128, 0, 32, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#800020',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  marginBottom: '8px'
+                }}>
+                  Email
+                </label>
+                <input
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    transition: 'all 0.3s ease',
+                    background: 'white'
+                  }}
+                  placeholder="Enter email address"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  disabled={loading}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#800020';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(128, 0, 32, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setName("");
+                    setEmail("");
+                  }}
+                  disabled={loading}
+                  style={{
+                    padding: '12px 24px',
+                    background: 'linear-gradient(135deg, #6b7280, #4b5563)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={create}
+                  disabled={loading}
+                  style={{
+                    padding: '12px 24px',
+                    background: loading 
+                      ? 'linear-gradient(135deg, #9ca3af, #6b7280)'
+                      : 'linear-gradient(135deg, #059669, #047857)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    transition: 'all 0.3s ease',
+                    boxShadow: loading ? 'none' : '0 4px 6px -1px rgba(5, 150, 105, 0.3)'
+                  }}
+                >
+                  {loading ? 'Creating...' : 'Create Accountant'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Accountant Modal */}
+        {showEditModal && editing && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              background: 'white',
+              borderRadius: '12px',
+              padding: '32px',
+              maxWidth: '500px',
+              width: '90%',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+            }}>
+              <h3 style={{
+                margin: '0 0 24px 0',
+                color: '#800020',
+                fontSize: '20px',
+                fontWeight: '600'
+              }}>
+                Edit Accountant
+              </h3>
+              
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#800020',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  marginBottom: '8px'
+                }}>
+                  Name
+                </label>
+                <input
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    transition: 'all 0.3s ease',
+                    background: 'white'
+                  }}
+                  placeholder="Enter accountant name"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  disabled={loading}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#800020';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(128, 0, 32, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#800020',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  marginBottom: '8px'
+                }}>
+                  Email
+                </label>
+                <input
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    transition: 'all 0.3s ease',
+                    background: 'white'
+                  }}
+                  placeholder="Enter email address"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  disabled={loading}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#800020';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(128, 0, 32, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#800020',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  marginBottom: '8px'
+                }}>
+                  New Password (optional)
+                </label>
+                <input
+                  type="password"
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    transition: 'all 0.3s ease',
+                    background: 'white'
+                  }}
+                  placeholder="Leave empty to keep current"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  disabled={loading}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#800020';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(128, 0, 32, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input
+                  type="checkbox"
+                  id="sendPasswordEdit"
+                  checked={sendNewPassword}
+                  onChange={e => setSendNewPassword(e.target.checked)}
+                  disabled={loading}
+                  style={{ margin: 0 }}
+                />
+                <label htmlFor="sendPasswordEdit" style={{ 
+                  fontSize: '14px',
+                  color: '#374151',
+                  margin: 0,
+                  cursor: 'pointer'
+                }}>
+                  Email new password
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={cancelEdit}
+                  disabled={loading}
+                  style={{
+                    padding: '12px 24px',
+                    background: 'linear-gradient(135deg, #6b7280, #4b5563)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={update}
+                  disabled={loading}
+                  style={{
+                    padding: '12px 24px',
+                    background: loading 
+                      ? 'linear-gradient(135deg, #9ca3af, #6b7280)'
+                      : 'linear-gradient(135deg, #800020, #4B0000)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    transition: 'all 0.3s ease',
+                    boxShadow: loading ? 'none' : '0 4px 6px -1px rgba(128, 0, 32, 0.3)'
+                  }}
+                >
+                  {loading ? 'Updating...' : 'Update Accountant'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
