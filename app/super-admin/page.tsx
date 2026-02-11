@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { AlertCircle, LogOut, Plus, Users, Trash2, Edit2, Phone, Mail, LogIn, X } from 'lucide-react'
+import { AlertCircle, LogOut, Plus, Users, Trash2, Edit2, Phone, Mail, LogIn, X, Menu, ChevronLeft, Moon, Sun, Shield, Building2, UserCircle, Landmark, Settings, Archive, RotateCcw } from 'lucide-react'
 import Logo from '@/components/logo'
 
 interface Accountant {
@@ -14,6 +14,22 @@ interface Accountant {
   email: string
   phone: string
   role: string
+}
+
+interface OwnerAccount {
+  id: number
+  accountName: string
+  accountNumber: string
+  bankDetails: string
+}
+
+interface BankAccount {
+  id: number
+  name: string
+  bank: 'normal' | 'PMO'
+  accountName: string
+  accountNumber: string
+  phoneNumber?: string
 }
 
 export default function AdminDashboard() {
@@ -31,6 +47,29 @@ export default function AdminDashboard() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [formData, setFormData] = useState({ name: '', email: '', phone: '' })
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [darkMode, setDarkMode] = useState(true)
+  const [currentPage, setCurrentPage] = useState<'accountants' | 'assign-roles' | 'owner-accounts' | 'bank-accounts' | 'settings'>('accountants')
+  const [selectedAccountantId, setSelectedAccountantId] = useState<number | null>(null)
+  const [bankAccess, setBankAccess] = useState<{ [accountantId: number]: number[] }>({
+    1: [1, 2],
+    2: [1, 3, 4],
+    3: [2, 4],
+  })
+  const [ownerAccounts, setOwnerAccounts] = useState<OwnerAccount[]>([
+    { id: 1, accountName: 'Main Owner Account', accountNumber: '1234567890', bankDetails: 'Bank of America' },
+  ])
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([
+    { id: 1, name: 'Operations Account', bank: 'normal', accountName: 'Company Operations', accountNumber: '9876543210' },
+    { id: 2, name: 'PMO Account', bank: 'PMO', accountName: 'PMO Finance', accountNumber: '5555444433', phoneNumber: '+1 (555) 999-8888' },
+  ])
+  const [showOwnerForm, setShowOwnerForm] = useState(false)
+  const [showBankForm, setShowBankForm] = useState(false)
+  const [ownerFormData, setOwnerFormData] = useState({ accountName: '', accountNumber: '', bankDetails: '' })
+  const [bankFormData, setBankFormData] = useState({ name: '', bank: 'normal' as 'normal' | 'PMO', accountName: '', accountNumber: '', phoneNumber: '' })
+  const [archivedAccountants, setArchivedAccountants] = useState<Accountant[]>([])
+  const [archivedOwnerAccounts, setArchivedOwnerAccounts] = useState<OwnerAccount[]>([])
+  const [archivedBankAccounts, setArchivedBankAccounts] = useState<BankAccount[]>([])
 
   useEffect(() => {
     const fetchMe = async () => {
@@ -100,7 +139,11 @@ export default function AdminDashboard() {
   }
 
   const handleDeleteAccountant = (id: number) => {
-    setAccountants(accountants.filter(acc => acc.id !== id))
+    const accountant = accountants.find(acc => acc.id === id)
+    if (accountant) {
+      setArchivedAccountants([...archivedAccountants, accountant])
+      setAccountants(accountants.filter(acc => acc.id !== id))
+    }
   }
 
   const handleLogout = async () => {
@@ -150,7 +193,11 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black overflow-hidden">
+    <div className={`min-h-screen overflow-hidden transition-colors duration-300 ${
+      darkMode 
+        ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-black' 
+        : 'bg-gradient-to-br from-slate-50 via-white to-blue-50'
+    }`}>
       <style>{`
         @keyframes float1 {
           0%, 100% { transform: translate(0, 0px); }
@@ -190,48 +237,230 @@ export default function AdminDashboard() {
           transform: translateY(-4px);
           border-color: rgba(255, 107, 107, 0.5);
         }
+        .sidebar-transition {
+          transition: transform 0.3s ease-in-out, width 0.3s ease-in-out;
+        }
       `}</style>
 
       {/* Animated Orbs Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="orb-1 absolute top-20 -right-40 w-80 h-80 bg-red-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
-        <div className="orb-2 absolute -bottom-20 -left-40 w-80 h-80 bg-red-900 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
-        <div className="orb-3 absolute top-1/2 left-1/2 w-96 h-96 bg-gray-700 rounded-full mix-blend-multiply filter blur-3xl opacity-10"></div>
+        <div className={`orb-1 absolute top-20 -right-40 w-80 h-80 rounded-full mix-blend-multiply filter blur-3xl transition-all duration-300 ${
+          darkMode ? 'bg-red-600 opacity-20' : 'bg-red-300 opacity-10'
+        }`}></div>
+        <div className={`orb-2 absolute -bottom-20 -left-40 w-80 h-80 rounded-full mix-blend-multiply filter blur-3xl transition-all duration-300 ${
+          darkMode ? 'bg-red-900 opacity-20' : 'bg-pink-300 opacity-10'
+        }`}></div>
+        <div className={`orb-3 absolute top-1/2 left-1/2 w-96 h-96 rounded-full mix-blend-multiply filter blur-3xl transition-all duration-300 ${
+          darkMode ? 'bg-gray-700 opacity-10' : 'bg-gray-200 opacity-15'
+        }`}></div>
       </div>
 
-      {/* Header */}
-      <header className="relative z-40 border-b border-[#FF6B6B]/20 glass-effect sticky top-0">
-        <div className="px-4 py-6 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-[#FF6B6B] to-[#FF8A80] rounded-lg flex items-center justify-center">
-                <Logo animated={false} className="w-8 h-8" />
+      {/* Sidebar */}
+      <aside
+        className={`fixed left-0 top-0 h-full z-50 sidebar-transition ${
+          sidebarOpen ? 'w-80' : 'w-0'
+        } overflow-hidden`}
+      >
+        <div className={`h-full border-r flex flex-col transition-colors ${
+          darkMode 
+            ? 'glass-effect-dark border-[#FF6B6B]/20' 
+            : 'bg-white border-gray-200 shadow-xl'
+        }`}>
+          {/* Sidebar Header */}
+          <div className={`p-6 border-b transition-colors ${
+            darkMode ? 'border-[#FF6B6B]/20' : 'border-slate-200'
+          }`}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-[#FF6B6B] to-[#FF8A80] rounded-lg flex items-center justify-center">
+                  <Logo animated={false} className="w-6 h-6" />
+                </div>
+                <div>
+                  <h1 className={`text-lg font-bold transition-colors ${darkMode ? 'text-white' : 'text-gray-900'}`}>Super Admin</h1>
+                  {user && (
+                    <p className={`text-xs transition-colors ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{user.email}</p>
+                  )}
+                </div>
               </div>
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-bold gradient-text">Super Admin Dashboard</h1>
-                <p className="text-gray-400 text-sm">Manage Accountants & System</p>
-              </div>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className={`cursor-pointer transition-colors p-2 hover:bg-[#FF6B6B]/10 rounded-lg ${
+                  darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
             </div>
+            
+            {/* Dark/Light Mode Toggle */}
+            <div className="mb-4">
+              <button
+                onClick={() => setDarkMode(!darkMode)}
+                className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all ${
+                  darkMode
+                    ? 'bg-[#FF6B6B]/10 text-[#FF8A80] hover:bg-[#FF6B6B]/20'
+                    : 'bg-gradient-to-r from-slate-100 to-blue-100 text-slate-700 hover:from-slate-200 hover:to-blue-200'
+                }`}
+              >
+                {darkMode ? (
+                  <>
+                    <Sun className="w-4 h-4" />
+                    <span>Switch to Light Mode</span>
+                  </>
+                ) : (
+                  <>
+                    <Moon className="w-4 h-4" />
+                    <span>Switch to Dark Mode</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Sidebar Navigation */}
+          <div className={`p-4 border-b transition-colors ${
+            darkMode ? 'border-[#FF6B6B]/20' : 'border-slate-200'
+          }`}>
+            <nav className="space-y-2">
+              <button
+                onClick={() => setCurrentPage('accountants')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-semibold text-sm transition-all ${
+                  currentPage === 'accountants'
+                    ? darkMode
+                      ? 'bg-[#FF6B6B]/20 text-[#FF8A80]'
+                      : 'bg-gradient-to-r from-slate-200 to-blue-200 text-slate-800'
+                    : darkMode
+                      ? 'text-gray-400 hover:bg-[#FF6B6B]/10 hover:text-[#FF8A80]'
+                      : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <Users className="w-5 h-5" />
+                <span>Accountants</span>
+              </button>
+              <button
+                onClick={() => setCurrentPage('assign-roles')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-semibold text-sm transition-all ${
+                  currentPage === 'assign-roles'
+                    ? darkMode
+                      ? 'bg-[#FF6B6B]/20 text-[#FF8A80]'
+                      : 'bg-gradient-to-r from-slate-200 to-blue-200 text-slate-800'
+                    : darkMode
+                      ? 'text-gray-400 hover:bg-[#FF6B6B]/10 hover:text-[#FF8A80]'
+                      : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <Shield className="w-5 h-5" />
+                <span>Assign Roles</span>
+              </button>
+              <button
+                onClick={() => setCurrentPage('owner-accounts')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-semibold text-sm transition-all ${
+                  currentPage === 'owner-accounts'
+                    ? darkMode
+                      ? 'bg-[#FF6B6B]/20 text-[#FF8A80]'
+                      : 'bg-gradient-to-r from-slate-200 to-blue-200 text-slate-800'
+                    : darkMode
+                      ? 'text-gray-400 hover:bg-[#FF6B6B]/10 hover:text-[#FF8A80]'
+                      : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <UserCircle className="w-5 h-5" />
+                <span>Owner Accounts</span>
+              </button>
+              <button
+                onClick={() => setCurrentPage('bank-accounts')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-semibold text-sm transition-all ${
+                  currentPage === 'bank-accounts'
+                    ? darkMode
+                      ? 'bg-[#FF6B6B]/20 text-[#FF8A80]'
+                      : 'bg-gradient-to-r from-slate-200 to-blue-200 text-slate-800'
+                    : darkMode
+                      ? 'text-gray-400 hover:bg-[#FF6B6B]/10 hover:text-[#FF8A80]'
+                      : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <Landmark className="w-5 h-5" />
+                <span>Bank Accounts</span>
+              </button>
+              <button
+                onClick={() => setCurrentPage('settings')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-semibold text-sm transition-all ${
+                  currentPage === 'settings'
+                    ? darkMode
+                      ? 'bg-[#FF6B6B]/20 text-[#FF8A80]'
+                      : 'bg-gradient-to-r from-slate-200 to-blue-200 text-slate-800'
+                    : darkMode
+                      ? 'text-gray-400 hover:bg-[#FF6B6B]/10 hover:text-[#FF8A80]'
+                      : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <Settings className="w-5 h-5" />
+                <span>Settings</span>
+              </button>
+            </nav>
+          </div>
+
+          {/* Sidebar Content */}
+          <div className="flex-1 p-6 overflow-y-auto">
+          </div>
+
+          {/* Sidebar Footer */}
+          <div className={`p-6 border-t transition-colors ${
+            darkMode ? 'border-[#FF6B6B]/20' : 'border-slate-200'
+          }`}>
             <button
               onClick={() => setShowLogoutConfirm(true)}
-              className="cursor-pointer px-4 py-2 bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity flex items-center gap-2"
+              className={`cursor-pointer w-full px-4 py-3 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
+                darkMode
+                  ? 'bg-red-900/20 hover:bg-red-900/40 text-red-400'
+                  : 'bg-red-50 hover:bg-red-100 text-red-600'
+              }`}
             >
               <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">Logout</span>
+              Logout
             </button>
           </div>
         </div>
-      </header>
+      </aside>
+
+      {/* Sidebar Overlay (mobile) */}
+      {sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+        ></div>
+      )}
+
+      {/* Toggle Button (when sidebar is closed) */}
+      {!sidebarOpen && (
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="cursor-pointer fixed top-6 left-6 z-50 p-3 bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white rounded-xl shadow-2xl hover:opacity-90 hover:scale-105 transition-all"
+        >
+          <Menu className="w-6 h-6" />
+        </button>
+      )}
 
       {/* Main Content */}
-      <main className="relative z-20 px-4 py-8 sm:px-6 lg:px-8">
+      <main
+        className={`relative z-20 transition-all duration-300 ${
+          sidebarOpen ? 'lg:ml-80' : 'ml-0'
+        }`}
+      >
+        <div className={`px-4 py-8 sm:px-6 lg:px-8 ${
+          !sidebarOpen ? 'pt-24' : ''
+        }`}>
         {/* Error Alert */}
         {error && (
-          <div className="mb-6 glass-effect-dark border-l-4 border-[#FF6B6B] rounded-lg p-4 flex gap-3 items-start animate-in">
+          <div className={`mb-6 border-l-4 border-[#FF6B6B] rounded-lg p-4 flex gap-3 items-start animate-in transition-colors ${
+            darkMode ? 'glass-effect-dark' : 'bg-white border border-red-100 shadow-md'
+          }`}>
             <AlertCircle className="w-5 h-5 text-[#FF6B6B] mt-0.5 flex-shrink-0" />
             <div className="flex-1">
               <h3 className="text-[#FF8A80] font-semibold">Error</h3>
-              <p className="text-gray-300 text-sm">{error}</p>
+              <p className={`text-sm transition-colors ${
+                darkMode ? 'text-gray-300' : 'text-gray-700'
+              }`}>{error}</p>
             </div>
             <button
               onClick={() => setError('')}
@@ -242,75 +471,41 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* User Welcome Card */}
-        {user && (
-          <div className="mb-8 glass-effect-dark rounded-2xl p-6 sm:p-8 border">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">Welcome, <span className="gradient-text">{user.name}</span></h2>
-                <p className="text-gray-400 flex items-center gap-2">
-                  <Mail className="w-4 h-4" />
-                  {user.email}
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="px-4 py-2 bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white rounded-lg font-semibold text-sm">
-                  {user.role?.toUpperCase()}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Dashboard Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-          {/* Quick Actions Sidebar */}
-          <div className="lg:col-span-1">
-            <div className="glass-effect-dark rounded-2xl p-6 border sticky top-24">
-              <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                <Users className="w-5 h-5 text-[#FF6B6B]" />
-                Quick Actions
-              </h3>
-              <button
-                onClick={() => {
-                  setEditingId(null)
-                  setFormData({ name: '', email: '', phone: '' })
-                  setShowAddForm(true)
-                }}
-                className="cursor-pointer w-full px-4 py-3 bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white rounded-lg font-semibold hover:opacity-90 transition-all hover:shadow-lg hover:shadow-red-500/20 flex items-center justify-center gap-2"
-              >
-                <Plus className="w-5 h-5" />
-                Add Accountant
-              </button>
-              <div className="mt-6 p-4 bg-[#0F172A]/50 rounded-lg border border-[#FF6B6B]/10">
-                <p className="text-gray-400 text-sm">
-                  <span className="text-[#FF8A80] font-bold text-lg">{accountants.length}</span>
-                  <br />
-                  accountant{accountants.length !== 1 ? 's' : ''} active
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Accountants Grid */}
-          <div className="lg:col-span-3">
-            <div className="mb-6">
-              <h3 className="text-xl sm:text-2xl font-bold text-white">Accountants</h3>
-              <p className="text-gray-400 text-sm mt-1">Manage your team members</p>
+        {/* Page Content */}
+        {currentPage === 'accountants' ? (
+          <>
+            {/* Page Header */}
+            <div className="mb-8">
+              <h2 className="text-3xl sm:text-4xl font-bold gradient-text mb-2">Accountants</h2>
+              <p className={`transition-colors ${
+                darkMode ? 'text-gray-400' : 'text-gray-600'
+              }`}>Manage your team members and their access</p>
             </div>
 
-            {accountants.length === 0 ? (
-              <div className="glass-effect-dark rounded-2xl p-12 border flex flex-col items-center justify-center">
-                <Users className="w-16 h-16 text-gray-600 mb-4" />
-                <p className="text-gray-300 text-lg font-semibold">No accountants yet</p>
-                <p className="text-gray-500 text-sm mt-1">Add your first accountant using the Quick Actions panel</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Accountants Grid */}
+            <div>
+          {accountants.length === 0 ? (
+            <div className={`rounded-2xl p-12 border flex flex-col items-center justify-center transition-colors ${
+              darkMode ? 'glass-effect-dark' : 'bg-white border-gray-200 shadow-sm'
+            }`}>
+              <Users className={`w-16 h-16 mb-4 transition-colors ${
+                darkMode ? 'text-gray-600' : 'text-gray-400'
+              }`} />
+              <p className={`text-lg font-semibold transition-colors ${
+                darkMode ? 'text-gray-300' : 'text-gray-700'
+              }`}>No accountants yet</p>
+              <p className={`text-sm mt-1 transition-colors ${
+                darkMode ? 'text-gray-500' : 'text-gray-500'
+              }`}>Add your first accountant using the sidebar</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {accountants.map((acc) => (
                   <div
                     key={acc.id}
-                    className="glass-effect rounded-2xl p-6 border card-hover group relative overflow-hidden"
+                    className={`rounded-2xl p-6 border card-hover group relative overflow-hidden transition-colors ${
+                      darkMode ? 'glass-effect' : 'bg-white border-gray-200 shadow-md hover:shadow-xl'
+                    }`}
                   >
                     {/* Gradient overlay on hover */}
                     <div className="absolute inset-0 bg-gradient-to-r from-[#FF6B6B]/0 to-[#FF8A80]/0 group-hover:from-[#FF6B6B]/5 group-hover:to-[#FF8A80]/5 transition-all pointer-events-none"></div>
@@ -319,7 +514,9 @@ export default function AdminDashboard() {
                       {/* Header */}
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex-1">
-                          <h4 className="text-lg font-bold text-white">{acc.name}</h4>
+                          <h4 className={`text-lg font-bold transition-colors ${
+                            darkMode ? 'text-white' : 'text-gray-900'
+                          }`}>{acc.name}</h4>
                           <span className="inline-block mt-2 px-3 py-1 bg-[#FF6B6B]/20 text-[#FF8A80] rounded-full text-xs font-semibold capitalize">
                             {acc.role}
                           </span>
@@ -328,13 +525,17 @@ export default function AdminDashboard() {
 
                       {/* Info */}
                       <div className="space-y-3 mb-6">
-                        <div className="flex items-center gap-3 text-gray-300">
+                        <div className={`flex items-center gap-3 transition-colors ${
+                          darkMode ? 'text-gray-300' : 'text-gray-600'
+                        }`}>
                           <Mail className="w-4 h-4 text-[#FF6B6B] flex-shrink-0" />
                           <a href={`mailto:${acc.email}`} className="text-sm hover:text-[#FF8A80] transition-colors break-all">
                             {acc.email}
                           </a>
                         </div>
-                        <div className="flex items-center gap-3 text-gray-300">
+                        <div className={`flex items-center gap-3 transition-colors ${
+                          darkMode ? 'text-gray-300' : 'text-gray-600'
+                        }`}>
                           <Phone className="w-4 h-4 text-[#FF6B6B] flex-shrink-0" />
                           <a href={`tel:${acc.phone}`} className="text-sm hover:text-[#FF8A80] transition-colors">
                             {acc.phone}
@@ -365,21 +566,538 @@ export default function AdminDashboard() {
               </div>
             )}
           </div>
+          </>
+        ) : currentPage === 'assign-roles' ? (
+          <>
+            {/* Assign Roles Page */}
+            <div className="mb-8">
+              <h2 className="text-3xl sm:text-4xl font-bold gradient-text mb-2">Assign Bank Access</h2>
+              <p className={`transition-colors ${
+                darkMode ? 'text-gray-400' : 'text-gray-600'
+              }`}>Manage which banks each accountant can access</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Accountants List */}
+              <div className={`rounded-2xl p-6 border transition-colors ${
+                darkMode ? 'glass-effect-dark' : 'bg-white border-gray-200 shadow-sm'
+              }`}>
+                <h3 className={`text-lg font-bold mb-4 transition-colors ${
+                  darkMode ? 'text-white' : 'text-gray-900'
+                }`}>Select Accountant</h3>
+                <div className="space-y-2">
+                  {accountants.map((acc) => (
+                    <button
+                      key={acc.id}
+                      onClick={() => setSelectedAccountantId(acc.id)}
+                      className={`w-full text-left px-4 py-3 rounded-lg font-medium transition-all ${
+                        selectedAccountantId === acc.id
+                          ? darkMode
+                            ? 'bg-[#FF6B6B]/20 text-[#FF8A80] border-2 border-[#FF6B6B]/50'
+                            : 'bg-gradient-to-r from-slate-200 to-blue-200 text-slate-800 border-2 border-slate-400'
+                          : darkMode
+                            ? 'bg-[#0F172A]/50 text-gray-300 hover:bg-[#0F172A]/80 border border-[#FF6B6B]/10'
+                            : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4" />
+                        <span className="text-sm">{acc.name}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Bank Access */}
+              <div className={`lg:col-span-2 rounded-2xl p-6 border transition-colors ${
+                darkMode ? 'glass-effect-dark' : 'bg-white border-gray-200 shadow-sm'
+              }`}>
+                {selectedAccountantId ? (
+                  <>
+                    <div className="mb-6">
+                      <h3 className={`text-lg font-bold mb-2 transition-colors ${
+                        darkMode ? 'text-white' : 'text-gray-900'
+                      }`}>
+                        Bank Access for {accountants.find(a => a.id === selectedAccountantId)?.name}
+                      </h3>
+                      <p className={`text-sm transition-colors ${
+                        darkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>Select which banks this accountant can access</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {[1, 2, 3, 4].map((bankId) => {
+                        const hasAccess = bankAccess[selectedAccountantId]?.includes(bankId) || false
+                        return (
+                          <div
+                            key={bankId}
+                            onClick={() => {
+                              const currentAccess = bankAccess[selectedAccountantId] || []
+                              if (hasAccess) {
+                                setBankAccess({
+                                  ...bankAccess,
+                                  [selectedAccountantId]: currentAccess.filter(id => id !== bankId)
+                                })
+                              } else {
+                                setBankAccess({
+                                  ...bankAccess,
+                                  [selectedAccountantId]: [...currentAccess, bankId]
+                                })
+                              }
+                            }}
+                            className={`cursor-pointer p-5 rounded-xl border-2 transition-all ${
+                              hasAccess
+                                ? darkMode
+                                  ? 'bg-[#FF6B6B]/10 border-[#FF6B6B] hover:bg-[#FF6B6B]/20'
+                                  : 'bg-gradient-to-br from-blue-50 to-slate-50 border-blue-400 hover:border-blue-500'
+                                : darkMode
+                                  ? 'bg-[#0F172A]/30 border-[#FF6B6B]/20 hover:border-[#FF6B6B]/40'
+                                  : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                                hasAccess
+                                  ? 'bg-[#FF6B6B] border-[#FF6B6B]'
+                                  : darkMode
+                                    ? 'border-gray-600'
+                                    : 'border-slate-300'
+                              }`}>
+                                {hasAccess && (
+                                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Building2 className="w-5 h-5 text-[#FF6B6B]" />
+                                  <h4 className={`font-bold transition-colors ${
+                                    darkMode ? 'text-white' : 'text-gray-900'
+                                  }`}>Bank {bankId}</h4>
+                                </div>
+                                <p className={`text-xs transition-colors ${
+                                  darkMode ? 'text-gray-400' : 'text-gray-600'
+                                }`}>
+                                  {hasAccess ? 'Access granted' : 'No access'}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    <div className={`mt-6 p-4 rounded-lg transition-colors ${
+                      darkMode ? 'bg-[#0F172A]/50 border border-[#FF6B6B]/10' : 'bg-gradient-to-br from-slate-50 to-blue-50 border border-slate-200'
+                    }`}>
+                      <p className={`text-sm transition-colors ${
+                        darkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
+                        <span className="font-bold text-[#FF8A80]">
+                          {bankAccess[selectedAccountantId]?.length || 0}
+                        </span> bank(s) accessible
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <Shield className={`w-16 h-16 mb-4 transition-colors ${
+                      darkMode ? 'text-gray-600' : 'text-gray-400'
+                    }`} />
+                    <p className={`text-lg font-semibold transition-colors ${
+                      darkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>Select an accountant</p>
+                    <p className={`text-sm mt-1 transition-colors ${
+                      darkMode ? 'text-gray-500' : 'text-gray-500'
+                    }`}>Choose an accountant to manage their bank access</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        ) : currentPage === 'owner-accounts' ? (
+          <>
+            {/* Owner Accounts Page */}
+            <div className="mb-8 flex items-center justify-between">
+              <div>
+                <h2 className="text-3xl sm:text-4xl font-bold gradient-text mb-2">Owner Accounts</h2>
+                <p className={`transition-colors ${
+                  darkMode ? 'text-gray-400' : 'text-gray-600'
+                }`}>Manage owner account information</p>
+              </div>
+              <button
+                onClick={() => setShowOwnerForm(true)}
+                className="cursor-pointer px-4 py-3 bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white rounded-lg font-semibold hover:opacity-90 transition-all hover:shadow-lg hover:shadow-red-500/20 flex items-center gap-2"
+              >
+                <Plus className="w-5 h-5" />
+                <span className="hidden sm:inline">Add Owner Account</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {ownerAccounts.map((account) => (
+                <div
+                  key={account.id}
+                  className={`rounded-2xl p-6 border transition-colors ${
+                    darkMode ? 'glass-effect' : 'bg-white border-gray-200 shadow-md'
+                  }`}
+                >
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="p-3 bg-[#FF6B6B]/10 rounded-lg">
+                      <UserCircle className="w-6 h-6 text-[#FF6B6B]" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className={`font-bold text-lg transition-colors ${
+                        darkMode ? 'text-white' : 'text-gray-900'
+                      }`}>{account.accountName}</h3>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <p className={`text-xs font-semibold uppercase tracking-wider mb-1 transition-colors ${
+                        darkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>Account Number</p>
+                      <p className={`font-mono transition-colors ${
+                        darkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>{account.accountNumber}</p>
+                    </div>
+                    <div>
+                      <p className={`text-xs font-semibold uppercase tracking-wider mb-1 transition-colors ${
+                        darkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>Bank Details</p>
+                      <p className={`transition-colors ${
+                        darkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>{account.bankDetails}</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-[#FF6B6B]/10 flex gap-2">
+                    <button
+                      onClick={() => {
+                        setArchivedOwnerAccounts([...archivedOwnerAccounts, account])
+                        setOwnerAccounts(ownerAccounts.filter(a => a.id !== account.id))
+                      }}
+                      className="cursor-pointer flex-1 px-3 py-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span className="hidden sm:inline">Delete</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : currentPage === 'bank-accounts' ? (
+          <>
+            {/* Bank Accounts Page */}
+            <div className="mb-8 flex items-center justify-between">
+              <div>
+                <h2 className="text-3xl sm:text-4xl font-bold gradient-text mb-2">Bank Accounts</h2>
+                <p className={`transition-colors ${
+                  darkMode ? 'text-gray-400' : 'text-gray-600'
+                }`}>Manage bank account information</p>
+              </div>
+              <button
+                onClick={() => setShowBankForm(true)}
+                className="cursor-pointer px-4 py-3 bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white rounded-lg font-semibold hover:opacity-90 transition-all hover:shadow-lg hover:shadow-red-500/20 flex items-center gap-2"
+              >
+                <Plus className="w-5 h-5" />
+                <span className="hidden sm:inline">Add Bank Account</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {bankAccounts.map((account) => (
+                <div
+                  key={account.id}
+                  className={`rounded-2xl p-6 border transition-colors ${
+                    darkMode ? 'glass-effect' : 'bg-white border-gray-200 shadow-md'
+                  }`}
+                >
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="p-3 bg-[#FF6B6B]/10 rounded-lg">
+                      <Landmark className="w-6 h-6 text-[#FF6B6B]" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className={`font-bold text-lg transition-colors ${
+                        darkMode ? 'text-white' : 'text-gray-900'
+                      }`}>{account.name}</h3>
+                      <span className={`inline-block mt-1 px-2 py-1 rounded-full text-xs font-semibold ${
+                        account.bank === 'PMO'
+                          ? 'bg-purple-500/20 text-purple-400'
+                          : 'bg-blue-500/20 text-blue-400'
+                      }`}>{account.bank}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-3 min-h-[160px]">
+                    <div>
+                      <p className={`text-xs font-semibold uppercase tracking-wider mb-1 transition-colors ${
+                        darkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>Account Name</p>
+                      <p className={`transition-colors ${
+                        darkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>{account.accountName}</p>
+                    </div>
+                    <div>
+                      <p className={`text-xs font-semibold uppercase tracking-wider mb-1 transition-colors ${
+                        darkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>Account Number</p>
+                      <p className={`font-mono transition-colors ${
+                        darkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>{account.accountNumber}</p>
+                    </div>
+                    <div>
+                      <p className={`text-xs font-semibold uppercase tracking-wider mb-1 transition-colors ${
+                        darkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>Phone Number</p>
+                      <p className={`transition-colors ${
+                        darkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>{account.phoneNumber || '—'}</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-[#FF6B6B]/10 flex gap-2">
+                    <button
+                      onClick={() => {
+                        setArchivedBankAccounts([...archivedBankAccounts, account])
+                        setBankAccounts(bankAccounts.filter(a => a.id !== account.id))
+                      }}
+                      className="cursor-pointer flex-1 px-3 py-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span className="hidden sm:inline">Delete</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : currentPage === 'settings' ? (
+          <>
+            {/* Settings Page - Archive */}
+            <div className="mb-8">
+              <h2 className="text-3xl sm:text-4xl font-bold gradient-text mb-2">Settings</h2>
+              <p className={`transition-colors ${
+                darkMode ? 'text-gray-400' : 'text-gray-600'
+              }`}>Manage system settings and archived items</p>
+            </div>
+
+            {/* Archive Section */}
+            <div className="space-y-8">
+              <div className={`rounded-2xl p-6 border transition-colors ${
+                darkMode ? 'glass-effect-dark' : 'bg-white border-gray-200 shadow-sm'
+              }`}>
+                <div className="flex items-center gap-3 mb-6">
+                  <Archive className="w-6 h-6 text-[#FF6B6B]" />
+                  <h3 className={`text-xl font-bold transition-colors ${
+                    darkMode ? 'text-white' : 'text-gray-900'
+                  }`}>Archive</h3>
+                </div>
+
+                {/* Archived Accountants */}
+                {archivedAccountants.length > 0 && (
+                  <div className="mb-8">
+                    <h4 className={`text-lg font-semibold mb-4 transition-colors ${
+                      darkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>Archived Accountants ({archivedAccountants.length})</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {archivedAccountants.map((acc) => (
+                        <div
+                          key={acc.id}
+                          className={`rounded-lg p-4 border transition-colors ${
+                            darkMode ? 'bg-[#0F172A]/50 border-[#FF6B6B]/10' : 'bg-slate-50 border-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <h5 className={`font-bold transition-colors ${
+                                darkMode ? 'text-white' : 'text-gray-900'
+                              }`}>{acc.name}</h5>
+                              <p className={`text-sm transition-colors ${
+                                darkMode ? 'text-gray-400' : 'text-gray-600'
+                              }`}>{acc.email}</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                setAccountants([...accountants, acc])
+                                setArchivedAccountants(archivedAccountants.filter(a => a.id !== acc.id))
+                              }}
+                              className={`cursor-pointer flex-1 px-3 py-2 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
+                                darkMode
+                                  ? 'bg-[#FF6B6B]/10 hover:bg-[#FF6B6B]/20 text-[#FF8A80]'
+                                  : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
+                              }`}
+                            >
+                              <RotateCcw className="w-4 h-4" />
+                              <span>Restore</span>
+                            </button>
+                            <button
+                              onClick={() => setArchivedAccountants(archivedAccountants.filter(a => a.id !== acc.id))}
+                              className="cursor-pointer px-3 py-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 rounded-lg font-semibold text-sm transition-all"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Archived Owner Accounts */}
+                {archivedOwnerAccounts.length > 0 && (
+                  <div className="mb-8">
+                    <h4 className={`text-lg font-semibold mb-4 transition-colors ${
+                      darkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>Archived Owner Accounts ({archivedOwnerAccounts.length})</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {archivedOwnerAccounts.map((acc) => (
+                        <div
+                          key={acc.id}
+                          className={`rounded-lg p-4 border transition-colors ${
+                            darkMode ? 'bg-[#0F172A]/50 border-[#FF6B6B]/10' : 'bg-slate-50 border-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <h5 className={`font-bold transition-colors ${
+                                darkMode ? 'text-white' : 'text-gray-900'
+                              }`}>{acc.accountName}</h5>
+                              <p className={`text-sm font-mono transition-colors ${
+                                darkMode ? 'text-gray-400' : 'text-gray-600'
+                              }`}>{acc.accountNumber}</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                setOwnerAccounts([...ownerAccounts, acc])
+                                setArchivedOwnerAccounts(archivedOwnerAccounts.filter(a => a.id !== acc.id))
+                              }}
+                              className={`cursor-pointer flex-1 px-3 py-2 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
+                                darkMode
+                                  ? 'bg-[#FF6B6B]/10 hover:bg-[#FF6B6B]/20 text-[#FF8A80]'
+                                  : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
+                              }`}
+                            >
+                              <RotateCcw className="w-4 h-4" />
+                              <span>Restore</span>
+                            </button>
+                            <button
+                              onClick={() => setArchivedOwnerAccounts(archivedOwnerAccounts.filter(a => a.id !== acc.id))}
+                              className="cursor-pointer px-3 py-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 rounded-lg font-semibold text-sm transition-all"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Archived Bank Accounts */}
+                {archivedBankAccounts.length > 0 && (
+                  <div className="mb-8">
+                    <h4 className={`text-lg font-semibold mb-4 transition-colors ${
+                      darkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>Archived Bank Accounts ({archivedBankAccounts.length})</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {archivedBankAccounts.map((acc) => (
+                        <div
+                          key={acc.id}
+                          className={`rounded-lg p-4 border transition-colors ${
+                            darkMode ? 'bg-[#0F172A]/50 border-[#FF6B6B]/10' : 'bg-slate-50 border-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h5 className={`font-bold transition-colors ${
+                                  darkMode ? 'text-white' : 'text-gray-900'
+                                }`}>{acc.name}</h5>
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                  acc.bank === 'PMO'
+                                    ? 'bg-purple-500/20 text-purple-400'
+                                    : 'bg-blue-500/20 text-blue-400'
+                                }`}>{acc.bank}</span>
+                              </div>
+                              <p className={`text-sm font-mono transition-colors ${
+                                darkMode ? 'text-gray-400' : 'text-gray-600'
+                              }`}>{acc.accountNumber}</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                setBankAccounts([...bankAccounts, acc])
+                                setArchivedBankAccounts(archivedBankAccounts.filter(a => a.id !== acc.id))
+                              }}
+                              className={`cursor-pointer flex-1 px-3 py-2 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
+                                darkMode
+                                  ? 'bg-[#FF6B6B]/10 hover:bg-[#FF6B6B]/20 text-[#FF8A80]'
+                                  : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
+                              }`}
+                            >
+                              <RotateCcw className="w-4 h-4" />
+                              <span>Restore</span>
+                            </button>
+                            <button
+                              onClick={() => setArchivedBankAccounts(archivedBankAccounts.filter(a => a.id !== acc.id))}
+                              className="cursor-pointer px-3 py-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 rounded-lg font-semibold text-sm transition-all"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty State */}
+                {archivedAccountants.length === 0 && archivedOwnerAccounts.length === 0 && archivedBankAccounts.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <Archive className={`w-16 h-16 mb-4 transition-colors ${
+                      darkMode ? 'text-gray-600' : 'text-gray-400'
+                    }`} />
+                    <p className={`text-lg font-semibold transition-colors ${
+                      darkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>Archive is empty</p>
+                    <p className={`text-sm mt-1 transition-colors ${
+                      darkMode ? 'text-gray-500' : 'text-gray-500'
+                    }`}>Deleted items will appear here</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        ) : null}
         </div>
       </main>
 
       {/* Add/Edit Accountant Modal */}
       {showAddForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="glass-effect-dark rounded-2xl border w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className={`rounded-2xl border w-full max-w-lg max-h-[90vh] overflow-y-auto transition-colors shadow-2xl ${
+            darkMode ? 'glass-effect-dark' : 'bg-white border-slate-200'
+          }`}>
             {/* Modal Header */}
-            <div className="sticky top-0 border-b border-[#FF6B6B]/20 glass-effect-dark p-6 sm:p-8 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-white">
+            <div className={`sticky top-0 border-b p-6 sm:p-8 flex items-center justify-between transition-colors ${
+              darkMode ? 'glass-effect-dark border-[#FF6B6B]/20' : 'bg-white border-slate-200'
+            }`}>
+              <h2 className={`text-2xl font-bold transition-colors ${
+                darkMode ? 'text-white' : 'text-gray-900'
+              }`}>
                 {editingId ? 'Edit Accountant' : 'Add New Accountant'}
               </h2>
               <button
                 onClick={closeModal}
-                className="cursor-pointer text-gray-400 hover:text-gray-200 transition-colors"
+                className={`cursor-pointer transition-colors ${
+                  darkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-600 hover:text-gray-900'
+                }`}
               >
                 <X className="w-6 h-6" />
               </button>
@@ -390,7 +1108,9 @@ export default function AdminDashboard() {
               <form onSubmit={handleAddAccountant} className="space-y-5">
                 {/* Name Field */}
                 <div className="space-y-2">
-                  <Label htmlFor="name" className="text-gray-300 font-semibold">
+                  <Label htmlFor="name" className={`font-semibold transition-colors ${
+                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>
                     Full Name
                   </Label>
                   <Input
@@ -398,13 +1118,19 @@ export default function AdminDashboard() {
                     placeholder="John Doe"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50 h-10"
+                    className={`h-10 transition-colors ${
+                      darkMode 
+                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-slate-50 border-slate-300 text-gray-900 placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                    }`}
                   />
                 </div>
 
                 {/* Email Field */}
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-gray-300 font-semibold">
+                  <Label htmlFor="email" className={`font-semibold transition-colors ${
+                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>
                     Email
                   </Label>
                   <Input
@@ -413,13 +1139,19 @@ export default function AdminDashboard() {
                     placeholder="john@example.com"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50 h-10"
+                    className={`h-10 transition-colors ${
+                      darkMode 
+                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-slate-50 border-slate-300 text-gray-900 placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                    }`}
                   />
                 </div>
 
                 {/* Phone Field */}
                 <div className="space-y-2">
-                  <Label htmlFor="phone" className="text-gray-300 font-semibold">
+                  <Label htmlFor="phone" className={`font-semibold transition-colors ${
+                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>
                     Phone Number
                   </Label>
                   <Input
@@ -428,7 +1160,11 @@ export default function AdminDashboard() {
                     placeholder="+1 (555) 123-4567"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50 h-10"
+                    className={`h-10 transition-colors ${
+                      darkMode 
+                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-slate-50 border-slate-300 text-gray-900 placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                    }`}
                   />
                 </div>
 
@@ -439,7 +1175,11 @@ export default function AdminDashboard() {
                   <button
                     type="button"
                     onClick={closeModal}
-                    className="cursor-pointer flex-1 px-4 py-2 bg-[#0F172A]/80 border border-[#FF6B6B]/20 text-gray-300 rounded-lg font-semibold hover:border-[#FF6B6B]/50 hover:text-white transition-all"
+                    className={`cursor-pointer flex-1 px-4 py-2 border rounded-lg font-semibold transition-all ${
+                      darkMode
+                        ? 'bg-[#0F172A]/80 border-[#FF6B6B]/20 text-gray-300 hover:border-[#FF6B6B]/50 hover:text-white'
+                        : 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200 hover:border-slate-400'
+                    }`}
                   >
                     Cancel
                   </button>
@@ -457,13 +1197,294 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* Owner Account Modal */}
+      {showOwnerForm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className={`rounded-2xl border w-full max-w-lg transition-colors shadow-2xl ${
+            darkMode ? 'glass-effect-dark' : 'bg-white border-slate-200'
+          }`}>
+            <div className={`border-b p-6 flex items-center justify-between transition-colors ${
+              darkMode ? 'glass-effect-dark border-[#FF6B6B]/20' : 'bg-white border-slate-200'
+            }`}>
+              <h2 className={`text-2xl font-bold transition-colors ${
+                darkMode ? 'text-white' : 'text-gray-900'
+              }`}>Add Owner Account</h2>
+              <button
+                onClick={() => {
+                  setShowOwnerForm(false)
+                  setOwnerFormData({ accountName: '', accountNumber: '', bankDetails: '' })
+                }}
+                className={`cursor-pointer transition-colors ${
+                  darkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6">
+              <form onSubmit={(e) => {
+                e.preventDefault()
+                if (!ownerFormData.accountName || !ownerFormData.accountNumber || !ownerFormData.bankDetails) {
+                  setError('All fields are required')
+                  return
+                }
+                const newAccount: OwnerAccount = {
+                  id: Math.max(...ownerAccounts.map(a => a.id), 0) + 1,
+                  ...ownerFormData
+                }
+                setOwnerAccounts([...ownerAccounts, newAccount])
+                setOwnerFormData({ accountName: '', accountNumber: '', bankDetails: '' })
+                setShowOwnerForm(false)
+              }} className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="ownerAccountName" className={`font-semibold transition-colors ${
+                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>Account Name</Label>
+                  <Input
+                    id="ownerAccountName"
+                    placeholder="Main Owner Account"
+                    value={ownerFormData.accountName}
+                    onChange={(e) => setOwnerFormData({ ...ownerFormData, accountName: e.target.value })}
+                    className={`h-10 transition-colors ${
+                      darkMode 
+                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-slate-50 border-slate-300 text-gray-900 placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                    }`}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ownerAccountNumber" className={`font-semibold transition-colors ${
+                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>Account Number</Label>
+                  <Input
+                    id="ownerAccountNumber"
+                    placeholder="1234567890"
+                    value={ownerFormData.accountNumber}
+                    onChange={(e) => setOwnerFormData({ ...ownerFormData, accountNumber: e.target.value })}
+                    className={`h-10 transition-colors ${
+                      darkMode 
+                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-slate-50 border-slate-300 text-gray-900 placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                    }`}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ownerBankDetails" className={`font-semibold transition-colors ${
+                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>Bank Details</Label>
+                  <Input
+                    id="ownerBankDetails"
+                    placeholder="Bank of America"
+                    value={ownerFormData.bankDetails}
+                    onChange={(e) => setOwnerFormData({ ...ownerFormData, bankDetails: e.target.value })}
+                    className={`h-10 transition-colors ${
+                      darkMode 
+                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-slate-50 border-slate-300 text-gray-900 placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                    }`}
+                  />
+                </div>
+                <div className="flex gap-3 pt-6">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowOwnerForm(false)
+                      setOwnerFormData({ accountName: '', accountNumber: '', bankDetails: '' })
+                    }}
+                    className={`cursor-pointer flex-1 px-4 py-2 border rounded-lg font-semibold transition-all ${
+                      darkMode
+                        ? 'bg-[#0F172A]/80 border-[#FF6B6B]/20 text-gray-300 hover:border-[#FF6B6B]/50 hover:text-white'
+                        : 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200 hover:border-slate-400'
+                    }`}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="cursor-pointer flex-1 px-4 py-2 bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white rounded-lg font-semibold hover:opacity-90 transition-all"
+                  >
+                    Add Account
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bank Account Modal */}
+      {showBankForm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className={`rounded-2xl border w-full max-w-lg max-h-[90vh] overflow-y-auto transition-colors shadow-2xl ${
+            darkMode ? 'glass-effect-dark' : 'bg-white border-slate-200'
+          }`}>
+            <div className={`sticky top-0 border-b p-6 flex items-center justify-between transition-colors ${
+              darkMode ? 'glass-effect-dark border-[#FF6B6B]/20' : 'bg-white border-slate-200'
+            }`}>
+              <h2 className={`text-2xl font-bold transition-colors ${
+                darkMode ? 'text-white' : 'text-gray-900'
+              }`}>Add Bank Account</h2>
+              <button
+                onClick={() => {
+                  setShowBankForm(false)
+                  setBankFormData({ name: '', bank: 'normal', accountName: '', accountNumber: '', phoneNumber: '' })
+                }}
+                className={`cursor-pointer transition-colors ${
+                  darkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6">
+              <form onSubmit={(e) => {
+                e.preventDefault()
+                if (!bankFormData.name || !bankFormData.accountName || !bankFormData.accountNumber) {
+                  setError('Name, Account Name, and Account Number are required')
+                  return
+                }
+                if (bankFormData.bank === 'PMO' && !bankFormData.phoneNumber) {
+                  setError('Phone number is required for PMO accounts')
+                  return
+                }
+                const newAccount: BankAccount = {
+                  id: Math.max(...bankAccounts.map(a => a.id), 0) + 1,
+                  name: bankFormData.name,
+                  bank: bankFormData.bank,
+                  accountName: bankFormData.accountName,
+                  accountNumber: bankFormData.accountNumber,
+                  phoneNumber: bankFormData.bank === 'PMO' ? bankFormData.phoneNumber : undefined
+                }
+                setBankAccounts([...bankAccounts, newAccount])
+                setBankFormData({ name: '', bank: 'normal', accountName: '', accountNumber: '', phoneNumber: '' })
+                setShowBankForm(false)
+              }} className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="bankName" className={`font-semibold transition-colors ${
+                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>Name</Label>
+                  <Input
+                    id="bankName"
+                    placeholder="Operations Account"
+                    value={bankFormData.name}
+                    onChange={(e) => setBankFormData({ ...bankFormData, name: e.target.value })}
+                    className={`h-10 transition-colors ${
+                      darkMode 
+                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-slate-50 border-slate-300 text-gray-900 placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                    }`}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bankType" className={`font-semibold transition-colors ${
+                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>Bank Type</Label>
+                  <select
+                    id="bankType"
+                    value={bankFormData.bank}
+                    onChange={(e) => setBankFormData({ ...bankFormData, bank: e.target.value as 'normal' | 'PMO' })}
+                    className={`w-full h-10 px-3 rounded-md border transition-colors ${
+                      darkMode 
+                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-slate-50 border-slate-300 text-gray-900 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                    }`}
+                  >
+                    <option value="normal">Normal</option>
+                    <option value="PMO">PMO</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bankAccountName" className={`font-semibold transition-colors ${
+                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>Account Name</Label>
+                  <Input
+                    id="bankAccountName"
+                    placeholder="Company Operations"
+                    value={bankFormData.accountName}
+                    onChange={(e) => setBankFormData({ ...bankFormData, accountName: e.target.value })}
+                    className={`h-10 transition-colors ${
+                      darkMode 
+                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-slate-50 border-slate-300 text-gray-900 placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                    }`}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bankAccountNumber" className={`font-semibold transition-colors ${
+                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>Account Number (Unique)</Label>
+                  <Input
+                    id="bankAccountNumber"
+                    placeholder="9876543210"
+                    value={bankFormData.accountNumber}
+                    onChange={(e) => setBankFormData({ ...bankFormData, accountNumber: e.target.value })}
+                    className={`h-10 transition-colors ${
+                      darkMode 
+                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-slate-50 border-slate-300 text-gray-900 placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                    }`}
+                  />
+                </div>
+                {bankFormData.bank === 'PMO' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="bankPhoneNumber" className={`font-semibold transition-colors ${
+                      darkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>Phone Number</Label>
+                    <Input
+                      id="bankPhoneNumber"
+                      type="tel"
+                      placeholder="+1 (555) 999-8888"
+                      value={bankFormData.phoneNumber}
+                      onChange={(e) => setBankFormData({ ...bankFormData, phoneNumber: e.target.value })}
+                      className={`h-10 transition-colors ${
+                        darkMode 
+                          ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                          : 'bg-slate-50 border-slate-300 text-gray-900 placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                      }`}
+                    />
+                  </div>
+                )}
+                <div className="flex gap-3 pt-6">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowBankForm(false)
+                      setBankFormData({ name: '', bank: 'normal', accountName: '', accountNumber: '', phoneNumber: '' })
+                    }}
+                    className={`cursor-pointer flex-1 px-4 py-2 border rounded-lg font-semibold transition-all ${
+                      darkMode
+                        ? 'bg-[#0F172A]/80 border-[#FF6B6B]/20 text-gray-300 hover:border-[#FF6B6B]/50 hover:text-white'
+                        : 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200 hover:border-slate-400'
+                    }`}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="cursor-pointer flex-1 px-4 py-2 bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white rounded-lg font-semibold hover:opacity-90 transition-all"
+                  >
+                    Add Account
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Logout Confirmation Modal */}
       {showLogoutConfirm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="glass-effect-dark rounded-2xl border w-full max-w-sm">
+          <div className={`rounded-2xl border w-full max-w-sm transition-colors shadow-2xl ${
+            darkMode ? 'glass-effect-dark' : 'bg-white border-slate-200'
+          }`}>
             {/* Modal Header */}
-            <div className="border-b border-[#FF6B6B]/20 glass-effect-dark p-6 sm:p-8">
-              <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+            <div className={`border-b p-6 sm:p-8 transition-colors ${
+              darkMode ? 'glass-effect-dark border-[#FF6B6B]/20' : 'bg-white border-slate-200'
+            }`}>
+              <h2 className={`text-2xl font-bold flex items-center gap-2 transition-colors ${
+                darkMode ? 'text-white' : 'text-gray-900'
+              }`}>
                 <AlertCircle className="w-6 h-6 text-[#FF6B6B]" />
                 Confirm Logout
               </h2>
@@ -471,7 +1492,9 @@ export default function AdminDashboard() {
 
             {/* Modal Content */}
             <div className="p-6 sm:p-8">
-              <p className="text-gray-300 mb-8 leading-relaxed">
+              <p className={`mb-8 leading-relaxed transition-colors ${
+                darkMode ? 'text-gray-300' : 'text-gray-700'
+              }`}>
                 Are you sure you want to logout? You'll need to sign in again to access the dashboard.
               </p>
 
@@ -479,7 +1502,11 @@ export default function AdminDashboard() {
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowLogoutConfirm(false)}
-                  className="cursor-pointer flex-1 px-4 py-2 bg-[#0F172A]/80 border border-[#FF6B6B]/20 text-gray-300 rounded-lg font-semibold hover:border-[#FF6B6B]/50 hover:text-white transition-all"
+                  className={`cursor-pointer flex-1 px-4 py-2 border rounded-lg font-semibold transition-all ${
+                    darkMode
+                      ? 'bg-[#0F172A]/80 border-[#FF6B6B]/20 text-gray-300 hover:border-[#FF6B6B]/50 hover:text-white'
+                      : 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200 hover:border-slate-400'
+                  }`}
                 >
                   Cancel
                 </button>
