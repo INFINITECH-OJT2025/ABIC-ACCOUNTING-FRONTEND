@@ -64,7 +64,7 @@ export default function OwnersAccountUI() {
         </div>
 
         {/* NAV */}
-        <div className="hidden md:flex bg-[#6A0D25] text-sm px-6">
+        <div className="hidden md:flex bg-[#6A0D25] text-sm px-6 justify-center">
           {[
             "Owner Accounts",
             "Banks",
@@ -96,6 +96,7 @@ export default function OwnersAccountUI() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
+                <p><span className="font-medium">Bank Name:</span> ---</p>
               <p><span className="font-medium">Account Name:</span> ---</p>
               <p><span className="font-medium">Account Number:</span> ---</p>
             </CardContent>
