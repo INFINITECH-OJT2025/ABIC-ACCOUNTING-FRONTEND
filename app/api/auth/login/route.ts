@@ -40,7 +40,9 @@ export async function POST(req: Request) {
     })
 
     return res
-  } catch (err) {
-    return NextResponse.json({ success: false, message: 'Internal server error' }, { status: 500 })
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+    console.error('Login error:', errorMessage)
+    return NextResponse.json({ success: false, message: 'Network error. Please try again.' }, { status: 500 })
   }
 }
