@@ -47,7 +47,7 @@ export default function LoginPage() {
         const role = data.user?.role
         setTimeout(() => {
           if (role === 'super_admin') {
-            router.push('/admin')
+            router.push('/super-admin')
           } else if (role === 'accountant') {
             router.push('/accountant')
           } else {

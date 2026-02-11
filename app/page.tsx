@@ -15,7 +15,7 @@ export default function Home() {
         if (res.ok && data.success) {
           const role = data.user?.role
           if (role === 'super_admin') {
-            router.push('/admin')
+            router.push('/super-admin')
           } else if (role === 'accountant') {
             router.push('/accountant')
           } else {

@@ -18,7 +18,7 @@ export function proxy(request: NextRequest) {
   }
 
   // Admin routes - only super_admin
-  if (pathname.startsWith('/admin')) {
+  if (pathname.startsWith('/super-admin')) {
     if (role !== 'super_admin') {
       return NextResponse.redirect(new URL('/accountant', request.url))
     }
@@ -36,5 +36,5 @@ export function proxy(request: NextRequest) {
 
 // Specify which routes the proxy applies to
 export const config = {
-  matcher: ['/', '/admin/:path*', '/accountant/:path*'],
+  matcher: ['/', '/super-admin/:path*', '/accountant/:path*'],
 }
