@@ -45,6 +45,10 @@ export default function AdminDashboard() {
   ])
   const [submitting, setSubmitting] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [showDeleteAccountantConfirm, setShowDeleteAccountantConfirm] = useState(false)
+  const [showDeleteOwnerConfirm, setShowDeleteOwnerConfirm] = useState(false)
+  const [showDeleteBankConfirm, setShowDeleteBankConfirm] = useState(false)
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null)
   const [formData, setFormData] = useState({ name: '', email: '', phone: '' })
   const [editingId, setEditingId] = useState<number | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -143,6 +147,28 @@ export default function AdminDashboard() {
     if (accountant) {
       setArchivedAccountants([...archivedAccountants, accountant])
       setAccountants(accountants.filter(acc => acc.id !== id))
+      setShowDeleteAccountantConfirm(false)
+      setDeleteTargetId(null)
+    }
+  }
+
+  const handleDeleteOwnerAccount = (id: number) => {
+    const account = ownerAccounts.find(acc => acc.id === id)
+    if (account) {
+      setArchivedOwnerAccounts([...archivedOwnerAccounts, account])
+      setOwnerAccounts(ownerAccounts.filter(a => a.id !== id))
+      setShowDeleteOwnerConfirm(false)
+      setDeleteTargetId(null)
+    }
+  }
+
+  const handleDeleteBankAccount = (id: number) => {
+    const account = bankAccounts.find(acc => acc.id === id)
+    if (account) {
+      setArchivedBankAccounts([...archivedBankAccounts, account])
+      setBankAccounts(bankAccounts.filter(a => a.id !== id))
+      setShowDeleteBankConfirm(false)
+      setDeleteTargetId(null)
     }
   }
 
@@ -196,7 +222,7 @@ export default function AdminDashboard() {
     <div className={`min-h-screen overflow-hidden transition-colors duration-300 ${
       darkMode 
         ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-black' 
-        : 'bg-gradient-to-br from-slate-50 via-white to-blue-50'
+        : 'bg-gradient-to-br from-red-50 via-white to-red-100'
     }`}>
       <style>{`
         @keyframes float1 {
@@ -245,13 +271,13 @@ export default function AdminDashboard() {
       {/* Animated Orbs Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className={`orb-1 absolute top-20 -right-40 w-80 h-80 rounded-full mix-blend-multiply filter blur-3xl transition-all duration-300 ${
-          darkMode ? 'bg-red-600 opacity-20' : 'bg-red-300 opacity-10'
+          darkMode ? 'bg-red-600 opacity-20' : 'bg-red-900 opacity-15'
         }`}></div>
         <div className={`orb-2 absolute -bottom-20 -left-40 w-80 h-80 rounded-full mix-blend-multiply filter blur-3xl transition-all duration-300 ${
-          darkMode ? 'bg-red-900 opacity-20' : 'bg-pink-300 opacity-10'
+          darkMode ? 'bg-red-900 opacity-20' : 'bg-red-800 opacity-15'
         }`}></div>
         <div className={`orb-3 absolute top-1/2 left-1/2 w-96 h-96 rounded-full mix-blend-multiply filter blur-3xl transition-all duration-300 ${
-          darkMode ? 'bg-gray-700 opacity-10' : 'bg-gray-200 opacity-15'
+          darkMode ? 'bg-gray-700 opacity-10' : 'bg-red-950 opacity-10'
         }`}></div>
       </div>
 
@@ -264,11 +290,11 @@ export default function AdminDashboard() {
         <div className={`h-full border-r flex flex-col transition-colors ${
           darkMode 
             ? 'glass-effect-dark border-[#FF6B6B]/20' 
-            : 'bg-white border-gray-200 shadow-xl'
+            : 'bg-white border-red-200 shadow-xl'
         }`}>
           {/* Sidebar Header */}
           <div className={`p-6 border-b transition-colors ${
-            darkMode ? 'border-[#FF6B6B]/20' : 'border-slate-200'
+            darkMode ? 'border-[#FF6B6B]/20' : 'border-red-200'
           }`}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -276,16 +302,16 @@ export default function AdminDashboard() {
                   <Logo animated={false} className="w-6 h-6" />
                 </div>
                 <div>
-                  <h1 className={`text-lg font-bold transition-colors ${darkMode ? 'text-white' : 'text-gray-900'}`}>Super Admin</h1>
+                  <h1 className={`text-lg font-bold transition-colors ${darkMode ? 'text-white' : 'text-red-950'}`}>Super Admin</h1>
                   {user && (
-                    <p className={`text-xs transition-colors ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{user.email}</p>
+                    <p className={`text-xs transition-colors ${darkMode ? 'text-gray-400' : 'text-red-800'}`}>{user.email}</p>
                   )}
                 </div>
               </div>
               <button
                 onClick={() => setSidebarOpen(false)}
                 className={`cursor-pointer transition-colors p-2 hover:bg-[#FF6B6B]/10 rounded-lg ${
-                  darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'
+                  darkMode ? 'text-gray-400 hover:text-white' : 'text-red-900 hover:text-red-950'
                 }`}
               >
                 <ChevronLeft className="w-5 h-5" />
@@ -299,7 +325,7 @@ export default function AdminDashboard() {
                 className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all ${
                   darkMode
                     ? 'bg-[#FF6B6B]/10 text-[#FF8A80] hover:bg-[#FF6B6B]/20'
-                    : 'bg-gradient-to-r from-slate-100 to-blue-100 text-slate-700 hover:from-slate-200 hover:to-blue-200'
+                    : 'bg-red-900 text-red-50 hover:bg-red-800'
                 }`}
               >
                 {darkMode ? (
@@ -319,7 +345,7 @@ export default function AdminDashboard() {
 
           {/* Sidebar Navigation */}
           <div className={`p-4 border-b transition-colors ${
-            darkMode ? 'border-[#FF6B6B]/20' : 'border-slate-200'
+            darkMode ? 'border-[#FF6B6B]/20' : 'border-red-200'
           }`}>
             <nav className="space-y-2">
               <button
@@ -328,10 +354,10 @@ export default function AdminDashboard() {
                   currentPage === 'accountants'
                     ? darkMode
                       ? 'bg-[#FF6B6B]/20 text-[#FF8A80]'
-                      : 'bg-gradient-to-r from-slate-200 to-blue-200 text-slate-800'
+                      : 'bg-red-900 text-red-50'
                     : darkMode
                       ? 'text-gray-400 hover:bg-[#FF6B6B]/10 hover:text-[#FF8A80]'
-                      : 'text-slate-600 hover:bg-slate-100'
+                      : 'text-red-900 hover:bg-red-100 hover:text-red-950'
                 }`}
               >
                 <Users className="w-5 h-5" />
@@ -343,10 +369,10 @@ export default function AdminDashboard() {
                   currentPage === 'assign-roles'
                     ? darkMode
                       ? 'bg-[#FF6B6B]/20 text-[#FF8A80]'
-                      : 'bg-gradient-to-r from-slate-200 to-blue-200 text-slate-800'
+                      : 'bg-red-900 text-red-50'
                     : darkMode
                       ? 'text-gray-400 hover:bg-[#FF6B6B]/10 hover:text-[#FF8A80]'
-                      : 'text-slate-600 hover:bg-slate-100'
+                      : 'text-red-900 hover:bg-red-100 hover:text-red-950'
                 }`}
               >
                 <Shield className="w-5 h-5" />
@@ -358,10 +384,10 @@ export default function AdminDashboard() {
                   currentPage === 'owner-accounts'
                     ? darkMode
                       ? 'bg-[#FF6B6B]/20 text-[#FF8A80]'
-                      : 'bg-gradient-to-r from-slate-200 to-blue-200 text-slate-800'
+                      : 'bg-red-900 text-red-50'
                     : darkMode
                       ? 'text-gray-400 hover:bg-[#FF6B6B]/10 hover:text-[#FF8A80]'
-                      : 'text-slate-600 hover:bg-slate-100'
+                      : 'text-red-900 hover:bg-red-100 hover:text-red-950'
                 }`}
               >
                 <UserCircle className="w-5 h-5" />
@@ -373,10 +399,10 @@ export default function AdminDashboard() {
                   currentPage === 'bank-accounts'
                     ? darkMode
                       ? 'bg-[#FF6B6B]/20 text-[#FF8A80]'
-                      : 'bg-gradient-to-r from-slate-200 to-blue-200 text-slate-800'
+                      : 'bg-red-900 text-red-50'
                     : darkMode
                       ? 'text-gray-400 hover:bg-[#FF6B6B]/10 hover:text-[#FF8A80]'
-                      : 'text-slate-600 hover:bg-slate-100'
+                      : 'text-red-900 hover:bg-red-100 hover:text-red-950'
                 }`}
               >
                 <Landmark className="w-5 h-5" />
@@ -388,10 +414,10 @@ export default function AdminDashboard() {
                   currentPage === 'settings'
                     ? darkMode
                       ? 'bg-[#FF6B6B]/20 text-[#FF8A80]'
-                      : 'bg-gradient-to-r from-slate-200 to-blue-200 text-slate-800'
+                      : 'bg-red-900 text-red-50'
                     : darkMode
                       ? 'text-gray-400 hover:bg-[#FF6B6B]/10 hover:text-[#FF8A80]'
-                      : 'text-slate-600 hover:bg-slate-100'
+                      : 'text-red-900 hover:bg-red-100 hover:text-red-950'
                 }`}
               >
                 <Settings className="w-5 h-5" />
@@ -406,14 +432,14 @@ export default function AdminDashboard() {
 
           {/* Sidebar Footer */}
           <div className={`p-6 border-t transition-colors ${
-            darkMode ? 'border-[#FF6B6B]/20' : 'border-slate-200'
+            darkMode ? 'border-[#FF6B6B]/20' : 'border-red-200'
           }`}>
             <button
               onClick={() => setShowLogoutConfirm(true)}
               className={`cursor-pointer w-full px-4 py-3 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
                 darkMode
                   ? 'bg-red-900/20 hover:bg-red-900/40 text-red-400'
-                  : 'bg-red-50 hover:bg-red-100 text-red-600'
+                  : 'bg-red-50 hover:bg-red-100 text-red-900'
               }`}
             >
               <LogOut className="w-4 h-4" />
@@ -435,7 +461,11 @@ export default function AdminDashboard() {
       {!sidebarOpen && (
         <button
           onClick={() => setSidebarOpen(true)}
-          className="cursor-pointer fixed top-6 left-6 z-50 p-3 bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white rounded-xl shadow-2xl hover:opacity-90 hover:scale-105 transition-all"
+          className={`cursor-pointer fixed top-6 left-6 z-50 p-3 rounded-xl shadow-2xl hover:scale-105 transition-all ${
+            darkMode
+              ? 'bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white hover:opacity-90'
+              : 'bg-red-900 hover:bg-red-800 text-red-50'
+          }`}
         >
           <Menu className="w-6 h-6" />
         </button>
@@ -459,7 +489,7 @@ export default function AdminDashboard() {
             <div className="flex-1">
               <h3 className="text-[#FF8A80] font-semibold">Error</h3>
               <p className={`text-sm transition-colors ${
-                darkMode ? 'text-gray-300' : 'text-gray-700'
+                darkMode ? 'text-gray-300' : 'text-red-900'
               }`}>{error}</p>
             </div>
             <button
@@ -476,9 +506,11 @@ export default function AdminDashboard() {
           <>
             {/* Page Header */}
             <div className="mb-8">
-              <h2 className="text-3xl sm:text-4xl font-bold gradient-text mb-2">Accountants</h2>
+              <h2 className={`text-3xl sm:text-4xl font-bold mb-2 transition-colors ${
+                darkMode ? 'gradient-text' : 'text-red-900'
+              }`}>Accountants</h2>
               <p className={`transition-colors ${
-                darkMode ? 'text-gray-400' : 'text-gray-600'
+                darkMode ? 'text-gray-400' : 'text-red-900'
               }`}>Manage your team members and their access</p>
             </div>
 
@@ -486,16 +518,16 @@ export default function AdminDashboard() {
             <div>
           {accountants.length === 0 ? (
             <div className={`rounded-2xl p-12 border flex flex-col items-center justify-center transition-colors ${
-              darkMode ? 'glass-effect-dark' : 'bg-white border-gray-200 shadow-sm'
+              darkMode ? 'glass-effect-dark' : 'bg-white border-red-200 shadow-sm'
             }`}>
               <Users className={`w-16 h-16 mb-4 transition-colors ${
-                darkMode ? 'text-gray-600' : 'text-gray-400'
+                darkMode ? 'text-gray-600' : 'text-red-300'
               }`} />
               <p className={`text-lg font-semibold transition-colors ${
-                darkMode ? 'text-gray-300' : 'text-gray-700'
+                darkMode ? 'text-gray-300' : 'text-red-900'
               }`}>No accountants yet</p>
               <p className={`text-sm mt-1 transition-colors ${
-                darkMode ? 'text-gray-500' : 'text-gray-500'
+                darkMode ? 'text-gray-500' : 'text-red-800'
               }`}>Add your first accountant using the sidebar</p>
             </div>
           ) : (
@@ -504,7 +536,7 @@ export default function AdminDashboard() {
                   <div
                     key={acc.id}
                     className={`rounded-2xl p-6 border card-hover group relative overflow-hidden transition-colors ${
-                      darkMode ? 'glass-effect' : 'bg-white border-gray-200 shadow-md hover:shadow-xl'
+                      darkMode ? 'glass-effect' : 'bg-white border-red-200 shadow-md hover:shadow-xl'
                     }`}
                   >
                     {/* Gradient overlay on hover */}
@@ -515,9 +547,11 @@ export default function AdminDashboard() {
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex-1">
                           <h4 className={`text-lg font-bold transition-colors ${
-                            darkMode ? 'text-white' : 'text-gray-900'
+                            darkMode ? 'text-white' : 'text-red-950'
                           }`}>{acc.name}</h4>
-                          <span className="inline-block mt-2 px-3 py-1 bg-[#FF6B6B]/20 text-[#FF8A80] rounded-full text-xs font-semibold capitalize">
+                          <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-semibold capitalize transition-colors ${
+                            darkMode ? 'bg-[#FF6B6B]/20 text-[#FF8A80]' : 'bg-red-900/20 text-red-900'
+                          }`}>
                             {acc.role}
                           </span>
                         </div>
@@ -526,7 +560,7 @@ export default function AdminDashboard() {
                       {/* Info */}
                       <div className="space-y-3 mb-6">
                         <div className={`flex items-center gap-3 transition-colors ${
-                          darkMode ? 'text-gray-300' : 'text-gray-600'
+                          darkMode ? 'text-gray-300' : 'text-red-950'
                         }`}>
                           <Mail className="w-4 h-4 text-[#FF6B6B] flex-shrink-0" />
                           <a href={`mailto:${acc.email}`} className="text-sm hover:text-[#FF8A80] transition-colors break-all">
@@ -534,7 +568,7 @@ export default function AdminDashboard() {
                           </a>
                         </div>
                         <div className={`flex items-center gap-3 transition-colors ${
-                          darkMode ? 'text-gray-300' : 'text-gray-600'
+                          darkMode ? 'text-gray-300' : 'text-red-950'
                         }`}>
                           <Phone className="w-4 h-4 text-[#FF6B6B] flex-shrink-0" />
                           <a href={`tel:${acc.phone}`} className="text-sm hover:text-[#FF8A80] transition-colors">
@@ -547,14 +581,25 @@ export default function AdminDashboard() {
                       <div className="flex gap-2 pt-4 border-t border-[#FF6B6B]/10">
                         <button
                           onClick={() => handleEditAccountant(acc)}
-                          className="cursor-pointer flex-1 px-3 py-2 bg-[#FF6B6B]/10 hover:bg-[#FF6B6B]/20 text-[#FF8A80] rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2"
+                          className={`cursor-pointer flex-1 px-3 py-2 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
+                            darkMode
+                              ? 'bg-[#FF6B6B]/10 hover:bg-[#FF6B6B]/20 text-[#FF8A80]'
+                              : 'bg-red-900/10 hover:bg-red-900/20 text-red-900'
+                          }`}
                         >
                           <Edit2 className="w-4 h-4" />
                           <span className="hidden sm:inline">Edit</span>
                         </button>
                         <button
-                          onClick={() => handleDeleteAccountant(acc.id)}
-                          className="cursor-pointer flex-1 px-3 py-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2"
+                          onClick={() => {
+                            setDeleteTargetId(acc.id)
+                            setShowDeleteAccountantConfirm(true)
+                          }}
+                          className={`cursor-pointer flex-1 px-3 py-2 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
+                            darkMode
+                              ? 'bg-red-900/20 hover:bg-red-900/40 text-red-400'
+                              : 'bg-red-900/10 hover:bg-red-900/20 text-red-900'
+                          }`}
                         >
                           <Trash2 className="w-4 h-4" />
                           <span className="hidden sm:inline">Delete</span>
@@ -571,19 +616,21 @@ export default function AdminDashboard() {
           <>
             {/* Assign Roles Page */}
             <div className="mb-8">
-              <h2 className="text-3xl sm:text-4xl font-bold gradient-text mb-2">Assign Bank Access</h2>
+              <h2 className={`text-3xl sm:text-4xl font-bold mb-2 transition-colors ${
+                darkMode ? 'gradient-text' : 'text-red-900'
+              }`}>Assign Bank Access</h2>
               <p className={`transition-colors ${
-                darkMode ? 'text-gray-400' : 'text-gray-600'
+                darkMode ? 'text-gray-400' : 'text-red-900'
               }`}>Manage which banks each accountant can access</p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Accountants List */}
               <div className={`rounded-2xl p-6 border transition-colors ${
-                darkMode ? 'glass-effect-dark' : 'bg-white border-gray-200 shadow-sm'
+                darkMode ? 'glass-effect-dark' : 'bg-white border-red-200 shadow-sm'
               }`}>
                 <h3 className={`text-lg font-bold mb-4 transition-colors ${
-                  darkMode ? 'text-white' : 'text-gray-900'
+                  darkMode ? 'text-white' : 'text-red-950'
                 }`}>Select Accountant</h3>
                 <div className="space-y-2">
                   {accountants.map((acc) => (
@@ -594,10 +641,10 @@ export default function AdminDashboard() {
                         selectedAccountantId === acc.id
                           ? darkMode
                             ? 'bg-[#FF6B6B]/20 text-[#FF8A80] border-2 border-[#FF6B6B]/50'
-                            : 'bg-gradient-to-r from-slate-200 to-blue-200 text-slate-800 border-2 border-slate-400'
+                            : 'bg-red-900 text-red-50 border-2 border-red-700'
                           : darkMode
                             ? 'bg-[#0F172A]/50 text-gray-300 hover:bg-[#0F172A]/80 border border-[#FF6B6B]/10'
-                            : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200'
+                            : 'bg-red-50 text-red-900 hover:bg-red-100 border border-red-200'
                       }`}
                     >
                       <div className="flex items-center gap-2">
@@ -611,18 +658,18 @@ export default function AdminDashboard() {
 
               {/* Bank Access */}
               <div className={`lg:col-span-2 rounded-2xl p-6 border transition-colors ${
-                darkMode ? 'glass-effect-dark' : 'bg-white border-gray-200 shadow-sm'
+                darkMode ? 'glass-effect-dark' : 'bg-white border-red-200 shadow-sm'
               }`}>
                 {selectedAccountantId ? (
                   <>
                     <div className="mb-6">
                       <h3 className={`text-lg font-bold mb-2 transition-colors ${
-                        darkMode ? 'text-white' : 'text-gray-900'
+                        darkMode ? 'text-white' : 'text-red-950'
                       }`}>
                         Bank Access for {accountants.find(a => a.id === selectedAccountantId)?.name}
                       </h3>
                       <p className={`text-sm transition-colors ${
-                        darkMode ? 'text-gray-400' : 'text-gray-600'
+                        darkMode ? 'text-gray-400' : 'text-red-800'
                       }`}>Select which banks this accountant can access</p>
                     </div>
 
@@ -650,10 +697,10 @@ export default function AdminDashboard() {
                               hasAccess
                                 ? darkMode
                                   ? 'bg-[#FF6B6B]/10 border-[#FF6B6B] hover:bg-[#FF6B6B]/20'
-                                  : 'bg-gradient-to-br from-blue-50 to-slate-50 border-blue-400 hover:border-blue-500'
+                                  : 'bg-red-100 border-red-800 hover:border-red-900'
                                 : darkMode
                                   ? 'bg-[#0F172A]/30 border-[#FF6B6B]/20 hover:border-[#FF6B6B]/40'
-                                  : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                                  : 'bg-red-50 border-red-200 hover:border-red-300'
                             }`}
                           >
                             <div className="flex items-start gap-3">
@@ -674,11 +721,11 @@ export default function AdminDashboard() {
                                 <div className="flex items-center gap-2 mb-1">
                                   <Building2 className="w-5 h-5 text-[#FF6B6B]" />
                                   <h4 className={`font-bold transition-colors ${
-                                    darkMode ? 'text-white' : 'text-gray-900'
+                                    darkMode ? 'text-white' : 'text-red-950'
                                   }`}>Bank {bankId}</h4>
                                 </div>
                                 <p className={`text-xs transition-colors ${
-                                  darkMode ? 'text-gray-400' : 'text-gray-600'
+                                  darkMode ? 'text-gray-400' : 'text-red-800'
                                 }`}>
                                   {hasAccess ? 'Access granted' : 'No access'}
                                 </p>
@@ -690,10 +737,10 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className={`mt-6 p-4 rounded-lg transition-colors ${
-                      darkMode ? 'bg-[#0F172A]/50 border border-[#FF6B6B]/10' : 'bg-gradient-to-br from-slate-50 to-blue-50 border border-slate-200'
+                      darkMode ? 'bg-[#0F172A]/50 border border-[#FF6B6B]/10' : 'bg-red-50 border border-red-200'
                     }`}>
                       <p className={`text-sm transition-colors ${
-                        darkMode ? 'text-gray-300' : 'text-gray-700'
+                        darkMode ? 'text-gray-300' : 'text-red-900'
                       }`}>
                         <span className="font-bold text-[#FF8A80]">
                           {bankAccess[selectedAccountantId]?.length || 0}
@@ -704,13 +751,13 @@ export default function AdminDashboard() {
                 ) : (
                   <div className="flex flex-col items-center justify-center py-12">
                     <Shield className={`w-16 h-16 mb-4 transition-colors ${
-                      darkMode ? 'text-gray-600' : 'text-gray-400'
+                      darkMode ? 'text-gray-600' : 'text-red-300'
                     }`} />
                     <p className={`text-lg font-semibold transition-colors ${
-                      darkMode ? 'text-gray-300' : 'text-gray-700'
+                      darkMode ? 'text-gray-300' : 'text-red-900'
                     }`}>Select an accountant</p>
                     <p className={`text-sm mt-1 transition-colors ${
-                      darkMode ? 'text-gray-500' : 'text-gray-500'
+                      darkMode ? 'text-gray-500' : 'text-red-800'
                     }`}>Choose an accountant to manage their bank access</p>
                   </div>
                 )}
@@ -722,14 +769,20 @@ export default function AdminDashboard() {
             {/* Owner Accounts Page */}
             <div className="mb-8 flex items-center justify-between">
               <div>
-                <h2 className="text-3xl sm:text-4xl font-bold gradient-text mb-2">Owner Accounts</h2>
+                <h2 className={`text-3xl sm:text-4xl font-bold mb-2 transition-colors ${
+                  darkMode ? 'gradient-text' : 'text-red-900'
+                }`}>Owner Accounts</h2>
                 <p className={`transition-colors ${
-                  darkMode ? 'text-gray-400' : 'text-gray-600'
+                  darkMode ? 'text-gray-400' : 'text-red-900'
                 }`}>Manage owner account information</p>
               </div>
               <button
                 onClick={() => setShowOwnerForm(true)}
-                className="cursor-pointer px-4 py-3 bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white rounded-lg font-semibold hover:opacity-90 transition-all hover:shadow-lg hover:shadow-red-500/20 flex items-center gap-2"
+                className={`cursor-pointer px-4 py-3 rounded-lg font-semibold transition-all hover:shadow-lg flex items-center gap-2 ${
+                  darkMode
+                    ? 'bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white hover:opacity-90 hover:shadow-red-500/20'
+                    : 'bg-red-900 hover:bg-red-800 text-red-50'
+                }`}
               >
                 <Plus className="w-5 h-5" />
                 <span className="hidden sm:inline">Add Owner Account</span>
@@ -750,35 +803,39 @@ export default function AdminDashboard() {
                     </div>
                     <div className="flex-1">
                       <h3 className={`font-bold text-lg transition-colors ${
-                        darkMode ? 'text-white' : 'text-gray-900'
+                        darkMode ? 'text-white' : 'text-red-950'
                       }`}>{account.accountName}</h3>
                     </div>
                   </div>
                   <div className="space-y-3">
                     <div>
                       <p className={`text-xs font-semibold uppercase tracking-wider mb-1 transition-colors ${
-                        darkMode ? 'text-gray-400' : 'text-gray-600'
+                        darkMode ? 'text-gray-400' : 'text-red-800'
                       }`}>Account Number</p>
                       <p className={`font-mono transition-colors ${
-                        darkMode ? 'text-gray-300' : 'text-gray-700'
+                        darkMode ? 'text-gray-300' : 'text-red-900'
                       }`}>{account.accountNumber}</p>
                     </div>
                     <div>
                       <p className={`text-xs font-semibold uppercase tracking-wider mb-1 transition-colors ${
-                        darkMode ? 'text-gray-400' : 'text-gray-600'
+                        darkMode ? 'text-gray-400' : 'text-red-800'
                       }`}>Bank Details</p>
                       <p className={`transition-colors ${
-                        darkMode ? 'text-gray-300' : 'text-gray-700'
+                        darkMode ? 'text-gray-300' : 'text-red-900'
                       }`}>{account.bankDetails}</p>
                     </div>
                   </div>
                   <div className="mt-4 pt-4 border-t border-[#FF6B6B]/10 flex gap-2">
                     <button
                       onClick={() => {
-                        setArchivedOwnerAccounts([...archivedOwnerAccounts, account])
-                        setOwnerAccounts(ownerAccounts.filter(a => a.id !== account.id))
+                        setDeleteTargetId(account.id)
+                        setShowDeleteOwnerConfirm(true)
                       }}
-                      className="cursor-pointer flex-1 px-3 py-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2"
+                      className={`cursor-pointer flex-1 px-3 py-2 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
+                        darkMode
+                          ? 'bg-red-900/20 hover:bg-red-900/40 text-red-400'
+                          : 'bg-red-900/10 hover:bg-red-900/20 text-red-900'
+                      }`}
                     >
                       <Trash2 className="w-4 h-4" />
                       <span className="hidden sm:inline">Delete</span>
@@ -793,14 +850,20 @@ export default function AdminDashboard() {
             {/* Bank Accounts Page */}
             <div className="mb-8 flex items-center justify-between">
               <div>
-                <h2 className="text-3xl sm:text-4xl font-bold gradient-text mb-2">Bank Accounts</h2>
+                <h2 className={`text-3xl sm:text-4xl font-bold mb-2 transition-colors ${
+                  darkMode ? 'gradient-text' : 'text-red-900'
+                }`}>Bank Accounts</h2>
                 <p className={`transition-colors ${
-                  darkMode ? 'text-gray-400' : 'text-gray-600'
+                  darkMode ? 'text-gray-400' : 'text-red-900'
                 }`}>Manage bank account information</p>
               </div>
               <button
                 onClick={() => setShowBankForm(true)}
-                className="cursor-pointer px-4 py-3 bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white rounded-lg font-semibold hover:opacity-90 transition-all hover:shadow-lg hover:shadow-red-500/20 flex items-center gap-2"
+                className={`cursor-pointer px-4 py-3 rounded-lg font-semibold transition-all hover:shadow-lg flex items-center gap-2 ${
+                  darkMode
+                    ? 'bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white hover:opacity-90 hover:shadow-red-500/20'
+                    : 'bg-red-900 hover:bg-red-800 text-red-50'
+                }`}
               >
                 <Plus className="w-5 h-5" />
                 <span className="hidden sm:inline">Add Bank Account</span>
@@ -812,7 +875,7 @@ export default function AdminDashboard() {
                 <div
                   key={account.id}
                   className={`rounded-2xl p-6 border transition-colors ${
-                    darkMode ? 'glass-effect' : 'bg-white border-gray-200 shadow-md'
+                    darkMode ? 'glass-effect' : 'bg-white border-red-200 shadow-md'
                   }`}
                 >
                   <div className="flex items-start gap-3 mb-4">
@@ -821,48 +884,54 @@ export default function AdminDashboard() {
                     </div>
                     <div className="flex-1">
                       <h3 className={`font-bold text-lg transition-colors ${
-                        darkMode ? 'text-white' : 'text-gray-900'
+                        darkMode ? 'text-white' : 'text-red-950'
                       }`}>{account.name}</h3>
                       <span className={`inline-block mt-1 px-2 py-1 rounded-full text-xs font-semibold ${
                         account.bank === 'PMO'
                           ? 'bg-purple-500/20 text-purple-400'
-                          : 'bg-blue-500/20 text-blue-400'
+                          : darkMode
+                            ? 'bg-blue-500/20 text-blue-400'
+                            : 'bg-red-800 text-red-50'
                       }`}>{account.bank}</span>
                     </div>
                   </div>
                   <div className="space-y-3 min-h-[160px]">
                     <div>
                       <p className={`text-xs font-semibold uppercase tracking-wider mb-1 transition-colors ${
-                        darkMode ? 'text-gray-400' : 'text-gray-600'
+                        darkMode ? 'text-gray-400' : 'text-red-800'
                       }`}>Account Name</p>
                       <p className={`transition-colors ${
-                        darkMode ? 'text-gray-300' : 'text-gray-700'
+                        darkMode ? 'text-gray-300' : 'text-red-900'
                       }`}>{account.accountName}</p>
                     </div>
                     <div>
                       <p className={`text-xs font-semibold uppercase tracking-wider mb-1 transition-colors ${
-                        darkMode ? 'text-gray-400' : 'text-gray-600'
+                        darkMode ? 'text-gray-400' : 'text-red-800'
                       }`}>Account Number</p>
                       <p className={`font-mono transition-colors ${
-                        darkMode ? 'text-gray-300' : 'text-gray-700'
+                        darkMode ? 'text-gray-300' : 'text-red-900'
                       }`}>{account.accountNumber}</p>
                     </div>
                     <div>
                       <p className={`text-xs font-semibold uppercase tracking-wider mb-1 transition-colors ${
-                        darkMode ? 'text-gray-400' : 'text-gray-600'
+                        darkMode ? 'text-gray-400' : 'text-red-800'
                       }`}>Phone Number</p>
                       <p className={`transition-colors ${
-                        darkMode ? 'text-gray-300' : 'text-gray-700'
+                        darkMode ? 'text-gray-300' : 'text-red-900'
                       }`}>{account.phoneNumber || '—'}</p>
                     </div>
                   </div>
                   <div className="mt-4 pt-4 border-t border-[#FF6B6B]/10 flex gap-2">
                     <button
                       onClick={() => {
-                        setArchivedBankAccounts([...archivedBankAccounts, account])
-                        setBankAccounts(bankAccounts.filter(a => a.id !== account.id))
+                        setDeleteTargetId(account.id)
+                        setShowDeleteBankConfirm(true)
                       }}
-                      className="cursor-pointer flex-1 px-3 py-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2"
+                      className={`cursor-pointer flex-1 px-3 py-2 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
+                        darkMode
+                          ? 'bg-red-900/20 hover:bg-red-900/40 text-red-400'
+                          : 'bg-red-900/10 hover:bg-red-900/20 text-red-900'
+                      }`}
                     >
                       <Trash2 className="w-4 h-4" />
                       <span className="hidden sm:inline">Delete</span>
@@ -876,21 +945,23 @@ export default function AdminDashboard() {
           <>
             {/* Settings Page - Archive */}
             <div className="mb-8">
-              <h2 className="text-3xl sm:text-4xl font-bold gradient-text mb-2">Settings</h2>
+              <h2 className={`text-3xl sm:text-4xl font-bold mb-2 transition-colors ${
+                darkMode ? 'gradient-text' : 'text-red-900'
+              }`}>Settings</h2>
               <p className={`transition-colors ${
-                darkMode ? 'text-gray-400' : 'text-gray-600'
+                darkMode ? 'text-gray-400' : 'text-red-900'
               }`}>Manage system settings and archived items</p>
             </div>
 
             {/* Archive Section */}
             <div className="space-y-8">
               <div className={`rounded-2xl p-6 border transition-colors ${
-                darkMode ? 'glass-effect-dark' : 'bg-white border-gray-200 shadow-sm'
+                darkMode ? 'glass-effect-dark' : 'bg-white border-red-200 shadow-sm'
               }`}>
                 <div className="flex items-center gap-3 mb-6">
                   <Archive className="w-6 h-6 text-[#FF6B6B]" />
                   <h3 className={`text-xl font-bold transition-colors ${
-                    darkMode ? 'text-white' : 'text-gray-900'
+                    darkMode ? 'text-white' : 'text-red-950'
                   }`}>Archive</h3>
                 </div>
 
@@ -898,23 +969,23 @@ export default function AdminDashboard() {
                 {archivedAccountants.length > 0 && (
                   <div className="mb-8">
                     <h4 className={`text-lg font-semibold mb-4 transition-colors ${
-                      darkMode ? 'text-gray-300' : 'text-gray-700'
+                      darkMode ? 'text-gray-300' : 'text-red-900'
                     }`}>Archived Accountants ({archivedAccountants.length})</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {archivedAccountants.map((acc) => (
                         <div
                           key={acc.id}
                           className={`rounded-lg p-4 border transition-colors ${
-                            darkMode ? 'bg-[#0F172A]/50 border-[#FF6B6B]/10' : 'bg-slate-50 border-slate-200'
+                            darkMode ? 'bg-[#0F172A]/50 border-[#FF6B6B]/10' : 'bg-red-50 border-red-200'
                           }`}
                         >
                           <div className="flex items-start justify-between mb-3">
                             <div>
                               <h5 className={`font-bold transition-colors ${
-                                darkMode ? 'text-white' : 'text-gray-900'
+                                darkMode ? 'text-white' : 'text-red-950'
                               }`}>{acc.name}</h5>
                               <p className={`text-sm transition-colors ${
-                                darkMode ? 'text-gray-400' : 'text-gray-600'
+                                darkMode ? 'text-gray-400' : 'text-red-900'
                               }`}>{acc.email}</p>
                             </div>
                           </div>
@@ -927,7 +998,7 @@ export default function AdminDashboard() {
                               className={`cursor-pointer flex-1 px-3 py-2 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
                                 darkMode
                                   ? 'bg-[#FF6B6B]/10 hover:bg-[#FF6B6B]/20 text-[#FF8A80]'
-                                  : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
+                                  : 'bg-red-900 hover:bg-red-800 text-red-50'
                               }`}
                             >
                               <RotateCcw className="w-4 h-4" />
@@ -935,7 +1006,11 @@ export default function AdminDashboard() {
                             </button>
                             <button
                               onClick={() => setArchivedAccountants(archivedAccountants.filter(a => a.id !== acc.id))}
-                              className="cursor-pointer px-3 py-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 rounded-lg font-semibold text-sm transition-all"
+                              className={`cursor-pointer px-3 py-2 rounded-lg font-semibold text-sm transition-all ${
+                                darkMode
+                                  ? 'bg-red-900/20 hover:bg-red-900/40 text-red-400'
+                                  : 'bg-red-900/10 hover:bg-red-900/20 text-red-900'
+                              }`}
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -950,23 +1025,23 @@ export default function AdminDashboard() {
                 {archivedOwnerAccounts.length > 0 && (
                   <div className="mb-8">
                     <h4 className={`text-lg font-semibold mb-4 transition-colors ${
-                      darkMode ? 'text-gray-300' : 'text-gray-700'
+                      darkMode ? 'text-gray-300' : 'text-red-900'
                     }`}>Archived Owner Accounts ({archivedOwnerAccounts.length})</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {archivedOwnerAccounts.map((acc) => (
                         <div
                           key={acc.id}
                           className={`rounded-lg p-4 border transition-colors ${
-                            darkMode ? 'bg-[#0F172A]/50 border-[#FF6B6B]/10' : 'bg-slate-50 border-slate-200'
+                            darkMode ? 'bg-[#0F172A]/50 border-[#FF6B6B]/10' : 'bg-red-50 border-red-200'
                           }`}
                         >
                           <div className="flex items-start justify-between mb-3">
                             <div>
                               <h5 className={`font-bold transition-colors ${
-                                darkMode ? 'text-white' : 'text-gray-900'
+                                darkMode ? 'text-white' : 'text-red-950'
                               }`}>{acc.accountName}</h5>
                               <p className={`text-sm font-mono transition-colors ${
-                                darkMode ? 'text-gray-400' : 'text-gray-600'
+                                darkMode ? 'text-gray-400' : 'text-red-900'
                               }`}>{acc.accountNumber}</p>
                             </div>
                           </div>
@@ -979,7 +1054,7 @@ export default function AdminDashboard() {
                               className={`cursor-pointer flex-1 px-3 py-2 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
                                 darkMode
                                   ? 'bg-[#FF6B6B]/10 hover:bg-[#FF6B6B]/20 text-[#FF8A80]'
-                                  : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
+                                  : 'bg-red-900 hover:bg-red-800 text-red-50'
                               }`}
                             >
                               <RotateCcw className="w-4 h-4" />
@@ -987,7 +1062,11 @@ export default function AdminDashboard() {
                             </button>
                             <button
                               onClick={() => setArchivedOwnerAccounts(archivedOwnerAccounts.filter(a => a.id !== acc.id))}
-                              className="cursor-pointer px-3 py-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 rounded-lg font-semibold text-sm transition-all"
+                              className={`cursor-pointer px-3 py-2 rounded-lg font-semibold text-sm transition-all ${
+                                darkMode
+                                  ? 'bg-red-900/20 hover:bg-red-900/40 text-red-400'
+                                  : 'bg-red-900/10 hover:bg-red-900/20 text-red-900'
+                              }`}
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -1002,30 +1081,32 @@ export default function AdminDashboard() {
                 {archivedBankAccounts.length > 0 && (
                   <div className="mb-8">
                     <h4 className={`text-lg font-semibold mb-4 transition-colors ${
-                      darkMode ? 'text-gray-300' : 'text-gray-700'
+                      darkMode ? 'text-gray-300' : 'text-red-900'
                     }`}>Archived Bank Accounts ({archivedBankAccounts.length})</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {archivedBankAccounts.map((acc) => (
                         <div
                           key={acc.id}
                           className={`rounded-lg p-4 border transition-colors ${
-                            darkMode ? 'bg-[#0F172A]/50 border-[#FF6B6B]/10' : 'bg-slate-50 border-slate-200'
+                            darkMode ? 'bg-[#0F172A]/50 border-[#FF6B6B]/10' : 'bg-red-50 border-red-200'
                           }`}
                         >
                           <div className="flex items-start justify-between mb-3">
                             <div>
                               <div className="flex items-center gap-2">
                                 <h5 className={`font-bold transition-colors ${
-                                  darkMode ? 'text-white' : 'text-gray-900'
+                                  darkMode ? 'text-white' : 'text-red-950'
                                 }`}>{acc.name}</h5>
                                 <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                                   acc.bank === 'PMO'
                                     ? 'bg-purple-500/20 text-purple-400'
-                                    : 'bg-blue-500/20 text-blue-400'
+                                    : darkMode
+                                      ? 'bg-blue-500/20 text-blue-400'
+                                      : 'bg-red-800 text-red-50'
                                 }`}>{acc.bank}</span>
                               </div>
                               <p className={`text-sm font-mono transition-colors ${
-                                darkMode ? 'text-gray-400' : 'text-gray-600'
+                                darkMode ? 'text-gray-400' : 'text-red-900'
                               }`}>{acc.accountNumber}</p>
                             </div>
                           </div>
@@ -1038,7 +1119,7 @@ export default function AdminDashboard() {
                               className={`cursor-pointer flex-1 px-3 py-2 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
                                 darkMode
                                   ? 'bg-[#FF6B6B]/10 hover:bg-[#FF6B6B]/20 text-[#FF8A80]'
-                                  : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
+                                  : 'bg-red-900 hover:bg-red-800 text-red-50'
                               }`}
                             >
                               <RotateCcw className="w-4 h-4" />
@@ -1046,7 +1127,11 @@ export default function AdminDashboard() {
                             </button>
                             <button
                               onClick={() => setArchivedBankAccounts(archivedBankAccounts.filter(a => a.id !== acc.id))}
-                              className="cursor-pointer px-3 py-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 rounded-lg font-semibold text-sm transition-all"
+                              className={`cursor-pointer px-3 py-2 rounded-lg font-semibold text-sm transition-all ${
+                                darkMode
+                                  ? 'bg-red-900/20 hover:bg-red-900/40 text-red-400'
+                                  : 'bg-red-900/10 hover:bg-red-900/20 text-red-900'
+                              }`}
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -1061,13 +1146,13 @@ export default function AdminDashboard() {
                 {archivedAccountants.length === 0 && archivedOwnerAccounts.length === 0 && archivedBankAccounts.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-12">
                     <Archive className={`w-16 h-16 mb-4 transition-colors ${
-                      darkMode ? 'text-gray-600' : 'text-gray-400'
+                      darkMode ? 'text-gray-600' : 'text-red-300'
                     }`} />
                     <p className={`text-lg font-semibold transition-colors ${
-                      darkMode ? 'text-gray-300' : 'text-gray-700'
+                      darkMode ? 'text-gray-300' : 'text-red-900'
                     }`}>Archive is empty</p>
                     <p className={`text-sm mt-1 transition-colors ${
-                      darkMode ? 'text-gray-500' : 'text-gray-500'
+                      darkMode ? 'text-gray-500' : 'text-red-800'
                     }`}>Deleted items will appear here</p>
                   </div>
                 )}
@@ -1089,14 +1174,14 @@ export default function AdminDashboard() {
               darkMode ? 'glass-effect-dark border-[#FF6B6B]/20' : 'bg-white border-slate-200'
             }`}>
               <h2 className={`text-2xl font-bold transition-colors ${
-                darkMode ? 'text-white' : 'text-gray-900'
+                darkMode ? 'text-white' : 'text-red-950'
               }`}>
                 {editingId ? 'Edit Accountant' : 'Add New Accountant'}
               </h2>
               <button
                 onClick={closeModal}
                 className={`cursor-pointer transition-colors ${
-                  darkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-600 hover:text-gray-900'
+                  darkMode ? 'text-gray-400 hover:text-gray-200' : 'text-red-800 hover:text-red-950'
                 }`}
               >
                 <X className="w-6 h-6" />
@@ -1109,7 +1194,7 @@ export default function AdminDashboard() {
                 {/* Name Field */}
                 <div className="space-y-2">
                   <Label htmlFor="name" className={`font-semibold transition-colors ${
-                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                    darkMode ? 'text-gray-300' : 'text-red-900'
                   }`}>
                     Full Name
                   </Label>
@@ -1121,7 +1206,7 @@ export default function AdminDashboard() {
                     className={`h-10 transition-colors ${
                       darkMode 
                         ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
-                        : 'bg-slate-50 border-slate-300 text-gray-900 placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-red-50 border-red-200 text-red-950 placeholder-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
                     }`}
                   />
                 </div>
@@ -1129,7 +1214,7 @@ export default function AdminDashboard() {
                 {/* Email Field */}
                 <div className="space-y-2">
                   <Label htmlFor="email" className={`font-semibold transition-colors ${
-                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                    darkMode ? 'text-gray-300' : 'text-red-900'
                   }`}>
                     Email
                   </Label>
@@ -1142,7 +1227,7 @@ export default function AdminDashboard() {
                     className={`h-10 transition-colors ${
                       darkMode 
                         ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
-                        : 'bg-slate-50 border-slate-300 text-gray-900 placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-red-50 border-red-200 text-red-950 placeholder-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
                     }`}
                   />
                 </div>
@@ -1150,7 +1235,7 @@ export default function AdminDashboard() {
                 {/* Phone Field */}
                 <div className="space-y-2">
                   <Label htmlFor="phone" className={`font-semibold transition-colors ${
-                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                    darkMode ? 'text-gray-300' : 'text-red-900'
                   }`}>
                     Phone Number
                   </Label>
@@ -1163,7 +1248,7 @@ export default function AdminDashboard() {
                     className={`h-10 transition-colors ${
                       darkMode 
                         ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
-                        : 'bg-slate-50 border-slate-300 text-gray-900 placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-red-50 border-red-200 text-red-950 placeholder-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
                     }`}
                   />
                 </div>
@@ -1178,7 +1263,7 @@ export default function AdminDashboard() {
                     className={`cursor-pointer flex-1 px-4 py-2 border rounded-lg font-semibold transition-all ${
                       darkMode
                         ? 'bg-[#0F172A]/80 border-[#FF6B6B]/20 text-gray-300 hover:border-[#FF6B6B]/50 hover:text-white'
-                        : 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200 hover:border-slate-400'
+                        : 'bg-red-50 border-red-200 text-red-900 hover:bg-red-100 hover:border-red-300'
                     }`}
                   >
                     Cancel
@@ -1186,7 +1271,11 @@ export default function AdminDashboard() {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="cursor-pointer flex-1 px-4 py-2 bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white rounded-lg font-semibold hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={`cursor-pointer flex-1 px-4 py-2 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                      darkMode
+                        ? 'bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white hover:opacity-90'
+                        : 'bg-red-900 hover:bg-red-800 text-red-50'
+                    }`}
                   >
                     {submitting ? (editingId ? 'Updating...' : 'Adding...') : (editingId ? 'Update' : 'Add')} Accountant
                   </button>
@@ -1207,7 +1296,7 @@ export default function AdminDashboard() {
               darkMode ? 'glass-effect-dark border-[#FF6B6B]/20' : 'bg-white border-slate-200'
             }`}>
               <h2 className={`text-2xl font-bold transition-colors ${
-                darkMode ? 'text-white' : 'text-gray-900'
+                darkMode ? 'text-white' : 'text-red-950'
               }`}>Add Owner Account</h2>
               <button
                 onClick={() => {
@@ -1215,7 +1304,7 @@ export default function AdminDashboard() {
                   setOwnerFormData({ accountName: '', accountNumber: '', bankDetails: '' })
                 }}
                 className={`cursor-pointer transition-colors ${
-                  darkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-600 hover:text-gray-900'
+                  darkMode ? 'text-gray-400 hover:text-gray-200' : 'text-red-800 hover:text-red-950'
                 }`}
               >
                 <X className="w-6 h-6" />
@@ -1238,7 +1327,7 @@ export default function AdminDashboard() {
               }} className="space-y-5">
                 <div className="space-y-2">
                   <Label htmlFor="ownerAccountName" className={`font-semibold transition-colors ${
-                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                    darkMode ? 'text-gray-300' : 'text-red-900'
                   }`}>Account Name</Label>
                   <Input
                     id="ownerAccountName"
@@ -1248,13 +1337,13 @@ export default function AdminDashboard() {
                     className={`h-10 transition-colors ${
                       darkMode 
                         ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
-                        : 'bg-slate-50 border-slate-300 text-gray-900 placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-red-50 border-red-200 text-red-950 placeholder-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
                     }`}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="ownerAccountNumber" className={`font-semibold transition-colors ${
-                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                    darkMode ? 'text-gray-300' : 'text-red-900'
                   }`}>Account Number</Label>
                   <Input
                     id="ownerAccountNumber"
@@ -1264,13 +1353,13 @@ export default function AdminDashboard() {
                     className={`h-10 transition-colors ${
                       darkMode 
                         ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
-                        : 'bg-slate-50 border-slate-300 text-gray-900 placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-red-50 border-red-200 text-red-950 placeholder-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
                     }`}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="ownerBankDetails" className={`font-semibold transition-colors ${
-                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                    darkMode ? 'text-gray-300' : 'text-red-900'
                   }`}>Bank Details</Label>
                   <Input
                     id="ownerBankDetails"
@@ -1280,7 +1369,7 @@ export default function AdminDashboard() {
                     className={`h-10 transition-colors ${
                       darkMode 
                         ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
-                        : 'bg-slate-50 border-slate-300 text-gray-900 placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-red-50 border-red-200 text-red-950 placeholder-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
                     }`}
                   />
                 </div>
@@ -1294,14 +1383,18 @@ export default function AdminDashboard() {
                     className={`cursor-pointer flex-1 px-4 py-2 border rounded-lg font-semibold transition-all ${
                       darkMode
                         ? 'bg-[#0F172A]/80 border-[#FF6B6B]/20 text-gray-300 hover:border-[#FF6B6B]/50 hover:text-white'
-                        : 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200 hover:border-slate-400'
+                        : 'bg-red-50 border-red-200 text-red-900 hover:bg-red-100 hover:border-red-300'
                     }`}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="cursor-pointer flex-1 px-4 py-2 bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white rounded-lg font-semibold hover:opacity-90 transition-all"
+                    className={`cursor-pointer flex-1 px-4 py-2 rounded-lg font-semibold transition-all ${
+                      darkMode
+                        ? 'bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white hover:opacity-90'
+                        : 'bg-red-900 hover:bg-red-800 text-red-50'
+                    }`}
                   >
                     Add Account
                   </button>
@@ -1322,7 +1415,7 @@ export default function AdminDashboard() {
               darkMode ? 'glass-effect-dark border-[#FF6B6B]/20' : 'bg-white border-slate-200'
             }`}>
               <h2 className={`text-2xl font-bold transition-colors ${
-                darkMode ? 'text-white' : 'text-gray-900'
+                darkMode ? 'text-white' : 'text-red-950'
               }`}>Add Bank Account</h2>
               <button
                 onClick={() => {
@@ -1330,7 +1423,7 @@ export default function AdminDashboard() {
                   setBankFormData({ name: '', bank: 'normal', accountName: '', accountNumber: '', phoneNumber: '' })
                 }}
                 className={`cursor-pointer transition-colors ${
-                  darkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-600 hover:text-gray-900'
+                  darkMode ? 'text-gray-400 hover:text-gray-200' : 'text-red-800 hover:text-red-950'
                 }`}
               >
                 <X className="w-6 h-6" />
@@ -1361,7 +1454,7 @@ export default function AdminDashboard() {
               }} className="space-y-5">
                 <div className="space-y-2">
                   <Label htmlFor="bankName" className={`font-semibold transition-colors ${
-                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                    darkMode ? 'text-gray-300' : 'text-red-900'
                   }`}>Name</Label>
                   <Input
                     id="bankName"
@@ -1371,13 +1464,13 @@ export default function AdminDashboard() {
                     className={`h-10 transition-colors ${
                       darkMode 
                         ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
-                        : 'bg-slate-50 border-slate-300 text-gray-900 placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-red-50 border-red-200 text-red-950 placeholder-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
                     }`}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="bankType" className={`font-semibold transition-colors ${
-                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                    darkMode ? 'text-gray-300' : 'text-red-900'
                   }`}>Bank Type</Label>
                   <select
                     id="bankType"
@@ -1386,7 +1479,7 @@ export default function AdminDashboard() {
                     className={`w-full h-10 px-3 rounded-md border transition-colors ${
                       darkMode 
                         ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
-                        : 'bg-slate-50 border-slate-300 text-gray-900 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-red-50 border-red-200 text-red-950 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
                     }`}
                   >
                     <option value="normal">Normal</option>
@@ -1395,7 +1488,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="bankAccountName" className={`font-semibold transition-colors ${
-                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                    darkMode ? 'text-gray-300' : 'text-red-900'
                   }`}>Account Name</Label>
                   <Input
                     id="bankAccountName"
@@ -1405,13 +1498,13 @@ export default function AdminDashboard() {
                     className={`h-10 transition-colors ${
                       darkMode 
                         ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
-                        : 'bg-slate-50 border-slate-300 text-gray-900 placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-red-50 border-red-200 text-red-950 placeholder-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
                     }`}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="bankAccountNumber" className={`font-semibold transition-colors ${
-                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                    darkMode ? 'text-gray-300' : 'text-red-900'
                   }`}>Account Number (Unique)</Label>
                   <Input
                     id="bankAccountNumber"
@@ -1421,14 +1514,14 @@ export default function AdminDashboard() {
                     className={`h-10 transition-colors ${
                       darkMode 
                         ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
-                        : 'bg-slate-50 border-slate-300 text-gray-900 placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-red-50 border-red-200 text-red-950 placeholder-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
                     }`}
                   />
                 </div>
                 {bankFormData.bank === 'PMO' && (
                   <div className="space-y-2">
                     <Label htmlFor="bankPhoneNumber" className={`font-semibold transition-colors ${
-                      darkMode ? 'text-gray-300' : 'text-gray-700'
+                      darkMode ? 'text-gray-300' : 'text-red-900'
                     }`}>Phone Number</Label>
                     <Input
                       id="bankPhoneNumber"
@@ -1439,7 +1532,7 @@ export default function AdminDashboard() {
                       className={`h-10 transition-colors ${
                         darkMode 
                           ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
-                          : 'bg-slate-50 border-slate-300 text-gray-900 placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                          : 'bg-red-50 border-red-200 text-red-950 placeholder-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
                       }`}
                     />
                   </div>
@@ -1454,14 +1547,18 @@ export default function AdminDashboard() {
                     className={`cursor-pointer flex-1 px-4 py-2 border rounded-lg font-semibold transition-all ${
                       darkMode
                         ? 'bg-[#0F172A]/80 border-[#FF6B6B]/20 text-gray-300 hover:border-[#FF6B6B]/50 hover:text-white'
-                        : 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200 hover:border-slate-400'
+                        : 'bg-red-50 border-red-200 text-red-900 hover:bg-red-100 hover:border-red-300'
                     }`}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="cursor-pointer flex-1 px-4 py-2 bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white rounded-lg font-semibold hover:opacity-90 transition-all"
+                    className={`cursor-pointer flex-1 px-4 py-2 rounded-lg font-semibold transition-all ${
+                      darkMode
+                        ? 'bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white hover:opacity-90'
+                        : 'bg-red-900 hover:bg-red-800 text-red-50'
+                    }`}
                   >
                     Add Account
                   </button>
@@ -1473,17 +1570,183 @@ export default function AdminDashboard() {
       )}
 
       {/* Logout Confirmation Modal */}
+      {/* Delete Accountant Confirmation Modal */}
+      {showDeleteAccountantConfirm && deleteTargetId && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className={`rounded-2xl border w-full max-w-sm transition-colors shadow-2xl ${
+            darkMode ? 'glass-effect-dark' : 'bg-white border-red-200'
+          }`}>
+            <div className={`border-b p-6 sm:p-8 transition-colors ${
+              darkMode ? 'glass-effect-dark border-[#FF6B6B]/20' : 'bg-white border-red-200'
+            }`}>
+              <h2 className={`text-2xl font-bold flex items-center gap-2 transition-colors ${
+                darkMode ? 'text-white' : 'text-red-950'
+              }`}>
+                <AlertCircle className="w-6 h-6 text-[#FF6B6B]" />
+                Delete Accountant
+              </h2>
+            </div>
+
+            <div className="p-6 sm:p-8">
+              <p className={`mb-8 leading-relaxed transition-colors ${
+                darkMode ? 'text-gray-300' : 'text-red-900'
+              }`}>
+                Are you sure you want to delete this accountant? This action will move them to the archive.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteAccountantConfirm(false)
+                    setDeleteTargetId(null)
+                  }}
+                  className={`cursor-pointer flex-1 px-4 py-2 border rounded-lg font-semibold transition-all ${
+                    darkMode
+                      ? 'bg-[#0F172A]/80 border-[#FF6B6B]/20 text-gray-300 hover:border-[#FF6B6B]/50 hover:text-white'
+                      : 'bg-red-50 border-red-200 text-red-900 hover:bg-red-100 hover:border-red-300'
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDeleteAccountant(deleteTargetId)}
+                  className={`cursor-pointer flex-1 px-4 py-2 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
+                    darkMode
+                      ? 'bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white hover:opacity-90'
+                      : 'bg-red-900 hover:bg-red-800 text-red-50'
+                  }`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Owner Account Confirmation Modal */}
+      {showDeleteOwnerConfirm && deleteTargetId && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className={`rounded-2xl border w-full max-w-sm transition-colors shadow-2xl ${
+            darkMode ? 'glass-effect-dark' : 'bg-white border-red-200'
+          }`}>
+            <div className={`border-b p-6 sm:p-8 transition-colors ${
+              darkMode ? 'glass-effect-dark border-[#FF6B6B]/20' : 'bg-white border-red-200'
+            }`}>
+              <h2 className={`text-2xl font-bold flex items-center gap-2 transition-colors ${
+                darkMode ? 'text-white' : 'text-red-950'
+              }`}>
+                <AlertCircle className="w-6 h-6 text-[#FF6B6B]" />
+                Delete Owner Account
+              </h2>
+            </div>
+
+            <div className="p-6 sm:p-8">
+              <p className={`mb-8 leading-relaxed transition-colors ${
+                darkMode ? 'text-gray-300' : 'text-red-900'
+              }`}>
+                Are you sure you want to delete this owner account? This action will move it to the archive.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteOwnerConfirm(false)
+                    setDeleteTargetId(null)
+                  }}
+                  className={`cursor-pointer flex-1 px-4 py-2 border rounded-lg font-semibold transition-all ${
+                    darkMode
+                      ? 'bg-[#0F172A]/80 border-[#FF6B6B]/20 text-gray-300 hover:border-[#FF6B6B]/50 hover:text-white'
+                      : 'bg-red-50 border-red-200 text-red-900 hover:bg-red-100 hover:border-red-300'
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDeleteOwnerAccount(deleteTargetId)}
+                  className={`cursor-pointer flex-1 px-4 py-2 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
+                    darkMode
+                      ? 'bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white hover:opacity-90'
+                      : 'bg-red-900 hover:bg-red-800 text-red-50'
+                  }`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Bank Account Confirmation Modal */}
+      {showDeleteBankConfirm && deleteTargetId && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className={`rounded-2xl border w-full max-w-sm transition-colors shadow-2xl ${
+            darkMode ? 'glass-effect-dark' : 'bg-white border-red-200'
+          }`}>
+            <div className={`border-b p-6 sm:p-8 transition-colors ${
+              darkMode ? 'glass-effect-dark border-[#FF6B6B]/20' : 'bg-white border-red-200'
+            }`}>
+              <h2 className={`text-2xl font-bold flex items-center gap-2 transition-colors ${
+                darkMode ? 'text-white' : 'text-red-950'
+              }`}>
+                <AlertCircle className="w-6 h-6 text-[#FF6B6B]" />
+                Delete Bank Account
+              </h2>
+            </div>
+
+            <div className="p-6 sm:p-8">
+              <p className={`mb-8 leading-relaxed transition-colors ${
+                darkMode ? 'text-gray-300' : 'text-red-900'
+              }`}>
+                Are you sure you want to delete this bank account? This action will move it to the archive.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteBankConfirm(false)
+                    setDeleteTargetId(null)
+                  }}
+                  className={`cursor-pointer flex-1 px-4 py-2 border rounded-lg font-semibold transition-all ${
+                    darkMode
+                      ? 'bg-[#0F172A]/80 border-[#FF6B6B]/20 text-gray-300 hover:border-[#FF6B6B]/50 hover:text-white'
+                      : 'bg-red-50 border-red-200 text-red-900 hover:bg-red-100 hover:border-red-300'
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDeleteBankAccount(deleteTargetId)}
+                  className={`cursor-pointer flex-1 px-4 py-2 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
+                    darkMode
+                      ? 'bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white hover:opacity-90'
+                      : 'bg-red-900 hover:bg-red-800 text-red-50'
+                  }`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Logout Confirmation Modal */}
       {showLogoutConfirm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className={`rounded-2xl border w-full max-w-sm transition-colors shadow-2xl ${
-            darkMode ? 'glass-effect-dark' : 'bg-white border-slate-200'
+            darkMode ? 'glass-effect-dark' : 'bg-white border-red-200'
           }`}>
             {/* Modal Header */}
             <div className={`border-b p-6 sm:p-8 transition-colors ${
-              darkMode ? 'glass-effect-dark border-[#FF6B6B]/20' : 'bg-white border-slate-200'
+              darkMode ? 'glass-effect-dark border-[#FF6B6B]/20' : 'bg-white border-red-200'
             }`}>
               <h2 className={`text-2xl font-bold flex items-center gap-2 transition-colors ${
-                darkMode ? 'text-white' : 'text-gray-900'
+                darkMode ? 'text-white' : 'text-red-950'
               }`}>
                 <AlertCircle className="w-6 h-6 text-[#FF6B6B]" />
                 Confirm Logout
@@ -1493,7 +1756,7 @@ export default function AdminDashboard() {
             {/* Modal Content */}
             <div className="p-6 sm:p-8">
               <p className={`mb-8 leading-relaxed transition-colors ${
-                darkMode ? 'text-gray-300' : 'text-gray-700'
+                darkMode ? 'text-gray-300' : 'text-red-900'
               }`}>
                 Are you sure you want to logout? You'll need to sign in again to access the dashboard.
               </p>
@@ -1505,14 +1768,18 @@ export default function AdminDashboard() {
                   className={`cursor-pointer flex-1 px-4 py-2 border rounded-lg font-semibold transition-all ${
                     darkMode
                       ? 'bg-[#0F172A]/80 border-[#FF6B6B]/20 text-gray-300 hover:border-[#FF6B6B]/50 hover:text-white'
-                      : 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200 hover:border-slate-400'
+                      : 'bg-red-50 border-red-200 text-red-900 hover:bg-red-100 hover:border-red-300'
                   }`}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleLogout}
-                  className="cursor-pointer flex-1 px-4 py-2 bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white rounded-lg font-semibold hover:opacity-90 transition-all flex items-center justify-center gap-2"
+                  className={`cursor-pointer flex-1 px-4 py-2 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
+                    darkMode
+                      ? 'bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white hover:opacity-90'
+                      : 'bg-red-900 hover:bg-red-800 text-red-50'
+                  }`}
                 >
                   <LogOut className="w-4 h-4" />
                   Logout

@@ -7,3 +7,4 @@ export { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, For
 export { Toaster } from "./sonner"
 export { Tabs, TabsList, TabsTrigger, TabsContent } from "./tabs"
 export { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "./dialog"
+export { Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell, TableCaption } from "./table"
