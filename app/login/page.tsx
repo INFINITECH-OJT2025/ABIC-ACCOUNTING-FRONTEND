@@ -110,7 +110,7 @@ export default function LoginPage() {
                 <div className="space-y-3">
                   <h2 className="text-5xl font-bold text-white leading-tight tracking-tight">
                     Welcome to<br />
-                    <span className="bg-gradient-to-r from-[#FF8A80] via-[#FF6B6B] to-[#FF5252] bg-clip-text text-transparent">
+                    <span className="bg-gradient-to-r from-[#FF8A80] via-[#FF6B6B] to-[#FF5252] bg-clip-text text-transparent leading-tight">
                       ABIC Accounting
                     </span>
                   </h2>
@@ -144,7 +144,7 @@ export default function LoginPage() {
               <div className="space-y-8">
                 {/* Header */}
                 <div className="space-y-4 text-center lg:text-left">
-                  <h1 className="text-5xl lg:text-5xl font-bold text-transparent bg-gradient-to-r from-white via-gray-100 to-gray-200 bg-clip-text animate-gradient">
+                  <h1 className="text-5xl lg:text-5xl font-bold text-transparent bg-gradient-to-r from-white via-gray-100 to-gray-200 bg-clip-text animate-gradient leading-tight">
                     Sign In
                   </h1>
                   <p className="text-gray-300 text-base font-light">
