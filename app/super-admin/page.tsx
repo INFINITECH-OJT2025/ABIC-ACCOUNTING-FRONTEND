@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { AlertCircle, LogOut, Plus, Users, Trash2, Edit2, Phone, Mail, LogIn, X, Menu, ChevronLeft, Moon, Sun, Shield, Building2, UserCircle, Landmark, Settings, Archive, RotateCcw } from 'lucide-react'
+import { AlertCircle, LogOut, Plus, Users, Trash2, Edit2, Phone, Mail, LogIn, X, Menu, ChevronLeft, ChevronDown, Moon, Sun, Shield, Building2, UserCircle, Landmark, Settings, Archive, RotateCcw, Search } from 'lucide-react'
 import Logo from '@/components/logo'
 
 interface Accountant {
@@ -53,7 +53,9 @@ export default function AdminDashboard() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [darkMode, setDarkMode] = useState(true)
-  const [currentPage, setCurrentPage] = useState<'accountants' | 'assign-roles' | 'owner-accounts' | 'bank-accounts' | 'settings'>('accountants')
+  const [currentPage, setCurrentPage] = useState<'accountants' | 'assign-roles' | 'owner-accounts' | 'bank-accounts' | 'archive'>('accountants')
+  const [showSettingsDropdown, setShowSettingsDropdown] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const [selectedAccountantId, setSelectedAccountantId] = useState<number | null>(null)
   const [bankAccess, setBankAccess] = useState<{ [accountantId: number]: number[] }>({
     1: [1, 2],
@@ -95,6 +97,11 @@ export default function AdminDashboard() {
 
     fetchMe()
   }, [router])
+
+  // Clear search when changing pages
+  useEffect(() => {
+    setSearchQuery('')
+  }, [currentPage])
 
   const handleAddAccountant = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -408,21 +415,54 @@ export default function AdminDashboard() {
                 <Landmark className="w-5 h-5" />
                 <span>Bank Accounts</span>
               </button>
-              <button
-                onClick={() => setCurrentPage('settings')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-semibold text-sm transition-all ${
-                  currentPage === 'settings'
-                    ? darkMode
-                      ? 'bg-[#FF6B6B]/20 text-[#FF8A80]'
-                      : 'bg-red-900 text-red-50'
-                    : darkMode
-                      ? 'text-gray-400 hover:bg-[#FF6B6B]/10 hover:text-[#FF8A80]'
-                      : 'text-red-900 hover:bg-red-100 hover:text-red-950'
-                }`}
+              <div
+                className="relative"
+                onMouseEnter={() => setShowSettingsDropdown(true)}
+                onMouseLeave={() => setShowSettingsDropdown(false)}
               >
-                <Settings className="w-5 h-5" />
-                <span>Settings</span>
-              </button>
+                <button
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-lg font-semibold text-sm transition-all ${
+                    currentPage === 'archive'
+                      ? darkMode
+                        ? 'bg-[#FF6B6B]/20 text-[#FF8A80]'
+                        : 'bg-red-900 text-red-50'
+                      : darkMode
+                        ? 'text-gray-400 hover:bg-[#FF6B6B]/10 hover:text-[#FF8A80]'
+                        : 'text-red-900 hover:bg-red-100 hover:text-red-950'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Settings className="w-5 h-5" />
+                    <span>Settings</span>
+                  </div>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${
+                    showSettingsDropdown ? 'rotate-180' : ''
+                  }`} />
+                </button>
+                
+                {/* Dropdown Menu */}
+                {showSettingsDropdown && (
+                  <div className={`mt-2 ml-4 space-y-1 overflow-hidden transition-all ${
+                    darkMode ? 'border-l border-[#FF6B6B]/20' : 'border-l border-red-200'
+                  }`}>
+                    <button
+                      onClick={() => setCurrentPage('archive')}
+                      className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                        currentPage === 'archive'
+                          ? darkMode
+                            ? 'bg-[#FF6B6B]/20 text-[#FF8A80]'
+                            : 'bg-red-900 text-red-50'
+                          : darkMode
+                            ? 'text-gray-400 hover:bg-[#FF6B6B]/10 hover:text-[#FF8A80]'
+                            : 'text-red-900 hover:bg-red-100 hover:text-red-950'
+                      }`}
+                    >
+                      <Archive className="w-4 h-4" />
+                      <span>Archive</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </nav>
           </div>
 
@@ -506,17 +546,65 @@ export default function AdminDashboard() {
           <>
             {/* Page Header */}
             <div className="mb-8">
-              <h2 className={`text-3xl sm:text-4xl font-bold mb-2 transition-colors ${
-                darkMode ? 'gradient-text' : 'text-red-900'
-              }`}>Accountants</h2>
-              <p className={`transition-colors ${
-                darkMode ? 'text-gray-400' : 'text-red-900'
-              }`}>Manage your team members and their access</p>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className={`text-3xl sm:text-4xl font-bold mb-2 transition-colors ${
+                    darkMode ? 'gradient-text' : 'text-red-900'
+                  }`}>Accountants</h2>
+                  <p className={`transition-colors ${
+                    darkMode ? 'text-gray-400' : 'text-red-900'
+                  }`}>Manage your team members and their access</p>
+                </div>
+                <button
+                  onClick={() => setShowAddForm(true)}
+                  className={`cursor-pointer px-4 py-3 rounded-lg font-semibold transition-all hover:shadow-lg flex items-center gap-2 ${
+                    darkMode
+                      ? 'bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white hover:opacity-90 hover:shadow-red-500/20'
+                      : 'bg-red-900 hover:bg-red-800 text-red-50'
+                  }`}
+                >
+                  <Plus className="w-5 h-5" />
+                  <span className="hidden sm:inline">Add Accountant</span>
+                </button>
+              </div>
+              
+              {/* Search Bar */}
+              <div className="relative max-w-md">
+                <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${
+                  darkMode ? 'text-gray-500' : 'text-red-400'
+                }`} />
+                <Input
+                  placeholder="Search by name, email, or phone..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className={`pl-10 pr-10 transition-colors ${
+                    darkMode
+                      ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder:text-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                      : 'bg-white border-red-200 text-red-950 placeholder:text-red-400 focus:border-red-400 focus:ring-red-400/50'
+                  }`}
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full transition-colors ${
+                      darkMode
+                        ? 'hover:bg-[#FF6B6B]/10 text-gray-500 hover:text-gray-300'
+                        : 'hover:bg-red-50 text-red-400 hover:text-red-600'
+                    }`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Accountants Grid */}
             <div>
-          {accountants.length === 0 ? (
+          {accountants.filter(acc => 
+            acc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            acc.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            acc.phone.toLowerCase().includes(searchQuery.toLowerCase())
+          ).length === 0 ? (
             <div className={`rounded-2xl p-12 border flex flex-col items-center justify-center transition-colors ${
               darkMode ? 'glass-effect-dark' : 'bg-white border-red-200 shadow-sm'
             }`}>
@@ -525,14 +613,18 @@ export default function AdminDashboard() {
               }`} />
               <p className={`text-lg font-semibold transition-colors ${
                 darkMode ? 'text-gray-300' : 'text-red-900'
-              }`}>No accountants yet</p>
+              }`}>{searchQuery ? 'No accountants found' : 'No accountants yet'}</p>
               <p className={`text-sm mt-1 transition-colors ${
                 darkMode ? 'text-gray-500' : 'text-red-800'
-              }`}>Add your first accountant using the sidebar</p>
+              }`}>{searchQuery ? 'Try adjusting your search terms' : 'Add your first accountant using the button above'}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {accountants.map((acc) => (
+                {accountants.filter(acc => 
+                  acc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  acc.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  acc.phone.toLowerCase().includes(searchQuery.toLowerCase())
+                ).map((acc) => (
                   <div
                     key={acc.id}
                     className={`rounded-2xl p-6 border card-hover group relative overflow-hidden transition-colors ${
@@ -616,12 +708,43 @@ export default function AdminDashboard() {
           <>
             {/* Assign Roles Page */}
             <div className="mb-8">
-              <h2 className={`text-3xl sm:text-4xl font-bold mb-2 transition-colors ${
-                darkMode ? 'gradient-text' : 'text-red-900'
-              }`}>Assign Bank Access</h2>
-              <p className={`transition-colors ${
-                darkMode ? 'text-gray-400' : 'text-red-900'
-              }`}>Manage which banks each accountant can access</p>
+              <div className="mb-6">
+                <h2 className={`text-3xl sm:text-4xl font-bold mb-2 transition-colors ${
+                  darkMode ? 'gradient-text' : 'text-red-900'
+                }`}>Assign Bank Access</h2>
+                <p className={`transition-colors ${
+                  darkMode ? 'text-gray-400' : 'text-red-900'
+                }`}>Manage which banks each accountant can access</p>
+              </div>
+              
+              {/* Search Bar */}
+              <div className="relative max-w-md mb-6">
+                <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${
+                  darkMode ? 'text-gray-500' : 'text-red-400'
+                }`} />
+                <Input
+                  placeholder="Search accountants..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className={`pl-10 pr-10 transition-colors ${
+                    darkMode
+                      ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder:text-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                      : 'bg-white border-red-200 text-red-950 placeholder:text-red-400 focus:border-red-400 focus:ring-red-400/50'
+                  }`}
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full transition-colors ${
+                      darkMode
+                        ? 'hover:bg-[#FF6B6B]/10 text-gray-500 hover:text-gray-300'
+                        : 'hover:bg-red-50 text-red-400 hover:text-red-600'
+                    }`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -633,7 +756,9 @@ export default function AdminDashboard() {
                   darkMode ? 'text-white' : 'text-red-950'
                 }`}>Select Accountant</h3>
                 <div className="space-y-2">
-                  {accountants.map((acc) => (
+                  {accountants.filter(acc => 
+                    acc.name.toLowerCase().includes(searchQuery.toLowerCase())
+                  ).map((acc) => (
                     <button
                       key={acc.id}
                       onClick={() => setSelectedAccountantId(acc.id)}
@@ -767,30 +892,65 @@ export default function AdminDashboard() {
         ) : currentPage === 'owner-accounts' ? (
           <>
             {/* Owner Accounts Page */}
-            <div className="mb-8 flex items-center justify-between">
-              <div>
-                <h2 className={`text-3xl sm:text-4xl font-bold mb-2 transition-colors ${
-                  darkMode ? 'gradient-text' : 'text-red-900'
-                }`}>Owner Accounts</h2>
-                <p className={`transition-colors ${
-                  darkMode ? 'text-gray-400' : 'text-red-900'
-                }`}>Manage owner account information</p>
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className={`text-3xl sm:text-4xl font-bold mb-2 transition-colors ${
+                    darkMode ? 'gradient-text' : 'text-red-900'
+                  }`}>Owner Accounts</h2>
+                  <p className={`transition-colors ${
+                    darkMode ? 'text-gray-400' : 'text-red-900'
+                  }`}>Manage owner account information</p>
+                </div>
+                <button
+                  onClick={() => setShowOwnerForm(true)}
+                  className={`cursor-pointer px-4 py-3 rounded-lg font-semibold transition-all hover:shadow-lg flex items-center gap-2 ${
+                    darkMode
+                      ? 'bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white hover:opacity-90 hover:shadow-red-500/20'
+                      : 'bg-red-900 hover:bg-red-800 text-red-50'
+                  }`}
+                >
+                  <Plus className="w-5 h-5" />
+                  <span className="hidden sm:inline">Add Owner Account</span>
+                </button>
               </div>
-              <button
-                onClick={() => setShowOwnerForm(true)}
-                className={`cursor-pointer px-4 py-3 rounded-lg font-semibold transition-all hover:shadow-lg flex items-center gap-2 ${
-                  darkMode
-                    ? 'bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white hover:opacity-90 hover:shadow-red-500/20'
-                    : 'bg-red-900 hover:bg-red-800 text-red-50'
-                }`}
-              >
-                <Plus className="w-5 h-5" />
-                <span className="hidden sm:inline">Add Owner Account</span>
-              </button>
+              
+              {/* Search Bar */}
+              <div className="relative max-w-md">
+                <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${
+                  darkMode ? 'text-gray-500' : 'text-red-400'
+                }`} />
+                <Input
+                  placeholder="Search by account name or number..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className={`pl-10 pr-10 transition-colors ${
+                    darkMode
+                      ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder:text-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                      : 'bg-white border-red-200 text-red-950 placeholder:text-red-400 focus:border-red-400 focus:ring-red-400/50'
+                  }`}
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full transition-colors ${
+                      darkMode
+                        ? 'hover:bg-[#FF6B6B]/10 text-gray-500 hover:text-gray-300'
+                        : 'hover:bg-red-50 text-red-400 hover:text-red-600'
+                    }`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {ownerAccounts.map((account) => (
+              {ownerAccounts.filter(account => 
+                account.accountName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                account.accountNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                account.bankDetails.toLowerCase().includes(searchQuery.toLowerCase())
+              ).map((account) => (
                 <div
                   key={account.id}
                   className={`rounded-2xl p-6 border transition-colors ${
@@ -848,30 +1008,65 @@ export default function AdminDashboard() {
         ) : currentPage === 'bank-accounts' ? (
           <>
             {/* Bank Accounts Page */}
-            <div className="mb-8 flex items-center justify-between">
-              <div>
-                <h2 className={`text-3xl sm:text-4xl font-bold mb-2 transition-colors ${
-                  darkMode ? 'gradient-text' : 'text-red-900'
-                }`}>Bank Accounts</h2>
-                <p className={`transition-colors ${
-                  darkMode ? 'text-gray-400' : 'text-red-900'
-                }`}>Manage bank account information</p>
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className={`text-3xl sm:text-4xl font-bold mb-2 transition-colors ${
+                    darkMode ? 'gradient-text' : 'text-red-900'
+                  }`}>Bank Accounts</h2>
+                  <p className={`transition-colors ${
+                    darkMode ? 'text-gray-400' : 'text-red-900'
+                  }`}>Manage bank account information</p>
+                </div>
+                <button
+                  onClick={() => setShowBankForm(true)}
+                  className={`cursor-pointer px-4 py-3 rounded-lg font-semibold transition-all hover:shadow-lg flex items-center gap-2 ${
+                    darkMode
+                      ? 'bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white hover:opacity-90 hover:shadow-red-500/20'
+                      : 'bg-red-900 hover:bg-red-800 text-red-50'
+                  }`}
+                >
+                  <Plus className="w-5 h-5" />
+                  <span className="hidden sm:inline">Add Bank Account</span>
+                </button>
               </div>
-              <button
-                onClick={() => setShowBankForm(true)}
-                className={`cursor-pointer px-4 py-3 rounded-lg font-semibold transition-all hover:shadow-lg flex items-center gap-2 ${
-                  darkMode
-                    ? 'bg-gradient-to-r from-[#FF6B6B] to-[#FF8A80] text-white hover:opacity-90 hover:shadow-red-500/20'
-                    : 'bg-red-900 hover:bg-red-800 text-red-50'
-                }`}
-              >
-                <Plus className="w-5 h-5" />
-                <span className="hidden sm:inline">Add Bank Account</span>
-              </button>
+              
+              {/* Search Bar */}
+              <div className="relative max-w-md">
+                <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${
+                  darkMode ? 'text-gray-500' : 'text-red-400'
+                }`} />
+                <Input
+                  placeholder="Search by name, account name, or number..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className={`pl-10 pr-10 transition-colors ${
+                    darkMode
+                      ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder:text-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                      : 'bg-white border-red-200 text-red-950 placeholder:text-red-400 focus:border-red-400 focus:ring-red-400/50'
+                  }`}
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full transition-colors ${
+                      darkMode
+                        ? 'hover:bg-[#FF6B6B]/10 text-gray-500 hover:text-gray-300'
+                        : 'hover:bg-red-50 text-red-400 hover:text-red-600'
+                    }`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {bankAccounts.map((account) => (
+              {bankAccounts.filter(account => 
+                account.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                account.accountName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                account.accountNumber.toLowerCase().includes(searchQuery.toLowerCase())
+              ).map((account) => (
                 <div
                   key={account.id}
                   className={`rounded-2xl p-6 border transition-colors ${
@@ -941,16 +1136,47 @@ export default function AdminDashboard() {
               ))}
             </div>
           </>
-        ) : currentPage === 'settings' ? (
+        ) : currentPage === 'archive' ? (
           <>
-            {/* Settings Page - Archive */}
+            {/* Archive Page */}
             <div className="mb-8">
-              <h2 className={`text-3xl sm:text-4xl font-bold mb-2 transition-colors ${
-                darkMode ? 'gradient-text' : 'text-red-900'
-              }`}>Settings</h2>
-              <p className={`transition-colors ${
-                darkMode ? 'text-gray-400' : 'text-red-900'
-              }`}>Manage system settings and archived items</p>
+              <div className="mb-6">
+                <h2 className={`text-3xl sm:text-4xl font-bold mb-2 transition-colors ${
+                  darkMode ? 'gradient-text' : 'text-red-900'
+                }`}>Archive</h2>
+                <p className={`transition-colors ${
+                  darkMode ? 'text-gray-400' : 'text-red-900'
+                }`}>View and manage archived items</p>
+              </div>
+              
+              {/* Search Bar */}
+              <div className="relative max-w-md">
+                <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${
+                  darkMode ? 'text-gray-500' : 'text-red-400'
+                }`} />
+                <Input
+                  placeholder="Search archived items..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className={`pl-10 pr-10 transition-colors ${
+                    darkMode
+                      ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder:text-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                      : 'bg-white border-red-200 text-red-950 placeholder:text-red-400 focus:border-red-400 focus:ring-red-400/50'
+                  }`}
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full transition-colors ${
+                      darkMode
+                        ? 'hover:bg-[#FF6B6B]/10 text-gray-500 hover:text-gray-300'
+                        : 'hover:bg-red-50 text-red-400 hover:text-red-600'
+                    }`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Archive Section */}
@@ -966,13 +1192,22 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Archived Accountants */}
-                {archivedAccountants.length > 0 && (
+                {archivedAccountants.filter(acc => 
+                  acc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  acc.email.toLowerCase().includes(searchQuery.toLowerCase())
+                ).length > 0 && (
                   <div className="mb-8">
                     <h4 className={`text-lg font-semibold mb-4 transition-colors ${
                       darkMode ? 'text-gray-300' : 'text-red-900'
-                    }`}>Archived Accountants ({archivedAccountants.length})</h4>
+                    }`}>Archived Accountants ({archivedAccountants.filter(acc => 
+                      acc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      acc.email.toLowerCase().includes(searchQuery.toLowerCase())
+                    ).length})</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {archivedAccountants.map((acc) => (
+                      {archivedAccountants.filter(acc => 
+                        acc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        acc.email.toLowerCase().includes(searchQuery.toLowerCase())
+                      ).map((acc) => (
                         <div
                           key={acc.id}
                           className={`rounded-lg p-4 border transition-colors ${
@@ -1022,13 +1257,22 @@ export default function AdminDashboard() {
                 )}
 
                 {/* Archived Owner Accounts */}
-                {archivedOwnerAccounts.length > 0 && (
+                {archivedOwnerAccounts.filter(acc => 
+                  acc.accountName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  acc.accountNumber.toLowerCase().includes(searchQuery.toLowerCase())
+                ).length > 0 && (
                   <div className="mb-8">
                     <h4 className={`text-lg font-semibold mb-4 transition-colors ${
                       darkMode ? 'text-gray-300' : 'text-red-900'
-                    }`}>Archived Owner Accounts ({archivedOwnerAccounts.length})</h4>
+                    }`}>Archived Owner Accounts ({archivedOwnerAccounts.filter(acc => 
+                      acc.accountName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      acc.accountNumber.toLowerCase().includes(searchQuery.toLowerCase())
+                    ).length})</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {archivedOwnerAccounts.map((acc) => (
+                      {archivedOwnerAccounts.filter(acc => 
+                        acc.accountName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        acc.accountNumber.toLowerCase().includes(searchQuery.toLowerCase())
+                      ).map((acc) => (
                         <div
                           key={acc.id}
                           className={`rounded-lg p-4 border transition-colors ${
@@ -1078,13 +1322,25 @@ export default function AdminDashboard() {
                 )}
 
                 {/* Archived Bank Accounts */}
-                {archivedBankAccounts.length > 0 && (
+                {archivedBankAccounts.filter(acc => 
+                  acc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  acc.accountName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  acc.accountNumber.toLowerCase().includes(searchQuery.toLowerCase())
+                ).length > 0 && (
                   <div className="mb-8">
                     <h4 className={`text-lg font-semibold mb-4 transition-colors ${
                       darkMode ? 'text-gray-300' : 'text-red-900'
-                    }`}>Archived Bank Accounts ({archivedBankAccounts.length})</h4>
+                    }`}>Archived Bank Accounts ({archivedBankAccounts.filter(acc => 
+                      acc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      acc.accountName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      acc.accountNumber.toLowerCase().includes(searchQuery.toLowerCase())
+                    ).length})</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {archivedBankAccounts.map((acc) => (
+                      {archivedBankAccounts.filter(acc => 
+                        acc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        acc.accountName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        acc.accountNumber.toLowerCase().includes(searchQuery.toLowerCase())
+                      ).map((acc) => (
                         <div
                           key={acc.id}
                           className={`rounded-lg p-4 border transition-colors ${
@@ -1143,17 +1399,29 @@ export default function AdminDashboard() {
                 )}
 
                 {/* Empty State */}
-                {archivedAccountants.length === 0 && archivedOwnerAccounts.length === 0 && archivedBankAccounts.length === 0 && (
+                {archivedAccountants.filter(acc => 
+                  acc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  acc.email.toLowerCase().includes(searchQuery.toLowerCase())
+                ).length === 0 && 
+                archivedOwnerAccounts.filter(acc => 
+                  acc.accountName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  acc.accountNumber.toLowerCase().includes(searchQuery.toLowerCase())
+                ).length === 0 && 
+                archivedBankAccounts.filter(acc => 
+                  acc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  acc.accountName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  acc.accountNumber.toLowerCase().includes(searchQuery.toLowerCase())
+                ).length === 0 && (
                   <div className="flex flex-col items-center justify-center py-12">
                     <Archive className={`w-16 h-16 mb-4 transition-colors ${
                       darkMode ? 'text-gray-600' : 'text-red-300'
                     }`} />
                     <p className={`text-lg font-semibold transition-colors ${
                       darkMode ? 'text-gray-300' : 'text-red-900'
-                    }`}>Archive is empty</p>
+                    }`}>{searchQuery ? 'No archived items found' : 'Archive is empty'}</p>
                     <p className={`text-sm mt-1 transition-colors ${
                       darkMode ? 'text-gray-500' : 'text-red-800'
-                    }`}>Deleted items will appear here</p>
+                    }`}>{searchQuery ? 'Try adjusting your search terms' : 'Deleted items will appear here'}</p>
                   </div>
                 )}
               </div>
@@ -1205,8 +1473,8 @@ export default function AdminDashboard() {
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className={`h-10 transition-colors ${
                       darkMode 
-                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
-                        : 'bg-red-50 border-red-200 text-red-950 placeholder-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder:text-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-red-50 border-red-200 text-red-950 placeholder:text-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
                     }`}
                   />
                 </div>
@@ -1226,8 +1494,8 @@ export default function AdminDashboard() {
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className={`h-10 transition-colors ${
                       darkMode 
-                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
-                        : 'bg-red-50 border-red-200 text-red-950 placeholder-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder:text-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-red-50 border-red-200 text-red-950 placeholder:text-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
                     }`}
                   />
                 </div>
@@ -1247,8 +1515,8 @@ export default function AdminDashboard() {
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     className={`h-10 transition-colors ${
                       darkMode 
-                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
-                        : 'bg-red-50 border-red-200 text-red-950 placeholder-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder:text-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-red-50 border-red-200 text-red-950 placeholder:text-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
                     }`}
                   />
                 </div>
@@ -1336,8 +1604,8 @@ export default function AdminDashboard() {
                     onChange={(e) => setOwnerFormData({ ...ownerFormData, accountName: e.target.value })}
                     className={`h-10 transition-colors ${
                       darkMode 
-                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
-                        : 'bg-red-50 border-red-200 text-red-950 placeholder-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder:text-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-red-50 border-red-200 text-red-950 placeholder:text-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
                     }`}
                   />
                 </div>
@@ -1352,8 +1620,8 @@ export default function AdminDashboard() {
                     onChange={(e) => setOwnerFormData({ ...ownerFormData, accountNumber: e.target.value })}
                     className={`h-10 transition-colors ${
                       darkMode 
-                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
-                        : 'bg-red-50 border-red-200 text-red-950 placeholder-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder:text-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-red-50 border-red-200 text-red-950 placeholder:text-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
                     }`}
                   />
                 </div>
@@ -1368,8 +1636,8 @@ export default function AdminDashboard() {
                     onChange={(e) => setOwnerFormData({ ...ownerFormData, bankDetails: e.target.value })}
                     className={`h-10 transition-colors ${
                       darkMode 
-                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
-                        : 'bg-red-50 border-red-200 text-red-950 placeholder-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder:text-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-red-50 border-red-200 text-red-950 placeholder:text-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
                     }`}
                   />
                 </div>
@@ -1463,8 +1731,8 @@ export default function AdminDashboard() {
                     onChange={(e) => setBankFormData({ ...bankFormData, name: e.target.value })}
                     className={`h-10 transition-colors ${
                       darkMode 
-                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
-                        : 'bg-red-50 border-red-200 text-red-950 placeholder-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder:text-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-red-50 border-red-200 text-red-950 placeholder:text-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
                     }`}
                   />
                 </div>
@@ -1476,10 +1744,10 @@ export default function AdminDashboard() {
                     id="bankType"
                     value={bankFormData.bank}
                     onChange={(e) => setBankFormData({ ...bankFormData, bank: e.target.value as 'normal' | 'PMO' })}
-                    className={`w-full h-10 px-3 rounded-md border transition-colors ${
+                    className={`w-full h-10 px-3 rounded-md border transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
                       darkMode 
-                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
-                        : 'bg-red-50 border-red-200 text-red-950 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50 [&>option]:bg-[#0F172A] [&>option]:text-white'
+                        : 'bg-red-50 border-red-200 text-red-950 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50 [&>option]:bg-white [&>option]:text-red-950'
                     }`}
                   >
                     <option value="normal">Normal</option>
@@ -1497,8 +1765,8 @@ export default function AdminDashboard() {
                     onChange={(e) => setBankFormData({ ...bankFormData, accountName: e.target.value })}
                     className={`h-10 transition-colors ${
                       darkMode 
-                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
-                        : 'bg-red-50 border-red-200 text-red-950 placeholder-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder:text-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-red-50 border-red-200 text-red-950 placeholder:text-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
                     }`}
                   />
                 </div>
@@ -1513,8 +1781,8 @@ export default function AdminDashboard() {
                     onChange={(e) => setBankFormData({ ...bankFormData, accountNumber: e.target.value })}
                     className={`h-10 transition-colors ${
                       darkMode 
-                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
-                        : 'bg-red-50 border-red-200 text-red-950 placeholder-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder:text-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                        : 'bg-red-50 border-red-200 text-red-950 placeholder:text-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
                     }`}
                   />
                 </div>
@@ -1531,8 +1799,8 @@ export default function AdminDashboard() {
                       onChange={(e) => setBankFormData({ ...bankFormData, phoneNumber: e.target.value })}
                       className={`h-10 transition-colors ${
                         darkMode 
-                          ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
-                          : 'bg-red-50 border-red-200 text-red-950 placeholder-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                          ? 'bg-[#0F172A] border-[#FF6B6B]/20 text-white placeholder:text-gray-500 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
+                          : 'bg-red-50 border-red-200 text-red-950 placeholder:text-red-400 focus:border-[#FF6B6B] focus:ring-[#FF6B6B]/50'
                       }`}
                     />
                   </div>
