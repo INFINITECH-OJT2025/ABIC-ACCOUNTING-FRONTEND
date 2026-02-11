@@ -117,6 +117,9 @@ export default function LoginPage() {
                   <p className="text-gray-300 text-lg">
                     Professional accounting management for your business
                   </p>
+                  <p className="text-[#FF8A80] text-base font-semibold pt-2">
+                    ABIC Realty & Consultancy Corporation 2026
+                  </p>
                 </div>
 
                 {/* Decorative dots */}
@@ -257,9 +260,14 @@ export default function LoginPage() {
               </div>
 
               {/* Footer */}
-              <p className="text-center text-gray-500 text-xs mt-10 pt-8 border-t border-gray-700/30 font-light">
-                © 2026 ABIC Accounting System. All rights reserved.
-              </p>
+              <div className="text-center text-gray-500 text-xs mt-10 pt-8 border-t border-gray-700/30 font-light space-y-1">
+                <p className="text-[#FF8A80] font-semibold text-sm">
+                  ABIC Realty & Consultancy Corporation 2026
+                </p>
+                <p>
+                  © 2026 ABIC Accounting System. All rights reserved.
+                </p>
+              </div>
             </div>
           </div>
         </div>

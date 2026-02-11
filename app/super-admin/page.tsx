@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { AlertCircle, LogOut, Plus, Users, Trash2, Edit2, Phone, Mail, LogIn, X, Menu, ChevronLeft, ChevronDown, Moon, Sun, Shield, Building2, UserCircle, Landmark, Settings, Archive, RotateCcw, Search } from 'lucide-react'
+import { AlertCircle, LogOut, Plus, Users, Trash2, Edit2, Phone, Mail, LogIn, X, Menu, ChevronLeft, ChevronDown, Moon, Sun, Shield, Building2, UserCircle, Landmark, Settings, Archive, RotateCcw, Search, Eye, MoreVertical } from 'lucide-react'
 import Logo from '@/components/logo'
 
 interface Accountant {
@@ -76,6 +76,9 @@ export default function AdminDashboard() {
   const [archivedAccountants, setArchivedAccountants] = useState<Accountant[]>([])
   const [archivedOwnerAccounts, setArchivedOwnerAccounts] = useState<OwnerAccount[]>([])
   const [archivedBankAccounts, setArchivedBankAccounts] = useState<BankAccount[]>([])
+  const [dropdownOpen, setDropdownOpen] = useState<number | null>(null)
+  const [ownerDropdownOpen, setOwnerDropdownOpen] = useState<number | null>(null)
+  const [bankDropdownOpen, setBankDropdownOpen] = useState<number | null>(null)
 
   useEffect(() => {
     const fetchMe = async () => {
@@ -630,6 +633,7 @@ export default function AdminDashboard() {
                     className={`rounded-2xl p-6 border card-hover group relative overflow-hidden transition-colors ${
                       darkMode ? 'glass-effect' : 'bg-white border-red-200 shadow-md hover:shadow-xl'
                     }`}
+                    onMouseLeave={() => setDropdownOpen(null)}
                   >
                     {/* Gradient overlay on hover */}
                     <div className="absolute inset-0 bg-gradient-to-r from-[#FF6B6B]/0 to-[#FF8A80]/0 group-hover:from-[#FF6B6B]/5 group-hover:to-[#FF8A80]/5 transition-all pointer-events-none"></div>
@@ -647,10 +651,81 @@ export default function AdminDashboard() {
                             {acc.role}
                           </span>
                         </div>
+                        
+                        {/* 3-dot menu */}
+                        <div className="relative">
+                          <button
+                            onMouseEnter={() => setDropdownOpen(acc.id)}
+                            onClick={() => setDropdownOpen(dropdownOpen === acc.id ? null : acc.id)}
+                            className={`cursor-pointer p-2 rounded-lg transition-all ${
+                              darkMode
+                                ? 'hover:bg-[#FF6B6B]/10 text-gray-400 hover:text-[#FF8A80]'
+                                : 'hover:bg-red-50 text-red-400 hover:text-red-600'
+                            }`}
+                          >
+                            <MoreVertical className="w-5 h-5" />
+                          </button>
+                          
+                          {/* Dropdown Menu */}
+                          {dropdownOpen === acc.id && (
+                            <div className={`absolute right-0 mt-2 w-48 rounded-lg shadow-xl border z-50 ${
+                              darkMode
+                                ? 'bg-[#1E293B] border-[#FF6B6B]/20'
+                                : 'bg-white border-red-200'
+                            }`}>
+                              <div className="py-1">
+                                <button
+                                  onClick={() => {
+                                    setDropdownOpen(null)
+                                    // View functionality - you can implement this
+                                    console.log('View accountant:', acc)
+                                  }}
+                                  className={`w-full px-4 py-2 text-sm flex items-center gap-3 transition-colors ${
+                                    darkMode
+                                      ? 'hover:bg-[#FF6B6B]/10 text-gray-300 hover:text-white'
+                                      : 'hover:bg-red-50 text-red-950 hover:text-red-900'
+                                  }`}
+                                >
+                                  <Eye className="w-4 h-4" />
+                                  View
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setDropdownOpen(null)
+                                    handleEditAccountant(acc)
+                                  }}
+                                  className={`w-full px-4 py-2 text-sm flex items-center gap-3 transition-colors ${
+                                    darkMode
+                                      ? 'hover:bg-[#FF6B6B]/10 text-gray-300 hover:text-white'
+                                      : 'hover:bg-red-50 text-red-950 hover:text-red-900'
+                                  }`}
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setDropdownOpen(null)
+                                    setDeleteTargetId(acc.id)
+                                    setShowDeleteAccountantConfirm(true)
+                                  }}
+                                  className={`w-full px-4 py-2 text-sm flex items-center gap-3 transition-colors ${
+                                    darkMode
+                                      ? 'hover:bg-red-900/20 text-red-400 hover:text-red-300'
+                                      : 'hover:bg-red-50 text-red-600 hover:text-red-700'
+                                  }`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       {/* Info */}
-                      <div className="space-y-3 mb-6">
+                      <div className="space-y-3 mb-4">
                         <div className={`flex items-center gap-3 transition-colors ${
                           darkMode ? 'text-gray-300' : 'text-red-950'
                         }`}>
@@ -667,35 +742,6 @@ export default function AdminDashboard() {
                             {acc.phone}
                           </a>
                         </div>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex gap-2 pt-4 border-t border-[#FF6B6B]/10">
-                        <button
-                          onClick={() => handleEditAccountant(acc)}
-                          className={`cursor-pointer flex-1 px-3 py-2 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
-                            darkMode
-                              ? 'bg-[#FF6B6B]/10 hover:bg-[#FF6B6B]/20 text-[#FF8A80]'
-                              : 'bg-red-900/10 hover:bg-red-900/20 text-red-900'
-                          }`}
-                        >
-                          <Edit2 className="w-4 h-4" />
-                          <span className="hidden sm:inline">Edit</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            setDeleteTargetId(acc.id)
-                            setShowDeleteAccountantConfirm(true)
-                          }}
-                          className={`cursor-pointer flex-1 px-3 py-2 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
-                            darkMode
-                              ? 'bg-red-900/20 hover:bg-red-900/40 text-red-400'
-                              : 'bg-red-900/10 hover:bg-red-900/20 text-red-900'
-                          }`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          <span className="hidden sm:inline">Delete</span>
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -956,6 +1002,7 @@ export default function AdminDashboard() {
                   className={`rounded-2xl p-6 border transition-colors ${
                     darkMode ? 'glass-effect' : 'bg-white border-gray-200 shadow-md'
                   }`}
+                  onMouseLeave={() => setOwnerDropdownOpen(null)}
                 >
                   <div className="flex items-start gap-3 mb-4">
                     <div className="p-3 bg-[#FF6B6B]/10 rounded-lg">
@@ -965,6 +1012,77 @@ export default function AdminDashboard() {
                       <h3 className={`font-bold text-lg transition-colors ${
                         darkMode ? 'text-white' : 'text-red-950'
                       }`}>{account.accountName}</h3>
+                    </div>
+                    
+                    {/* 3-dot menu */}
+                    <div className="relative">
+                      <button
+                        onMouseEnter={() => setOwnerDropdownOpen(account.id)}
+                        onClick={() => setOwnerDropdownOpen(ownerDropdownOpen === account.id ? null : account.id)}
+                        className={`cursor-pointer p-2 rounded-lg transition-all ${
+                          darkMode
+                            ? 'hover:bg-[#FF6B6B]/10 text-gray-400 hover:text-[#FF8A80]'
+                            : 'hover:bg-red-50 text-red-400 hover:text-red-600'
+                        }`}
+                      >
+                        <MoreVertical className="w-5 h-5" />
+                      </button>
+                      
+                      {/* Dropdown Menu */}
+                      {ownerDropdownOpen === account.id && (
+                        <div className={`absolute right-0 mt-2 w-48 rounded-lg shadow-xl border z-50 ${
+                          darkMode
+                            ? 'bg-[#1E293B] border-[#FF6B6B]/20'
+                            : 'bg-white border-red-200'
+                        }`}>
+                          <div className="py-1">
+                            <button
+                              onClick={() => {
+                                setOwnerDropdownOpen(null)
+                                router.push('/owners')
+                              }}
+                              className={`w-full px-4 py-2 text-sm flex items-center gap-3 transition-colors ${
+                                darkMode
+                                  ? 'hover:bg-[#FF6B6B]/10 text-gray-300 hover:text-white'
+                                  : 'hover:bg-red-50 text-red-950 hover:text-red-900'
+                              }`}
+                            >
+                              <Eye className="w-4 h-4" />
+                              View
+                            </button>
+                            <button
+                              onClick={() => {
+                                setOwnerDropdownOpen(null)
+                                // Edit functionality - you can implement this
+                                console.log('Edit owner account:', account)
+                              }}
+                              className={`w-full px-4 py-2 text-sm flex items-center gap-3 transition-colors ${
+                                darkMode
+                                  ? 'hover:bg-[#FF6B6B]/10 text-gray-300 hover:text-white'
+                                  : 'hover:bg-red-50 text-red-950 hover:text-red-900'
+                              }`}
+                            >
+                              <Edit2 className="w-4 h-4" />
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => {
+                                setOwnerDropdownOpen(null)
+                                setDeleteTargetId(account.id)
+                                setShowDeleteOwnerConfirm(true)
+                              }}
+                              className={`w-full px-4 py-2 text-sm flex items-center gap-3 transition-colors ${
+                                darkMode
+                                  ? 'hover:bg-red-900/20 text-red-400 hover:text-red-300'
+                                  : 'hover:bg-red-50 text-red-600 hover:text-red-700'
+                              }`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="space-y-3">
@@ -984,22 +1102,6 @@ export default function AdminDashboard() {
                         darkMode ? 'text-gray-300' : 'text-red-900'
                       }`}>{account.bankDetails}</p>
                     </div>
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-[#FF6B6B]/10 flex gap-2">
-                    <button
-                      onClick={() => {
-                        setDeleteTargetId(account.id)
-                        setShowDeleteOwnerConfirm(true)
-                      }}
-                      className={`cursor-pointer flex-1 px-3 py-2 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
-                        darkMode
-                          ? 'bg-red-900/20 hover:bg-red-900/40 text-red-400'
-                          : 'bg-red-900/10 hover:bg-red-900/20 text-red-900'
-                      }`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      <span className="hidden sm:inline">Delete</span>
-                    </button>
                   </div>
                 </div>
               ))}
@@ -1072,6 +1174,7 @@ export default function AdminDashboard() {
                   className={`rounded-2xl p-6 border transition-colors ${
                     darkMode ? 'glass-effect' : 'bg-white border-red-200 shadow-md'
                   }`}
+                  onMouseLeave={() => setBankDropdownOpen(null)}
                 >
                   <div className="flex items-start gap-3 mb-4">
                     <div className="p-3 bg-[#FF6B6B]/10 rounded-lg">
@@ -1088,6 +1191,63 @@ export default function AdminDashboard() {
                             ? 'bg-blue-500/20 text-blue-400'
                             : 'bg-red-800 text-red-50'
                       }`}>{account.bank}</span>
+                    </div>
+                    
+                    {/* 3-dot menu */}
+                    <div className="relative">
+                      <button
+                        onMouseEnter={() => setBankDropdownOpen(account.id)}
+                        onClick={() => setBankDropdownOpen(bankDropdownOpen === account.id ? null : account.id)}
+                        className={`cursor-pointer p-2 rounded-lg transition-all ${
+                          darkMode
+                            ? 'hover:bg-[#FF6B6B]/10 text-gray-400 hover:text-[#FF8A80]'
+                            : 'hover:bg-red-50 text-red-400 hover:text-red-600'
+                        }`}
+                      >
+                        <MoreVertical className="w-5 h-5" />
+                      </button>
+                      
+                      {/* Dropdown Menu */}
+                      {bankDropdownOpen === account.id && (
+                        <div className={`absolute right-0 mt-2 w-48 rounded-lg shadow-xl border z-50 ${
+                          darkMode
+                            ? 'bg-[#1E293B] border-[#FF6B6B]/20'
+                            : 'bg-white border-red-200'
+                        }`}>
+                          <div className="py-1">
+                            <button
+                              onClick={() => {
+                                setBankDropdownOpen(null)
+                                // Edit functionality - you can implement this
+                                console.log('Edit bank account:', account)
+                              }}
+                              className={`w-full px-4 py-2 text-sm flex items-center gap-3 transition-colors ${
+                                darkMode
+                                  ? 'hover:bg-[#FF6B6B]/10 text-gray-300 hover:text-white'
+                                  : 'hover:bg-red-50 text-red-950 hover:text-red-900'
+                              }`}
+                            >
+                              <Edit2 className="w-4 h-4" />
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => {
+                                setBankDropdownOpen(null)
+                                setDeleteTargetId(account.id)
+                                setShowDeleteBankConfirm(true)
+                              }}
+                              className={`w-full px-4 py-2 text-sm flex items-center gap-3 transition-colors ${
+                                darkMode
+                                  ? 'hover:bg-red-900/20 text-red-400 hover:text-red-300'
+                                  : 'hover:bg-red-50 text-red-600 hover:text-red-700'
+                              }`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="space-y-3 min-h-[160px]">
@@ -1115,22 +1275,6 @@ export default function AdminDashboard() {
                         darkMode ? 'text-gray-300' : 'text-red-900'
                       }`}>{account.phoneNumber || '—'}</p>
                     </div>
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-[#FF6B6B]/10 flex gap-2">
-                    <button
-                      onClick={() => {
-                        setDeleteTargetId(account.id)
-                        setShowDeleteBankConfirm(true)
-                      }}
-                      className={`cursor-pointer flex-1 px-3 py-2 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
-                        darkMode
-                          ? 'bg-red-900/20 hover:bg-red-900/40 text-red-400'
-                          : 'bg-red-900/10 hover:bg-red-900/20 text-red-900'
-                      }`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      <span className="hidden sm:inline">Delete</span>
-                    </button>
                   </div>
                 </div>
               ))}

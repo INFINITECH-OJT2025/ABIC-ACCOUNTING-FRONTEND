@@ -25,8 +25,10 @@ import {
   Download,
   Printer,
   Eye,
+  MoreVertical,
 } from "lucide-react"
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 
 
 export default function OwnersAccountUI() {
@@ -57,11 +59,11 @@ export default function OwnersAccountUI() {
 
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="min-h-screen flex flex-col bg-[#F9F6F7]">
 
 
       {/* HEADER */}
-      <div className="bg-[#7B0F2B] text-white shadow-md">
+      <div className="bg-gradient-to-r from-[#7B0F2B] to-[#A4163A] text-white shadow-md">
         <div className="flex items-center justify-between px-6 py-5">
           <div className="flex items-center gap-4">
             <Menu className="w-6 h-6 cursor-pointer" />
@@ -74,7 +76,7 @@ export default function OwnersAccountUI() {
 
 
         {/* NAV */}
-        <div className="hidden md:flex bg-[#6A0D25] text-sm px-6">
+        <div className="hidden md:flex bg-[#6A0D25] text-sm px-6 justify-center">
           {[
             "Owner Accounts",
             "Banks",
@@ -108,6 +110,7 @@ export default function OwnersAccountUI() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
+                <p><span className="font-medium">Bank Name:</span> ---</p>
               <p><span className="font-medium">Account Name:</span> ---</p>
               <p><span className="font-medium">Account Number:</span> ---</p>
             </CardContent>
@@ -130,7 +133,7 @@ export default function OwnersAccountUI() {
 
        {/* SEARCH + ACTION BAR */}
 <Card className="rounded-2xl shadow-md border-none">
-  <CardContent className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5">
+  <CardContent className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5 pt-8">
     {/* SEARCH */}
     <div className="relative w-full md:w-1/3">
       <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
@@ -152,7 +155,7 @@ export default function OwnersAccountUI() {
       </Button>
 
 
-      <Button className="bg-[#7B0F2B] hover:bg-[#5E0C20] text-white rounded-xl transition">
+      <Button className="bg-gradient-to-r from-[#7B0F2B] to-[#A4163A] text-white rounded-xl hover:from-[#5E0C20] hover:to-[#7C102E] transition">
         <Download className="w-4 h-4 mr-2" />
         Export
       </Button>
@@ -181,7 +184,7 @@ export default function OwnersAccountUI() {
   {/* TABLE */}
   <CardContent className="p-0 overflow-x-auto">
     <Table className="min-w-[800px] md:min-w-full">
-      <TableHeader className="bg-gray-50">
+      <TableHeader className="bg-[#F3E8EB]">
         <TableRow>
           <TableHead>Voucher Date</TableHead>
           <TableHead>Voucher No.</TableHead>
@@ -208,7 +211,7 @@ export default function OwnersAccountUI() {
         {currentRows.map((row, idx) => (
           <TableRow
             key={idx}
-            className="hover:bg-gray-50 transition"
+            className="hover:bg-[#F9ECEF] transition"
           >
             <TableCell>--/--/----</TableCell>
             <TableCell>------</TableCell>
@@ -270,7 +273,7 @@ export default function OwnersAccountUI() {
               onClick={() => setCurrentPage(page)}
               className={`rounded-xl ${
                 isActive
-                  ? "bg-[#7B0F2B] text-white"
+                  ? "bg-gradient-to-r from-[#7B0F2B] to-[#A4163A] text-white"
                   : ""
               }`}
             >
@@ -301,7 +304,7 @@ export default function OwnersAccountUI() {
 
 
       {/* FOOTER */}
-<footer className="bg-[#7B0F2B] text-white">
+<footer className="bg-gradient-to-r from-[#7B0F2B] to-[#A4163A] text-white">
   <div className=" max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row items-center justify-between text-xs">
    
     <p className="tracking-wide">
@@ -321,6 +324,8 @@ export default function OwnersAccountUI() {
     </div>
   )
 }
+
+
 
 
 
