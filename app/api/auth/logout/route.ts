@@ -11,7 +11,9 @@ export async function POST() {
       return res
     }
 
-    const backendRes = await fetch('http://127.0.0.1:8000/api/logout', {
+    const backendUrl = process.env.BACKEND_URL ?? 'http://127.0.0.1:8000'
+
+    const backendRes = await fetch(`${backendUrl}/api/logout`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,

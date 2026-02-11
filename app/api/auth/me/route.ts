@@ -10,7 +10,9 @@ export async function GET() {
       return NextResponse.json({ success: false, message: 'Not authenticated' }, { status: 401 })
     }
 
-    const backendRes = await fetch('http://127.0.0.1:8000/api/me', {
+    const backendUrl = process.env.BACKEND_URL ?? 'http://127.0.0.1:8000'
+
+    const backendRes = await fetch(`${backendUrl}/api/me`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
