@@ -277,4 +277,46 @@ class EmployeeController extends Controller
             ], 422);
         }
     }
+
+    /**
+     * Onboard employee with additional details
+     */
+    public function onboard(Request $request, $id)
+    {
+        try {
+            $validated = $request->validate([
+                'position' => 'required|string|max:255',
+                'department' => 'required|string|max:255',
+                'onboarding_date' => 'required|date',
+                'email_assigned' => 'sometimes|nullable|string|email|max:255',
+                'access_level' => 'sometimes|nullable|string|max:255',
+                'equipment_issued' => 'sometimes|nullable|string',
+                'training_completed' => 'sometimes|boolean',
+                'onboarding_notes' => 'sometimes|nullable|string',
+            ]);
+
+            $employee = Employee::find($id);
+
+            if (!$employee) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Employee not found'
+                ], 404);
+            }
+
+            $employee->update($validated);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Employee onboarded successfully',
+                'data' => $employee
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        }
+    }
 }
