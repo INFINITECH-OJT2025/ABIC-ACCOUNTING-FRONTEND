@@ -67,6 +67,160 @@ export default function EmployeeDashboardPage() {
   const [formData, setFormData] = useState<Partial<Employee>>({})
   const [dataLoaded, setDataLoaded] = useState(false)
 
+  // Address dropdown states
+  const [regions, setRegions] = useState<{ code: string; name: string }[]>([])
+  const [provinces, setProvinces] = useState<{ code: string; name: string }[]>([])
+  const [cities, setCities] = useState<{ code: string; name: string }[]>([])
+  const [barangays, setBarangays] = useState<{ code: string; name: string }[]>([])
+  const [loadingRegions, setLoadingRegions] = useState(false)
+  const [loadingProvinces, setLoadingProvinces] = useState(false)
+  const [loadingCities, setLoadingCities] = useState(false)
+  const [loadingBarangays, setLoadingBarangays] = useState(false)
+
+  // Fetch regions on component mount
+  useEffect(() => {
+    fetchRegions()
+  }, [])
+
+  const fetchRegions = async () => {
+    setLoadingRegions(true)
+    try {
+      const response = await fetch('https://psgc.gitlab.io/api/regions/')
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`)
+      }
+      const data = await response.json()
+      
+      // Ensure data is an array
+      const regionsArray = Array.isArray(data) ? data : data.data || []
+      
+      const regionsList = regionsArray.map((region: any) => ({
+        code: region.code,
+        name: region.name,
+      }))
+      
+      console.log(`Fetched ${regionsList.length} regions`)
+      setRegions(regionsList)
+    } catch (error) {
+      console.error('Error fetching regions:', error)
+      setRegions([])
+    } finally {
+      setLoadingRegions(false)
+    }
+  }
+
+  const fetchProvinces = async (regionCode: string) => {
+    if (!regionCode) {
+      setProvinces([])
+      setCities([])
+      setBarangays([])
+      return
+    }
+
+    setLoadingProvinces(true)
+    try {
+      const response = await fetch(`https://psgc.gitlab.io/api/regions/${regionCode}/provinces/`)
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`)
+      }
+      const data = await response.json()
+      
+      // Ensure data is an array
+      const provincesArray = Array.isArray(data) ? data : data.data || []
+      
+      const provincesList = provincesArray.map((province: any) => ({
+        code: province.code,
+        name: province.name,
+      }))
+      
+      console.log(`Fetched ${provincesList.length} provinces for region ${regionCode}`)
+      setProvinces(provincesList)
+      setCities([])
+      setBarangays([])
+      setFormData((prev) => ({ ...prev, province: '', city_municipality: '', barangay: '' }))
+    } catch (error) {
+      console.error('Error fetching provinces:', error)
+      setProvinces([])
+    } finally {
+      setLoadingProvinces(false)
+    }
+  }
+
+  const fetchCities = async (provinceCode: string) => {
+    if (!provinceCode) {
+      setCities([])
+      setBarangays([])
+      return
+    }
+
+    setLoadingCities(true)
+    try {
+      // Fetch both cities and municipalities for the province
+      const citiesResponse = await fetch(`https://psgc.gitlab.io/api/provinces/${provinceCode}/cities/`)
+      const municipalitiesResponse = await fetch(`https://psgc.gitlab.io/api/provinces/${provinceCode}/municipalities/`)
+      
+      if (!citiesResponse.ok && !municipalitiesResponse.ok) {
+        throw new Error(`API error`)
+      }
+      
+      const citiesData = citiesResponse.ok ? await citiesResponse.json() : []
+      const municipalitiesData = municipalitiesResponse.ok ? await municipalitiesResponse.json() : []
+      
+      // Ensure data is arrays
+      const citiesArray = Array.isArray(citiesData) ? citiesData : citiesData.data || []
+      const municipalitiesArray = Array.isArray(municipalitiesData) ? municipalitiesData : municipalitiesData.data || []
+      
+      // Combine both cities and municipalities
+      const allCities = [...citiesArray, ...municipalitiesArray].map((city: any) => ({
+        code: city.code,
+        name: city.name,
+      }))
+      
+      console.log(`Fetched ${allCities.length} cities/municipalities for province ${provinceCode}`)
+      setCities(allCities)
+      setBarangays([])
+      setFormData((prev) => ({ ...prev, city_municipality: '', barangay: '' }))
+    } catch (error) {
+      console.error('Error fetching cities:', error)
+      setCities([])
+    } finally {
+      setLoadingCities(false)
+    }
+  }
+
+  const fetchBarangays = async (cityCode: string) => {
+    if (!cityCode) {
+      setBarangays([])
+      return
+    }
+
+    setLoadingBarangays(true)
+    try {
+      const response = await fetch(`https://psgc.gitlab.io/api/cities/${cityCode}/barangays/`)
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`)
+      }
+      const data = await response.json()
+      
+      // Ensure data is an array
+      const barangaysArray = Array.isArray(data) ? data : data.data || []
+      
+      const barangaysList = barangaysArray.map((barangay: any) => ({
+        code: barangay.code,
+        name: barangay.name,
+      }))
+      
+      console.log(`Fetched ${barangaysList.length} barangays for city ${cityCode}`)
+      setBarangays(barangaysList)
+      setFormData((prev) => ({ ...prev, barangay: '' }))
+    } catch (error) {
+      console.error('Error fetching barangays:', error)
+      setBarangays([])
+    } finally {
+      setLoadingBarangays(false)
+    }
+  }
+
   useEffect(() => {
     const checkAuthAndFetchProfile = async () => {
       const email = localStorage.getItem('employee_email')
@@ -142,6 +296,15 @@ export default function EmployeeDashboardPage() {
       ...prev,
       [name]: value,
     }))
+
+    // Handle cascading address dropdowns
+    if (name === 'region') {
+      fetchProvinces(value)
+    } else if (name === 'province') {
+      fetchCities(value)
+    } else if (name === 'city_municipality') {
+      fetchBarangays(value)
+    }
   }
 
   const handleSave = async () => {
@@ -517,18 +680,6 @@ export default function EmployeeDashboardPage() {
                         className="w-full px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-slate-900"
                       />
                     </div>
-
-                    <div className="border border-gray-300 p-3">
-                      <label className="block text-xs font-bold text-slate-700 mb-1">BARANGAY <span className="text-red-500">*</span></label>
-                      <input
-                        type="text"
-                        name="barangay"
-                        value={formData.barangay || ''}
-                        onChange={handleChange}
-                        disabled={!isEditing}
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-slate-900"
-                      />
-                    </div>
                   </div>
                 </div>
               </div>
@@ -712,38 +863,74 @@ export default function EmployeeDashboardPage() {
                   <div className="space-y-3">
                     <div className="border border-gray-300 p-3">
                       <label className="block text-xs font-bold text-slate-700 mb-1">REGION <span className="text-red-500">*</span></label>
-                      <input
-                        type="text"
+                      <select
                         name="region"
                         value={formData.region || ''}
                         onChange={handleChange}
-                        disabled={!isEditing}
+                        disabled={!isEditing || loadingRegions}
                         className="w-full px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-slate-900"
-                      />
+                      >
+                        <option value="">Select Region...</option>
+                        {regions.map((region) => (
+                          <option key={region.code} value={region.code}>
+                            {region.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
                     <div className="border border-gray-300 p-3">
                       <label className="block text-xs font-bold text-slate-700 mb-1">PROVINCE <span className="text-red-500">*</span></label>
-                      <input
-                        type="text"
+                      <select
                         name="province"
                         value={formData.province || ''}
                         onChange={handleChange}
-                        disabled={!isEditing}
+                        disabled={!isEditing || !formData.region || loadingProvinces}
                         className="w-full px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-slate-900"
-                      />
+                      >
+                        <option value="">Select Province...</option>
+                        {provinces.map((province) => (
+                          <option key={province.code} value={province.code}>
+                            {province.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
                     <div className="border border-gray-300 p-3">
                       <label className="block text-xs font-bold text-slate-700 mb-1">CITY / MUNICIPALITY <span className="text-red-500">*</span></label>
-                      <input
-                        type="text"
+                      <select
                         name="city_municipality"
                         value={formData.city_municipality || ''}
                         onChange={handleChange}
-                        disabled={!isEditing}
+                        disabled={!isEditing || !formData.province || loadingCities}
                         className="w-full px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-slate-900"
-                      />
+                      >
+                        <option value="">Select City / Municipality...</option>
+                        {cities.map((city) => (
+                          <option key={city.code} value={city.code}>
+                            {city.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="border border-gray-300 p-3">
+                      <label className="block text-xs font-bold text-slate-700 mb-1">BARANGAY <span className="text-red-500">*</span></label>
+                      <select
+                        name="barangay"
+                        value={formData.barangay || ''}
+                        onChange={handleChange}
+                        disabled={!isEditing || !formData.city_municipality || loadingBarangays}
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-slate-900"
+                      >
+                        <option value="">Select Barangay...</option>
+                        {barangays.map((barangay) => (
+                          <option key={barangay.code} value={barangay.code}>
+                            {barangay.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
                     <div className="border border-gray-300 p-3">
