@@ -139,10 +139,8 @@ export default function MasterfilePage() {
       'province',
       'city_municipality',
       'zip_code',
-      'mothers_maiden_name',
       'mlast_name',
       'mfirst_name',
-      'fathers_name',
       'flast_name',
       'ffirst_name',
     ]
@@ -371,12 +369,8 @@ export default function MasterfilePage() {
               <div className="mb-8">
                 <h3 className="text-lg font-bold text-slate-900 mb-4 pb-2 border-b-2 border-slate-200">FAMILY INFORMATION</h3>
                 <div className="mb-6">
-                  <p className="text-slate-700 font-semibold mb-3">Mother's Information</p>
+                  <p className="text-slate-700 font-semibold mb-3">MOTHER'S MAIDEN NAME</p>
                   <div className="grid grid-cols-2 gap-6 ml-4">
-                    <div>
-                      <p className="text-slate-600 text-sm font-medium mb-1">MOTHER'S MAIDEN NAME <span className="text-red-500">*</span></p>
-                      <p className="text-slate-900 font-medium text-base">{selectedEmployee.mothers_maiden_name || '-'}</p>
-                    </div>
                     <div>
                       <p className="text-slate-600 text-sm font-medium mb-1">MLAST NAME <span className="text-red-500">*</span></p>
                       <p className="text-slate-900 font-medium text-base">{selectedEmployee.mlast_name || '-'}</p>
@@ -396,12 +390,8 @@ export default function MasterfilePage() {
                   </div>
                 </div>
                 <div>
-                  <p className="text-slate-700 font-semibold mb-3">Father's Information</p>
+                  <p className="text-slate-700 font-semibold mb-3">FATHER'S NAME <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
                   <div className="grid grid-cols-2 gap-6 ml-4">
-                    <div>
-                      <p className="text-slate-600 text-sm font-medium mb-1">FATHER'S NAME <span className="text-red-500">*</span></p>
-                      <p className="text-slate-900 font-medium text-base">{selectedEmployee.fathers_name || '-'}</p>
-                    </div>
                     <div>
                       <p className="text-slate-600 text-sm font-medium mb-1">FLAST NAME <span className="text-red-500">*</span></p>
                       <p className="text-slate-900 font-medium text-base">{selectedEmployee.flast_name || '-'}</p>

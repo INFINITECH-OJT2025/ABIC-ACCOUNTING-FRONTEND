@@ -597,124 +597,112 @@ export default function EmployeeDashboardPage() {
                     FAMILY INFORMATION
                   </h2>
                   <div className="space-y-3">
-                    <div className="border border-gray-300 p-3">
-                      <label className="block text-xs font-bold text-slate-700 mb-1">MOTHER'S MAIDEN NAME <span className="text-red-500">*</span></label>
-                      <input
-                        type="text"
-                        name="mothers_maiden_name"
-                        value={formData.mothers_maiden_name || ''}
-                        onChange={handleChange}
-                        disabled={!isEditing}
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-slate-900"
-                      />
+                    {/* Mother's Information */}
+                    <div className="border border-gray-300 p-3 bg-gray-50">
+                      <p className="text-xs font-bold text-slate-700 mb-3">MOTHER'S MAIDEN NAME</p>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">MLAST NAME <span className="text-red-500">*</span></label>
+                          <input
+                            type="text"
+                            name="mlast_name"
+                            value={formData.mlast_name || ''}
+                            onChange={handleChange}
+                            disabled={!isEditing}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-slate-900"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">MFIRST NAME <span className="text-red-500">*</span></label>
+                          <input
+                            type="text"
+                            name="mfirst_name"
+                            value={formData.mfirst_name || ''}
+                            onChange={handleChange}
+                            disabled={!isEditing}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-slate-900"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">MMIDDLE NAME <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></label>
+                          <input
+                            type="text"
+                            name="mmiddle_name"
+                            value={formData.mmiddle_name || ''}
+                            onChange={handleChange}
+                            disabled={!isEditing}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-slate-900"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">MSUFFIX <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></label>
+                          <input
+                            type="text"
+                            name="msuffix"
+                            value={formData.msuffix || ''}
+                            onChange={handleChange}
+                            disabled={!isEditing}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-slate-900"
+                          />
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="border border-gray-300 p-3">
-                      <label className="block text-xs font-bold text-slate-700 mb-1">MLAST NAME <span className="text-red-500">*</span></label>
-                      <input
-                        type="text"
-                        name="mlast_name"
-                        value={formData.mlast_name || ''}
-                        onChange={handleChange}
-                        disabled={!isEditing}
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-slate-900"
-                      />
-                    </div>
+                    {/* Father's Information */}
+                    <div className="border border-gray-300 p-3 bg-gray-50">
+                      <p className="text-xs font-bold text-slate-700 mb-3">FATHER'S NAME <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">FLAST NAME <span className="text-red-500">*</span></label>
+                          <input
+                            type="text"
+                            name="flast_name"
+                            value={formData.flast_name || ''}
+                            onChange={handleChange}
+                            disabled={!isEditing}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-slate-900"
+                          />
+                        </div>
 
-                    <div className="border border-gray-300 p-3">
-                      <label className="block text-xs font-bold text-slate-700 mb-1">MFIRST NAME <span className="text-red-500">*</span></label>
-                      <input
-                        type="text"
-                        name="mfirst_name"
-                        value={formData.mfirst_name || ''}
-                        onChange={handleChange}
-                        disabled={!isEditing}
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-slate-900"
-                      />
-                    </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">FFIRST NAME <span className="text-red-500">*</span></label>
+                          <input
+                            type="text"
+                            name="ffirst_name"
+                            value={formData.ffirst_name || ''}
+                            onChange={handleChange}
+                            disabled={!isEditing}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-slate-900"
+                          />
+                        </div>
 
-                    <div className="border border-gray-300 p-3">
-                      <label className="block text-xs font-bold text-slate-700 mb-1">MMIDDLE NAME <span className="text-red-500">*</span></label>
-                      <input
-                        type="text"
-                        name="mmiddle_name"
-                        value={formData.mmiddle_name || ''}
-                        onChange={handleChange}
-                        disabled={!isEditing}
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-slate-900"
-                      />
-                    </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">FMIDDLE NAME <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></label>
+                          <input
+                            type="text"
+                            name="fmiddle_name"
+                            value={formData.fmiddle_name || ''}
+                            onChange={handleChange}
+                            disabled={!isEditing}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-slate-900"
+                          />
+                        </div>
 
-                    <div className="border border-gray-300 p-3">
-                      <label className="block text-xs font-bold text-slate-700 mb-1">MSUFIX <span className="text-red-500 text-xs">NOT REQUIRED</span></label>
-                      <input
-                        type="text"
-                        name="msuffix"
-                        value={formData.msuffix || ''}
-                        onChange={handleChange}
-                        disabled={!isEditing}
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-slate-900"
-                      />
-                    </div>
-
-                    <div className="border border-gray-300 p-3">
-                      <label className="block text-xs font-bold text-slate-700 mb-1">FATHER'S NAME <span className="text-red-500">*</span></label>
-                      <input
-                        type="text"
-                        name="fathers_name"
-                        value={formData.fathers_name || ''}
-                        onChange={handleChange}
-                        disabled={!isEditing}
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-slate-900"
-                      />
-                    </div>
-
-                    <div className="border border-gray-300 p-3">
-                      <label className="block text-xs font-bold text-slate-700 mb-1">FLAST NAME <span className="text-red-500">*</span></label>
-                      <input
-                        type="text"
-                        name="flast_name"
-                        value={formData.flast_name || ''}
-                        onChange={handleChange}
-                        disabled={!isEditing}
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-slate-900"
-                      />
-                    </div>
-
-                    <div className="border border-gray-300 p-3">
-                      <label className="block text-xs font-bold text-slate-700 mb-1">FFIRST NAME <span className="text-red-500">*</span></label>
-                      <input
-                        type="text"
-                        name="ffirst_name"
-                        value={formData.ffirst_name || ''}
-                        onChange={handleChange}
-                        disabled={!isEditing}
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-slate-900"
-                      />
-                    </div>
-
-                    <div className="border border-gray-300 p-3">
-                      <label className="block text-xs font-bold text-slate-700 mb-1">FMIDDLE NAME <span className="text-red-500">*</span></label>
-                      <input
-                        type="text"
-                        name="fmiddle_name"
-                        value={formData.fmiddle_name || ''}
-                        onChange={handleChange}
-                        disabled={!isEditing}
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-slate-900"
-                      />
-                    </div>
-
-                    <div className="border border-gray-300 p-3">
-                      <label className="block text-xs font-bold text-slate-700 mb-1">FSUFIX</label>
-                      <input
-                        type="text"
-                        name="fsuffix"
-                        value={formData.fsuffix || ''}
-                        onChange={handleChange}
-                        disabled={!isEditing}
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-slate-900"
-                      />
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">FSUFFIX <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></label>
+                          <input
+                            type="text"
+                            name="fsuffix"
+                            value={formData.fsuffix || ''}
+                            onChange={handleChange}
+                            disabled={!isEditing}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-slate-900"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

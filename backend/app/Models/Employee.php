@@ -33,12 +33,10 @@ class Employee extends Model
         'tin_number',
         
         // Family Information
-        'mothers_maiden_name',
         'mlast_name',
         'mfirst_name',
         'mmiddle_name',
         'msuffix',
-        'fathers_name',
         'flast_name',
         'ffirst_name',
         'fmiddle_name',
