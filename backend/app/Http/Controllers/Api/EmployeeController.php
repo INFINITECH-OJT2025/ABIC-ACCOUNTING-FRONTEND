@@ -45,6 +45,7 @@ class EmployeeController extends Controller
                 'last_name' => $validated['last_name'],
                 'email' => $validated['email'],
                 'password' => $hashedPassword,
+                'status' => 'pending', // Default status
             ]);
 
             // Send welcome email with password
@@ -124,6 +125,7 @@ class EmployeeController extends Controller
                 'zip_code' => 'sometimes|nullable|string|max:255',
                 'email_address' => 'sometimes|nullable|string|max:255',
                 'password' => 'sometimes|nullable|string|min:6',
+                'status' => 'sometimes|in:pending,approved,terminated',
             ]);
 
             if (isset($validated['password'])) {

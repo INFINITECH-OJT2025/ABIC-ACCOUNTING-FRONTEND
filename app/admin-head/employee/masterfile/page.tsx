@@ -3,22 +3,61 @@
 import React, { useEffect, useState } from 'react'
 import { EmployeeRegistrationForm } from '@/components/employee-registration-form'
 import { getApiUrl } from '@/lib/api'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 
 interface Employee {
   id: number
   first_name: string
   last_name: string
   email: string
+  position: string
+  status: 'pending' | 'approved' | 'terminated'
   created_at: string
+}
+
+interface EmployeeDetails extends Employee {
+  [key: string]: any
+}
+
+const statusBadgeColors = {
+  pending: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+  approved: 'bg-green-100 text-green-800 border-green-300',
+  terminated: 'bg-red-100 text-red-800 border-red-300',
+}
+
+const statusLabels = {
+  pending: 'Pending',
+  approved: 'Approved',
+  terminated: 'Terminated',
 }
 
 export default function MasterfilePage() {
   const [employees, setEmployees] = useState<Employee[]>([])
+  const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeDetails | null>(null)
+  const [showDetailModal, setShowDetailModal] = useState(false)
+  const [updatingStatus, setUpdatingStatus] = useState(false)
 
   useEffect(() => {
     fetchEmployees()
   }, [])
+
+  useEffect(() => {
+    const filtered = employees.filter((emp) => {
+      const query = searchQuery.toLowerCase()
+      return (
+        emp.first_name?.toLowerCase().includes(query) ||
+        emp.last_name?.toLowerCase().includes(query) ||
+        emp.email?.toLowerCase().includes(query) ||
+        emp.position?.toLowerCase().includes(query)
+      )
+    })
+    setFilteredEmployees(filtered)
+  }, [searchQuery, employees])
 
   const fetchEmployees = async () => {
     try {
@@ -32,6 +71,89 @@ export default function MasterfilePage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const fetchEmployeeDetails = async (employeeId: number) => {
+    try {
+      const response = await fetch(`${getApiUrl()}/api/employees/${employeeId}`)
+      const data = await response.json()
+      if (data.success) {
+        setSelectedEmployee(data.data)
+        setShowDetailModal(true)
+      }
+    } catch (error) {
+      console.error('Error fetching employee details:', error)
+    }
+  }
+
+  const handleStatusUpdate = async (newStatus: 'pending' | 'approved' | 'terminated') => {
+    if (!selectedEmployee) return
+
+    setUpdatingStatus(true)
+    try {
+      const response = await fetch(`${getApiUrl()}/api/employees/${selectedEmployee.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        // Update employee in list
+        setEmployees(employees.map(emp =>
+          emp.id === selectedEmployee.id ? { ...emp, status: newStatus } : emp
+        ))
+        // Update selected employee
+        setSelectedEmployee({ ...selectedEmployee, status: newStatus })
+        // Show success message
+        alert(`Employee status updated to ${statusLabels[newStatus]}`)
+      } else {
+        alert('Failed to update status')
+      }
+    } catch (error) {
+      console.error('Error updating status:', error)
+      alert('Error updating status')
+    } finally {
+      setUpdatingStatus(false)
+    }
+  }
+
+  const isEmployeeComplete = (employee: EmployeeDetails): boolean => {
+    // Check if all required fields are filled
+    const requiredFields = [
+      'first_name',
+      'last_name',
+      'email',
+      'position',
+      'date_hired',
+      'birthday',
+      'birthplace',
+      'civil_status',
+      'gender',
+      'mobile_number',
+      'street',
+      'barangay',
+      'region',
+      'province',
+      'city_municipality',
+      'zip_code',
+      'mothers_maiden_name',
+      'mlast_name',
+      'mfirst_name',
+      'fathers_name',
+      'flast_name',
+      'ffirst_name',
+    ]
+
+    for (const field of requiredFields) {
+      const value = employee[field]
+      if (!value || (typeof value === 'string' && value.trim() === '')) {
+        return false
+      }
+    }
+    return true
   }
 
   return (
@@ -50,10 +172,25 @@ export default function MasterfilePage() {
           <div className="bg-white p-6 rounded-lg shadow">
             <h2 className="text-2xl font-bold text-slate-900 mb-4">Employee List</h2>
 
+            {/* Search Bar */}
+            <div className="mb-6">
+              <Input
+                type="text"
+                placeholder="Search by name, email, or position..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full"
+              />
+            </div>
+
             {loading ? (
               <p className="text-slate-500">Loading employees...</p>
-            ) : employees.length === 0 ? (
-              <p className="text-slate-500">No employees found. Create one using the form.</p>
+            ) : filteredEmployees.length === 0 ? (
+              <p className="text-slate-500">
+                {employees.length === 0
+                  ? 'No employees found. Create one using the form.'
+                  : 'No employees match your search.'}
+              </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -61,16 +198,34 @@ export default function MasterfilePage() {
                     <tr className="border-b border-slate-200">
                       <th className="text-left py-3 px-4 font-semibold text-slate-900">Name</th>
                       <th className="text-left py-3 px-4 font-semibold text-slate-900">Email</th>
+                      <th className="text-left py-3 px-4 font-semibold text-slate-900">Position</th>
+                      <th className="text-left py-3 px-4 font-semibold text-slate-900">Status</th>
                       <th className="text-left py-3 px-4 font-semibold text-slate-900">Created</th>
+                      <th className="text-left py-3 px-4 font-semibold text-slate-900">Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {employees.map((employee) => (
+                    {filteredEmployees.map((employee) => (
                       <tr key={employee.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="py-3 px-4 text-slate-700">{employee.first_name} {employee.last_name}</td>
+                        <td className="py-3 px-4 text-slate-700 font-medium">{employee.first_name} {employee.last_name}</td>
                         <td className="py-3 px-4 text-slate-700">{employee.email}</td>
+                        <td className="py-3 px-4 text-slate-700">{employee.position || '-'}</td>
+                        <td className="py-3 px-4">
+                          <Badge className={`${statusBadgeColors[employee.status]} border`}>
+                            {statusLabels[employee.status]}
+                          </Badge>
+                        </td>
                         <td className="py-3 px-4 text-slate-500 text-sm">
                           {new Date(employee.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="py-3 px-4">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => fetchEmployeeDetails(employee.id)}
+                          >
+                            View
+                          </Button>
                         </td>
                       </tr>
                     ))}
@@ -81,6 +236,271 @@ export default function MasterfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Employee Detail Modal */}
+      {showDetailModal && selectedEmployee && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[95vh] overflow-y-auto">
+            <div className="p-6 border-b border-slate-200 sticky top-0 bg-white">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold text-slate-900">
+                  {selectedEmployee.first_name} {selectedEmployee.last_name}
+                </h2>
+                <button
+                  onClick={() => setShowDetailModal(false)}
+                  className="text-slate-500 hover:text-slate-700 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+              {/* Current Status Badge */}
+              <div className="flex items-center gap-3">
+                <span className="text-slate-600 font-medium">Current Status:</span>
+                <Badge className={`${statusBadgeColors[selectedEmployee.status]} border text-base py-1 px-3`}>
+                  {statusLabels[selectedEmployee.status]}
+                </Badge>
+              </div>
+            </div>
+
+            <div className="p-6">
+              {/* EMPLOYEE DETAILS */}
+              <div className="mb-8">
+                <h3 className="text-lg font-bold text-slate-900 mb-4 pb-2 border-b-2 border-slate-200">EMPLOYEE DETAILS</h3>
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">POSITION <span className="text-red-500">*</span></p>
+                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.position || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">DATE HIRED <span className="text-red-500">*</span></p>
+                    <p className="text-slate-900 font-medium text-base">
+                      {selectedEmployee.date_hired
+                        ? new Date(selectedEmployee.date_hired).toLocaleDateString()
+                        : '-'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* PERSONAL INFORMATION */}
+              <div className="mb-8">
+                <h3 className="text-lg font-bold text-slate-900 mb-4 pb-2 border-b-2 border-slate-200">PERSONAL INFORMATION</h3>
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">LAST NAME <span className="text-red-500">*</span></p>
+                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.last_name || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">FIRST NAME <span className="text-red-500">*</span></p>
+                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.first_name || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">MIDDLE NAME <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
+                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.middle_name || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">SUFFIX <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
+                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.suffix || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">BIRTHDAY <span className="text-red-500">*</span></p>
+                    <p className="text-slate-900 font-medium text-base">
+                      {selectedEmployee.birthday
+                        ? new Date(selectedEmployee.birthday).toLocaleDateString()
+                        : '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">BIRTHPLACE <span className="text-red-500">*</span></p>
+                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.birthplace || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">CIVIL_STATUS <span className="text-red-500">*</span></p>
+                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.civil_status || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">GENDER <span className="text-red-500">*</span></p>
+                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.gender || '-'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* CONTACT INFORMATION */}
+              <div className="mb-8">
+                <h3 className="text-lg font-bold text-slate-900 mb-4 pb-2 border-b-2 border-slate-200">CONTACT INFORMATION</h3>
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">MOBILE NUMBER <span className="text-red-500">*</span></p>
+                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.mobile_number || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">PHONE NUMBER <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
+                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.phone_number || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">EMAIL ADDRESS <span className="text-red-500">*</span></p>
+                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.email_address || selectedEmployee.email || '-'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* GOVERNMENT ID NUMBERS */}
+              <div className="mb-8">
+                <h3 className="text-lg font-bold text-slate-900 mb-4 pb-2 border-b-2 border-slate-200">GOVERNMENT ID NUMBERS</h3>
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">SSS NUMBER <span className="text-slate-400 text-xs">(can be N/A)</span></p>
+                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.sss_number || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">PHILHEALTH NUMBER <span className="text-slate-400 text-xs">(can be N/A)</span></p>
+                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.philhealth_number || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">PAG-IBIG NUMBER <span className="text-slate-400 text-xs">(can be N/A)</span></p>
+                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.pagibig_number || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">TIN NUMBER <span className="text-slate-400 text-xs">(can be N/A)</span></p>
+                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.tin_number || '-'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* FAMILY INFORMATION */}
+              <div className="mb-8">
+                <h3 className="text-lg font-bold text-slate-900 mb-4 pb-2 border-b-2 border-slate-200">FAMILY INFORMATION</h3>
+                <div className="mb-6">
+                  <p className="text-slate-700 font-semibold mb-3">Mother's Information</p>
+                  <div className="grid grid-cols-2 gap-6 ml-4">
+                    <div>
+                      <p className="text-slate-600 text-sm font-medium mb-1">MOTHER'S MAIDEN NAME <span className="text-red-500">*</span></p>
+                      <p className="text-slate-900 font-medium text-base">{selectedEmployee.mothers_maiden_name || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-600 text-sm font-medium mb-1">MLAST NAME <span className="text-red-500">*</span></p>
+                      <p className="text-slate-900 font-medium text-base">{selectedEmployee.mlast_name || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-600 text-sm font-medium mb-1">MFIRST NAME <span className="text-red-500">*</span></p>
+                      <p className="text-slate-900 font-medium text-base">{selectedEmployee.mfirst_name || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-600 text-sm font-medium mb-1">MMIDDLE NAME <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
+                      <p className="text-slate-900 font-medium text-base">{selectedEmployee.mmiddle_name || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-600 text-sm font-medium mb-1">MSUFFIX <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
+                      <p className="text-slate-900 font-medium text-base">{selectedEmployee.msuffix || '-'}</p>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-slate-700 font-semibold mb-3">Father's Information</p>
+                  <div className="grid grid-cols-2 gap-6 ml-4">
+                    <div>
+                      <p className="text-slate-600 text-sm font-medium mb-1">FATHER'S NAME <span className="text-red-500">*</span></p>
+                      <p className="text-slate-900 font-medium text-base">{selectedEmployee.fathers_name || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-600 text-sm font-medium mb-1">FLAST NAME <span className="text-red-500">*</span></p>
+                      <p className="text-slate-900 font-medium text-base">{selectedEmployee.flast_name || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-600 text-sm font-medium mb-1">FFIRST NAME <span className="text-red-500">*</span></p>
+                      <p className="text-slate-900 font-medium text-base">{selectedEmployee.ffirst_name || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-600 text-sm font-medium mb-1">FMIDDLE NAME <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
+                      <p className="text-slate-900 font-medium text-base">{selectedEmployee.fmiddle_name || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-600 text-sm font-medium mb-1">FSUFFIX <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
+                      <p className="text-slate-900 font-medium text-base">{selectedEmployee.fsuffix || '-'}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ADDRESS INFORMATION */}
+              <div className="mb-8">
+                <h3 className="text-lg font-bold text-slate-900 mb-4 pb-2 border-b-2 border-slate-200">ADDRESS INFORMATION</h3>
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">HOUSE NUMBER <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
+                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.house_number || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">STREET <span className="text-red-500">*</span></p>
+                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.street || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">VILLAGE <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
+                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.village || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">SUBDIVISION <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
+                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.subdivision || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">BARANGAY <span className="text-red-500">*</span></p>
+                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.barangay || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">REGION <span className="text-red-500">*</span></p>
+                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.region || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">PROVINCE <span className="text-red-500">*</span></p>
+                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.province || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">CITY / MUNICIPALITY <span className="text-red-500">*</span></p>
+                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.city_municipality || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium mb-1">ZIP CODE <span className="text-red-500">*</span></p>
+                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.zip_code || '-'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Requirements Check */}
+              <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-slate-600 text-sm font-medium">
+                  <span className="text-blue-700 font-semibold">ℹ️ Required fields check:</span> All fields marked with <span className="text-red-500">*</span> must be filled to approve this employee.
+                </p>
+              </div>
+            </div>
+
+            {/* Footer with Action Buttons */}
+            <div className="p-6 border-t border-slate-200 bg-slate-50 sticky bottom-0">
+              <div className="flex gap-3 justify-end">
+                <Button
+                  onClick={() => setShowDetailModal(false)}
+                  variant="outline"
+                >
+                  Close
+                </Button>
+                <Button
+                  onClick={() => handleStatusUpdate('approved')}
+                  disabled={updatingStatus || selectedEmployee.status === 'approved' || !isEmployeeComplete(selectedEmployee)}
+                  className={`${!isEmployeeComplete(selectedEmployee) ? 'opacity-50 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
+                >
+                  {updatingStatus ? 'Updating...' : 'Approve Employee'}
+                </Button>
+                <Button
+                  onClick={() => handleStatusUpdate('terminated')}
+                  disabled={updatingStatus || selectedEmployee.status === 'terminated'}
+                  className={`bg-red-600 hover:bg-red-700 text-white ${updatingStatus || selectedEmployee.status === 'terminated' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  Terminate
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

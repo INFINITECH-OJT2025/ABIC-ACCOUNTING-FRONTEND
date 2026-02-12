@@ -10,6 +10,7 @@ class Employee extends Model
         // Basic authentication
         'email',
         'password',
+        'status',
         
         // Employee Details
         'position',
