@@ -14,7 +14,9 @@ export default function Home() {
         const data = await res.json()
         if (res.ok && data.success) {
           const role = data.user?.role
-          if (role === 'super_admin') {
+          if (role === 'admin_head') {
+            router.push('/admin-head')
+          } else if (role === 'super_admin') {
             router.push('/super-admin')
           } else if (role === 'accountant') {
             router.push('/accountant')
@@ -22,10 +24,12 @@ export default function Home() {
             router.push('/login')
           }
         } else {
-          router.push('/login')
+          // Temporarily redirect to admin-head for development
+          router.push('/admin-head')
         }
       } catch (err) {
-        router.push('/login')
+        // Temporarily redirect to admin-head for development
+        router.push('/admin-head')
       } finally {
         setLoading(false)
       }
