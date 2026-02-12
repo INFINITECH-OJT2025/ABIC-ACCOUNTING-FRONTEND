@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
+use App\Models\Termination;
 use App\Mail\EmployeeWelcome;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -317,6 +318,75 @@ class EmployeeController extends Controller
                 'message' => 'Validation failed',
                 'errors' => $e->errors()
             ], 422);
+        }
+    }
+
+    /**
+     * Terminate employee with reason
+     */
+    public function terminate(Request $request, $id)
+    {
+        try {
+            $validated = $request->validate([
+                'termination_date' => 'required|date',
+                'reason' => 'required|string|min:10|max:1000',
+                'notes' => 'sometimes|nullable|string|max:1000',
+                'status' => 'sometimes|in:pending,completed,cancelled',
+            ]);
+
+            $employee = Employee::find($id);
+
+            if (!$employee) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Employee not found'
+                ], 404);
+            }
+
+            // Create termination record
+            $termination = Termination::create([
+                'employee_id' => $employee->id,
+                'termination_date' => $validated['termination_date'],
+                'reason' => $validated['reason'],
+                'notes' => $validated['notes'] ?? null,
+                'status' => $validated['status'] ?? 'completed',
+            ]);
+
+            // Update employee status to terminated
+            $employee->update(['status' => 'terminated']);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Employee terminated successfully',
+                'data' => $termination
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        }
+    }
+
+    /**
+     * Get all terminations
+     */
+    public function getTerminations()
+    {
+        try {
+            $terminations = Termination::with('employee')->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $terminations
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch terminations',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 }

@@ -28,3 +28,7 @@ Route::get('/employees-profile', [EmployeeController::class, 'getProfile']);
 
 // Onboarding routes
 Route::post('/employees/{id}/onboard', [EmployeeController::class, 'onboard']);
+
+// Termination routes
+Route::post('/employees/{id}/terminate', [EmployeeController::class, 'terminate']);
+Route::get('/terminations', [EmployeeController::class, 'getTerminations']);
