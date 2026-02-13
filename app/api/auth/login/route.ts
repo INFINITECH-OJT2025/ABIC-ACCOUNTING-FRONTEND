@@ -96,9 +96,11 @@ export async function POST(req: Request) {
     const res = NextResponse.json({ 
       success: true, 
       message: 'Login successful',
-      user,
-      token_type: data.data?.token_type || 'Bearer',
-      expires_in: data.data?.expires_in || 604800 // 7 days default
+      data: {
+        user,
+        token_type: data.data?.token_type || 'Bearer',
+        expires_in: data.data?.expires_in || 604800 // 7 days default
+      }
     })
 
     // Set secure HTTP-only cookie for token

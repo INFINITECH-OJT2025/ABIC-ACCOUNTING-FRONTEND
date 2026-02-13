@@ -1,399 +1,322 @@
-"use client"
+  "use client"
 
-import React, { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+  import React, { useState, useEffect, useRef } from 'react'
+  import { useRouter } from 'next/navigation'
+  import { Button } from '@/components/ui/button'
+  import { Input } from '@/components/ui/input'
+  import { Alert, AlertDescription } from '@/components/ui/alert'
+  import { AlertCircle, CheckCircle2, ArrowRight, Eye, EyeOff } from 'lucide-react'
 
-interface LoginResponse {
-  success: boolean
-  message: string
-  user?: {
-    id: number
-    name: string
-    email: string
-    role: string
-    account_status: string
-    first_login: boolean
-    password_expires_at?: string
+  interface LoginResponse {
+    success: boolean
+    message: string
+    data?: {
+      token: string
+      token_type: string
+      expires_in: number
+      user: {
+        id: number
+        name: string
+        email: string
+        role: string
+        account_status: string
+        first_login: boolean
+        password_expires_at?: string
+      }
+    }
+    errors?: Record<string, string[]>
+    retry_after?: number
+    requires_password_reset?: boolean
   }
-  errors?: Record<string, string[]>
-  retry_after?: number
-  requires_password_reset?: boolean
-}
 
-export default function LoginPage() {
-  const router = useRouter()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
-  const [retryAfter, setRetryAfter] = useState<number | null>(null)
-  const [countdown, setCountdown] = useState<number | null>(null)
+  export default function LoginPage() {
+    const router = useRouter()
+    const [email, setEmail] = useState('')
+    const [password, setPassword] = useState('')
+    const [showPassword, setShowPassword] = useState(false)
+    const [loading, setLoading] = useState(false)
+    const [error, setError] = useState('')
+    const [success, setSuccess] = useState('')
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
+    const [retryAfter, setRetryAfter] = useState<number | null>(null)
+    const [countdown, setCountdown] = useState<number | null>(null)
+    const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+    const gradientRef = useRef<HTMLDivElement>(null)
 
-  // Handle countdown for rate limiting
-  useEffect(() => {
-    if (retryAfter && retryAfter > 0) {
-      setCountdown(retryAfter)
-      const timer = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev && prev > 1) {
-            return prev - 1
-          }
-          clearInterval(timer)
-          return null
+    // Handle countdown for rate limiting
+    useEffect(() => {
+      if (retryAfter && retryAfter > 0) {
+        setCountdown(retryAfter)
+        const timer = setInterval(() => {
+          setCountdown((prev) => {
+            if (prev && prev > 1) {
+              return prev - 1
+            }
+            clearInterval(timer)
+            return null
+          })
+        }, 1000)
+
+        return () => clearInterval(timer)
+      }
+    }, [retryAfter])
+
+    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!gradientRef.current) return
+      
+      const rect = gradientRef.current.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+      
+      setMousePosition({ x, y })
+    }
+
+    const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault()
+      setLoading(true)
+      setError('')
+      setSuccess('')
+      setFieldErrors({})
+      setRetryAfter(null)
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
         })
-      }, 1000)
 
-      return () => clearInterval(timer)
-    }
-  }, [retryAfter])
+        const responseText = await res.text()
+        console.log('Raw response text:', responseText)
+        const data: LoginResponse = JSON.parse(responseText)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-    setFieldErrors({})
-    setRetryAfter(null)
+        // Debug logging
+        console.log('=== LOGIN RESPONSE DEBUG ===')
+        console.log('Response status:', res.status)
+        console.log('Response ok:', res.ok)
+        console.log('Response headers:', res.headers)
+        console.log('Full response:', data)
+        console.log('Response success:', data.success)
+        console.log('Response data.user:', data.data?.user)
 
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      })
+        if (res.ok && data.success) {
+          // Handle password reset requirement
+          if (data.requires_password_reset) {
+            setError("Your password has expired. Please contact your administrator for new credentials.")
+            setLoading(false)
+            return
+          }
 
-      const data: LoginResponse = await res.json()
+          // Handle first login redirect - only for non-super-admins
+          if (data.data?.user?.first_login && data.data?.user?.role !== 'super_admin') {
+            setSuccess('Login successful! Redirecting to password change...')
+            setTimeout(() => {
+              router.push("/change-password")
+            }, 800)
+            return
+          }
 
-      if (data.user?.first_login && data.user?.role !== 'super_admin') {
-        router.push("/change-password");
-        return;
-      }
+          // Handle suspended account
+          if (data.data?.user?.account_status === 'suspended') {
+            setError("Your account has been suspended. Please contact your administrator.")
+            setLoading(false)
+            return
+          }
 
-      if (res.ok && data.success) {
-        // Handle password reset requirement
-        if (data.requires_password_reset) {
-          setError("Your password has expired. Please contact your administrator for new credentials.");
-          setLoading(false);
-          return;
-        }
-
-        // Handle first login redirect - only for accountants, not super-admins
-        if (data.user?.first_login && data.user?.role !== 'super_admin') {
-          router.push("/change-password");
-          return;
-        }
-
-        // Handle suspended account
-        if (data.user?.account_status === 'suspended') {
-          setError("Your account has been suspended. Please contact your administrator.");
-          setLoading(false);
-          return;
-        }
-
-        // Normal login success - redirect based on role
-        const role = data.user?.role
-        if (role === 'super_admin') {
-          router.push('/admin')
-        } else if (role === 'accountant') {
-          router.push('/accountant')
+          // Normal login success - frontend handles all routing based on role
+          setSuccess('Login successful! Redirecting...')
+          
+          console.log('=== FRONTEND ROUTING DEBUG ===')
+          console.log('Raw data.data:', data.data)
+          console.log('Raw data.data?.user:', data.data?.user)
+          console.log('Type of data.data?.user?.role:', typeof data.data?.user?.role)
+          console.log('Value of data.data?.user?.role:', data.data?.user?.role)
+          
+          const userRole = data.data?.user?.role
+          
+          console.log('Final userRole variable:', userRole)
+          console.log('Type of userRole:', typeof userRole)
+          console.log('String comparison - userRole === "super_admin":', userRole === 'super_admin')
+          console.log('String comparison - userRole === "super_admin" (strict):', userRole === 'super_admin')
+          
+          // Immediate routing without nested timeouts
+          if (userRole === 'super_admin') {
+              console.log('✅ Frontend routing: super_admin → /super')
+              router.push('/super')
+            } else if (userRole === 'admin_head') {
+              console.log('✅ Frontend routing: admin_head → /admin')
+              router.push('/admin')
+            } else if (userRole === 'accountant_head' || userRole === 'accountant') {
+              console.log('✅ Frontend routing: accountant → /admin/accountant')
+              router.push('/admin/accountant')
+            } else {
+              console.log('✅ Frontend routing: default → /dashboard for role:', userRole)
+              router.push('/dashboard')
+            }
         } else {
-          router.push('/')
+          setError(data.message || 'Login failed')
+          setFieldErrors(data.errors || {})
+          
+          // Handle rate limiting
+          if (data.retry_after) {
+            setRetryAfter(data.retry_after)
+          }
         }
-      } else {
-        setError(data.message || 'Login failed')
-        setFieldErrors(data.errors || {})
-        
-        // Handle rate limiting
-        if (data.retry_after) {
-          setRetryAfter(data.retry_after)
-        }
+
+      } catch (err) {
+        setError('Network error. Please check your connection and try again.')
+      } finally {
+        setLoading(false)
       }
-
-    } catch (err) {
-      setError('Network error. Please check your connection and try again.')
-    } finally {
-      setLoading(false)
     }
-  }
 
-  const getFieldError = (fieldName: string) => {
-    const errors = fieldErrors[fieldName]
-    return errors && errors.length > 0 ? errors[0] : ''
-  }
+    const getFieldError = (fieldName: string) => {
+      const errors = fieldErrors[fieldName]
+      return errors && errors.length > 0 ? errors[0] : ''
+    }
 
-  return (
-    <div style={{ 
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #800020 0%, #4B0000 50%, #2D0000 100%)',
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: '20px'
-    }}>
-      <div style={{ 
-        width: '100%',
-        maxWidth: '400px',
-        background: 'rgba(255, 255, 255, 0.95)',
-        borderRadius: '16px',
-        padding: '32px',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-        backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(255, 255, 255, 0.2)'
-      }}>
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <h1 style={{ 
-            margin: '0 0 8px 0',
-            fontSize: '28px',
-            fontWeight: '700',
-            background: 'linear-gradient(135deg, #800020, #4B0000)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text'
-          }}>
-            Welcome Back
-          </h1>
-          <div style={{ 
-            height: '4px',
-            width: '60px',
-            background: 'linear-gradient(90deg, #800020, #4B0000)',
-            margin: '0 auto',
-            borderRadius: '2px'
-          }}></div>
-          <p style={{ 
-            margin: '12px 0 0 0',
-            fontSize: '14px',
-            color: '#6b7280'
-          }}>
-            Sign in to your ABIC Accounting account
-          </p>
-        </div>
-
-        {error && (
-          <div style={{ 
-            padding: '12px 16px',
-            background: 'linear-gradient(135deg, #fee2e2, #fecaca)',
-            color: '#991b1b',
-            borderRadius: '8px',
-            marginBottom: '24px',
-            border: '1px solid #fca5a5',
-            fontSize: '14px',
-            fontWeight: '500'
-          }}>
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div>
-            <label style={{ 
-              display: 'block',
-              fontSize: '12px',
-              fontWeight: '600',
-              color: '#800020',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-              marginBottom: '6px'
-            }}>
-              Email Address
-            </label>
-            <input 
-              type="email" 
-              value={email} 
-              onChange={e => setEmail(e.target.value)} 
-              required 
-              disabled={loading || !!countdown}
-              placeholder="Enter your email"
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                border: getFieldError('email') ? '2px solid #dc2626' : '2px solid #e5e7eb',
-                borderRadius: '8px',
-                fontSize: '14px',
-                transition: 'all 0.3s ease',
-                background: 'white',
-                opacity: loading || countdown ? 0.6 : 1,
-                color: '#000000'
-              }}
-              onFocus={(e) => {
-                if (!getFieldError('email')) {
-                  e.target.style.borderColor = '#800020'
-                  e.target.style.boxShadow = '0 0 0 3px rgba(128, 0, 32, 0.1)'
-                }
-              }}
-              onBlur={(e) => {
-                if (!getFieldError('email')) {
-                  e.target.style.borderColor = '#e5e7eb'
-                  e.target.style.boxShadow = 'none'
-                }
-              }}
-            />
-            {getFieldError('email') && (
-              <div style={{ 
-                color: '#dc2626', 
-                fontSize: '12px', 
-                marginTop: '4px',
-                fontWeight: '500'
-              }}>
-                {getFieldError('email')}
+    return (
+      <div 
+        className="min-h-screen bg-gray-50 flex items-center justify-center relative"
+        style={{
+          backgroundImage: 'url(/images/background/abic-background.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat'
+        }}
+      >
+        {/* Overlay for better readability */}
+        <div className="absolute inset-0 bg-white/80 backdrop-blur-sm"></div>
+        
+        <div className="relative z-10 w-full max-w-md">
+          <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-8">
+            {/* Logo and Header */}
+            <div className="text-center mb-8">
+              <div className="flex justify-center mb-6">
+                <img 
+                  src="/images/logo/abic-logo-black.png" 
+                  alt="ABIC Logo" 
+                  className="w-32 h-8 object-contain"
+                />
               </div>
-            )}
-          </div>
-
-          <div>
-            <label style={{ 
-              display: 'block',
-              fontSize: '12px',
-              fontWeight: '600',
-              color: '#800020',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-              marginBottom: '6px'
-            }}>
-              Password
-            </label>
-            <div style={{ position: 'relative' }}>
-              <input 
-                type={showPassword ? "text" : "password"} 
-                value={password} 
-                onChange={e => setPassword(e.target.value)} 
-                required 
-                disabled={loading || !!countdown}
-                placeholder="Enter your password"
-                style={{
-                  width: '100%',
-                  padding: '12px 16px',
-                  paddingRight: '45px', // Space for toggle button
-                  border: getFieldError('password') ? '2px solid #dc2626' : '2px solid #e5e7eb',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  transition: 'all 0.3s ease',
-                  background: 'white',
-                  opacity: loading || countdown ? 0.6 : 1,
-                  color: '#000000' // Black text
-                }}
-                onFocus={(e) => {
-                  if (!getFieldError('password')) {
-                    e.target.style.borderColor = '#800020'
-                    e.target.style.boxShadow = '0 0 0 3px rgba(128, 0, 32, 0.1)'
-                  }
-                }}
-                onBlur={(e) => {
-                  if (!getFieldError('password')) {
-                    e.target.style.borderColor = '#e5e7eb'
-                    e.target.style.boxShadow = 'none'
-                  }
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                disabled={loading || !!countdown}
-                style={{
-                  position: 'absolute',
-                  right: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  cursor: loading || countdown ? 'not-allowed' : 'pointer',
-                  color: '#6b7280',
-                  fontSize: '14px',
-                  padding: '4px',
-                  borderRadius: '4px',
-                  opacity: loading || countdown ? 0.5 : 1
-                }}
-              >
-                {showPassword ? '👁️' : '👁️‍🗨️'}
-              </button>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                Admin Login
+              </h1>
+              <p className="text-gray-600 text-sm">
+                ABIC Accounting System
+              </p>
             </div>
-            {getFieldError('password') && (
-              <div style={{ 
-                color: '#dc2626', 
-                fontSize: '12px', 
-                marginTop: '4px',
-                fontWeight: '500'
-              }}>
-                {getFieldError('password')}
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {error && (
+                <Alert variant="destructive" className="bg-red-50 border-red-200 text-red-700 rounded-lg">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="ml-2 text-sm">{error}</AlertDescription>
+                </Alert>
+              )}
+              
+              {success && (
+                <Alert className="bg-green-50 border-green-200 text-green-700 rounded-lg">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <AlertDescription className="ml-2 text-sm">{success}</AlertDescription>
+                </Alert>
+              )}
+
+              {/* Email Input */}
+              <div className="space-y-2">
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                  Email
+                </label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="admin@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={loading || !!countdown}
+                  className={`h-10 text-sm bg-white border text-gray-900 placeholder-gray-400 transition-colors duration-200 focus:border-[#7B0F2B] focus:ring-1 focus:ring-[#7B0F2B]/20 disabled:opacity-50 rounded-md ${
+                    getFieldError('email') 
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                      : 'border-gray-300'
+                  }`}
+                  autoFocus
+                />
+                {getFieldError('email') && (
+                  <div className="text-red-500 text-xs mt-1">
+                    {getFieldError('email')}
+                  </div>
+                )}
               </div>
-            )}
+
+              {/* Password Input */}
+              <div className="space-y-2">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                  Password
+                </label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={loading || !!countdown}
+                    className={`h-10 text-sm bg-white border text-gray-900 placeholder-gray-400 transition-colors duration-200 focus:border-[#7B0F2B] focus:ring-1 focus:ring-[#7B0F2B]/20 disabled:opacity-50 pr-10 rounded-md ${
+                      getFieldError('password') 
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                        : 'border-gray-300'
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-200"
+                    disabled={loading || !!countdown}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+                {getFieldError('password') && (
+                  <div className="text-red-500 text-xs mt-1">
+                    {getFieldError('password')}
+                  </div>
+                )}
+              </div>
+
+              {/* Sign In Button */}
+              <Button
+                type="submit"
+                disabled={loading || !email.trim() || !password.trim() || !!countdown}
+                className="w-full h-10 text-sm font-medium bg-[#7B0F2B] hover:bg-[#5E0C20] transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md"
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-r-transparent"></span>
+                    Signing in...
+                  </span>
+                ) : countdown ? (
+                  <span>Please wait {countdown}s</span>
+                ) : (
+                  'Sign In'
+                )}
+              </Button>
+            </form>
+
+            {/* Footer */}
+            <div className="mt-8 pt-6 border-t border-gray-200 text-center">
+              <p className="text-xs text-gray-500">
+                © 2026 ABIC Realty & Consultancy Corporation
+              </p>
+            </div>
           </div>
-
-          <button 
-            type="submit" 
-            disabled={loading || !!countdown}
-            style={{
-              padding: '14px 24px',
-              background: loading || countdown 
-                ? 'linear-gradient(135deg, #9ca3af, #6b7280)'
-                : 'linear-gradient(135deg, #800020, #4B0000)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: loading || countdown ? 'not-allowed' : 'pointer',
-              fontSize: '16px',
-              fontWeight: '600',
-              transition: 'all 0.3s ease',
-              boxShadow: loading || countdown 
-                ? 'none'
-                : '0 4px 6px -1px rgba(128, 0, 32, 0.3)',
-              opacity: loading || countdown ? 0.7 : 1
-            }}
-            onMouseOver={(e) => {
-              if (!loading && !countdown) {
-                e.currentTarget.style.transform = 'translateY(-2px)'
-                e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(128, 0, 32, 0.4)'
-              }
-            }}
-            onMouseOut={(e) => {
-              if (!loading && !countdown) {
-                e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(128, 0, 32, 0.3)'
-              }
-            }}
-          >
-            {loading ? (
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                <span style={{ 
-                  width: '16px', 
-                  height: '16px', 
-                  border: '2px solid #ffffff', 
-                  borderTop: '2px solid transparent', 
-                  borderRadius: '50%',
-                  animation: 'spin 1s linear infinite'
-                }}></span>
-                Signing in...
-              </span>
-            ) : countdown ? (
-              `Please wait ${countdown}s`
-            ) : (
-              'Sign In'
-            )}
-          </button>
-        </form>
-
-        <div style={{ 
-          textAlign: 'center',
-          marginTop: '24px',
-          paddingTop: '24px',
-          borderTop: '1px solid #e5e7eb'
-        }}>
-          <p style={{ 
-            margin: '0',
-            fontSize: '12px',
-            color: '#6b7280'
-          }}>
-            ABIC Accounting System © 2025
-          </p>
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
-    </div>
-  )
-}
+    )
+  }

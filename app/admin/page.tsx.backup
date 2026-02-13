@@ -9,6 +9,14 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
   Menu,
   User,
   Search,
@@ -18,8 +26,6 @@ import {
   Eye,
   MoreVertical,
   Bell,
-  CheckCircle,
-  Mail,
   ChevronDown,
   Plus,
   X,
@@ -336,139 +342,35 @@ export default function AdminDashboard() {
       <div className="flex-1 p-6 space-y-6">
         {/* Error Message */}
         {error && (
-          <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
-            {error}
-          </div>
-        )}
-
-        {/* DASHBOARD HEADER */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-          <div>
-            <h2 className="text-2xl font-bold text-[#7B0F2B] mb-2">Dashboard Overview</h2>
-            <p className="text-gray-600">Welcome back, {user?.name}! Here's what's happening with your system today.</p>
-          </div>
-          <div className="flex gap-3">
-            <Button variant="outline" className="rounded-xl">
-              <RefreshCcw className="w-4 h-4 mr-2" />
-              Refresh
-            </Button>
-            <Button className="bg-gradient-to-r from-[#7B0F2B] to-[#A4163A] text-white rounded-xl hover:from-[#5E0C20] hover:to-[#7C102E]">
-              <Download className="w-4 h-4 mr-2" />
-              Export Report
-            </Button>
-          </div>
-        </div>
-
-        {/* SUMMARY CARDS */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card className="rounded-2xl shadow-lg border-none hover:shadow-xl transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Total Accountants</CardTitle>
-              <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                <User className="h-4 w-4 text-blue-600" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-[#7B0F2B]">24</div>
-              <p className="text-xs text-gray-500 mt-1">+2 from last month</p>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-2xl shadow-lg border-none hover:shadow-xl transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Active Users</CardTitle>
-              <div className="h-8 w-8 rounded-lg bg-green-100 flex items-center justify-center">
-                <div className="h-4 w-4 bg-green-600 rounded-full" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">18</div>
-              <p className="text-xs text-gray-500 mt-1">75% of total users</p>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-2xl shadow-lg border-none hover:shadow-xl transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Pending Tasks</CardTitle>
-              <div className="h-8 w-8 rounded-lg bg-yellow-100 flex items-center justify-center">
-                <Plus className="h-4 w-4 text-yellow-600" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">7</div>
-              <p className="text-xs text-gray-500 mt-1">Requires attention</p>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-2xl shadow-lg border-none hover:shadow-xl transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">System Health</CardTitle>
-              <div className="h-8 w-8 rounded-lg bg-green-100 flex items-center justify-center">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">98%</div>
-              <p className="text-xs text-gray-500 mt-1">All systems operational</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* CHARTS AND ANALYTICS */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* USER ACTIVITY CHART */}
-          <Card className="rounded-2xl shadow-lg border-none">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold text-[#7B0F2B]">User Activity</CardTitle>
-              <p className="text-sm text-gray-600">Daily login activity for the last 7 days</p>
-            </CardHeader>
-            <CardContent>
-              <div className="h-64 flex items-end justify-between gap-2">
-                {Array.from({ length: 7 }, (_, i) => {
-                  const height = Math.random() * 100 + 20
-                  return (
-                    <div key={i} className="flex-1 flex flex-col items-center">
-                      <div 
-                        className="w-full bg-gradient-to-t from-[#7B0F2B] to-[#A4163A] rounded-t"
-                        style={{ height: `${height}%` }}
-                      />
-                      <p className="text-xs text-gray-500 mt-2">
-                        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i]}
-                      </p>
                     </div>
-                  )
-                })}
-              </div>
-            </CardContent>
-          </Card>
 
-          {/* RECENT ACTIVITIES */}
-          <Card className="rounded-2xl shadow-lg border-none">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold text-[#7B0F2B]">Recent Activities</CardTitle>
-              <p className="text-sm text-gray-600">Latest system activities</p>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {[
-                  { icon: <User className="w-4 h-4" />, title: "New accountant added", desc: "John Doe was added to the system", time: "2 hours ago", color: "blue" },
-                  { icon: <Eye className="w-4 h-4" />, title: "Report viewed", desc: "Monthly report was accessed", time: "4 hours ago", color: "green" },
-                  { icon: <Mail className="w-4 h-4" />, title: "Credentials sent", desc: "Password reset email sent", time: "6 hours ago", color: "yellow" },
-                  { icon: <Download className="w-4 h-4" />, title: "Data exported", desc: "Accountant data exported", time: "1 day ago", color: "purple" },
-                ].map((activity, index) => (
-                  <div key={index} className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className={`p-2 rounded-lg ${
-                      activity.color === 'blue' ? 'bg-blue-100 text-blue-600' :
-                      activity.color === 'green' ? 'bg-green-100 text-green-600' :
-                      activity.color === 'yellow' ? 'bg-yellow-100 text-yellow-600' :
-                      'bg-purple-100 text-purple-600'
-                    }`}>
-                      {activity.icon}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900 text-sm">{activity.title}</p>
-                      <p className="text-gray-600 text-xs">{activity.desc}</p>
-                      <p className="text-gray-400 text-xs mt-1">{activity.time}</p>
+                    {/* CHARTS AND ANALYTICS */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* USER ACTIVITY CHART */}
+                      <Card className="rounded-2xl shadow-lg border-none">
+                        <CardHeader>
+                          <CardTitle className="text-lg font-semibold text-[#7B0F2B]">User Activity</CardTitle>
+                          <p className="text-sm text-gray-600">Daily login activity for the last 7 days</p>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="h-64 flex items-end justify-between gap-2">
+                            {Array.from({ length: 7 }, (_, i) => {
+                              const height = Math.random() * 100 + 20
+                              return (
+                                <div key={i} className="flex-1 flex flex-col items-center">
+                                  <div 
+                                    className="w-full bg-gradient-to-t from-[#7B0F2B] to-[#A4163A] rounded-t"
+                                    style={{ height: `${height}%` }}
+                                  />
+                                  <p className="text-xs text-gray-500 mt-2">
+                                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i]}
+                                  </p>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </CardContent>
+                      </Card>
                     </div>
                   </div>
                 ))}
