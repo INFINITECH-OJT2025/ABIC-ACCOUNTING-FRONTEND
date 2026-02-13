@@ -204,27 +204,27 @@ export default function ComponentsPage() {
             <div>
               <h3 className="font-semibold mb-2">Import Components</h3>
               <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm">
-{`import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Alert, AlertDescription } from '@/components/ui/alert'`}
-              </pre>
-            </div>
+                {`import { Button } from '@/components/ui/button'
+                import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+                import { Alert, AlertDescription } from '@/components/ui/alert'`}
+                              </pre>
+                            </div>
 
-            <div>
-              <h3 className="font-semibold mb-2">Use in Your Component</h3>
-              <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm">
-{`export default function MyComponent() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Hello World</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Button>Click Me</Button>
-      </CardContent>
-    </Card>
-  )
-}`}
+                            <div>
+                              <h3 className="font-semibold mb-2">Use in Your Component</h3>
+                              <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm">
+                {`export default function MyComponent() {
+                  return (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Hello World</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <Button>Click Me</Button>
+                      </CardContent>
+                    </Card>
+                  )
+                }`}
               </pre>
             </div>
 
