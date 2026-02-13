@@ -237,7 +237,7 @@ export default function OnboardPage() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#A0153E] mx-auto mb-4"></div>
           <p className="text-slate-600">Loading approved employees...</p>
         </div>
       </div>
@@ -245,46 +245,44 @@ export default function OnboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <div className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <h1 className="text-3xl font-bold text-slate-900">Onboard Employee</h1>
-          <p className="text-slate-600 mt-1">Select approved employees to onboard into the system</p>
-        </div>
+    <div className="min-h-screen">
+      {/* Maroon Gradient Header */}
+      <div className="bg-gradient-to-br from-[#800020] via-[#A0153E] to-[#C9184A] text-white rounded-lg shadow-lg p-8 mb-8">
+        <h1 className="text-4xl font-bold mb-3">Onboard Employee</h1>
+        <p className="text-rose-100 text-lg">Select approved employees to onboard into the system</p>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div>
         {/* Approved Employees Table */}
-        <div className="bg-white rounded-lg shadow">
+        <div className="bg-white rounded-lg shadow-lg border-2 border-[#FFE5EC]">
           <div className="p-6">
-            <h2 className="text-2xl font-bold text-slate-900 mb-4">Approved Employees</h2>
+            <h2 className="text-2xl font-bold text-[#800020] mb-4">Approved Employees</h2>
             
             {employees.length === 0 ? (
               <p className="text-slate-500 text-center py-8">No approved employees found</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-200">
-                      <th className="text-left py-3 px-4 font-semibold text-slate-900">Name</th>
-                      <th className="text-left py-3 px-4 font-semibold text-slate-900">Email</th>
-                      <th className="text-left py-3 px-4 font-semibold text-slate-900">Position</th>
-                      <th className="text-left py-3 px-4 font-semibold text-slate-900">Status</th>
-                      <th className="text-left py-3 px-4 font-semibold text-slate-900">Action</th>
+                  <thead className="bg-gradient-to-r from-[#FFE5EC] to-rose-50">
+                    <tr className="border-b-2 border-[#C9184A]">
+                      <th className="text-left py-3 px-4 font-semibold text-[#800020]">Name</th>
+                      <th className="text-left py-3 px-4 font-semibold text-[#800020]">Email</th>
+                      <th className="text-left py-3 px-4 font-semibold text-[#800020]">Position</th>
+                      <th className="text-left py-3 px-4 font-semibold text-[#800020]">Status</th>
+                      <th className="text-left py-3 px-4 font-semibold text-[#800020]">Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {employees.map((employee) => (
-                      <tr key={employee.id} className="border-b border-slate-100 hover:bg-slate-50">
+                      <tr key={employee.id} className="border-b border-slate-100 hover:bg-[#FFE5EC] transition-colors duration-200">
                         <td className="py-3 px-4 text-slate-700 font-medium">
                           {employee.first_name} {employee.last_name}
                         </td>
                         <td className="py-3 px-4 text-slate-700">{employee.email}</td>
                         <td className="py-3 px-4 text-slate-700">{employee.position || '-'}</td>
                         <td className="py-3 px-4">
-                          <Badge className="bg-green-100 text-green-800 border-green-300 border">
+                          <Badge className="bg-emerald-50 text-[#800020] border-[#A0153E] border-2">
                             Approved
                           </Badge>
                         </td>
@@ -292,7 +290,7 @@ export default function OnboardPage() {
                           <Button
                             size="sm"
                             onClick={() => handleSelectEmployee(employee)}
-                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                            className="bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white transition-all duration-300"
                           >
                             Select
                           </Button>
@@ -310,16 +308,16 @@ export default function OnboardPage() {
       {/* Onboarding Form Modal */}
       {showForm && selectedEmployee && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-lg max-w-md w-full">
-            <div className="p-6 border-b border-slate-200">
-              <h2 className="text-2xl font-bold text-slate-900">
+          <div className="bg-white rounded-lg shadow-2xl max-w-md w-full border-2 border-[#C9184A]">
+            <div className="p-6 border-b-2 border-[#C9184A] bg-gradient-to-r from-[#800020] via-[#A0153E] to-[#C9184A]">
+              <h2 className="text-2xl font-bold text-white">
                 Onboard {selectedEmployee.first_name} {selectedEmployee.last_name}
               </h2>
             </div>
 
             <div className="p-6 space-y-4">
               {/* Employee Info Display */}
-              <div className="bg-slate-50 p-4 rounded-lg">
+              <div className="bg-[#FFE5EC] p-4 rounded-lg border border-[#C9184A]">
                 <div>
                   <p className="text-slate-600 text-sm">Full Name</p>
                   <p className="text-slate-900 font-medium">
@@ -330,7 +328,7 @@ export default function OnboardPage() {
 
               {/* Position Dropdown */}
               <div>
-                <label className="block text-sm font-semibold text-slate-900 mb-1">
+                <label className="block text-sm font-semibold text-[#800020] mb-1">
                   Position <span className="text-red-500">*</span>
                 </label>
                 {!showAddPosition ? (
@@ -345,7 +343,7 @@ export default function OnboardPage() {
                           setPosition(e.target.value)
                         }
                       }}
-                      className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A]"
                     >
                       <option value="">Select Position...</option>
                       {positions.map((pos) => (
@@ -363,13 +361,13 @@ export default function OnboardPage() {
                       value={newPosition}
                       onChange={(e) => setNewPosition(e.target.value)}
                       placeholder="Enter new position"
-                      className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A]"
                       autoFocus
                     />
                     <Button
                       onClick={handleAddPosition}
                       size="sm"
-                      className="bg-green-600 hover:bg-green-700 text-white"
+                      className="bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white transition-all duration-300"
                     >
                       Add
                     </Button>
@@ -389,20 +387,20 @@ export default function OnboardPage() {
 
               {/* Onboarding Date */}
               <div>
-                <label className="block text-sm font-semibold text-slate-900 mb-1">
+                <label className="block text-sm font-semibold text-[#800020] mb-1">
                   Onboarding Date <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="date"
                   value={onboardingDate}
                   onChange={(e) => setOnboardingDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A]"
                 />
               </div>
 
               {/* Department Dropdown */}
               <div>
-                <label className="block text-sm font-semibold text-slate-900 mb-1">
+                <label className="block text-sm font-semibold text-[#800020] mb-1">
                   Department <span className="text-red-500">*</span>
                 </label>
                 {!showAddDepartment ? (
@@ -417,7 +415,7 @@ export default function OnboardPage() {
                           setDepartment(e.target.value)
                         }
                       }}
-                      className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A]"
                     >
                       <option value="">Select Department...</option>
                       {departments.map((dept) => (
@@ -435,13 +433,13 @@ export default function OnboardPage() {
                       value={newDepartment}
                       onChange={(e) => setNewDepartment(e.target.value)}
                       placeholder="Enter new department"
-                      className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A]"
                       autoFocus
                     />
                     <Button
                       onClick={handleAddDepartment}
                       size="sm"
-                      className="bg-green-600 hover:bg-green-700 text-white"
+                      className="bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white transition-all duration-300"
                     >
                       Add
                     </Button>
@@ -460,7 +458,7 @@ export default function OnboardPage() {
               </div>
             </div>
 
-            <div className="p-6 border-t border-slate-200 bg-slate-50 flex gap-3 justify-end">
+            <div className="p-6 border-t-2 border-[#C9184A] bg-gradient-to-r from-[#FFE5EC] to-rose-50 flex gap-3 justify-end">
               <Button
                 onClick={handleCloseForm}
                 variant="outline"
@@ -470,7 +468,7 @@ export default function OnboardPage() {
               </Button>
               <Button
                 onClick={handleStartOnboarding}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className="bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white transition-all duration-300"
                 disabled={isSaving}
               >
                 {isSaving ? 'Saving...' : 'START ONBOARDING'}

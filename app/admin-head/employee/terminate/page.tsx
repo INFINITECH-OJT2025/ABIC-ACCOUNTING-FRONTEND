@@ -159,17 +159,18 @@ export default function TerminatePage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-slate-900 mb-2">
+    <div className="min-h-screen">
+      {/* Maroon Gradient Header */}
+      <div className="bg-gradient-to-br from-[#800020] via-[#A0153E] to-[#C9184A] text-white rounded-lg shadow-lg p-8 mb-8">
+        <h1 className="text-4xl font-bold mb-3">
           Terminate Employee
         </h1>
-        <p className="text-slate-600">
+        <p className="text-rose-100 text-lg">
           Process employee termination with reason and documentation
         </p>
       </div>
 
-      <div className="bg-white rounded-lg shadow">
+      <div className="bg-white rounded-lg shadow-lg border-2 border-[#FFE5EC]">
         {employees.length === 0 ? (
           <div className="p-6 text-center">
             <p className="text-slate-500">No active employees to terminate</p>
@@ -177,19 +178,19 @@ export default function TerminatePage() {
         ) : (
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Employee ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Position</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
+              <TableHeader className="bg-gradient-to-r from-[#FFE5EC] to-rose-50">
+                <TableRow className="border-b-2 border-[#C9184A]">
+                  <TableHead className="text-[#800020] font-semibold">Employee ID</TableHead>
+                  <TableHead className="text-[#800020] font-semibold">Name</TableHead>
+                  <TableHead className="text-[#800020] font-semibold">Email</TableHead>
+                  <TableHead className="text-[#800020] font-semibold">Position</TableHead>
+                  <TableHead className="text-[#800020] font-semibold">Status</TableHead>
+                  <TableHead className="text-right text-[#800020] font-semibold">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {employees.map((employee) => (
-                  <TableRow key={employee.id}>
+                  <TableRow key={employee.id} className="hover:bg-[#FFE5EC] transition-colors duration-200">
                     <TableCell>#{employee.id}</TableCell>
                     <TableCell className="font-medium">
                       {employee.first_name} {employee.last_name}
@@ -197,7 +198,7 @@ export default function TerminatePage() {
                     <TableCell>{employee.email}</TableCell>
                     <TableCell>{employee.position || 'N/A'}</TableCell>
                     <TableCell>
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-emerald-50 text-[#800020] border border-[#A0153E]">
                         {employee.status || 'active'}
                       </span>
                     </TableCell>
@@ -205,25 +206,25 @@ export default function TerminatePage() {
                       <Dialog open={dialogOpen && selectedEmployee?.id === employee.id} onOpenChange={setDialogOpen}>
                         <DialogTrigger asChild>
                           <Button
-                            className="bg-red-600 hover:bg-red-700 text-white"
+                            className="bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white transition-all duration-300"
                             size="sm"
                             onClick={() => handleTerminateClick(employee)}
                           >
                             Terminate
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-[500px]">
-                          <DialogHeader>
-                            <DialogTitle>Terminate Employee</DialogTitle>
-                            <DialogDescription>
-                              Terminating: <strong>{selectedEmployee?.first_name} {selectedEmployee?.last_name}</strong>
+                        <DialogContent className="sm:max-w-[500px] border-2 border-[#C9184A]">
+                          <DialogHeader className="bg-gradient-to-r from-[#FFE5EC] to-rose-50 -m-6 mb-6 p-6 rounded-t-lg border-b-2 border-[#C9184A]">
+                            <DialogTitle className="text-[#800020] text-2xl">Terminate Employee</DialogTitle>
+                            <DialogDescription className="text-slate-700">
+                              Terminating: <strong className="text-[#800020]">{selectedEmployee?.first_name} {selectedEmployee?.last_name}</strong>
                             </DialogDescription>
                           </DialogHeader>
 
                           <form onSubmit={handleSubmit} className="space-y-4">
                             {/* Termination Date */}
                             <div className="space-y-2">
-                              <Label htmlFor="termination_date">
+                              <Label htmlFor="termination_date" className="text-[#800020] font-semibold">
                                 Termination Date
                               </Label>
                               <Input
@@ -233,12 +234,13 @@ export default function TerminatePage() {
                                 value={formData.termination_date}
                                 onChange={handleInputChange}
                                 required
+                                className="focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A]"
                               />
                             </div>
 
                             {/* Reason - Required */}
                             <div className="space-y-2">
-                              <Label htmlFor="reason">
+                              <Label htmlFor="reason" className="text-[#800020] font-semibold">
                                 Reason for Termination <span className="text-red-500">*</span>
                               </Label>
                               <textarea
@@ -250,7 +252,7 @@ export default function TerminatePage() {
                                 required
                                 minLength={5}
                                 maxLength={1000}
-                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A] resize-none"
                                 rows={4}
                               />
                               <p className="text-xs text-slate-500">
@@ -260,7 +262,7 @@ export default function TerminatePage() {
 
                             {/* Notes - Optional */}
                             <div className="space-y-2">
-                              <Label htmlFor="notes">Additional Notes (Optional)</Label>
+                              <Label htmlFor="notes" className="text-[#800020] font-semibold">Additional Notes (Optional)</Label>
                               <textarea
                                 id="notes"
                                 name="notes"
@@ -268,7 +270,7 @@ export default function TerminatePage() {
                                 onChange={handleInputChange}
                                 placeholder="Any additional notes or comments"
                                 maxLength={1000}
-                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A] resize-none"
                                 rows={3}
                               />
                             </div>
@@ -285,7 +287,7 @@ export default function TerminatePage() {
                               </Button>
                               <Button
                                 type="submit"
-                                className="bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
+                                className="bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white transition-all duration-300 disabled:opacity-50"
                                 disabled={submitting || !formData.reason.trim() || formData.reason.length < 5}
                               >
                                 {submitting ? 'Processing...' : 'Confirm Termination'}

@@ -6,6 +6,14 @@ import { getApiUrl } from '@/lib/api'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 
 interface Employee {
   id: number
@@ -22,9 +30,9 @@ interface EmployeeDetails extends Employee {
 }
 
 const statusBadgeColors = {
-  pending: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-  approved: 'bg-green-100 text-green-800 border-green-300',
-  terminated: 'bg-red-100 text-red-800 border-red-300',
+  pending: 'bg-amber-50 text-[#A0153E] border-[#C9184A]',
+  approved: 'bg-emerald-50 text-[#800020] border-[#A0153E]',
+  terminated: 'bg-rose-50 text-[#800020] border-[#C9184A]',
 }
 
 const statusLabels = {
@@ -40,6 +48,7 @@ export default function MasterfilePage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeDetails | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
+  const [showRegistrationModal, setShowRegistrationModal] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
 
   useEffect(() => {
@@ -214,106 +223,107 @@ export default function MasterfilePage() {
   }
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold text-slate-900 mb-4">Employee Masterfile</h1>
-      <p className="text-slate-600 mb-8">Manage employee master data and records</p>
+    <div className="min-h-screen">
+      {/* Maroon Gradient Header */}
+      <div className="bg-gradient-to-br from-[#800020] via-[#A0153E] to-[#C9184A] text-white rounded-lg shadow-lg p-8 mb-8">
+        <h1 className="text-4xl font-bold mb-3">Employee Masterfile</h1>
+        <p className="text-rose-100 text-lg">Manage employee master data and records</p>
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Registration Form */}
-        <div>
-          <EmployeeRegistrationForm />
+      <div className="bg-white p-6 rounded-lg shadow-lg border-2 border-[#FFE5EC]">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+          <h2 className="text-2xl font-bold text-[#800020]">Employee List</h2>
+          <Button
+            onClick={() => setShowRegistrationModal(true)}
+            className="bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white font-bold px-6 py-2 rounded-lg transition-all duration-300 shadow-md hover:shadow-lg"
+          >
+            + CREATE EMPLOYEE
+          </Button>
         </div>
 
-        {/* Employees List */}
-        <div className="lg:col-span-2">
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h2 className="text-2xl font-bold text-slate-900 mb-4">Employee List</h2>
+        {/* Search Bar */}
+        <div className="mb-6">
+          <Input
+            type="text"
+            placeholder="Search by name, email, or position..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A]"
+          />
+        </div>
 
-            {/* Search Bar */}
-            <div className="mb-6">
-              <Input
-                type="text"
-                placeholder="Search by name, email, or position..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full"
-              />
-            </div>
-
-            {loading ? (
-              <p className="text-slate-500">Loading employees...</p>
-            ) : filteredEmployees.length === 0 ? (
-              <p className="text-slate-500">
-                {employees.length === 0
-                  ? 'No employees found. Create one using the form.'
-                  : 'No employees match your search.'}
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-200">
-                      <th className="text-left py-3 px-4 font-semibold text-slate-900">Name</th>
-                      <th className="text-left py-3 px-4 font-semibold text-slate-900">Email</th>
-                      <th className="text-left py-3 px-4 font-semibold text-slate-900">Position</th>
-                      <th className="text-left py-3 px-4 font-semibold text-slate-900">Status</th>
-                      <th className="text-left py-3 px-4 font-semibold text-slate-900">Created</th>
-                      <th className="text-left py-3 px-4 font-semibold text-slate-900">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredEmployees.map((employee) => (
-                      <tr key={employee.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="py-3 px-4 text-slate-700 font-medium">{employee.first_name} {employee.last_name}</td>
-                        <td className="py-3 px-4 text-slate-700">{employee.email}</td>
-                        <td className="py-3 px-4 text-slate-700">{employee.position || '-'}</td>
-                        <td className="py-3 px-4">
-                          <Badge className={`${statusBadgeColors[employee.status]} border`}>
-                            {statusLabels[employee.status]}
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4 text-slate-500 text-sm">
-                          {new Date(employee.created_at).toLocaleDateString()}
-                        </td>
-                        <td className="py-3 px-4">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => fetchEmployeeDetails(employee.id)}
-                          >
-                            View
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+        {loading ? (
+          <p className="text-slate-500">Loading employees...</p>
+        ) : filteredEmployees.length === 0 ? (
+          <p className="text-slate-500">
+            {employees.length === 0
+              ? 'No employees found. Create one using the button above.'
+              : 'No employees match your search.'}
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gradient-to-r from-[#FFE5EC] to-rose-50">
+                <tr className="border-b-2 border-[#C9184A]">
+                  <th className="text-left py-3 px-4 font-semibold text-[#800020]">Name</th>
+                  <th className="text-left py-3 px-4 font-semibold text-[#800020]">Email</th>
+                  <th className="text-left py-3 px-4 font-semibold text-[#800020]">Position</th>
+                  <th className="text-left py-3 px-4 font-semibold text-[#800020]">Status</th>
+                  <th className="text-left py-3 px-4 font-semibold text-[#800020]">Created</th>
+                  <th className="text-left py-3 px-4 font-semibold text-[#800020]">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredEmployees.map((employee) => (
+                  <tr key={employee.id} className="border-b border-slate-100 hover:bg-[#FFE5EC] transition-colors duration-200">
+                    <td className="py-3 px-4 text-slate-700 font-medium">{employee.first_name} {employee.last_name}</td>
+                    <td className="py-3 px-4 text-slate-700">{employee.email}</td>
+                    <td className="py-3 px-4 text-slate-700">{employee.position || '-'}</td>
+                    <td className="py-3 px-4">
+                      <Badge className={`${statusBadgeColors[employee.status]} border`}>
+                        {statusLabels[employee.status]}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-4 text-slate-500 text-sm">
+                      {new Date(employee.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="py-3 px-4">
+                      <Button
+                        size="sm"
+                        className="bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white border-0 transition-all duration-300"
+                        onClick={() => fetchEmployeeDetails(employee.id)}
+                      >
+                        View
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Employee Detail Modal */}
       {showDetailModal && selectedEmployee && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[95vh] overflow-y-auto">
-            <div className="p-6 border-b border-slate-200 sticky top-0 bg-white">
+          <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[95vh] overflow-y-auto border-2 border-[#C9184A]">
+            <div className="p-6 border-b-2 border-[#C9184A] sticky top-0 bg-gradient-to-r from-[#800020] via-[#A0153E] to-[#C9184A]">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-bold text-slate-900">
+                <h2 className="text-2xl font-bold text-white">
                   {selectedEmployee.first_name} {selectedEmployee.last_name}
                 </h2>
                 <button
                   onClick={() => setShowDetailModal(false)}
-                  className="text-slate-500 hover:text-slate-700 text-2xl font-bold"
+                  className="text-white hover:text-rose-100 text-2xl font-bold transition-colors"
                 >
                   ×
                 </button>
               </div>
               {/* Current Status Badge */}
               <div className="flex items-center gap-3">
-                <span className="text-slate-600 font-medium">Current Status:</span>
-                <Badge className={`${statusBadgeColors[selectedEmployee.status]} border text-base py-1 px-3`}>
+                <span className="text-white font-medium">Current Status:</span>
+                <Badge className={`${statusBadgeColors[selectedEmployee.status]} border-2 text-base py-1 px-3`}>
                   {statusLabels[selectedEmployee.status]}
                 </Badge>
               </div>
@@ -322,7 +332,7 @@ export default function MasterfilePage() {
             <div className="p-6">
               {/* EMPLOYEE DETAILS */}
               <div className="mb-8">
-                <h3 className="text-lg font-bold text-slate-900 mb-4 pb-2 border-b-2 border-slate-200">EMPLOYEE DETAILS</h3>
+                <h3 className="text-lg font-bold text-[#800020] mb-4 pb-2 border-b-2 border-[#C9184A]">EMPLOYEE DETAILS</h3>
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <p className="text-slate-600 text-sm font-medium mb-1">POSITION <span className="text-red-500">*</span></p>
@@ -341,7 +351,7 @@ export default function MasterfilePage() {
 
               {/* PERSONAL INFORMATION */}
               <div className="mb-8">
-                <h3 className="text-lg font-bold text-slate-900 mb-4 pb-2 border-b-2 border-slate-200">PERSONAL INFORMATION</h3>
+                <h3 className="text-lg font-bold text-[#800020] mb-4 pb-2 border-b-2 border-[#C9184A]">PERSONAL INFORMATION</h3>
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <p className="text-slate-600 text-sm font-medium mb-1">LAST NAME <span className="text-red-500">*</span></p>
@@ -384,7 +394,7 @@ export default function MasterfilePage() {
 
               {/* CONTACT INFORMATION */}
               <div className="mb-8">
-                <h3 className="text-lg font-bold text-slate-900 mb-4 pb-2 border-b-2 border-slate-200">CONTACT INFORMATION</h3>
+                <h3 className="text-lg font-bold text-[#800020] mb-4 pb-2 border-b-2 border-[#C9184A]">CONTACT INFORMATION</h3>
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <p className="text-slate-600 text-sm font-medium mb-1">MOBILE NUMBER <span className="text-red-500">*</span></p>
@@ -403,7 +413,7 @@ export default function MasterfilePage() {
 
               {/* GOVERNMENT ID NUMBERS */}
               <div className="mb-8">
-                <h3 className="text-lg font-bold text-slate-900 mb-4 pb-2 border-b-2 border-slate-200">GOVERNMENT ID NUMBERS</h3>
+                <h3 className="text-lg font-bold text-[#800020] mb-4 pb-2 border-b-2 border-[#C9184A]">GOVERNMENT ID NUMBERS</h3>
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <p className="text-slate-600 text-sm font-medium mb-1">SSS NUMBER <span className="text-slate-400 text-xs">(can be N/A)</span></p>
@@ -426,7 +436,7 @@ export default function MasterfilePage() {
 
               {/* FAMILY INFORMATION */}
               <div className="mb-8">
-                <h3 className="text-lg font-bold text-slate-900 mb-4 pb-2 border-b-2 border-slate-200">FAMILY INFORMATION</h3>
+                <h3 className="text-lg font-bold text-[#800020] mb-4 pb-2 border-b-2 border-[#C9184A]">FAMILY INFORMATION</h3>
                 <div className="mb-6">
                   <p className="text-slate-700 font-semibold mb-3">MOTHER'S MAIDEN NAME</p>
                   <div className="grid grid-cols-2 gap-6 ml-4">
@@ -473,7 +483,7 @@ export default function MasterfilePage() {
 
               {/* ADDRESS INFORMATION */}
               <div className="mb-8">
-                <h3 className="text-lg font-bold text-slate-900 mb-4 pb-2 border-b-2 border-slate-200">ADDRESS INFORMATION</h3>
+                <h3 className="text-lg font-bold text-[#800020] mb-4 pb-2 border-b-2 border-[#C9184A]">ADDRESS INFORMATION</h3>
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <p className="text-slate-600 text-sm font-medium mb-1">HOUSE NUMBER <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
@@ -515,15 +525,15 @@ export default function MasterfilePage() {
               </div>
 
               {/* Status Requirements Check */}
-              <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <p className="text-slate-600 text-sm font-medium">
-                  <span className="text-blue-700 font-semibold">ℹ️ Required fields check:</span> All fields marked with <span className="text-red-500">*</span> must be filled to approve this employee.
+              <div className="mb-6 p-4 bg-[#FFE5EC] rounded-lg border-2 border-[#C9184A]">
+                <p className="text-slate-700 text-sm font-medium">
+                  <span className="text-[#800020] font-semibold">ℹ️ Required fields check:</span> All fields marked with <span className="text-red-500">*</span> must be filled to approve this employee.
                 </p>
               </div>
             </div>
 
             {/* Footer with Action Buttons */}
-            <div className="p-6 border-t border-slate-200 bg-slate-50 sticky bottom-0">
+            <div className="p-6 border-t-2 border-[#C9184A] bg-gradient-to-r from-[#FFE5EC] to-rose-50 sticky bottom-0">
               <div className="flex gap-3 justify-end">
                 <Button
                   onClick={() => setShowDetailModal(false)}
@@ -534,14 +544,14 @@ export default function MasterfilePage() {
                 <Button
                   onClick={() => handleStatusUpdate('approved')}
                   disabled={updatingStatus || selectedEmployee.status === 'approved' || !isEmployeeComplete(selectedEmployee)}
-                  className={`${!isEmployeeComplete(selectedEmployee) ? 'opacity-50 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
+                  className={`${!isEmployeeComplete(selectedEmployee) ? 'opacity-50 cursor-not-allowed' : 'bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A]'} text-white transition-all duration-300`}
                 >
                   {updatingStatus ? 'Updating...' : 'Approve Employee'}
                 </Button>
                 <Button
                   onClick={() => handleStatusUpdate('terminated')}
                   disabled={updatingStatus || selectedEmployee.status === 'terminated'}
-                  className={`bg-red-600 hover:bg-red-700 text-white ${updatingStatus || selectedEmployee.status === 'terminated' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white transition-all duration-300 ${updatingStatus || selectedEmployee.status === 'terminated' ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   Terminate
                 </Button>
@@ -550,6 +560,26 @@ export default function MasterfilePage() {
           </div>
         </div>
       )}
+
+      {/* Employee Registration Modal */}
+      <Dialog open={showRegistrationModal} onOpenChange={setShowRegistrationModal}>
+        <DialogContent className="sm:max-w-[500px] border-2 border-[#C9184A] p-0 overflow-hidden">
+          <DialogHeader className="bg-gradient-to-r from-[#800020] via-[#A0153E] to-[#C9184A] p-6 text-white">
+            <DialogTitle className="text-2xl font-bold">Create New Employee</DialogTitle>
+            <DialogDescription className="text-rose-100">
+              Fill in the details below to register a new employee.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-6">
+            <EmployeeRegistrationForm 
+              onSuccess={() => {
+                setShowRegistrationModal(false)
+                fetchEmployees()
+              }} 
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
