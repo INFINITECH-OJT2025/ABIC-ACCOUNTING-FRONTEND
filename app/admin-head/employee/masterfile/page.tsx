@@ -548,13 +548,6 @@ export default function MasterfilePage() {
                 >
                   {updatingStatus ? 'Updating...' : 'Approve Employee'}
                 </Button>
-                <Button
-                  onClick={() => handleStatusUpdate('terminated')}
-                  disabled={updatingStatus || selectedEmployee.status === 'terminated'}
-                  className={`bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white transition-all duration-300 ${updatingStatus || selectedEmployee.status === 'terminated' ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  Terminate
-                </Button>
               </div>
             </div>
           </div>

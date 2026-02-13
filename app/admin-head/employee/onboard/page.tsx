@@ -5,6 +5,16 @@ import { useRouter } from 'next/navigation'
 import { getApiUrl } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { EmployeeRegistrationForm } from '@/components/employee-registration-form'
+import { Trash2, Plus, Settings2 } from 'lucide-react'
 
 interface ApprovedEmployee {
   id: number
@@ -13,6 +23,16 @@ interface ApprovedEmployee {
   email: string
   position: string
   status: string
+}
+
+interface Position {
+  id: number
+  name: string
+}
+
+interface Department {
+  id: number
+  name: string
 }
 
 interface OnboardingData {
@@ -27,19 +47,22 @@ interface OnboardingData {
 export default function OnboardPage() {
   const router = useRouter()
   const [employees, setEmployees] = useState<ApprovedEmployee[]>([])
-  const [positions, setPositions] = useState<string[]>([])
-  const [departments, setDepartments] = useState<string[]>([])
+  const [positions, setPositions] = useState<Position[]>([])
+  const [departments, setDepartments] = useState<Department[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedEmployee, setSelectedEmployee] = useState<OnboardingData | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [onboardingDate, setOnboardingDate] = useState('')
   const [department, setDepartment] = useState('')
   const [position, setPosition] = useState('')
-  const [showAddPosition, setShowAddPosition] = useState(false)
-  const [newPosition, setNewPosition] = useState('')
-  const [showAddDepartment, setShowAddDepartment] = useState(false)
-  const [newDepartment, setNewDepartment] = useState('')
+  
+  // Modal states
+  const [showRegistrationModal, setShowRegistrationModal] = useState(false)
+  const [managementModalType, setManagementModalType] = useState<'position' | 'department' | null>(null)
+  const [newItemName, setNewItemName] = useState('')
+  
   const [isSaving, setIsSaving] = useState(false)
+  const [isActionLoading, setIsActionLoading] = useState(false)
 
   useEffect(() => {
     const loadData = async () => {
@@ -56,8 +79,7 @@ export default function OnboardPage() {
       const data = await response.json()
       
       if (data.success) {
-        // Filter only approved employees
-        const approved = data.data.filter((emp: any) => emp.status === 'approved')
+        const approved = data.data.filter((emp: any) => emp.status === 'approved' || emp.status === 'pending')
         setEmployees(approved)
       }
     } catch (error) {
@@ -71,10 +93,8 @@ export default function OnboardPage() {
     try {
       const response = await fetch(`${getApiUrl()}/api/positions`)
       const data = await response.json()
-      
       if (data.success) {
-        const positionNames = data.data.map((pos: any) => pos.name)
-        setPositions(positionNames)
+        setPositions(data.data)
       }
     } catch (error) {
       console.error('Error fetching positions:', error)
@@ -85,10 +105,8 @@ export default function OnboardPage() {
     try {
       const response = await fetch(`${getApiUrl()}/api/departments`)
       const data = await response.json()
-      
       if (data.success) {
-        const departmentNames = data.data.map((dept: any) => dept.name)
-        setDepartments(departmentNames)
+        setDepartments(data.data)
       }
     } catch (error) {
       console.error('Error fetching departments:', error)
@@ -118,7 +136,6 @@ export default function OnboardPage() {
 
     setIsSaving(true)
     try {
-      // Submit onboarding data to API
       const response = await fetch(`${getApiUrl()}/api/employees/${selectedEmployee.employee_id}/onboard`, {
         method: 'POST',
         headers: {
@@ -140,11 +157,7 @@ export default function OnboardPage() {
           onboarding_date: onboardingDate,
           department: department,
         }
-
-        // Store data in sessionStorage for the next page
         sessionStorage.setItem('onboardingData', JSON.stringify(onboardingData))
-        
-        // Redirect to onboarding form
         router.push('/admin-head/forms/onboarding')
       } else {
         alert('Error saving onboarding data: ' + data.message)
@@ -157,67 +170,74 @@ export default function OnboardPage() {
     }
   }
 
-  const handleAddPosition = async () => {
-    if (newPosition.trim()) {
-      try {
-        // Add new position to API
-        const response = await fetch(`${getApiUrl()}/api/positions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            name: newPosition.trim(),
-          }),
-        })
+  const handleAddItem = async () => {
+    if (!newItemName.trim() || !managementModalType) return
 
-        const data = await response.json()
+    setIsActionLoading(true)
+    try {
+      const endpoint = managementModalType === 'position' ? 'positions' : 'departments'
+      const response = await fetch(`${getApiUrl()}/api/${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newItemName.trim(),
+        }),
+      })
 
-        if (data.success) {
-          // Update positions list
-          setPositions([...positions, newPosition.trim()])
-          setPosition(newPosition.trim())
-          setNewPosition('')
-          setShowAddPosition(false)
+      const data = await response.json()
+
+      if (data.success) {
+        if (managementModalType === 'position') {
+          await fetchPositions()
         } else {
-          alert('Error adding position: ' + data.message)
+          await fetchDepartments()
         }
-      } catch (error) {
-        console.error('Error adding position:', error)
-        alert('Failed to add position')
+        setNewItemName('')
+      } else {
+        alert('Error adding item: ' + data.message)
       }
+    } catch (error) {
+      console.error('Error adding item:', error)
+      alert('Failed to add item')
+    } finally {
+      setIsActionLoading(false)
     }
   }
 
-  const handleAddDepartment = async () => {
-    if (newDepartment.trim()) {
-      try {
-        // Add new department to API
-        const response = await fetch(`${getApiUrl()}/api/departments`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            name: newDepartment.trim(),
-          }),
-        })
+  const handleDeleteItem = async (id: number) => {
+    if (!managementModalType) return
+    if (!confirm(`Are you sure you want to delete this ${managementModalType}?`)) return
 
-        const data = await response.json()
+    setIsActionLoading(true)
+    try {
+      const endpoint = managementModalType === 'position' ? 'positions' : 'departments'
+      const response = await fetch(`${getApiUrl()}/api/${endpoint}/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
 
-        if (data.success) {
-          // Update departments list
-          setDepartments([...departments, newDepartment.trim()])
-          setDepartment(newDepartment.trim())
-          setNewDepartment('')
-          setShowAddDepartment(false)
+      const data = await response.json()
+
+      if (data.success) {
+        if (managementModalType === 'position') {
+          await fetchPositions()
+          if (position === data.name) setPosition('')
         } else {
-          alert('Error adding department: ' + data.message)
+          await fetchDepartments()
+          if (department === data.name) setDepartment('')
         }
-      } catch (error) {
-        console.error('Error adding department:', error)
-        alert('Failed to add department')
+      } else {
+        alert('Error deleting item: ' + data.message)
       }
+    } catch (error) {
+      console.error('Error deleting item:', error)
+      alert('Failed to delete item')
+    } finally {
+      setIsActionLoading(false)
     }
   }
 
@@ -227,81 +247,92 @@ export default function OnboardPage() {
     setOnboardingDate('')
     setDepartment('')
     setPosition('')
-    setNewPosition('')
-    setShowAddPosition(false)
-    setNewDepartment('')
-    setShowAddDepartment(false)
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#A0153E] mx-auto mb-4"></div>
-          <p className="text-slate-600">Loading approved employees...</p>
-        </div>
-      </div>
-    )
   }
 
   return (
     <div className="min-h-screen">
       {/* Maroon Gradient Header */}
       <div className="bg-gradient-to-br from-[#800020] via-[#A0153E] to-[#C9184A] text-white rounded-lg shadow-lg p-8 mb-8">
-        <h1 className="text-4xl font-bold mb-3">Onboard Employee</h1>
-        <p className="text-rose-100 text-lg">Select approved employees to onboard into the system</p>
+        <div>
+          <h1 className="text-4xl font-bold mb-3">Onboard Employee</h1>
+          <p className="text-rose-100 text-lg">Select approved employees to onboard into the system</p>
+        </div>
       </div>
 
       {/* Main Content */}
-      <div>
-        {/* Approved Employees Table */}
-        <div className="bg-white rounded-lg shadow-lg border-2 border-[#FFE5EC]">
-          <div className="p-6">
-            <h2 className="text-2xl font-bold text-[#800020] mb-4">Approved Employees</h2>
-            
-            {employees.length === 0 ? (
-              <p className="text-slate-500 text-center py-8">No approved employees found</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gradient-to-r from-[#FFE5EC] to-rose-50">
-                    <tr className="border-b-2 border-[#C9184A]">
-                      <th className="text-left py-3 px-4 font-semibold text-[#800020]">Name</th>
-                      <th className="text-left py-3 px-4 font-semibold text-[#800020]">Email</th>
-                      <th className="text-left py-3 px-4 font-semibold text-[#800020]">Position</th>
-                      <th className="text-left py-3 px-4 font-semibold text-[#800020]">Status</th>
-                      <th className="text-left py-3 px-4 font-semibold text-[#800020]">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {employees.map((employee) => (
-                      <tr key={employee.id} className="border-b border-slate-100 hover:bg-[#FFE5EC] transition-colors duration-200">
-                        <td className="py-3 px-4 text-slate-700 font-medium">
-                          {employee.first_name} {employee.last_name}
-                        </td>
-                        <td className="py-3 px-4 text-slate-700">{employee.email}</td>
-                        <td className="py-3 px-4 text-slate-700">{employee.position || '-'}</td>
-                        <td className="py-3 px-4">
-                          <Badge className="bg-emerald-50 text-[#800020] border-[#A0153E] border-2">
-                            Approved
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4">
-                          <Button
-                            size="sm"
-                            onClick={() => handleSelectEmployee(employee)}
-                            className="bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white transition-all duration-300"
-                          >
-                            Select
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+      <div className="bg-white rounded-lg shadow-lg border-2 border-[#FFE5EC]">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-[#800020]">Approved Employees</h2>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setManagementModalType('position')}
+                className="border-[#C9184A] text-[#800020] hover:bg-rose-50"
+              >
+                <Settings2 className="mr-1 h-4 w-4" />
+                Manage Positions
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setManagementModalType('department')}
+                className="border-[#C9184A] text-[#800020] hover:bg-rose-50"
+              >
+                <Settings2 className="mr-1 h-4 w-4" />
+                Manage Departments
+              </Button>
+            </div>
           </div>
+          
+          {loading ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#A0153E] mx-auto mb-4"></div>
+              <p className="text-slate-500">Loading employees...</p>
+            </div>
+          ) : employees.length === 0 ? (
+            <p className="text-slate-500 text-center py-8">No approved employees found</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gradient-to-r from-[#FFE5EC] to-rose-50">
+                  <tr className="border-b-2 border-[#C9184A]">
+                    <th className="text-left py-3 px-4 font-semibold text-[#800020]">Name</th>
+                    <th className="text-left py-3 px-4 font-semibold text-[#800020]">Email</th>
+                    <th className="text-left py-3 px-4 font-semibold text-[#800020]">Position</th>
+                    <th className="text-left py-3 px-4 font-semibold text-[#800020]">Status</th>
+                    <th className="text-left py-3 px-4 font-semibold text-[#800020]">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {employees.map((employee) => (
+                    <tr key={employee.id} className="border-b border-slate-100 hover:bg-[#FFE5EC] transition-colors duration-200">
+                      <td className="py-3 px-4 text-slate-700 font-medium">
+                        {employee.first_name} {employee.last_name}
+                      </td>
+                      <td className="py-3 px-4 text-slate-700">{employee.email}</td>
+                      <td className="py-3 px-4 text-slate-700">{employee.position || '-'}</td>
+                      <td className="py-3 px-4">
+                        <Badge className="bg-emerald-50 text-[#800020] border-[#A0153E] border-2">
+                          {employee.status === 'approved' ? 'Approved' : 'Pending'}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-4">
+                        <Button
+                          size="sm"
+                          onClick={() => handleSelectEmployee(employee)}
+                          className="bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white transition-all duration-300"
+                        >
+                          Select
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 
@@ -316,7 +347,6 @@ export default function OnboardPage() {
             </div>
 
             <div className="p-6 space-y-4">
-              {/* Employee Info Display */}
               <div className="bg-[#FFE5EC] p-4 rounded-lg border border-[#C9184A]">
                 <div>
                   <p className="text-slate-600 text-sm">Full Name</p>
@@ -326,135 +356,52 @@ export default function OnboardPage() {
                 </div>
               </div>
 
-              {/* Position Dropdown */}
               <div>
                 <label className="block text-sm font-semibold text-[#800020] mb-1">
                   Position <span className="text-red-500">*</span>
                 </label>
-                {!showAddPosition ? (
-                  <div className="flex gap-2">
-                    <select
-                      value={position}
-                      onChange={(e) => {
-                        if (e.target.value === '__add__') {
-                          setShowAddPosition(true)
-                          setPosition('')
-                        } else {
-                          setPosition(e.target.value)
-                        }
-                      }}
-                      className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A]"
-                    >
-                      <option value="">Select Position...</option>
-                      {positions.map((pos) => (
-                        <option key={pos} value={pos}>
-                          {pos}
-                        </option>
-                      ))}
-                      <option value="__add__">+ Add New Position</option>
-                    </select>
-                  </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newPosition}
-                      onChange={(e) => setNewPosition(e.target.value)}
-                      placeholder="Enter new position"
-                      className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A]"
-                      autoFocus
-                    />
-                    <Button
-                      onClick={handleAddPosition}
-                      size="sm"
-                      className="bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white transition-all duration-300"
-                    >
-                      Add
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        setShowAddPosition(false)
-                        setNewPosition('')
-                      }}
-                      size="sm"
-                      variant="outline"
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                )}
+                <select
+                  value={position}
+                  onChange={(e) => setPosition(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A]"
+                >
+                  <option value="">Select Position...</option>
+                  {positions.map((pos) => (
+                    <option key={pos.id} value={pos.name}>
+                      {pos.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              {/* Onboarding Date */}
               <div>
                 <label className="block text-sm font-semibold text-[#800020] mb-1">
                   Onboarding Date <span className="text-red-500">*</span>
                 </label>
-                <input
+                <Input
                   type="date"
                   value={onboardingDate}
                   onChange={(e) => setOnboardingDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A]"
+                  className="focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A]"
                 />
               </div>
 
-              {/* Department Dropdown */}
               <div>
                 <label className="block text-sm font-semibold text-[#800020] mb-1">
                   Department <span className="text-red-500">*</span>
                 </label>
-                {!showAddDepartment ? (
-                  <div className="flex gap-2">
-                    <select
-                      value={department}
-                      onChange={(e) => {
-                        if (e.target.value === '__add__') {
-                          setShowAddDepartment(true)
-                          setDepartment('')
-                        } else {
-                          setDepartment(e.target.value)
-                        }
-                      }}
-                      className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A]"
-                    >
-                      <option value="">Select Department...</option>
-                      {departments.map((dept) => (
-                        <option key={dept} value={dept}>
-                          {dept}
-                        </option>
-                      ))}
-                      <option value="__add__">+ Add New Department</option>
-                    </select>
-                  </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newDepartment}
-                      onChange={(e) => setNewDepartment(e.target.value)}
-                      placeholder="Enter new department"
-                      className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A]"
-                      autoFocus
-                    />
-                    <Button
-                      onClick={handleAddDepartment}
-                      size="sm"
-                      className="bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white transition-all duration-300"
-                    >
-                      Add
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        setShowAddDepartment(false)
-                        setNewDepartment('')
-                      }}
-                      size="sm"
-                      variant="outline"
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                )}
+                <select
+                  value={department}
+                  onChange={(e) => setDepartment(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A]"
+                >
+                  <option value="">Select Department...</option>
+                  {departments.map((dept) => (
+                    <option key={dept.id} value={dept.name}>
+                      {dept.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -477,6 +424,88 @@ export default function OnboardPage() {
           </div>
         </div>
       )}
+
+      {/* Registration Modal */}
+      <Dialog open={showRegistrationModal} onOpenChange={setShowRegistrationModal}>
+        <DialogContent className="sm:max-w-[500px] border-2 border-[#C9184A] p-0 overflow-hidden">
+          <DialogHeader className="bg-gradient-to-r from-[#800020] via-[#A0153E] to-[#C9184A] p-6 text-white">
+            <DialogTitle className="text-2xl font-bold">Create New Employee</DialogTitle>
+            <DialogDescription className="text-rose-100">
+              Register a new employee. They will appear here once approved.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-6">
+            <EmployeeRegistrationForm 
+              onSuccess={() => {
+                setShowRegistrationModal(false)
+                fetchApprovedEmployees()
+              }} 
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Management Modal (Positions/Departments) */}
+      <Dialog 
+        open={managementModalType !== null} 
+        onOpenChange={(open) => !open && setManagementModalType(null)}
+      >
+        <DialogContent className="sm:max-w-[500px] border-2 border-[#C9184A] p-0 overflow-hidden">
+          <DialogHeader className="bg-gradient-to-r from-[#800020] via-[#A0153E] to-[#C9184A] p-6 text-white">
+            <div className="flex justify-between items-center">
+              <DialogTitle className="text-2xl font-bold font-montserrat">
+                Manage {managementModalType === 'position' ? 'Positions' : 'Departments'}
+              </DialogTitle>
+            </div>
+          </DialogHeader>
+          
+          <div className="p-6">
+            {/* Add New Input */}
+            <div className="flex gap-2 mb-6">
+              <Input
+                placeholder={`New ${managementModalType}...`}
+                value={newItemName}
+                onChange={(e) => setNewItemName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddItem()}
+                className="focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A]"
+              />
+              <Button 
+                onClick={handleAddItem}
+                disabled={isActionLoading || !newItemName.trim()}
+                className="bg-[#800020] hover:bg-[#A0153E] text-white"
+              >
+                Add
+              </Button>
+            </div>
+
+            {/* List */}
+            <div className="bg-slate-50 rounded-lg border border-slate-200 divide-y divide-slate-200 max-h-[300px] overflow-y-auto">
+              {(managementModalType === 'position' ? positions : departments).length === 0 ? (
+                <p className="p-4 text-center text-slate-500">No items found.</p>
+              ) : (
+                (managementModalType === 'position' ? positions : departments).map((item) => (
+                  <div key={item.id} className="flex justify-between items-center p-3 hover:bg-rose-50 transition-colors">
+                    <span className="text-slate-700 font-medium">{item.name}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteItem(item.id)}
+                      disabled={isActionLoading}
+                      className="text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 h-11 w-11 p-0 rounded-lg shadow-sm transition-all duration-200"
+                    >
+                      <Trash2 className="h-6 w-6" />
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="p-4 border-t border-slate-100 flex justify-end">
+            <Button onClick={() => setManagementModalType(null)}>Close</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
