@@ -109,7 +109,7 @@ export default function EmployeeDashboardPage() {
     }
   }
 
-  const fetchProvinces = async (regionCode: string) => {
+  const fetchProvinces = async (regionCode: string, preserveValues = false) => {
     if (!regionCode) {
       setProvinces([])
       setCities([])
@@ -137,7 +137,10 @@ export default function EmployeeDashboardPage() {
       setProvinces(provincesList)
       setCities([])
       setBarangays([])
-      setFormData((prev) => ({ ...prev, province: '', city_municipality: '', barangay: '' }))
+      // Only clear formData if not preserving values (i.e., user is changing selection)
+      if (!preserveValues) {
+        setFormData((prev) => ({ ...prev, province: '', city_municipality: '', barangay: '' }))
+      }
     } catch (error) {
       console.error('Error fetching provinces:', error)
       setProvinces([])
@@ -146,7 +149,7 @@ export default function EmployeeDashboardPage() {
     }
   }
 
-  const fetchCities = async (provinceCode: string) => {
+  const fetchCities = async (provinceCode: string, preserveValues = false) => {
     if (!provinceCode) {
       setCities([])
       setBarangays([])
@@ -179,7 +182,10 @@ export default function EmployeeDashboardPage() {
       console.log(`Fetched ${allCities.length} cities/municipalities for province ${provinceCode}`)
       setCities(allCities)
       setBarangays([])
-      setFormData((prev) => ({ ...prev, city_municipality: '', barangay: '' }))
+      // Only clear formData if not preserving values (i.e., user is changing selection)
+      if (!preserveValues) {
+        setFormData((prev) => ({ ...prev, city_municipality: '', barangay: '' }))
+      }
     } catch (error) {
       console.error('Error fetching cities:', error)
       setCities([])
@@ -188,7 +194,7 @@ export default function EmployeeDashboardPage() {
     }
   }
 
-  const fetchBarangays = async (cityCode: string) => {
+  const fetchBarangays = async (cityCode: string, preserveValues = false) => {
     if (!cityCode) {
       setBarangays([])
       return
@@ -212,7 +218,10 @@ export default function EmployeeDashboardPage() {
       
       console.log(`Fetched ${barangaysList.length} barangays for city ${cityCode}`)
       setBarangays(barangaysList)
-      setFormData((prev) => ({ ...prev, barangay: '' }))
+      // Only clear formData if not preserving values (i.e., user is changing selection)
+      if (!preserveValues) {
+        setFormData((prev) => ({ ...prev, barangay: '' }))
+      }
     } catch (error) {
       console.error('Error fetching barangays:', error)
       setBarangays([])
@@ -290,6 +299,39 @@ export default function EmployeeDashboardPage() {
     checkAuthAndFetchProfile()
   }, [router])
 
+  // Populate provinces when region is loaded
+  useEffect(() => {
+    if (!formData.region || regions.length === 0 || !dataLoaded) return
+
+    const selectedRegion = regions.find(r => r.name === formData.region)
+    if (selectedRegion) {
+      fetchProvinces(selectedRegion.code, true)
+    }
+  }, [formData.region, regions.length, dataLoaded])
+
+  // Populate cities when provinces are loaded
+  useEffect(() => {
+    if (!formData.province || provinces.length === 0 || !dataLoaded) return
+
+    const selectedProvince = provinces.find(p => p.name === formData.province)
+    if (selectedProvince) {
+      fetchCities(selectedProvince.code, true)
+    }
+  }, [formData.province, provinces.length, dataLoaded])
+
+  // Populate barangays when cities are loaded
+  useEffect(() => {
+    if (!formData.city_municipality || cities.length === 0 || !dataLoaded) return
+
+    const selectedCity = cities.find(c => c.name === formData.city_municipality)
+    if (selectedCity) {
+      fetchBarangays(selectedCity.code, true)
+    }
+  }, [formData.city_municipality, cities.length, dataLoaded])
+
+
+
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setFormData((prev) => ({
@@ -298,12 +340,22 @@ export default function EmployeeDashboardPage() {
     }))
 
     // Handle cascading address dropdowns
+    // Now we need to find the code from the selected name
     if (name === 'region') {
-      fetchProvinces(value)
+      const selectedRegion = regions.find(r => r.name === value)
+      if (selectedRegion) {
+        fetchProvinces(selectedRegion.code)
+      }
     } else if (name === 'province') {
-      fetchCities(value)
+      const selectedProvince = provinces.find(p => p.name === value)
+      if (selectedProvince) {
+        fetchCities(selectedProvince.code)
+      }
     } else if (name === 'city_municipality') {
-      fetchBarangays(value)
+      const selectedCity = cities.find(c => c.name === value)
+      if (selectedCity) {
+        fetchBarangays(selectedCity.code)
+      }
     }
   }
 
@@ -872,7 +924,7 @@ export default function EmployeeDashboardPage() {
                       >
                         <option value="">Select Region...</option>
                         {regions.map((region) => (
-                          <option key={region.code} value={region.code}>
+                          <option key={region.code} value={region.name}>
                             {region.name}
                           </option>
                         ))}
@@ -890,7 +942,7 @@ export default function EmployeeDashboardPage() {
                       >
                         <option value="">Select Province...</option>
                         {provinces.map((province) => (
-                          <option key={province.code} value={province.code}>
+                          <option key={province.code} value={province.name}>
                             {province.name}
                           </option>
                         ))}
@@ -908,7 +960,7 @@ export default function EmployeeDashboardPage() {
                       >
                         <option value="">Select City / Municipality...</option>
                         {cities.map((city) => (
-                          <option key={city.code} value={city.code}>
+                          <option key={city.code} value={city.name}>
                             {city.name}
                           </option>
                         ))}
@@ -926,7 +978,7 @@ export default function EmployeeDashboardPage() {
                       >
                         <option value="">Select Barangay...</option>
                         {barangays.map((barangay) => (
-                          <option key={barangay.code} value={barangay.code}>
+                          <option key={barangay.code} value={barangay.name}>
                             {barangay.name}
                           </option>
                         ))}

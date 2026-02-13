@@ -103,8 +103,8 @@ export default function TerminatePage() {
       return
     }
 
-    if (formData.reason.length < 10) {
-      toast.error('Reason must be at least 10 characters')
+    if (formData.reason.length < 5) {
+      toast.error('Reason must be at least 5 characters')
       return
     }
 
@@ -246,9 +246,9 @@ export default function TerminatePage() {
                                 name="reason"
                                 value={formData.reason}
                                 onChange={handleInputChange}
-                                placeholder="Enter the reason for termination (minimum 10 characters)"
+                                placeholder="Enter the reason for termination (minimum 5 characters)"
                                 required
-                                minLength={10}
+                                minLength={5}
                                 maxLength={1000}
                                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
                                 rows={4}
@@ -286,7 +286,7 @@ export default function TerminatePage() {
                               <Button
                                 type="submit"
                                 className="bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
-                                disabled={submitting || !formData.reason.trim() || formData.reason.length < 10}
+                                disabled={submitting || !formData.reason.trim() || formData.reason.length < 5}
                               >
                                 {submitting ? 'Processing...' : 'Confirm Termination'}
                               </Button>
