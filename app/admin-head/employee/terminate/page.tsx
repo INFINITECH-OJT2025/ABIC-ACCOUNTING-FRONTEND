@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { getApiUrl } from '@/lib/api'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -22,6 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Users, FileText, Search, AlertCircle } from 'lucide-react'
 
 interface Employee {
   id: number
@@ -32,6 +34,17 @@ interface Employee {
   status: string
 }
 
+interface TerminationRecord {
+  id: number
+  employee_id: number
+  termination_date: string
+  reason: string
+  notes: string
+  status: string
+  employee: Employee
+  created_at?: string
+}
+
 interface TerminationFormData {
   termination_date: string
   reason: string
@@ -40,10 +53,15 @@ interface TerminationFormData {
 
 export default function TerminatePage() {
   const [employees, setEmployees] = useState<Employee[]>([])
+  const [terminations, setTerminations] = useState<TerminationRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
+  const [selectedTermination, setSelectedTermination] = useState<TerminationRecord | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [showTerminatedModal, setShowTerminatedModal] = useState(false)
+  const [showDetailDialog, setShowDetailDialog] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const [formData, setFormData] = useState<TerminationFormData>({
     termination_date: new Date().toISOString().split('T')[0],
     reason: '',
@@ -51,29 +69,41 @@ export default function TerminatePage() {
   })
 
   useEffect(() => {
-    fetchEmployees()
+    fetchData()
   }, [])
 
-  const fetchEmployees = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`${getApiUrl()}/api/employees`)
-      const data = await response.json()
+      const [empRes, termRes] = await Promise.all([
+        fetch(`${getApiUrl()}/api/employees`),
+        fetch(`${getApiUrl()}/api/terminations`)
+      ])
 
-      if (data.success && Array.isArray(data.data)) {
-        // Filter to show only active employees
-        const activeEmployees = data.data.filter(
+      const empData = await empRes.json()
+      const termData = await termRes.json()
+
+      if (empData.success && Array.isArray(empData.data)) {
+        // Active employees (not terminated)
+        const active = empData.data.filter(
           (emp: Employee) => emp.status !== 'terminated'
         )
-        setEmployees(activeEmployees)
+        setEmployees(active)
+      }
+
+      if (termData.success && Array.isArray(termData.data)) {
+        setTerminations(termData.data)
       }
     } catch (error) {
-      console.error('Error fetching employees:', error)
-      toast.error('Failed to fetch employees')
+      console.error('Error fetching data:', error)
+      toast.error('Failed to fetch data')
     } finally {
       setLoading(false)
     }
   }
+
+  const fetchEmployees = fetchData // Maintain compatibility for internal calls
+
 
   const handleTerminateClick = (employee: Employee) => {
     setSelectedEmployee(employee)
@@ -103,8 +133,8 @@ export default function TerminatePage() {
       return
     }
 
-    if (formData.reason.length < 5) {
-      toast.error('Reason must be at least 5 characters')
+    if (formData.reason.length < 10) {
+      toast.error('Reason must be at least 10 characters')
       return
     }
 
@@ -137,8 +167,8 @@ export default function TerminatePage() {
         toast.success(data.message || 'Employee terminated successfully')
         setDialogOpen(false)
         setSelectedEmployee(null)
-        // Refresh employee list
-        fetchEmployees()
+        // Refresh data
+        fetchData()
       } else {
         toast.error(data.message || 'Failed to terminate employee')
       }
@@ -150,152 +180,101 @@ export default function TerminatePage() {
     }
   }
 
-  if (loading) {
+  const filteredEmployees = employees.filter((emp) => {
+    const query = searchQuery.toLowerCase()
     return (
-      <div className="flex items-center justify-center p-8">
-        <p className="text-slate-600">Loading employees...</p>
-      </div>
+      emp.first_name?.toLowerCase().includes(query) ||
+      emp.last_name?.toLowerCase().includes(query) ||
+      emp.email?.toLowerCase().includes(query) ||
+      emp.position?.toLowerCase().includes(query)
     )
-  }
+  })
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen pb-12">
       {/* Maroon Gradient Header */}
       <div className="bg-gradient-to-br from-[#800020] via-[#A0153E] to-[#C9184A] text-white rounded-lg shadow-lg p-8 mb-8">
-        <h1 className="text-4xl font-bold mb-3">
-          Terminate Employee
-        </h1>
-        <p className="text-rose-100 text-lg">
-          Process employee termination with reason and documentation
-        </p>
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-4xl font-bold mb-3">
+              Terminate Employee
+            </h1>
+            <p className="text-rose-100 text-lg">
+              Process employee termination with reason and documentation
+            </p>
+          </div>
+          <Button
+            onClick={() => setShowTerminatedModal(true)}
+            className="bg-white text-[#800020] hover:bg-rose-50 font-bold px-6 py-2 rounded-lg transition-all duration-300 shadow-md hover:shadow-lg flex items-center gap-2 h-auto py-3"
+          >
+            <Users className="h-5 w-5" />
+            VIEW TERMINATED
+          </Button>
+        </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-lg border-2 border-[#FFE5EC]">
-        {employees.length === 0 ? (
-          <div className="p-6 text-center">
-            <p className="text-slate-500">No active employees to terminate</p>
+      <div className="bg-white rounded-xl shadow-lg border-2 border-[#FFE5EC] overflow-hidden">
+        <div className="p-6 border-b border-rose-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <h2 className="text-2xl font-bold text-[#800020]">Active Employees</h2>
+          <div className="relative w-full md:w-96">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search by name, email, or position..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 focus:ring-rose-200 border-rose-100"
+            />
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="p-20 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#A0153E] mx-auto"></div>
+            <p className="text-slate-500 mt-4">Loading accounts...</p>
+          </div>
+        ) : filteredEmployees.length === 0 ? (
+          <div className="p-20 text-center bg-slate-50/50">
+            <AlertCircle className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500 text-lg">
+              {employees.length === 0 
+                ? "No active employees available for termination." 
+                : "No employees match your search query."}
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader className="bg-gradient-to-r from-[#FFE5EC] to-rose-50">
+              <TableHeader className="bg-rose-50/50">
                 <TableRow className="border-b-2 border-[#C9184A]">
-                  <TableHead className="text-[#800020] font-semibold">Employee ID</TableHead>
-                  <TableHead className="text-[#800020] font-semibold">Name</TableHead>
-                  <TableHead className="text-[#800020] font-semibold">Email</TableHead>
-                  <TableHead className="text-[#800020] font-semibold">Position</TableHead>
-                  <TableHead className="text-[#800020] font-semibold">Status</TableHead>
-                  <TableHead className="text-right text-[#800020] font-semibold">Action</TableHead>
+                  <TableHead className="text-[#800020] font-bold py-4 pl-6 uppercase text-xs tracking-wider">Employee</TableHead>
+                  <TableHead className="text-[#800020] font-bold uppercase text-xs tracking-wider">Contact</TableHead>
+                  <TableHead className="text-[#800020] font-bold uppercase text-xs tracking-wider">Position</TableHead>
+                  <TableHead className="text-[#800020] font-bold uppercase text-xs tracking-wider">Status</TableHead>
+                  <TableHead className="text-right text-[#800020] font-bold py-4 pr-6 uppercase text-xs tracking-wider">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {employees.map((employee) => (
-                  <TableRow key={employee.id} className="hover:bg-[#FFE5EC] transition-colors duration-200">
-                    <TableCell>#{employee.id}</TableCell>
-                    <TableCell className="font-medium">
-                      {employee.first_name} {employee.last_name}
+                {filteredEmployees.map((employee) => (
+                  <TableRow key={employee.id} className="hover:bg-rose-50/30 transition-colors duration-200 border-b border-rose-50">
+                    <TableCell className="py-4 pl-6">
+                      <div className="font-bold text-slate-900">{employee.first_name} {employee.last_name}</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">ID: #{employee.id}</div>
                     </TableCell>
-                    <TableCell>{employee.email}</TableCell>
-                    <TableCell>{employee.position || 'N/A'}</TableCell>
+                    <TableCell className="text-slate-600 text-sm">{employee.email}</TableCell>
+                    <TableCell className="text-slate-700 font-medium">{employee.position || 'N/A'}</TableCell>
                     <TableCell>
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-emerald-50 text-[#800020] border border-[#A0153E]">
+                      <Badge className="bg-emerald-50 text-[#800020] hover:bg-emerald-50 border-[#A0153E] border shadow-sm">
                         {employee.status || 'active'}
-                      </span>
+                      </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
-                      <Dialog open={dialogOpen && selectedEmployee?.id === employee.id} onOpenChange={setDialogOpen}>
-                        <DialogTrigger asChild>
-                          <Button
-                            className="bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white transition-all duration-300"
-                            size="sm"
-                            onClick={() => handleTerminateClick(employee)}
-                          >
-                            Terminate
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[500px] border-2 border-[#C9184A]">
-                          <DialogHeader className="bg-gradient-to-r from-[#FFE5EC] to-rose-50 -m-6 mb-6 p-6 rounded-t-lg border-b-2 border-[#C9184A]">
-                            <DialogTitle className="text-[#800020] text-2xl">Terminate Employee</DialogTitle>
-                            <DialogDescription className="text-slate-700">
-                              Terminating: <strong className="text-[#800020]">{selectedEmployee?.first_name} {selectedEmployee?.last_name}</strong>
-                            </DialogDescription>
-                          </DialogHeader>
-
-                          <form onSubmit={handleSubmit} className="space-y-4">
-                            {/* Termination Date */}
-                            <div className="space-y-2">
-                              <Label htmlFor="termination_date" className="text-[#800020] font-semibold">
-                                Termination Date
-                              </Label>
-                              <Input
-                                id="termination_date"
-                                name="termination_date"
-                                type="date"
-                                value={formData.termination_date}
-                                onChange={handleInputChange}
-                                required
-                                className="focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A]"
-                              />
-                            </div>
-
-                            {/* Reason - Required */}
-                            <div className="space-y-2">
-                              <Label htmlFor="reason" className="text-[#800020] font-semibold">
-                                Reason for Termination <span className="text-red-500">*</span>
-                              </Label>
-                              <textarea
-                                id="reason"
-                                name="reason"
-                                value={formData.reason}
-                                onChange={handleInputChange}
-                                placeholder="Enter the reason for termination (minimum 5 characters)"
-                                required
-                                minLength={5}
-                                maxLength={1000}
-                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A] resize-none"
-                                rows={4}
-                              />
-                              <p className="text-xs text-slate-500">
-                                {formData.reason.length}/1000 characters
-                              </p>
-                            </div>
-
-                            {/* Notes - Optional */}
-                            <div className="space-y-2">
-                              <Label htmlFor="notes" className="text-[#800020] font-semibold">Additional Notes (Optional)</Label>
-                              <textarea
-                                id="notes"
-                                name="notes"
-                                value={formData.notes}
-                                onChange={handleInputChange}
-                                placeholder="Any additional notes or comments"
-                                maxLength={1000}
-                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A] resize-none"
-                                rows={3}
-                              />
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="flex justify-end gap-3 pt-4">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setDialogOpen(false)}
-                                disabled={submitting}
-                              >
-                                Cancel
-                              </Button>
-                              <Button
-                                type="submit"
-                                className="bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white transition-all duration-300 disabled:opacity-50"
-                                disabled={submitting || !formData.reason.trim() || formData.reason.length < 5}
-                              >
-                                {submitting ? 'Processing...' : 'Confirm Termination'}
-                              </Button>
-                            </div>
-                          </form>
-                        </DialogContent>
-                      </Dialog>
+                    <TableCell className="text-right pr-6">
+                      <Button
+                        className="bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white shadow-sm hover:shadow-md transition-all duration-300"
+                        size="sm"
+                        onClick={() => handleTerminateClick(employee)}
+                      >
+                        Terminate
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -304,6 +283,242 @@ export default function TerminatePage() {
           </div>
         )}
       </div>
+
+      {/* Termination Entry Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-[500px] border-2 border-[#C9184A] p-0 overflow-hidden">
+          <DialogHeader className="bg-gradient-to-r from-[#800020] via-[#A0153E] to-[#C9184A] p-6 text-white">
+            <DialogTitle className="text-2xl font-bold">Terminate Employee</DialogTitle>
+            <DialogDescription className="text-rose-100">
+              Terminating: <strong className="text-white underline decoration-rose-300">{selectedEmployee?.first_name} {selectedEmployee?.last_name}</strong>
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="termination_date" className="text-[#800020] font-semibold">
+                Termination Date
+              </Label>
+              <Input
+                id="termination_date"
+                name="termination_date"
+                type="date"
+                value={formData.termination_date}
+                onChange={handleInputChange}
+                required
+                className="focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A]"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="reason" className="text-[#800020] font-semibold">
+                Reason for Termination <span className="text-red-500">*</span>
+              </Label>
+              <textarea
+                id="reason"
+                name="reason"
+                value={formData.reason}
+                onChange={handleInputChange}
+                placeholder="Enter the reason for termination (min. 10 characters)..."
+                required
+                minLength={10}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A] resize-none"
+                rows={4}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notes" className="text-[#800020] font-semibold">Additional Notes (Optional)</Label>
+              <textarea
+                id="notes"
+                name="notes"
+                value={formData.notes}
+                onChange={handleInputChange}
+                placeholder="Any additional documentation..."
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A] resize-none"
+                rows={3}
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDialogOpen(false)}
+                disabled={submitting}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white transition-all duration-300"
+                disabled={submitting || formData.reason.length < 10}
+              >
+                {submitting ? 'Processing...' : 'Confirm Termination'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Terminated Employees View Modal */}
+      <Dialog open={showTerminatedModal} onOpenChange={setShowTerminatedModal}>
+        <DialogContent className="sm:max-w-4xl border-2 border-[#C9184A] p-0 overflow-hidden">
+          <DialogHeader className="bg-gradient-to-r from-[#800020] via-[#A0153E] to-[#C9184A] p-6 text-white">
+            <div className="flex justify-between items-center">
+              <div>
+                <DialogTitle className="text-2xl font-bold">Terminated Employee Accounts</DialogTitle>
+                <DialogDescription className="text-rose-100">
+                  History of terminated employees and reasons
+                </DialogDescription>
+              </div>
+              <Badge className="bg-white text-[#800020] hover:bg-rose-50 px-3 py-1 text-sm border-0">
+                {terminations.length} Total
+              </Badge>
+            </div>
+          </DialogHeader>
+
+          <div className="p-6">
+            {terminations.length === 0 ? (
+              <div className="text-center py-12 bg-slate-50 rounded-lg border border-slate-100">
+                <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-500">No termination records found.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto max-h-[500px] border border-slate-200 rounded-lg shadow-inner">
+                <Table>
+                  <TableHeader className="bg-slate-50 sticky top-0 z-10 shadow-sm">
+                    <TableRow className="border-b-2 border-[#FFE5EC]">
+                      <TableHead className="text-[#800020] font-bold">Employee</TableHead>
+                      <TableHead className="text-[#800020] font-bold">Position</TableHead>
+                      <TableHead className="text-[#800020] font-bold">Terminated On</TableHead>
+                      <TableHead className="text-[#800020] font-bold">Reason (Preview)</TableHead>
+                      <TableHead className="text-[#800020] font-bold text-center">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {terminations.map((record) => (
+                      <TableRow key={record.id} className="hover:bg-rose-50 transition-colors">
+                        <TableCell className="font-semibold text-slate-900 py-4">
+                          {record.employee?.first_name} {record.employee?.last_name}
+                          <p className="text-xs font-normal text-slate-500 mt-1">{record.employee?.email}</p>
+                        </TableCell>
+                        <TableCell className="text-slate-700">{record.employee?.position || 'N/A'}</TableCell>
+                        <TableCell className="text-slate-700">
+                          {record.termination_date ? new Date(record.termination_date).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          }) : (record.created_at ? new Date(record.created_at).toLocaleDateString() : 'N/A')}
+                        </TableCell>
+                        <TableCell className="text-slate-700 max-w-[300px]">
+                          <div className="text-sm italic text-slate-500 truncate">
+                            {record.reason || 'No reason provided'}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="text-[#800020] hover:text-[#A0153E] hover:bg-rose-100 font-semibold"
+                            onClick={() => {
+                              setSelectedTermination(record)
+                              setShowTerminatedModal(false)
+                              setTimeout(() => setShowDetailDialog(true), 100)
+                            }}
+                          >
+                            View details
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+
+          <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
+            <Button 
+              onClick={() => setShowTerminatedModal(false)}
+              className="bg-[#800020] hover:bg-[#A0153E] text-white px-8"
+            >
+              Close History
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Termination Detail View Modal */}
+      <Dialog 
+        open={showDetailDialog} 
+        onOpenChange={(open) => {
+          setShowDetailDialog(open)
+          if (!open) {
+            // Re-open history if details are closed
+            setTimeout(() => setShowTerminatedModal(true), 100)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl border-2 border-[#C9184A] p-0 overflow-hidden">
+          <DialogHeader className="bg-gradient-to-r from-[#800020] via-[#A0153E] to-[#C9184A] p-6 text-white">
+            <DialogTitle className="text-2xl font-bold">Termination Details</DialogTitle>
+            <DialogDescription className="text-rose-100">
+              Complete record for {selectedTermination?.employee?.first_name} {selectedTermination?.employee?.last_name}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="p-8 space-y-6">
+            <div className="grid grid-cols-2 gap-8 bg-rose-50 p-4 rounded-lg border border-rose-100">
+              <div>
+                <Label className="text-[#800020] font-bold uppercase text-[10px] tracking-widest">Position</Label>
+                <p className="text-slate-900 font-medium">{selectedTermination?.employee?.position || 'N/A'}</p>
+              </div>
+              <div>
+                <Label className="text-[#800020] font-bold uppercase text-[10px] tracking-widest">Effective Date</Label>
+                <p className="text-slate-900 font-medium">
+                  {selectedTermination?.termination_date ? new Date(selectedTermination.termination_date).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  }) : 'N/A'}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Label className="text-[#800020] font-bold uppercase text-[10px] tracking-widest flex items-center gap-2">
+                <FileText className="h-3 w-3" /> Reason for Termination
+              </Label>
+              <div className="bg-white border-2 border-[#FFE5EC] rounded-xl p-5 text-slate-800 leading-relaxed shadow-sm min-h-[120px] max-h-[300px] overflow-y-auto">
+                {selectedTermination?.reason || 'No reason provided'}
+              </div>
+            </div>
+
+            {selectedTermination?.notes && (
+              <div className="space-y-3">
+                <Label className="text-[#800020] font-bold uppercase text-[10px] tracking-widest">Additional Notes</Label>
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-slate-600 text-sm italic">
+                  {selectedTermination.notes}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
+            <Button 
+              onClick={() => {
+                setShowDetailDialog(false)
+                // The onOpenChange will handle re-opening history
+              }}
+              className="bg-white text-[#800020] hover:bg-rose-50 border-[#800020] border font-bold"
+            >
+              Back to History
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </div>
   )
 }
