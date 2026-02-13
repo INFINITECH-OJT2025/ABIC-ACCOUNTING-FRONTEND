@@ -61,13 +61,37 @@ export default function MasterfilePage() {
 
   const fetchEmployees = async () => {
     try {
-      const response = await fetch(`${getApiUrl()}/api/employees`)
+      const apiUrl = getApiUrl()
+      const fullUrl = `${apiUrl}/api/employees`
+      console.log('Fetching employees from:', fullUrl)
+      
+      const response = await fetch(fullUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        credentials: 'include',
+      })
+      
+      if (!response.ok) {
+        console.error(`API returned status ${response.status}: ${response.statusText}`)
+        throw new Error(`HTTP Error: ${response.status}`)
+      }
+      
       const data = await response.json()
       if (data.success) {
         setEmployees(data.data || [])
+      } else {
+        console.warn('API response not successful:', data)
       }
     } catch (error) {
-      console.error('Error fetching employees:', error)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      console.error('Error fetching employees:', errorMessage)
+      console.error('Full error:', error)
+      
+      // Show error to user for debugging
+      alert(`Failed to load employees: ${errorMessage}\n\nMake sure the backend server is running on ${getApiUrl()}`)
     } finally {
       setLoading(false)
     }
@@ -75,14 +99,36 @@ export default function MasterfilePage() {
 
   const fetchEmployeeDetails = async (employeeId: number) => {
     try {
-      const response = await fetch(`${getApiUrl()}/api/employees/${employeeId}`)
+      const apiUrl = getApiUrl()
+      const fullUrl = `${apiUrl}/api/employees/${employeeId}`
+      console.log('Fetching employee details from:', fullUrl)
+      
+      const response = await fetch(fullUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        credentials: 'include',
+      })
+      
+      if (!response.ok) {
+        console.error(`API returned status ${response.status}: ${response.statusText}`)
+        throw new Error(`HTTP Error: ${response.status}`)
+      }
+      
       const data = await response.json()
       if (data.success) {
         setSelectedEmployee(data.data)
         setShowDetailModal(true)
+      } else {
+        console.warn('API response not successful:', data)
+        alert('Failed to load employee details')
       }
     } catch (error) {
-      console.error('Error fetching employee details:', error)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      console.error('Error fetching employee details:', errorMessage)
+      alert(`Failed to load employee details: ${errorMessage}`)
     }
   }
 
@@ -91,13 +137,24 @@ export default function MasterfilePage() {
 
     setUpdatingStatus(true)
     try {
-      const response = await fetch(`${getApiUrl()}/api/employees/${selectedEmployee.id}`, {
+      const apiUrl = getApiUrl()
+      const fullUrl = `${apiUrl}/api/employees/${selectedEmployee.id}`
+      console.log('Updating employee status at:', fullUrl)
+      
+      const response = await fetch(fullUrl, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ status: newStatus }),
       })
+
+      if (!response.ok) {
+        console.error(`API returned status ${response.status}: ${response.statusText}`)
+        throw new Error(`HTTP Error: ${response.status}`)
+      }
 
       const data = await response.json()
       if (data.success) {
@@ -110,11 +167,13 @@ export default function MasterfilePage() {
         // Show success message
         alert(`Employee status updated to ${statusLabels[newStatus]}`)
       } else {
+        console.warn('API response not successful:', data)
         alert('Failed to update status')
       }
     } catch (error) {
-      console.error('Error updating status:', error)
-      alert('Error updating status')
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      console.error('Error updating status:', errorMessage)
+      alert(`Failed to update status: ${errorMessage}`)
     } finally {
       setUpdatingStatus(false)
     }
