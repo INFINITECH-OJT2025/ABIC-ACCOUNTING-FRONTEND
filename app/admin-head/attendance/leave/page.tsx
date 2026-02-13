@@ -2,11 +2,11 @@
 
 import React from 'react'
 
-export default function OnboardingPage() {
+export default function LeavePage() {
   return (
     <div>
-      <h1 className="text-3xl font-bold text-slate-900 mb-4">Onboarding</h1>
-      <p className="text-slate-600">Manage employee onboarding forms</p>
+      <h1 className="text-3xl font-bold text-slate-900 mb-4">Leave</h1>
+      <p className="text-slate-600">Manage employee leave requests and approvals</p>
       <div className="mt-6 bg-white p-6 rounded-lg shadow">
         <p className="text-slate-500">Content coming soon...</p>
       </div>
