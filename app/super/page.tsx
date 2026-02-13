@@ -16,6 +16,14 @@ import {
   Eye,
   Mail,
   CheckCircle,
+  TrendingUp,
+  DollarSign,
+  FileText,
+  Calendar,
+  AlertTriangle,
+  Database,
+  Clock,
+  HardDrive,
 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
@@ -62,12 +70,12 @@ export default function SuperAdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F9F6F7]">
+    <div className="min-h-screen bg-gray-100">
       <SuperAdminHeader user={user} onLogout={handleLogout} />
-
+      
       {/* CONTENT - Constrained Width */}
-      <div className="flex-1 p-6 space-y-6">
-        <div className="max-w-7xl mx-auto w-full">
+      <div className="flex-1 p-6">
+        <div className="max-w-7xl mx-auto w-full space-y-6">
           {/* Error Message */}
           {error && (
             <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
@@ -77,10 +85,6 @@ export default function SuperAdminDashboard() {
 
           {/* DASHBOARD HEADER */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-            <div>
-              <h2 className="text-2xl font-bold text-[#7B0F2B] mb-2">Super Admin Dashboard</h2>
-              <p className="text-gray-600">Welcome back, {user?.name}! Here's what's happening across all systems.</p>
-            </div>
             <div className="flex gap-3">
               <Button variant="outline" className="rounded-xl">
                 <RefreshCcw className="w-4 h-4 mr-2" />
@@ -93,57 +97,89 @@ export default function SuperAdminDashboard() {
             </div>
           </div>
 
-          {/* SUMMARY CARDS */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card className="rounded-2xl shadow-lg border-none hover:shadow-xl transition-shadow">
+          {/* TOP SUMMARY CARDS - KPI ROW */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {/* Total Records / Transactions */}
+            <Card className="bg-white rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-shadow">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Total Systems</CardTitle>
-                <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                  <Settings className="h-4 w-4 text-blue-600" />
+                <CardTitle className="text-sm font-medium text-gray-600">Total Records</CardTitle>
+                <div className="h-8 w-8 rounded-lg bg-[#7B0F2B]/20 flex items-center justify-center">
+                  <FileText className="h-4 w-4 text-[#7B0F2B]" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-[#7B0F2B]">12</div>
-                <p className="text-xs text-gray-500 mt-1">+2 new this month</p>
+                <div className="text-2xl font-bold text-[#7B0F2B]">45,892</div>
+                <p className="text-xs text-gray-600">+342 this month</p>
               </CardContent>
             </Card>
 
-            <Card className="rounded-2xl shadow-lg border-none hover:shadow-xl transition-shadow">
+            {/* Reports Generated */}
+            <Card className="bg-white rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-shadow">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Active Users</CardTitle>
-                <div className="h-8 w-8 rounded-lg bg-green-100 flex items-center justify-center">
-                  <div className="h-4 w-4 bg-green-600 rounded-full" />
+                <CardTitle className="text-sm font-medium text-gray-600">Reports Generated</CardTitle>
+                <div className="h-8 w-8 rounded-lg bg-[#7B0F2B]/20 flex items-center justify-center">
+                  <FileText className="h-4 w-4 text-[#7B0F2B]" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">1,247</div>
-                <p className="text-xs text-gray-500 mt-1">85% of total users</p>
+                <div className="text-2xl font-bold text-[#7B0F2B]">127</div>
+                <p className="text-xs text-gray-600">Today & this week</p>
               </CardContent>
             </Card>
 
-            <Card className="rounded-2xl shadow-lg border-none hover:shadow-xl transition-shadow">
+            {/* Pending Exports */}
+            <Card className="bg-white rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-shadow">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Pending Tasks</CardTitle>
-                <div className="h-8 w-8 rounded-lg bg-yellow-100 flex items-center justify-center">
-                  <Plus className="h-4 w-4 text-yellow-600" />
+                <CardTitle className="text-sm font-medium text-gray-600">Pending Exports</CardTitle>
+                <div className="h-8 w-8 rounded-lg bg-[#7B0F2B]/20 flex items-center justify-center">
+                  <Clock className="h-4 w-4 text-[#7B0F2B]" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-yellow-600">23</div>
-                <p className="text-xs text-gray-500 mt-1">Requires attention</p>
+                <div className="text-2xl font-bold text-[#7B0F2B]">8</div>
+                <p className="text-xs text-gray-600">Awaiting processing</p>
               </CardContent>
             </Card>
 
-            <Card className="rounded-2xl shadow-lg border-none hover:shadow-xl transition-shadow">
+            {/* Archive Snapshots */}
+            <Card className="bg-white rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-shadow">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">System Health</CardTitle>
-                <div className="h-8 w-8 rounded-lg bg-green-100 flex items-center justify-center">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
+                <CardTitle className="text-sm font-medium text-gray-600">Archive Snapshots</CardTitle>
+                <div className="h-8 w-8 rounded-lg bg-[#7B0F2B]/20 flex items-center justify-center">
+                  <Database className="h-4 w-4 text-[#7B0F2B]" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">99.9%</div>
-                <p className="text-xs text-gray-500 mt-1">All systems operational</p>
+                <div className="text-2xl font-bold text-[#7B0F2B]">24</div>
+                <p className="text-xs text-gray-600">Available for restore</p>
+              </CardContent>
+            </Card>
+
+            {/* Failed Jobs / Errors */}
+            <Card className="bg-white rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-shadow">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">Failed Jobs / Errors</CardTitle>
+                <div className="h-8 w-8 rounded-lg bg-[#7B0F2B]/20 flex items-center justify-center">
+                  <AlertTriangle className="h-4 w-4 text-[#7B0F2B]" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-[#7B0F2B]">3</div>
+                <p className="text-xs text-gray-600">Requires attention</p>
+              </CardContent>
+            </Card>
+
+            {/* Active Users Today */}
+            <Card className="bg-white rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-shadow">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">Active Users Today</CardTitle>
+                <div className="h-8 w-8 rounded-lg bg-[#7B0F2B]/20 flex items-center justify-center">
+                  <User className="h-4 w-4 text-[#7B0F2B]" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-[#7B0F2B]">156</div>
+                <p className="text-xs text-gray-600">Currently logged in</p>
               </CardContent>
             </Card>
           </div>
@@ -210,70 +246,6 @@ export default function SuperAdminDashboard() {
               </CardContent>
             </Card>
           </div>
-
-          {/* QUICK ACTIONS */}
-          <Card className="rounded-2xl shadow-lg border-none">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold text-[#7B0F2B]">Quick Actions</CardTitle>
-              <p className="text-sm text-gray-600">Common administrative tasks</p>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Button 
-                  onClick={goToAccountants}
-                  className="h-20 flex flex-col items-center justify-center gap-2 rounded-xl hover:from-[#5E0C20] hover:to-[#7C102E]"
-                >
-                  <User className="w-6 h-6" />
-                  <span className="text-sm">Manage Users</span>
-                </Button>
-                <Button variant="outline" className="h-20 flex flex-col items-center justify-center gap-2 rounded-xl">
-                  <Plus className="w-6 h-6" />
-                  <span className="text-sm">Add System</span>
-                </Button>
-                <Button variant="outline" className="h-20 flex flex-col items-center justify-center gap-2 rounded-xl">
-                  <Download className="w-6 h-6" />
-                  <span className="text-sm">Export Data</span>
-                </Button>
-                <Button variant="outline" className="h-20 flex flex-col items-center justify-center gap-2 rounded-xl">
-                  <Settings className="w-6 h-6" />
-                  <span className="text-sm">Settings</span>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* SYSTEM STATUS */}
-          <Card className="rounded-2xl shadow-lg border-none">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold text-[#7B0F2B]">System Status</CardTitle>
-              <p className="text-sm text-gray-600">Current system performance metrics</p>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-green-600 mb-2">99.9%</div>
-                  <p className="text-sm text-gray-600">Uptime</p>
-                  <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                    <div className="bg-green-500 h-2 rounded-full" style={{ width: '99.9%' }}></div>
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-600 mb-2">32ms</div>
-                  <p className="text-sm text-gray-600">Response Time</p>
-                  <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                    <div className="bg-blue-500 h-2 rounded-full" style={{ width: '95%' }}></div>
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-purple-600 mb-2">8.7GB</div>
-                  <p className="text-sm text-gray-600">Storage Used</p>
-                  <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                    <div className="bg-purple-500 h-2 rounded-full" style={{ width: '58%' }}></div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
 

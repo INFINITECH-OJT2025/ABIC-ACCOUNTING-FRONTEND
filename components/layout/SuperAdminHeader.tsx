@@ -8,7 +8,7 @@
     X,
   } from "lucide-react"
   import { useState, useEffect } from "react"
-  import { useRouter } from "next/navigation"
+  import { useRouter, usePathname } from "next/navigation"
 
   interface SuperAdminHeaderProps {
     user: any | null
@@ -17,21 +17,27 @@
 
   export default function SuperAdminHeader({ user, onLogout }: SuperAdminHeaderProps) {
     const router = useRouter()
+    const pathname = usePathname()
+
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const [searchOpen, setSearchOpen] = useState(false)
-    const [searchQuery, setSearchQuery] = useState('')
+    const [searchQuery, setSearchQuery] = useState("")
     const [userMenuOpen, setUserMenuOpen] = useState(false)
     const [isScrolled, setIsScrolled] = useState(false)
     const [adminDropdownOpen, setAdminDropdownOpen] = useState(false)
     const [accountantDropdownOpen, setAccountantDropdownOpen] = useState(false)
 
-    // Handle scroll for sticky header effect
+    // ---------- ACTIVE HELPERS ----------
+    const isSection = (href: string) =>
+      pathname === href || pathname.startsWith(href + "/")
+
+    const isExact = (href: string) => pathname === href
+
+    // ---------- SCROLL EFFECT ----------
     useEffect(() => {
-      const handleScroll = () => {
-        setIsScrolled(window.scrollY > 10)
-      }
-      window.addEventListener('scroll', handleScroll)
-      return () => window.removeEventListener('scroll', handleScroll)
+      const handleScroll = () => setIsScrolled(window.scrollY > 10)
+      window.addEventListener("scroll", handleScroll)
+      return () => window.removeEventListener("scroll", handleScroll)
     }, [])
 
     return (
@@ -40,11 +46,13 @@
           ? 'bg-gradient-to-r from-[#7B0F2B]/95 to-[#A4163A]/95 backdrop-blur-lg shadow-lg' 
           : 'bg-gradient-to-r from-[#7B0F2B] to-[#A4163A] shadow-md'
       }`}>
+
+        {/* TOP BAR */}
         <div className="px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between">
-            {/* LEFT SIDE - Logo & Mobile Menu */}
+
+            {/* LEFT */}
             <div className="flex items-center gap-4">
-              {/* Mobile Menu Button */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="md:hidden text-white hover:bg-white/10 p-2 rounded-lg transition-all duration-200"
@@ -52,7 +60,6 @@
                 {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
 
-              {/* Logo */}
               <div className="flex items-center gap-3">
                 <img 
                   src="/images/logo/abic-logo.png" 
@@ -60,13 +67,12 @@
                   className="w-50 h-auto object-contain"
                 />
               </div>
-
             </div>
 
-            {/* CENTER - Search Bar (Desktop) */}
+            {/* SEARCH */}
             <div className="hidden lg:flex flex-1 max-w-xl mx-8">
               <div className="relative w-full">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/60" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60" />
                 <input
                   type="text"
                   placeholder="Search anything..."
@@ -86,9 +92,8 @@
               </div>
             </div>
 
-            {/* RIGHT SIDE - Actions */}
+            {/* USER */}
             <div className="flex items-center gap-2 sm:gap-4">
-              {/* User Menu */}
               <div className="relative">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
@@ -101,22 +106,23 @@
                   <ChevronDown className="w-4 h-4" />
                 </button>
 
-                {/* User Dropdown */}
                 {userMenuOpen && (
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden z-50">
                     <div className="p-4 border-b border-gray-200">
                       <p className="font-medium text-gray-900">{user?.name}</p>
                       <p className="text-gray-600 text-sm">{user?.email}</p>
                     </div>
+
                     <div className="py-2">
-                      <button className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">Profile</button>
-                      <button className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">Settings</button>
-                      <button className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">Help</button>
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100">Profile</button>
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100">Settings</button>
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100">Help</button>
                     </div>
-                    <div className="border-t border-gray-200 p-2">
+
+                    <div className="border-t p-2">
                       <button
                         onClick={onLogout}
-                        className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 rounded transition-colors"
+                        className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 rounded"
                       >
                         Logout
                       </button>
@@ -125,170 +131,104 @@
                 )}
               </div>
             </div>
+
           </div>
         </div>
 
-        {/* ENHANCED NAVIGATION */}
+        {/* NAV */}
         <nav className="hidden md:flex bg-[#6A0D25]/50 backdrop-blur-sm text-sm px-6 justify-center">
-          {/* Dashboard */}
+
+          {/* Dashboard — EXACT ONLY */}
           <div
             className={`group relative px-6 py-4 border-r border-[#8E1B3E]/30 hover:bg-[#5E0C20]/50 cursor-pointer transition-all duration-200 ${
-                "Dashboard" === "Dashboard" ? "bg-[#5E0C20]/50" : ""
-              }`}
+              isExact("/super") ? "bg-[#5E0C20]/50" : ""
+            }`}
             onClick={() => router.push('/super')}
           >
             <span className="relative z-10 text-white">Dashboard</span>
-            <div className="absolute bottom-0 left-0 w-full h-0.5 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-200 origin-left"></div>
+            <div className="absolute bottom-0 left-0 w-full h-0.5 bg-white scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></div>
           </div>
 
-          {/* Admin Dropdown */}
+          {/* Admin — SECTION */}
           <div
-            className="relative px-6 py-4 border-r border-[#8E1B3E]/30 hover:bg-[#5E0C20]/50 transition-all duration-200"
+            className={`relative px-6 py-4 border-r border-[#8E1B3E]/30 hover:bg-[#5E0C20]/50 transition-all duration-200 ${
+              isSection("/super/admin") ? "bg-[#5E0C20]/50" : ""
+            }`}
             onMouseEnter={() => setAdminDropdownOpen(true)}
             onMouseLeave={() => setAdminDropdownOpen(false)}
           >
-            <span className="relative z-10 flex items-center gap-1 text-white">
-              Admin
-              <ChevronDown className="w-3 h-3" />
+            <span className="flex items-center gap-1 text-white">
+              Admin <ChevronDown className="w-3 h-3" />
             </span>
-            <div className="absolute bottom-0 left-0 w-full h-0.5 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-200 origin-left"></div>
-            
+
             {adminDropdownOpen && (
-              <div className="absolute top-full left-0 mt-0 bg-white rounded-lg shadow-xl border border-gray-200 min-w-[200px] z-50">
-                <div className="py-2">
-                  <button className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors text-sm">Employee</button>
-                  <button className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors text-sm">Forms</button>
-                  <button className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors text-sm">Directory</button>
-                  <button className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors text-sm">Attendance</button>
-                  <button className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors text-sm">Management</button>
-                </div>
-              </div>
+              <Dropdown>
+                <SubBtn active={isSection('/super/admin/employee')} onClick={()=>router.push('/super/admin/employee')} label="Employee"/>
+                <SubBtn active={isSection('/super/admin/forms')} onClick={()=>router.push('/super/admin/forms')} label="Forms"/>
+                <SubBtn active={isSection('/super/admin/directory')} onClick={()=>router.push('/super/admin/directory')} label="Directory"/>
+                <SubBtn active={isSection('/super/admin/management')} onClick={()=>router.push('/super/admin/management')} label="Management"/>
+              </Dropdown>
             )}
           </div>
 
-          {/* Accountant Dropdown */}
+          {/* Accountant — SECTION */}
           <div
-            className="relative px-6 py-4 border-r border-[#8E1B3E]/30 hover:bg-[#5E0C20]/50 transition-all duration-200"
+            className={`relative px-6 py-4 border-r border-[#8E1B3E]/30 hover:bg-[#5E0C20]/50 transition-all duration-200 ${
+              isSection("/super/accountant") ? "bg-[#5E0C20]/50" : ""
+            }`}
             onMouseEnter={() => setAccountantDropdownOpen(true)}
             onMouseLeave={() => setAccountantDropdownOpen(false)}
           >
-            <span className="relative z-10 flex items-center gap-1 text-white">
-              Accountant
-              <ChevronDown className="w-3 h-3" />
+            <span className="flex items-center gap-1 text-white">
+              Accountant <ChevronDown className="w-3 h-3" />
             </span>
-            <div className="absolute bottom-0 left-0 w-full h-0.5 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-200 origin-left"></div>
-            
+
             {accountantDropdownOpen && (
-              <div className="absolute top-full left-0 mt-0 bg-white rounded-lg shadow-xl border border-gray-200 min-w-[200px] z-50">
-                <div className="py-2">
-                  <button 
-                    onClick={() => router.push('/super/accountant')}
-                    className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors text-sm"
-                  >
-                    SCB Banks
-                  </button>
-                  <button 
-                    onClick={() => router.push('/super/accountant/owner-accounts')}
-                    className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors text-sm"
-                  >
-                    Owner Accounts
-                  </button>
-                  <button 
-                    onClick={() => router.push('/super/accountant/unit-owner')}
-                    className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors text-sm"
-                  >
-                    Unit Owner
-                  </button>
-                  <button 
-                    onClick={() => router.push('/super/accountant/account-summary')}
-                    className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors text-sm"
-                  >
-                    Account Summary
-                  </button>
-                  <button className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors text-sm">Management</button>
-                </div>
-              </div>
+              <Dropdown>
+                <SubBtn active={isSection('/super/accountant')} onClick={()=>router.push('/super/accountant')} label="SCB Banks"/>
+                <SubBtn active={isSection('/super/accountant/account-summary')} onClick={()=>router.push('/super/accountant/account-summary')} label="Account Summary"/>
+              </Dropdown>
             )}
           </div>
 
-          {/* Activity Log */}
-          <div
-            className="group relative px-6 py-4 border-r border-[#8E1B3E]/30 hover:bg-[#5E0C20]/50 cursor-pointer transition-all duration-200"
-          >
-            <span className="relative z-10 text-white">Activity Log</span>
-            <div className="absolute bottom-0 left-0 w-full h-0.5 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-200 origin-left"></div>
-          </div>
-
-          {/* Reports */}
-          <div
-            className="group relative px-6 py-4 border-r border-[#8E1B3E]/30 hover:bg-[#5E0C20]/50 cursor-pointer transition-all duration-200"
-          >
-            <span className="relative z-10 text-white">Reports</span>
-            <div className="absolute bottom-0 left-0 w-full h-0.5 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-200 origin-left"></div>
-          </div>
-
-          {/* Support */}
-          <div
-            className="group relative px-6 py-4 hover:bg-[#5E0C20]/50 cursor-pointer transition-all duration-200"
-          >
-            <span className="relative z-10 text-white">Support</span>
-            <div className="absolute bottom-0 left-0 w-full h-0.5 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-200 origin-left"></div>
-          </div>
         </nav>
 
-        {/* Mobile Navigation Menu */}
+        {/* MOBILE */}
         {mobileMenuOpen && (
           <div className="md:hidden bg-[#6A0D25]/95 backdrop-blur-sm">
             <div className="px-6 py-4 space-y-2">
-              {/* Dashboard */}
-              <div
-                className={`px-4 py-2 rounded-lg hover:bg-[#5E0C20]/50 cursor-pointer transition-all duration-200 ${
-                  "Dashboard" === "Dashboard" ? "bg-[#5E0C20]/50" : ""
-                }`}
-                onClick={() => {
-                  router.push('/super')
-                  setMobileMenuOpen(false)
-                }}
-              >
-                Dashboard
-              </div>
-
-              {/* Admin Mobile Submenu */}
-              <div>
-                <div className="px-4 py-2 font-medium text-white/80">Admin</div>
-                <div className="ml-4 space-y-1">
-                  <button className="w-full text-left px-4 py-2 text-white/70 hover:bg-[#5E0C20]/50 rounded transition-colors text-sm">Employee</button>
-                  <button className="w-full text-left px-4 py-2 text-white/70 hover:bg-[#5E0C20]/50 rounded transition-colors text-sm">Forms</button>
-                  <button className="w-full text-left px-4 py-2 text-white/70 hover:bg-[#5E0C20]/50 rounded transition-colors text-sm">Directory</button>
-                  <button className="w-full text-left px-4 py-2 text-white/70 hover:bg-[#5E0C20]/50 rounded transition-colors text-sm">Attendance</button>
-                  <button className="w-full text-left px-4 py-2 text-white/70 hover:bg-[#5E0C20]/50 rounded transition-colors text-sm">Management</button>
-                </div>
-              </div>
-
-              {/* Accountant Mobile Submenu */}
-              <div>
-                <div className="px-4 py-2 font-medium text-white/80">Accountant</div>
-                <div className="ml-4 space-y-1">
-                  <button 
-                    onClick={() => {
-                      router.push('/super/accountant')
-                      setMobileMenuOpen(false)
-                    }}
-                    className="w-full text-left px-4 py-2 text-white/70 hover:bg-[#5E0C20]/50 rounded transition-colors text-sm"
-                  >
-                    SCB Banks
-                  </button>
-                  <button className="w-full text-left px-4 py-2 text-white/70 hover:bg-[#5E0C20]/50 rounded transition-colors text-sm">Management</button>
-                </div>
-              </div>
-
-              {/* Other Items */}
-              <div className="px-4 py-2 rounded-lg hover:bg-[#5E0C20]/50 cursor-pointer transition-all duration-200">Activity Log</div>
-              <div className="px-4 py-2 rounded-lg hover:bg-[#5E0C20]/50 cursor-pointer transition-all duration-200">Reports</div>
-              <div className="px-4 py-2 rounded-lg hover:bg-[#5E0C20]/50 cursor-pointer transition-all duration-200">Support</div>
+              <MobileBtn active={isExact('/super')} label="Dashboard" onClick={()=>router.push('/super')}/>
+              <MobileBtn active={isSection('/super/admin/employee')} label="Employee" onClick={()=>router.push('/super/admin/employee')}/>
+              <MobileBtn active={isSection('/super/admin/management')} label="Management" onClick={()=>router.push('/super/admin/management')}/>
+              <MobileBtn active={isSection('/super/accountant')} label="Accountant" onClick={()=>router.push('/super/accountant')}/>
             </div>
           </div>
         )}
+
       </header>
     )
   }
+
+  /* helpers */
+
+  const Dropdown = ({children}:any)=>(
+    <div className="absolute top-full left-0 bg-white rounded-lg shadow-xl border min-w-[200px] z-50 py-2">
+      {children}
+    </div>
+  )
+
+  const SubBtn = ({label,onClick,active}:any)=>(
+    <button onClick={onClick}
+      className={`w-full text-left px-4 py-2 text-sm ${
+        active ? "bg-[#7B0F2B]/10 text-[#7B0F2B] font-semibold" : "hover:bg-gray-100"
+      }`}
+    >{label}</button>
+  )
+
+  const MobileBtn = ({label,onClick,active}:any)=>(
+    <div onClick={onClick}
+      className={`px-4 py-2 rounded-lg cursor-pointer ${
+        active ? "bg-[#5E0C20]/50" : "hover:bg-[#5E0C20]/50"
+      }`}
+    >{label}</div>
+  )
