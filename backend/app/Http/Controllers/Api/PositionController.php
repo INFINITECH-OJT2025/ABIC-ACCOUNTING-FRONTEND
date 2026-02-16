@@ -4,18 +4,25 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Position;
+use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
 class PositionController extends Controller
 {
+    protected $activityLogService;
+
+    public function __construct(ActivityLogService $activityLogService)
+    {
+        $this->activityLogService = $activityLogService;
+    }
     /**
      * Display a listing of all positions.
      */
     public function index()
     {
         $positions = Position::orderBy('is_custom', 'asc')->orderBy('name', 'asc')->get();
-        
+
         return response()->json([
             'success' => true,
             'data' => $positions
@@ -36,6 +43,9 @@ class PositionController extends Controller
                 'name' => $validated['name'],
                 'is_custom' => true
             ]);
+
+            // Log activity
+            $this->activityLogService->logPositionAction('created', $position, null, $request);
 
             return response()->json([
                 'success' => true,
@@ -74,6 +84,9 @@ class PositionController extends Controller
 
             $position->update($validated);
 
+            // Log activity
+            $this->activityLogService->logPositionAction('updated', $position, null, $request);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Position updated successfully',
@@ -91,10 +104,13 @@ class PositionController extends Controller
     /**
      * Remove the specified position from database.
      */
-    public function destroy(Position $position)
+    public function destroy(Request $request, Position $position)
     {
         // Only allow deletion of custom positions
         if ($position->is_custom) {
+            // Log activity before deletion
+            $this->activityLogService->logPositionAction('deleted', $position, null, $request);
+
             $position->delete();
 
             return response()->json([
@@ -127,6 +143,11 @@ class PositionController extends Controller
                     ['is_custom' => true]
                 );
                 $created[] = $position;
+
+                // Log activity for each created position
+                if ($position->wasRecentlyCreated) {
+                    $this->activityLogService->logPositionAction('created', $position, null, $request);
+                }
             }
 
             return response()->json([

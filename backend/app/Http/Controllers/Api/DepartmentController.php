@@ -4,18 +4,25 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Department;
+use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
 class DepartmentController extends Controller
 {
+    protected $activityLogService;
+
+    public function __construct(ActivityLogService $activityLogService)
+    {
+        $this->activityLogService = $activityLogService;
+    }
     /**
      * Display a listing of all departments.
      */
     public function index()
     {
         $departments = Department::orderBy('is_custom', 'asc')->orderBy('name', 'asc')->get();
-        
+
         return response()->json([
             'success' => true,
             'data' => $departments
@@ -36,6 +43,9 @@ class DepartmentController extends Controller
                 'name' => $validated['name'],
                 'is_custom' => true
             ]);
+
+            // Log activity
+            $this->activityLogService->logDepartmentAction('created', $department, null, $request);
 
             return response()->json([
                 'success' => true,
@@ -74,6 +84,9 @@ class DepartmentController extends Controller
 
             $department->update($validated);
 
+            // Log activity
+            $this->activityLogService->logDepartmentAction('updated', $department, null, $request);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Department updated successfully',
@@ -91,10 +104,13 @@ class DepartmentController extends Controller
     /**
      * Remove the specified department from database.
      */
-    public function destroy(Department $department)
+    public function destroy(Request $request, Department $department)
     {
         // Only allow deletion of custom departments
         if ($department->is_custom) {
+            // Log activity before deletion
+            $this->activityLogService->logDepartmentAction('deleted', $department, null, $request);
+
             $department->delete();
 
             return response()->json([
@@ -127,6 +143,11 @@ class DepartmentController extends Controller
                     ['is_custom' => true]
                 );
                 $created[] = $department;
+
+                // Log activity for each created department
+                if ($department->wasRecentlyCreated) {
+                    $this->activityLogService->logDepartmentAction('created', $department, null, $request);
+                }
             }
 
             return response()->json([

@@ -21,7 +21,8 @@ import {
   CalendarDays,
   AlertCircle,
   X,
-  PanelLeft
+  PanelLeft,
+  Activity
 } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -69,7 +70,13 @@ export default function AdminHeadSidebar() {
         )}
       </div>
 
-
+<Link
+          href="/admin-head"
+          className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-white/10 transition-all duration-200 font-semibold text-sm group"
+        >
+          <Activity size={20} className="shrink-0" />
+          {!isCollapsed && <span className="font-medium whitespace-nowrap">ACTIVITY LOGS</span>}
+        </Link>
       {/* Navigation Menu */}
       <nav className="flex-1 space-y-2 overflow-y-auto no-scrollbar py-2">
         {/* EMPLOYEE with Dropdown */}
@@ -172,6 +179,20 @@ export default function AdminHeadSidebar() {
           <BookOpen size={20} className="shrink-0" />
           {!isCollapsed && <span className="font-medium whitespace-nowrap">DIRECTORY</span>}
         </Link>
+
+
+        {/* UPDATE PROFILE */}
+        <Link
+          href="/admin-head/update-profile"
+          className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-white/10 transition-all duration-200 font-semibold text-sm group"
+        >
+          <User size={20} className="shrink-0" />
+          {!isCollapsed && <span className="font-medium whitespace-nowrap">UPDATE PROFILE</span>}
+        </Link>
+
+
+        {/* ACTIVITY LOGS */}
+        
 
 
         {/* ATTENDANCE with Dropdown */}
