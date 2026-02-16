@@ -32,6 +32,7 @@ Route::post('/employees/{id}/onboard', [EmployeeController::class, 'onboard']);
 
 // Termination routes
 Route::post('/employees/{id}/terminate', [EmployeeController::class, 'terminate']);
+Route::post('/employees/{id}/rehire', [EmployeeController::class, 'rehire']);
 Route::get('/terminations', [EmployeeController::class, 'getTerminations']);
 
 // Activity Log API Routes

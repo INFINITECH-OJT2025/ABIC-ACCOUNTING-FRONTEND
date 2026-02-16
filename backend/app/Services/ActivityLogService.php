@@ -140,6 +140,29 @@ class ActivityLogService
     }
 
     /**
+     * Log employee re-hire
+     */
+    public function logEmployeeRehired($employee, $performedBy = null, ?Request $request = null)
+    {
+        return $this->log([
+            'activity_type' => 'employee',
+            'action' => 'updated',
+            'status' => 'success',
+            'title' => 'Employee Re-hired',
+            'description' => "{$employee->first_name} {$employee->last_name} has been re-hired/restored to the system",
+            'user_id' => $performedBy?->id,
+            'user_name' => $performedBy ? "{$performedBy->first_name} {$performedBy->last_name}" : 'Admin',
+            'user_email' => $performedBy?->email ?? 'admin@abic.com',
+            'target_id' => $employee->id,
+            'target_type' => 'Employee',
+            'metadata' => [
+                'employee_email' => $employee->email,
+                'employee_name' => "{$employee->first_name} {$employee->last_name}",
+            ],
+        ], $request);
+    }
+
+    /**
      * Log login attempt
      */
     public function logLogin($employee, $success = true, ?Request $request = null)

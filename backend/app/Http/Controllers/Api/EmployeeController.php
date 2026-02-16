@@ -425,4 +425,51 @@ class EmployeeController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Re-hire / Restore terminated employee
+     */
+    public function rehire(Request $request, $id)
+    {
+        try {
+            $employee = Employee::find($id);
+
+            if (!$employee) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Employee not found'
+                ], 404);
+            }
+
+            if ($employee->status !== 'terminated') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Employee is not terminated'
+                ], 400);
+            }
+
+            // Update employee status back to approved
+            $employee->update(['status' => 'approved']);
+
+            // Update the termination records for this employee to 'cancelled'
+            Termination::where('employee_id', $employee->id)
+                ->where('status', 'completed')
+                ->update(['status' => 'cancelled']);
+
+            // Log activity
+            $this->activityLogService->logEmployeeRehired($employee, null, $request);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Employee re-hired successfully',
+                'data' => $employee
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to re-hire employee',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
