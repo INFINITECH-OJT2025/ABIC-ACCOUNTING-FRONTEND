@@ -652,27 +652,35 @@ export default function AttendanceDashboard() {
               <div className="flex items-center gap-3">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <div className="bg-white border-white/20 text-red-900 hover:bg-red-50 gap-2 text-sm h-10 px-4 shadow-md font-semibold inline-flex items-center justify-center whitespace-nowrap rounded-md border cursor-pointer">
-                      {selectedYear} <ChevronDown className="w-4 h-4 opacity-70" />
+                    <div className="bg-white/95 backdrop-blur-sm border border-stone-200 text-red-900 hover:bg-white hover:border-red-200 transition-all duration-200 gap-2 text-sm h-10 px-4 shadow-sm hover:shadow-md font-bold inline-flex items-center justify-center whitespace-nowrap rounded-lg cursor-pointer group">
+                      {selectedYear} <ChevronDown className="w-4 h-4 ml-1 opacity-50 group-hover:opacity-100 transition-opacity" />
                     </div>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="bg-white border-stone-200 text-stone-700">
+                  <DropdownMenuContent className="w-32 bg-white border-stone-200 shadow-xl rounded-xl p-1.5" align="end">
                     {yearsList.map(year => (
-                      <DropdownMenuItem key={year} onClick={() => setSelectedYear(year)} className="hover:bg-stone-50 cursor-pointer">
+                      <DropdownMenuItem
+                        key={year}
+                        onClick={() => setSelectedYear(year)}
+                        className={cn(
+                          "flex items-center justify-between rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors",
+                          selectedYear === year ? "bg-red-50 text-red-900 font-semibold" : "text-stone-600 hover:bg-stone-50"
+                        )}
+                      >
                         {year}
+                        {selectedYear === year && <Check className="w-4 h-4 text-red-600" />}
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-                <Button onClick={addNewYear} className="bg-white text-red-900 hover:bg-red-50 shadow-md text-sm h-10 px-4 font-semibold">
+                <Button onClick={addNewYear} className="bg-white/95 backdrop-blur-sm border-stone-200 text-red-900 hover:bg-white hover:border-red-200 shadow-sm hover:shadow-md transition-all duration-200 text-sm h-10 px-4 font-bold rounded-lg border">
                   <Plus className="w-4 h-4 mr-1" /> New Year
                 </Button>
 
                 <Button
                   onClick={openAddEntryModal}
                   disabled={selectedYear !== new Date().getFullYear() || selectedMonth !== months[new Date().getMonth()]}
-                  className="bg-white text-red-900 hover:bg-red-50 shadow-md text-sm h-10 px-4 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-white/95 backdrop-blur-sm border-stone-200 text-red-900 hover:bg-white hover:border-red-200 shadow-sm hover:shadow-md transition-all duration-200 text-sm h-10 px-4 font-bold rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed"
                   title={
                     (selectedYear !== new Date().getFullYear() || selectedMonth !== months[new Date().getMonth()])
                       ? `Can only add entries for current period (${months[new Date().getMonth()]} ${new Date().getFullYear()})`
@@ -695,17 +703,25 @@ export default function AttendanceDashboard() {
                   <span className="text-[11px] font-bold text-red-100/60 tracking-widest uppercase">Month</span>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <div className="bg-red-900/40 border-red-700/50 text-white hover:bg-red-800/60 text-sm h-9 px-4 min-w-[140px] justify-between shadow-inner font-medium inline-flex items-center whitespace-nowrap rounded-md border cursor-pointer">
-                        {selectedMonth} <ChevronDown className="w-4 h-4 ml-2 opacity-40" />
+                      <div className="bg-white/10 backdrop-blur-md border border-white/10 text-white hover:bg-white/20 hover:border-white/20 transition-all duration-200 text-sm h-10 px-4 min-w-[140px] justify-between shadow-lg font-semibold inline-flex items-center whitespace-nowrap rounded-lg cursor-pointer group">
+                        {selectedMonth} <ChevronDown className="w-4 h-4 ml-2 opacity-50 group-hover:opacity-100 transition-opacity" />
                       </div>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="bg-white border-stone-200 text-stone-700 max-h-60 min-w-[140px]">
-                      {months.map(month => (
-                        <DropdownMenuItem key={month} onClick={() => setSelectedMonth(month)} className="hover:bg-stone-50 cursor-pointer">
-                          {month}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
+                      <DropdownMenuContent className="w-48 bg-white border-stone-200 shadow-xl rounded-xl p-1.5 max-h-[350px] overflow-y-auto" align="start">
+                        {months.map(month => (
+                          <DropdownMenuItem
+                            key={month}
+                            onClick={() => setSelectedMonth(month)}
+                            className={cn(
+                              "flex items-center justify-between rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors",
+                              selectedMonth === month ? "bg-red-50 text-red-900 font-semibold" : "text-stone-600 hover:bg-stone-50"
+                            )}
+                          >
+                            {month}
+                            {selectedMonth === month && <Check className="w-4 h-4 text-red-600" />}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
 
@@ -714,20 +730,41 @@ export default function AttendanceDashboard() {
                   <span className="text-[11px] font-bold text-red-100/60 tracking-widest uppercase">Period</span>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <div className="bg-red-900/40 border-red-700/50 text-white hover:bg-red-800/60 text-sm h-9 px-4 min-w-[160px] justify-between shadow-inner font-medium inline-flex items-center whitespace-nowrap rounded-md border cursor-pointer">
+                      <div className="bg-white/10 backdrop-blur-md border border-white/10 text-white hover:bg-white/20 hover:border-white/20 transition-all duration-200 text-sm h-10 px-4 min-w-[180px] justify-between shadow-lg font-semibold inline-flex items-center whitespace-nowrap rounded-lg cursor-pointer group">
                         {showCutoff === 'first' ? '1st - 15th' : showCutoff === 'second' ? (selectedMonth === 'February' ? '16th - 28/29th' : '16th - 30/31st') : 'Show Both'}
-                        <ChevronDown className="w-4 h-4 ml-2 opacity-40" />
+                        <ChevronDown className="w-4 h-4 ml-2 opacity-50 group-hover:opacity-100 transition-opacity" />
                       </div>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="bg-white border-stone-200 text-stone-700 min-w-[160px]">
-                      <DropdownMenuItem onClick={() => setShowCutoff('first')} className="hover:bg-stone-50 cursor-pointer">
+                    <DropdownMenuContent className="w-56 bg-white border-stone-200 shadow-xl rounded-xl p-1.5" align="start">
+                      <DropdownMenuItem
+                        onClick={() => setShowCutoff('first')}
+                        className={cn(
+                          "flex items-center justify-between rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors",
+                          showCutoff === 'first' ? "bg-red-50 text-red-900 font-semibold" : "text-stone-600 hover:bg-stone-50"
+                        )}
+                      >
                         1st - 15th
+                        {showCutoff === 'first' && <Check className="w-4 h-4 text-red-600" />}
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setShowCutoff('second')} className="hover:bg-stone-50 cursor-pointer">
+                      <DropdownMenuItem
+                        onClick={() => setShowCutoff('second')}
+                        className={cn(
+                          "flex items-center justify-between rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors",
+                          showCutoff === 'second' ? "bg-red-50 text-red-900 font-semibold" : "text-stone-600 hover:bg-stone-50"
+                        )}
+                      >
                         {selectedMonth === 'February' ? '16th - 28/29th' : '16th - 30/31st'}
+                        {showCutoff === 'second' && <Check className="w-4 h-4 text-red-600" />}
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setShowCutoff('both')} className="hover:bg-stone-50 cursor-pointer">
+                      <DropdownMenuItem
+                        onClick={() => setShowCutoff('both')}
+                        className={cn(
+                          "flex items-center justify-between rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors",
+                          showCutoff === 'both' ? "bg-red-50 text-red-900 font-semibold" : "text-stone-600 hover:bg-stone-50"
+                        )}
+                      >
                         Show Both
+                        {showCutoff === 'both' && <Check className="w-4 h-4 text-red-600" />}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -740,7 +777,7 @@ export default function AttendanceDashboard() {
                     placeholder="Search employee..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="bg-red-950/30 border-red-700/50 text-white placeholder:text-red-200/30 pl-10 h-9 w-full focus-visible:ring-red-500 shadow-inner text-sm"
+                    className="bg-white/10 backdrop-blur-md border border-white/10 text-white placeholder:text-white/30 pl-10 h-10 w-full focus-visible:ring-white/20 shadow-lg text-sm rounded-lg transition-all focus:bg-white/15"
                   />
                 </div>
               </div>
