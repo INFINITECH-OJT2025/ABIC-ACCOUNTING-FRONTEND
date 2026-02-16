@@ -473,7 +473,7 @@ function SummarySheet({ isOpen, onClose, cutoffTitle, entries, selectedYear, sel
 // ---------- MAIN DASHBOARD ----------
 export default function AttendanceDashboard() {
   // State for year & month selection
-  const [selectedYear, setSelectedYear] = useState(2026)
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [selectedMonth, setSelectedMonth] = useState('February')
   const [yearsList, setYearsList] = useState<number[]>(availableYears)
 
@@ -481,6 +481,22 @@ export default function AttendanceDashboard() {
   const [allEntries, setAllEntries] = useState<LateEntry[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
   const [isLoading, setIsLoading] = useState(false)
+
+  // Fetch years list
+  useEffect(() => {
+    const fetchYears = async () => {
+      try {
+        const res = await fetch('/api/admin-head/attendance/tardiness/years')
+        const data = await res.json()
+        if (data.success) {
+          setYearsList(data.data)
+        }
+      } catch (error) {
+        console.error('Failed to fetch years:', error)
+      }
+    }
+    fetchYears()
+  }, [])
 
   // Fetch employees and entries
   useEffect(() => {
@@ -553,11 +569,25 @@ export default function AttendanceDashboard() {
   const secondPagination = usePagination(filteredSecondEntries, 15)
 
   // Handler to add a new year
-  const addNewYear = () => {
+  const addNewYear = async () => {
     const nextYear = Math.max(...yearsList) + 1
-    if (!yearsList.includes(nextYear)) {
-      setYearsList([...yearsList, nextYear].sort())
-      setSelectedYear(nextYear)
+    try {
+      const res = await fetch('/api/admin-head/attendance/tardiness/years', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ year: nextYear })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setYearsList(prev => [...prev, nextYear].sort())
+        setSelectedYear(nextYear)
+        toast.success(`Year ${nextYear} added and saved to database`)
+      } else {
+        toast.error(data.message || 'Failed to save new year')
+      }
+    } catch (error) {
+      console.error('Failed to add year:', error)
+      toast.error('An error occurred while saving the new year')
     }
   }
 
@@ -754,8 +784,14 @@ export default function AttendanceDashboard() {
 
                 <Button
                   onClick={openAddEntryModal}
-                  className="bg-white/95 backdrop-blur-sm border-stone-200 text-red-900 hover:bg-white hover:border-red-200 shadow-sm hover:shadow-md transition-all duration-200 text-sm h-10 px-4 font-bold rounded-lg border cursor-pointer"
-                  title="Add new late entry"
+                  disabled={selectedYear !== new Date().getFullYear()}
+                  className={cn(
+                    "bg-white/95 backdrop-blur-sm border-stone-200 text-red-900 shadow-sm transition-all duration-200 text-sm h-10 px-4 font-bold rounded-lg border",
+                    selectedYear !== new Date().getFullYear()
+                      ? "opacity-50 cursor-not-allowed grayscale" 
+                      : "hover:bg-white hover:border-red-200 hover:shadow-md cursor-pointer"
+                  )}
+                  title={selectedYear !== new Date().getFullYear() ? "Add Entry is only available for the current year" : "Add new late entry"}
                 >
                   <Plus className="w-4 h-4 mr-1" /> Add Entry
                 </Button>
