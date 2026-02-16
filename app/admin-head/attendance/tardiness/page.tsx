@@ -665,9 +665,9 @@ export default function AttendanceDashboard() {
               <div className="flex items-center gap-3">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="bg-white border-white/20 text-red-900 hover:bg-red-50 gap-2 text-sm h-10 px-4 shadow-md font-semibold">
+                    <div className="bg-white border-white/20 text-red-900 hover:bg-red-50 gap-2 text-sm h-10 px-4 shadow-md font-semibold inline-flex items-center justify-center whitespace-nowrap rounded-md border cursor-pointer">
                       {selectedYear} <ChevronDown className="w-4 h-4 opacity-70" />
-                    </Button>
+                    </div>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="bg-white border-stone-200 text-stone-700">
                     {yearsList.map(year => (
@@ -708,9 +708,9 @@ export default function AttendanceDashboard() {
                   <span className="text-[11px] font-bold text-red-100/60 tracking-widest uppercase">Month</span>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="bg-red-900/40 border-red-700/50 text-white hover:bg-red-800/60 text-sm h-9 px-4 min-w-[140px] justify-between shadow-inner font-medium">
+                      <div className="bg-red-900/40 border-red-700/50 text-white hover:bg-red-800/60 text-sm h-9 px-4 min-w-[140px] justify-between shadow-inner font-medium inline-flex items-center whitespace-nowrap rounded-md border cursor-pointer">
                         {selectedMonth} <ChevronDown className="w-4 h-4 ml-2 opacity-40" />
-                      </Button>
+                      </div>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="bg-white border-stone-200 text-stone-700 max-h-60 min-w-[140px]">
                       {months.map(month => (
@@ -727,10 +727,10 @@ export default function AttendanceDashboard() {
                   <span className="text-[11px] font-bold text-red-100/60 tracking-widest uppercase">Period</span>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="bg-red-900/40 border-red-700/50 text-white hover:bg-red-800/60 text-sm h-9 px-4 min-w-[160px] justify-between shadow-inner font-medium">
+                      <div className="bg-red-900/40 border-red-700/50 text-white hover:bg-red-800/60 text-sm h-9 px-4 min-w-[160px] justify-between shadow-inner font-medium inline-flex items-center whitespace-nowrap rounded-md border cursor-pointer">
                         {showCutoff === 'first' ? '1st - 15th' : showCutoff === 'second' ? (selectedMonth === 'February' ? '16th - 28/29th' : '16th - 30/31st') : 'Show Both'}
                         <ChevronDown className="w-4 h-4 ml-2 opacity-40" />
-                      </Button>
+                      </div>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="bg-white border-stone-200 text-stone-700 min-w-[160px]">
                       <DropdownMenuItem onClick={() => setShowCutoff('first')} className="hover:bg-stone-50 cursor-pointer">
