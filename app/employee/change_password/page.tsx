@@ -1,12 +1,14 @@
 "use client"
 
-import React, { useState } from 'react'
+import React, { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import Image from 'next/image'
+import abicLogo from '../login/abic_logo.png'
 import { getApiUrl } from '@/lib/api'
 
-export default function ChangePasswordPage() {
+function ChangePasswordForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const tokenEmail = searchParams.get('token') || ''
@@ -73,26 +75,27 @@ export default function ChangePasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-2xl max-w-md w-full p-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Reset Password</h1>
-          <p className="text-slate-600 text-sm">Create a new secure password for your account</p>
+    <div className="min-h-screen bg-gradient-to-br from-[#4A0404] via-[#800000] to-[#2D0606] flex items-center justify-center p-4 font-sans">
+      <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] max-w-md w-full p-10 transform transition-all">
+        {/* Logo Section */}
+        <div className="flex flex-col items-center mb-10">
+          <div className="relative w-64 h-24 mb-4">
+            <Image
+              src={abicLogo}
+              alt="ABIC Realty Logo"
+              fill
+              className="object-contain"
+              priority
+            />
+          </div>
+          <div className="h-1 w-12 bg-gradient-to-r from-maroon-700 to-maroon-900 rounded-full mb-2" />
+          <h2 className="text-xl font-bold text-gray-800 uppercase tracking-wider">Reset Password</h2>
         </div>
 
-        {/* Security Info */}
-        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
-          <p className="text-sm text-blue-800">
-            <strong>Security Tip:</strong> Use a combination of uppercase, lowercase, numbers, and symbols for a strong password.
-          </p>
-        </div>
-
-        {/* Form */}
+        {/* Form Section */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Email Field (Pre-filled) */}
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
+          <div className="space-y-1">
+            <label htmlFor="email" className="block text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">
               Email Address
             </label>
             <input
@@ -101,15 +104,14 @@ export default function ChangePasswordPage() {
               name="email"
               value={formData.email}
               onChange={handleChange}
-              placeholder="your@email.com"
+              placeholder="name@abic.com"
               required
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-maroon-600/20 focus:border-maroon-600 transition-all text-gray-800 placeholder:text-gray-400"
             />
           </div>
 
-          {/* Current Password Field */}
-          <div>
-            <label htmlFor="old_password" className="block text-sm font-medium text-slate-700 mb-2">
+          <div className="space-y-1">
+            <label htmlFor="old_password" className="block text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">
               Current Password
             </label>
             <input
@@ -118,18 +120,14 @@ export default function ChangePasswordPage() {
               name="old_password"
               value={formData.old_password}
               onChange={handleChange}
-              placeholder="Enter your current password"
+              placeholder="Enter current password"
               required
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-maroon-600/20 focus:border-maroon-600 transition-all text-gray-800 placeholder:text-gray-400"
             />
-            <p className="text-xs text-slate-500 mt-1">
-              If you forgot your temporary password, check your email
-            </p>
           </div>
 
-          {/* New Password Field */}
-          <div>
-            <label htmlFor="new_password" className="block text-sm font-medium text-slate-700 mb-2">
+          <div className="space-y-1">
+            <label htmlFor="new_password" className="block text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">
               New Password
             </label>
             <input
@@ -138,18 +136,16 @@ export default function ChangePasswordPage() {
               name="new_password"
               value={formData.new_password}
               onChange={handleChange}
-              placeholder="••••••••"
+              placeholder="Min. 6 characters"
               required
               minLength={6}
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-maroon-600/20 focus:border-maroon-600 transition-all text-gray-800 placeholder:text-gray-400"
             />
-            <p className="text-xs text-slate-500 mt-1">Minimum 6 characters</p>
           </div>
 
-          {/* Confirm Password Field */}
-          <div>
-            <label htmlFor="new_password_confirmation" className="block text-sm font-medium text-slate-700 mb-2">
-              Confirm New Password
+          <div className="space-y-1">
+            <label htmlFor="new_password_confirmation" className="block text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">
+              Confirm Password
             </label>
             <input
               type="password"
@@ -157,40 +153,62 @@ export default function ChangePasswordPage() {
               name="new_password_confirmation"
               value={formData.new_password_confirmation}
               onChange={handleChange}
-              placeholder="••••••••"
+              placeholder="Repeat new password"
               required
               minLength={6}
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-maroon-600/20 focus:border-maroon-600 transition-all text-gray-800 placeholder:text-gray-400"
             />
           </div>
 
-          {/* Submit Button */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium py-3 px-4 rounded-lg transition-colors"
+            className="w-full mt-2 bg-gradient-to-br from-[#4A0404] via-[#800000] to-[#2D0606] hover:brightness-110 disabled:opacity-70 text-white font-bold py-4 px-4 rounded-xl shadow-lg shadow-maroon-900/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
           >
-            {loading ? 'Updating...' : 'Change Password'}
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Updating...
+              </span>
+            ) : (
+              "Update Password"
+            )}
           </button>
         </form>
 
-        {/* Links */}
-        <div className="mt-6 text-center space-y-2">
-          <p className="text-slate-600 text-sm">
-            Remember your password?{' '}
-            <Link href="/employee/login" className="text-green-600 hover:text-green-700 font-medium">
-              Login Here
-            </Link>
-          </p>
-        </div>
-
-        {/* Footer */}
-        <div className="mt-8 pt-6 border-t border-slate-200">
-          <p className="text-center text-xs text-slate-500">
-            For assistance, contact the HR department
-          </p>
+        {/* Footer Section */}
+        <div className="mt-8 text-center space-y-4">
+          <Link href="/employee/login" className="text-sm text-maroon-700 hover:text-maroon-800 font-bold hover:underline transition-all block">
+            Cancel and Return to Login
+          </Link>
+          <div className="pt-4 border-t border-gray-100">
+            <p className="text-[10px] text-gray-300 font-bold uppercase tracking-[0.2em]">
+              © 2026 ABIC Realty & Consultancy Corp.
+            </p>
+          </div>
         </div>
       </div>
+
+      <style jsx global>{`
+        .bg-maroon-800 { background-color: #800000; }
+        .from-maroon-700 { --tw-gradient-from: #800000; }
+        .to-maroon-900 { --tw-gradient-to: #4A0404; }
+        .text-maroon-700 { color: #800000; }
+        .focus\\:ring-maroon-600\\/20 { --tw-ring-color: rgba(128, 0, 0, 0.2); }
+        .focus\\:border-maroon-600 { border-color: #800000; }
+      `}</style>
     </div>
+  )
+}
+
+export default function ChangePasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#4A0404] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+      </div>
+    }>
+      <ChangePasswordForm />
+    </Suspense>
   )
 }

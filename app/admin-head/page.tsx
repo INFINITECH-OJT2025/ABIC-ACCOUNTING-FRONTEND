@@ -6,12 +6,12 @@ import { Badge } from '@/components/ui'
 import { Avatar, AvatarFallback } from '@/components/ui'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui'
 import { Button } from '@/components/ui'
-import { 
-  UserPlus, 
-  UserMinus, 
-  FileText, 
-  Clock, 
-  Settings, 
+import {
+  UserPlus,
+  UserMinus,
+  FileText,
+  Clock,
+  Settings,
   AlertCircle,
   CheckCircle,
   XCircle,
@@ -21,9 +21,9 @@ import {
   Loader2
 } from 'lucide-react'
 import { Input } from '@/components/ui'
-import { 
-  fetchActivityLogs, 
-  fetchActivityStats, 
+import {
+  fetchActivityLogs,
+  fetchActivityStats,
   formatRelativeTime,
   type ActivityLog,
   type ActivityLogStats
@@ -159,7 +159,7 @@ export default function AdminHeadPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="p-8 space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -293,14 +293,13 @@ export default function AdminHeadPage() {
                     >
                       <div className="flex items-start gap-4">
                         {/* Icon */}
-                        <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
-                          activity.activity_type === 'employee' ? 'bg-blue-500/10 text-blue-600' :
+                        <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${activity.activity_type === 'employee' ? 'bg-blue-500/10 text-blue-600' :
                           activity.activity_type === 'department' ? 'bg-purple-500/10 text-purple-600' :
-                          activity.activity_type === 'position' ? 'bg-green-500/10 text-green-600' :
-                          activity.activity_type === 'attendance' ? 'bg-amber-500/10 text-amber-600' :
-                          activity.activity_type === 'auth' ? 'bg-emerald-500/10 text-emerald-600' :
-                          'bg-slate-500/10 text-slate-600'
-                        } group-hover:scale-110 transition-transform duration-300`}>
+                            activity.activity_type === 'position' ? 'bg-green-500/10 text-green-600' :
+                              activity.activity_type === 'attendance' ? 'bg-amber-500/10 text-amber-600' :
+                                activity.activity_type === 'auth' ? 'bg-emerald-500/10 text-emerald-600' :
+                                  'bg-slate-500/10 text-slate-600'
+                          } group-hover:scale-110 transition-transform duration-300`}>
                           {getActivityIcon(activity.activity_type, activity.action)}
                         </div>
 
@@ -315,8 +314,8 @@ export default function AdminHeadPage() {
                                 {activity.description}
                               </p>
                             </div>
-                            <Badge 
-                              variant="outline" 
+                            <Badge
+                              variant="outline"
                               className={`flex items-center gap-1.5 px-3 py-1 ${getStatusColor(activity.status as ActivityStatus)}`}
                             >
                               {getStatusIcon(activity.status as ActivityStatus)}

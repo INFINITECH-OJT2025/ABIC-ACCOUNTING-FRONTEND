@@ -10,9 +10,7 @@ export default function AdminHeadLayout({
     <div className="flex">
       <AdminHeadSidebar />
       <main className="flex-1 bg-slate-50">
-        <div className="p-8">
-          {children}
-        </div>
+        {children}
       </main>
     </div>
   )

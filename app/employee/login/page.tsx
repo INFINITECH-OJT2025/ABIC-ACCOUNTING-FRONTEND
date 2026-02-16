@@ -4,6 +4,8 @@ import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import Image from 'next/image'
+import abicLogo from './abic_logo.png'
 import { getApiUrl } from '@/lib/api'
 
 export default function EmployeeLoginPage() {
@@ -38,15 +40,12 @@ export default function EmployeeLoginPage() {
       const data = await response.json()
 
       if (response.ok && data.success) {
-        // Store token and employee info in localStorage
         localStorage.setItem('employee_token', data.data.token)
-        // Use email from API response to ensure consistency
         localStorage.setItem('employee_email', data.data.employee.email)
         localStorage.setItem('employee_data', JSON.stringify(data.data.employee))
-        
+
         toast.success('Login successful!')
-        
-        // Use a small delay to ensure localStorage is written before redirect
+
         setTimeout(() => {
           router.push('/employee/dashboard')
         }, 100)
@@ -62,20 +61,27 @@ export default function EmployeeLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-2xl max-w-md w-full p-8">
-        {/* Logo/Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">ABIC</h1>
-          <p className="text-slate-600">Employee Portal</p>
-          <p className="text-sm text-slate-500 mt-2">Login to access your dashboard</p>
+    <div className="min-h-screen bg-gradient-to-br from-[#4A0404] via-[#800000] to-[#2D0606] flex items-center justify-center p-4 font-sans">
+      <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] max-w-md w-full p-10 transform transition-all">
+        {/* Logo Section */}
+        <div className="flex flex-col items-center mb-10">
+          <div className="relative w-64 h-24 mb-4">
+            <Image
+              src={abicLogo}
+              alt="ABIC Realty Logo"
+              fill
+              className="object-contain"
+              priority
+            />
+          </div>
+          <div className="h-1 w-12 bg-gradient-to-r from-maroon-700 to-maroon-900 rounded-full mb-2" />
+          <h2 className="text-xl font-bold text-gray-800 uppercase tracking-wider">Employee Portal</h2>
         </div>
 
-        {/* Form */}
+        {/* Form Section */}
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Email Field */}
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
+          <div className="space-y-1">
+            <label htmlFor="email" className="block text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">
               Email Address
             </label>
             <input
@@ -84,17 +90,21 @@ export default function EmployeeLoginPage() {
               name="email"
               value={formData.email}
               onChange={handleChange}
-              placeholder="your@email.com"
+              placeholder="name@abic.com"
               required
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-maroon-600/20 focus:border-maroon-600 transition-all text-gray-800 placeholder:text-gray-400"
             />
           </div>
 
-          {/* Password Field */}
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-2">
-              Password
-            </label>
+          <div className="space-y-1">
+            <div className="flex justify-between items-center px-1">
+              <label htmlFor="password" className="block text-xs font-bold text-gray-500 uppercase tracking-widest">
+                Password
+              </label>
+              <Link href="/employee/change_password" title="Go to Change Password" className="text-xs text-maroon-700 hover:text-maroon-800 font-bold hover:underline transition-all">
+                Change Password?
+              </Link>
+            </div>
             <input
               type="password"
               id="password"
@@ -103,37 +113,45 @@ export default function EmployeeLoginPage() {
               onChange={handleChange}
               placeholder="••••••••"
               required
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-maroon-600/20 focus:border-maroon-600 transition-all text-gray-800 placeholder:text-gray-400"
             />
           </div>
 
-          {/* Login Button */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-3 px-4 rounded-lg transition-colors"
+            className="w-full bg-gradient-to-br from-[#4A0404] via-[#800000] to-[#2D0606] hover:brightness-110 disabled:opacity-70 text-white font-bold py-4 px-4 rounded-xl shadow-lg shadow-maroon-900/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
           >
-            {loading ? 'Logging in...' : 'Login'}
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Logging in...
+              </span>
+            ) : (
+              "Sign In"
+            )}
           </button>
         </form>
 
-        {/* Change Password Link */}
-        <div className="mt-6 text-center">
-          <p className="text-slate-600 text-sm">
-            Did you forget your password?{' '}
-            <Link href="/employee/change_password" className="text-blue-600 hover:text-blue-700 font-medium">
-              Change Password
-            </Link>
+        {/* Footer Section */}
+        <div className="mt-12 text-center">
+          <p className="text-xs text-gray-400 font-medium pb-4 border-b border-gray-100">
+            Internal Access Only • ABIC Accounting System
           </p>
-        </div>
-
-        {/* Footer */}
-        <div className="mt-8 pt-6 border-t border-slate-200">
-          <p className="text-center text-xs text-slate-500">
-            For assistance, contact the HR department
+          <p className="mt-4 text-[10px] text-gray-300 font-bold uppercase tracking-[0.2em]">
+            © 2026 ABIC Realty & Consultancy Corp.
           </p>
         </div>
       </div>
+
+      <style jsx global>{`
+        .bg-maroon-800 { background-color: #800000; }
+        .from-maroon-800 { --tw-gradient-from: #800000; }
+        .to-maroon-700 { --tw-gradient-to: #4A0404; }
+        .text-maroon-700 { color: #800000; }
+        .focus\\:ring-maroon-600\\/20 { --tw-ring-color: rgba(128, 0, 0, 0.2); }
+        .focus\\:border-maroon-600 { border-color: #800000; }
+      `}</style>
     </div>
   )
 }

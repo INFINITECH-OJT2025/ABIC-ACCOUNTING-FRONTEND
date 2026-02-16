@@ -57,26 +57,31 @@ export default function AdminHeadSidebar() {
 
 
 
-      {/* Profile Summary (Only shown when collapsed or condensed) */}
-      <div className={`mb-6 flex flex-col items-center ${isCollapsed ? 'px-0 mt-2' : 'px-4 mt-8'}`}>
-        <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center mb-2 shadow-lg ring-2 ring-white/20 backdrop-blur-sm">
+      {/* Profile Summary Clickable Logo */}
+      <Link
+        href="/admin-head/update-profile"
+        className={`mb-6 flex flex-col items-center hover:bg-white/5 p-2 rounded-xl transition-all duration-200 group ${isCollapsed ? 'px-0 mt-2' : 'px-4 mt-8'}`}
+        title="View Profile"
+      >
+        <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center mb-2 shadow-lg ring-2 ring-white/20 backdrop-blur-sm group-hover:scale-110 transition-transform duration-200">
           <User size={24} className="text-white" />
         </div>
         {!isCollapsed && (
           <div className="text-center overflow-hidden transition-all duration-300">
-            <p className="text-sm font-bold truncate">Admin Head</p>
+            <p className="text-sm font-bold truncate group-hover:text-red-100">Admin Head</p>
             <p className="text-[10px] text-white/60 truncate uppercase tracking-wider">adminhead@gmail.com</p>
           </div>
         )}
-      </div>
+      </Link>
 
-<Link
-          href="/admin-head"
-          className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-white/10 transition-all duration-200 font-semibold text-sm group"
-        >
-          <Activity size={20} className="shrink-0" />
-          {!isCollapsed && <span className="font-medium whitespace-nowrap">ACTIVITY LOGS</span>}
-        </Link>
+
+      <Link
+        href="/admin-head"
+        className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-white/10 transition-all duration-200 font-semibold text-sm group"
+      >
+        <Activity size={20} className="shrink-0" />
+        {!isCollapsed && <span className="font-medium whitespace-nowrap">ACTIVITY LOGS</span>}
+      </Link>
       {/* Navigation Menu */}
       <nav className="flex-1 space-y-2 overflow-y-auto no-scrollbar py-2">
         {/* EMPLOYEE with Dropdown */}
@@ -96,7 +101,6 @@ export default function AdminHeadSidebar() {
               />
             )}
           </button>
-
 
           {/* Employee Dropdown Menu (hover OR click) */}
           <div className={`${isCollapsed ? 'fixed left-20 top-auto ml-1 w-48 z-50' : 'ml-9 mt-1'} space-y-1 bg-[#7B0F2B]/95 rounded-lg p-2 border border-white/10 backdrop-blur-md transition-all duration-200 ${isEmployeeOpen ? 'block' : 'hidden'} group-hover:block`}>
@@ -181,18 +185,11 @@ export default function AdminHeadSidebar() {
         </Link>
 
 
-        {/* UPDATE PROFILE */}
-        <Link
-          href="/admin-head/update-profile"
-          className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-white/10 transition-all duration-200 font-semibold text-sm group"
-        >
-          <User size={20} className="shrink-0" />
-          {!isCollapsed && <span className="font-medium whitespace-nowrap">UPDATE PROFILE</span>}
-        </Link>
+
 
 
         {/* ACTIVITY LOGS */}
-        
+
 
 
         {/* ATTENDANCE with Dropdown */}
