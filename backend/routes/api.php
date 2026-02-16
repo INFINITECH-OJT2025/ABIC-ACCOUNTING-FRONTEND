@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\PositionController;
 use App\Http\Controllers\Api\DepartmentController;
+use App\Http\Controllers\Api\ActivityLogController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -32,3 +33,8 @@ Route::post('/employees/{id}/onboard', [EmployeeController::class, 'onboard']);
 // Termination routes
 Route::post('/employees/{id}/terminate', [EmployeeController::class, 'terminate']);
 Route::get('/terminations', [EmployeeController::class, 'getTerminations']);
+
+// Activity Log API Routes
+Route::get('/activity-logs', [ActivityLogController::class, 'index']);
+Route::get('/activity-logs/stats', [ActivityLogController::class, 'stats']);
+Route::get('/activity-logs/{id}', [ActivityLogController::class, 'show']);

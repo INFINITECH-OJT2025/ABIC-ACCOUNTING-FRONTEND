@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\Termination;
 use App\Mail\EmployeeWelcome;
+use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -14,6 +15,12 @@ use Illuminate\Support\Str;
 
 class EmployeeController extends Controller
 {
+    protected $activityLogService;
+
+    public function __construct(ActivityLogService $activityLogService)
+    {
+        $this->activityLogService = $activityLogService;
+    }
     /**
      * Display a listing of all employees.
      */
@@ -56,6 +63,9 @@ class EmployeeController extends Controller
                 // Log email error but don't fail the creation
                 \Log::error('Failed to send welcome email: ' . $e->getMessage());
             }
+
+            // Log activity
+            $this->activityLogService->logEmployeeCreated($employee, null, $request);
 
             return response()->json([
                 'success' => true,
@@ -131,7 +141,13 @@ class EmployeeController extends Controller
                 $validated['password'] = Hash::make($validated['password']);
             }
 
+            // Track changes for activity log
+            $changes = array_diff_key($validated, array_flip(['password']));
+
             $employee->update($validated);
+
+            // Log activity
+            $this->activityLogService->logEmployeeUpdated($employee, $changes, null, $request);
 
             return response()->json([
                 'success' => true,
@@ -150,8 +166,11 @@ class EmployeeController extends Controller
     /**
      * Remove the specified employee from database.
      */
-    public function destroy(Employee $employee)
+    public function destroy(Request $request, Employee $employee)
     {
+        // Log activity before deletion
+        $this->activityLogService->logEmployeeDeleted($employee, null, $request);
+
         $employee->delete();
 
         return response()->json([
@@ -174,15 +193,23 @@ class EmployeeController extends Controller
             $employee = Employee::where('email', $validated['email'])->first();
 
             if (!$employee || !Hash::check($validated['password'], $employee->password)) {
+                // Log failed login attempt
+                if ($employee) {
+                    $this->activityLogService->logLogin($employee, false, $request);
+                }
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid email or password'
                 ], 401);
             }
 
+            // Log successful login
+            $this->activityLogService->logLogin($employee, true, $request);
+
             // Generate a token (simple session token)
             $token = Str::random(80);
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'Login successful',
@@ -232,6 +259,9 @@ class EmployeeController extends Controller
             $employee->update([
                 'password' => Hash::make($validated['new_password'])
             ]);
+
+            // Log activity
+            $this->activityLogService->logPasswordChange($employee, null, $request);
 
             return response()->json([
                 'success' => true,
@@ -307,6 +337,9 @@ class EmployeeController extends Controller
 
             $employee->update($validated);
 
+            // Log activity
+            $this->activityLogService->logEmployeeOnboarded($employee, null, $request);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Employee onboarded successfully',
@@ -354,6 +387,9 @@ class EmployeeController extends Controller
 
             // Update employee status to terminated
             $employee->update(['status' => 'terminated']);
+
+            // Log activity
+            $this->activityLogService->logEmployeeTerminated($employee, $termination, null, $request);
 
             return response()->json([
                 'success' => true,
