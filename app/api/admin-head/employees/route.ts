@@ -24,10 +24,15 @@ export async function POST(request: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // Insert employee
+    // Split name into first and last name (simple split)
+    const nameParts = name.trim().split(' ')
+    const firstName = nameParts[0]
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : ''
+
+    // Insert employee using actual columns
     const result = await query(
-      'INSERT INTO employees (name, email, password) VALUES (?, ?, ?)',
-      [name, email, hashedPassword]
+      'INSERT INTO employees (first_name, last_name, email, password) VALUES (?, ?, ?, ?)',
+      [firstName, lastName, email, hashedPassword]
     )
 
     return NextResponse.json(
@@ -52,12 +57,13 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    const results = await query('SELECT id, name, email, created_at FROM employees ORDER BY created_at DESC')
+    // Concatenate first_name and last_name as name
+    const results = await query("SELECT id, CONCAT(first_name, ' ', last_name) AS name, email, created_at FROM employees ORDER BY created_at DESC")
     return NextResponse.json({ success: true, data: results })
-  } catch (error) {
-    console.error('API Error:', error)
+  } catch (error: any) {
+    console.error('API Error in GET /api/admin-head/employees:', error)
     return NextResponse.json(
-      { success: false, message: 'Failed to fetch employees' },
+      { success: false, message: 'Failed to fetch employees', error: error.message },
       { status: 500 }
     )
   }
