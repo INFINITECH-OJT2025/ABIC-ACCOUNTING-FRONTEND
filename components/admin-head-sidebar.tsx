@@ -71,7 +71,13 @@ export default function AdminHeadSidebar() {
         )}
       </div>
 
-
+<Link
+          href="/admin-head"
+          className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-white/10 transition-all duration-200 font-semibold text-sm group"
+        >
+          <Activity size={20} className="shrink-0" />
+          {!isCollapsed && <span className="font-medium whitespace-nowrap">ACTIVITY LOGS</span>}
+        </Link>
       {/* Navigation Menu */}
       <nav className="flex-1 space-y-2 overflow-y-auto no-scrollbar py-2">
         {/* EMPLOYEE with Dropdown */}
@@ -176,14 +182,18 @@ export default function AdminHeadSidebar() {
         </Link>
 
 
-        {/* ACTIVITY LOGS */}
+        {/* UPDATE PROFILE */}
         <Link
-          href="/admin-head"
+          href="/admin-head/update-profile"
           className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-white/10 transition-all duration-200 font-semibold text-sm group"
         >
-          <Activity size={20} className="shrink-0" />
-          {!isCollapsed && <span className="font-medium whitespace-nowrap">ACTIVITY LOGS</span>}
+          <User size={20} className="shrink-0" />
+          {!isCollapsed && <span className="font-medium whitespace-nowrap">UPDATE PROFILE</span>}
         </Link>
+
+
+        {/* ACTIVITY LOGS */}
+        
 
 
         {/* ATTENDANCE with Dropdown */}
