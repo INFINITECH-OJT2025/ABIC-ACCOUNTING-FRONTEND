@@ -136,7 +136,7 @@ function formatDate(dateInput: any): string {
   if (!dateInput) return ''
   const date = new Date(dateInput)
   if (isNaN(date.getTime())) return String(dateInput)
-  
+
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
@@ -657,13 +657,13 @@ export default function AttendanceDashboard() {
     const entryMonth = months[dateObj.getMonth()]
     const dayOfMonth = dateObj.getDate()
     const dateStr = `${entryYear}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dayOfMonth).padStart(2, '0')}`
-    
+
     // Determine cutoff
     const autoCutoff: 'cutoff1' | 'cutoff2' = dayOfMonth <= 15 ? 'cutoff1' : 'cutoff2'
 
     // Minutes calculation (parseTimeToMinutes now supports the 24h output from <input type="time">)
     const minutesLate = calculateMinutesFrom8AM(newEntryTime)
-    
+
     // Validation 2: Check if employee already has an entry for this date (Strict Prevention)
     // Normalize dates for robust comparison
     const duplicateEntry = allEntries.find(
@@ -736,13 +736,13 @@ export default function AttendanceDashboard() {
   // ---------- RENDER ----------
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-16">
+    <div className="min-h-screen w-full bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-2">
       <div className="relative w-full">
 
         {/* ----- MAROON GRADIENT HEADER ----- */}
         <div className="bg-gradient-to-r from-red-950 via-red-900 to-red-800 shadow-lg">
-          <div className="max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8 py-6">
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div className="max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8 py-2">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
               <div>
                 <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
                   ABIC REALTY & CONSULTANCY CORPORATION
@@ -788,7 +788,7 @@ export default function AttendanceDashboard() {
                   className={cn(
                     "bg-white/95 backdrop-blur-sm border-stone-200 text-red-900 shadow-sm transition-all duration-200 text-sm h-10 px-4 font-bold rounded-lg border",
                     selectedYear !== new Date().getFullYear()
-                      ? "opacity-50 cursor-not-allowed grayscale" 
+                      ? "opacity-50 cursor-not-allowed grayscale"
                       : "hover:bg-white hover:border-red-200 hover:shadow-md cursor-pointer"
                   )}
                   title={selectedYear !== new Date().getFullYear() ? "Add Entry is only available for the current year" : "Add new late entry"}
@@ -801,8 +801,8 @@ export default function AttendanceDashboard() {
 
           {/* ----- SECONDARY CONTROLS (TOOLBAR) - INSIDE HEADER ----- */}
           <div className="border-t border-red-800/50 bg-red-950/20 backdrop-blur-sm">
-            <div className="max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8 py-3">
-              <div className="flex flex-wrap items-center gap-6 md:gap-10">
+            <div className="max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8 py-1.5">
+              <div className="flex flex-wrap items-center gap-3 md:gap-4">
 
                 {/* Month Selection */}
                 <div className="flex items-center gap-3">
@@ -813,21 +813,21 @@ export default function AttendanceDashboard() {
                         {selectedMonth} <ChevronDown className="w-4 h-4 ml-2 opacity-50 group-hover:opacity-100 transition-opacity" />
                       </div>
                     </DropdownMenuTrigger>
-                      <DropdownMenuContent className="w-48 bg-white border-stone-200 shadow-xl rounded-xl p-1.5 max-h-[350px] overflow-y-auto" align="start">
-                        {months.map(month => (
-                          <DropdownMenuItem
-                            key={month}
-                            onClick={() => setSelectedMonth(month)}
-                            className={cn(
-                              "flex items-center justify-between rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors",
-                              selectedMonth === month ? "bg-red-50 text-red-900 font-semibold" : "text-stone-600 hover:bg-stone-50"
-                            )}
-                          >
-                            {month}
-                            {selectedMonth === month && <Check className="w-4 h-4 text-red-600" />}
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
+                    <DropdownMenuContent className="w-48 bg-white border-stone-200 shadow-xl rounded-xl p-1.5 max-h-[350px] overflow-y-auto" align="start">
+                      {months.map(month => (
+                        <DropdownMenuItem
+                          key={month}
+                          onClick={() => setSelectedMonth(month)}
+                          className={cn(
+                            "flex items-center justify-between rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors",
+                            selectedMonth === month ? "bg-red-50 text-red-900 font-semibold" : "text-stone-600 hover:bg-stone-50"
+                          )}
+                        >
+                          {month}
+                          {selectedMonth === month && <Check className="w-4 h-4 text-red-600" />}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
 
@@ -893,11 +893,11 @@ export default function AttendanceDashboard() {
 
 
         {/* Main Content Area */}
-        <div className="max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8 py-6 space-y-6">
+        <div className="max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8 py-2 space-y-2">
 
 
           {/* ----- CUTOFF TABLES - WITH SUMMARY BUTTONS ----- */}
-          <div className={`grid ${showCutoff === 'both' ? 'grid-cols-1 lg:grid-cols-2 gap-6' : 'grid-cols-1'} w-full`}>
+          <div className={`grid ${showCutoff === 'both' ? 'grid-cols-1 lg:grid-cols-2 gap-2' : 'grid-cols-1'} w-full`}>
             {isLoading ? (
               <div className="flex items-center justify-center p-12 col-span-full">
                 <Loader2 className="w-8 h-8 animate-spin text-red-600" />
@@ -947,14 +947,14 @@ export default function AttendanceDashboard() {
           </div>
 
           {/* ----- BOTTOM CARDS ----- */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 w-full">
             <Card className="bg-white border-stone-200 shadow-sm">
-              <CardHeader className="pb-2 p-4 md:p-5">
+              <CardHeader className="pb-1.5 p-2.5">
                 <CardTitle className="text-base md:text-lg text-stone-800 flex items-center gap-2">
                   <Users className="w-5 h-5 text-stone-500" /> Frequently Late
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-4 md:p-5 pt-0">
+              <CardContent className="p-2.5 pt-0">
                 <div className="flex items-center gap-3">
                   <div className="flex -space-x-3">
                     {Array.from(new Set([...firstCutoffEntries, ...secondCutoffEntries]
@@ -975,12 +975,12 @@ export default function AttendanceDashboard() {
             </Card>
 
             <Card className="bg-white border-stone-200 shadow-sm">
-              <CardHeader className="pb-2 p-4 md:p-5">
+              <CardHeader className="pb-1.5 p-2.5">
                 <CardTitle className="text-base md:text-lg text-stone-800 flex items-center gap-2">
                   <Clock className="w-5 h-5 text-stone-500" /> Grace Period Policy
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-4 md:p-5 pt-0">
+              <CardContent className="p-2.5 pt-0">
                 <div className="flex items-baseline gap-2">
                   <span className="text-3xl md:text-4xl font-bold text-stone-900">5 min</span>
                   <span className="text-stone-500">allowance</span>
@@ -1072,17 +1072,6 @@ export default function AttendanceDashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <footer className="bg-gradient-to-r from-[#7B0F2B] to-[#A4163A] text-white fixed bottom-0 left-0 right-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row items-center justify-between text-xs">
-          <p className="tracking-wide">
-            © 2026 ABIC Realty & Consultancy Corporation
-          </p>
-          <p className="opacity-80">
-            All Rights Reserved
-          </p>
-        </div>
-      </footer>
     </div>
   )
 }
@@ -1110,8 +1099,8 @@ function CutoffTable({
 }) {
   return (
     <Card className="bg-white border-stone-200 shadow-sm overflow-hidden h-full flex flex-col">
-      <CardHeader className="bg-stone-50 pb-3 border-b border-stone-200 p-4 md:p-5">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+      <CardHeader className="bg-stone-50 pb-1.5 border-b border-stone-200 p-2.5">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-1.5">
           <CardTitle className="text-base md:text-lg text-stone-800 font-semibold">{title}</CardTitle>
           <div className="flex items-center gap-2 w-full md:w-auto">
             <Button
@@ -1136,33 +1125,33 @@ function CutoffTable({
           <table className="w-full text-sm">
             <thead className="bg-stone-50 sticky top-0 border-b border-stone-200">
               <tr>
-                <th className="px-3 py-2.5 text-left font-semibold text-stone-600 text-xs md:text-sm w-[30%]">EMPLOYEE NAME</th>
-                <th className="px-3 py-2.5 text-left font-semibold text-stone-600 text-xs md:text-sm w-[20%]">DATE</th>
-                <th className="px-3 py-2.5 text-left font-semibold text-stone-600 text-xs md:text-sm w-[20%]">ACTUAL IN</th>
-                <th className="px-3 py-2.5 text-left font-semibold text-stone-600 text-xs md:text-sm w-[20%]">MINUTES LATE</th>
-                <th className="px-3 py-2.5 text-left font-semibold text-stone-600 text-xs md:text-sm w-[10%]">WARNING</th>
+                <th className="px-2.5 py-1 text-left font-semibold text-stone-600 text-xs w-[30%]">EMPLOYEE NAME</th>
+                <th className="px-2.5 py-1 text-left font-semibold text-stone-600 text-xs w-[20%]">DATE</th>
+                <th className="px-2.5 py-1 text-left font-semibold text-stone-600 text-xs w-[20%]">ACTUAL IN</th>
+                <th className="px-2.5 py-1 text-left font-semibold text-stone-600 text-xs w-[20%]">MINUTES LATE</th>
+                <th className="px-2.5 py-1 text-left font-semibold text-stone-600 text-xs w-[10%]">WARNING</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100">
               {entries.map((entry) => (
                 <tr key={entry.id} className="hover:bg-stone-50 transition-colors">
-                  <td className="px-3 py-2">
+                  <td className="px-2.5 py-1">
                     <span className="font-medium text-stone-800 text-xs md:text-sm">
                       {entry.employeeName}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-stone-600 text-xs md:text-sm">
+                  <td className="px-2.5 py-1 text-stone-600 text-xs">
                     {entry.date || '—'}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-2.5 py-1">
                     <Input
                       value={entry.actual_in || entry.actualIn || ''}
                       onChange={(e) => onUpdateTime(entry.id, e.target.value.toUpperCase())}
                       placeholder="8:00 AM"
-                      className="bg-white border-stone-200 text-stone-900 placeholder:text-stone-400 h-7 md:h-8 text-xs md:text-sm w-24 md:w-28 font-mono focus-visible:ring-red-500 uppercase"
+                      className="bg-white border-stone-200 text-stone-900 placeholder:text-stone-400 h-6 text-xs w-20 font-mono focus-visible:ring-red-500 uppercase"
                     />
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-2.5 py-1">
                     {entry.minutesLate > 0 ? (
                       <span className={`
                       inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold border
@@ -1177,7 +1166,7 @@ function CutoffTable({
                       <span className="text-stone-400">—</span>
                     )}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-2.5 py-1">
                     {entry.warningLevel && entry.warningLevel > 0 ? (
                       <div className="flex items-center gap-1 text-red-600">
                         <AlertTriangle className="w-4 h-4" />
@@ -1192,11 +1181,11 @@ function CutoffTable({
               {/* Fill empty rows to maintain 15 rows */}
               {entries.length < 15 && Array.from({ length: 15 - entries.length }).map((_, i) => (
                 <tr key={`empty-${i}`} className="bg-stone-50/30">
-                  <td className="px-3 py-2">&nbsp;</td>
-                  <td className="px-3 py-2">&nbsp;</td>
-                  <td className="px-3 py-2">&nbsp;</td>
-                  <td className="px-3 py-2">&nbsp;</td>
-                  <td className="px-3 py-2">&nbsp;</td>
+                  <td className="px-2.5 py-1">&nbsp;</td>
+                  <td className="px-2.5 py-1">&nbsp;</td>
+                  <td className="px-2.5 py-1">&nbsp;</td>
+                  <td className="px-2.5 py-1">&nbsp;</td>
+                  <td className="px-2.5 py-1">&nbsp;</td>
                 </tr>
               ))}
             </tbody>
