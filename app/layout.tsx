@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 const inter = Inter({
@@ -25,6 +26,7 @@ export default function RootLayout({
         style={{ fontFamily: "Inter, Inter Fallback, system-ui, sans-serif" }}
       >
         {children}
+        <Toaster richColors position="top-right" />
       </body>
     </html>
   );

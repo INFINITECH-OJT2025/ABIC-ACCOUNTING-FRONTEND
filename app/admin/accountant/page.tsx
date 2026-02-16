@@ -29,6 +29,7 @@ import {
   Edit,
   Trash2,
   Mail,
+  Lock,
   Ban,
   CheckCircle,
   Bell,
@@ -56,8 +57,6 @@ type Accountant = {
   last_password_change?: string;
   created_at: string;
   updated_at: string;
-  suspended_at?: string;
-  suspended_reason?: string;
 };
 
 type ApiResponse = {
@@ -743,11 +742,6 @@ export default function AccountantPage() {
                       }}>
                         {accountant.account_status}
                       </div>
-                      {accountant.suspended_reason && (
-                        <div className="text-xs text-red-600 mt-1 italic">
-                          {accountant.suspended_reason}
-                        </div>
-                      )}
                     </TableCell>
                     <TableCell>
                       {accountant.password_expires_at ? formatExpirationTime(accountant.password_expires_at) : 'Never'}
@@ -890,26 +884,42 @@ export default function AccountantPage() {
             <DialogTitle>Create New Accountant</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                placeholder="Enter accountant name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                disabled={loading}
-              />
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium mb-1 text-gray-700">
+                Name
+              </label>
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <User className="h-4 w-4" />
+                </div>
+                <Input
+                  id="name"
+                  placeholder="Enter accountant name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  disabled={loading}
+                  className="h-10 pl-10 rounded-lg border-gray-300 text-gray-900 placeholder-gray-400 focus:border-[#7B0F2B] focus:ring-[#7B0F2B]/20 disabled:opacity-50"
+                />
+              </div>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="Enter email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={loading}
-              />
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium mb-1 text-gray-700">
+                Email
+              </label>
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <Mail className="h-4 w-4" />
+                </div>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="Enter email address"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
+                  className="h-10 pl-10 rounded-lg border-gray-300 text-gray-900 placeholder-gray-400 focus:border-[#7B0F2B] focus:ring-[#7B0F2B]/20 disabled:opacity-50"
+                />
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -942,37 +952,61 @@ export default function AccountantPage() {
             <DialogTitle>Edit Accountant</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="edit-name">Name</Label>
-              <Input
-                id="edit-name"
-                placeholder="Enter accountant name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                disabled={loading}
-              />
+            <div>
+              <label htmlFor="edit-name" className="block text-sm font-medium mb-1 text-gray-700">
+                Name
+              </label>
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <User className="h-4 w-4" />
+                </div>
+                <Input
+                  id="edit-name"
+                  placeholder="Enter accountant name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  disabled={loading}
+                  className="h-10 pl-10 rounded-lg border-gray-300 text-gray-900 placeholder-gray-400 focus:border-[#7B0F2B] focus:ring-[#7B0F2B]/20 disabled:opacity-50"
+                />
+              </div>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-email">Email</Label>
-              <Input
-                id="edit-email"
-                type="email"
-                placeholder="Enter email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={loading}
-              />
+            <div>
+              <label htmlFor="edit-email" className="block text-sm font-medium mb-1 text-gray-700">
+                Email
+              </label>
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <Mail className="h-4 w-4" />
+                </div>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  placeholder="Enter email address"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
+                  className="h-10 pl-10 rounded-lg border-gray-300 text-gray-900 placeholder-gray-400 focus:border-[#7B0F2B] focus:ring-[#7B0F2B]/20 disabled:opacity-50"
+                />
+              </div>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-password">New Password (optional)</Label>
-              <Input
-                id="edit-password"
-                type="password"
-                placeholder="Leave empty to keep current"
-                value={password}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
-                disabled={loading}
-              />
+            <div>
+              <label htmlFor="edit-password" className="block text-sm font-medium mb-1 text-gray-700">
+                New Password (optional)
+              </label>
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <Lock className="h-4 w-4" />
+                </div>
+                <Input
+                  id="edit-password"
+                  type="password"
+                  placeholder="Leave empty to keep current"
+                  value={password}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
+                  disabled={loading}
+                  className="h-10 pl-10 rounded-lg border-gray-300 text-gray-900 placeholder-gray-400 focus:border-[#7B0F2B] focus:ring-[#7B0F2B]/20 disabled:opacity-50"
+                />
+              </div>
             </div>
             <div className="flex items-center space-x-2">
               <input

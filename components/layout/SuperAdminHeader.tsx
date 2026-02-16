@@ -5,6 +5,7 @@
     User,
     Search,
     ChevronDown,
+    ChevronUp,
     X,
   } from "lucide-react"
   import { useState, useEffect } from "react"
@@ -26,6 +27,7 @@
     const [isScrolled, setIsScrolled] = useState(false)
     const [adminDropdownOpen, setAdminDropdownOpen] = useState(false)
     const [accountantDropdownOpen, setAccountantDropdownOpen] = useState(false)
+    const [headerCollapsed, setHeaderCollapsed] = useState(false)
 
     // ---------- ACTIVE HELPERS ----------
     const isSection = (href: string) =>
@@ -41,12 +43,27 @@
     }, [])
 
     return (
-      <header className={`sticky top-0 z-50 transition-all duration-300 ${
-        isScrolled 
-          ? 'bg-gradient-to-r from-[#7B0F2B]/95 to-[#A4163A]/95 backdrop-blur-lg shadow-lg' 
-          : 'bg-gradient-to-r from-[#7B0F2B] to-[#A4163A] shadow-md'
-      }`}>
+      <header className="sticky top-0 z-50 relative">
 
+        {/* COLLAPSED: Tiny centered indicator - floating, no layout space */}
+        {headerCollapsed ? (
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-[calc(50%+6px)] z-40">
+            <button
+              onClick={() => setHeaderCollapsed(false)}
+              className="group flex items-center justify-center w-16 h-8 rounded-b-2xl bg-gradient-to-b from-[#7B0F2B] via-[#8B1535] to-[#A4163A] shadow-lg shadow-[#7B0F2B]/40 hover:shadow-xl hover:shadow-[#7B0F2B]/50 border border-b-0 border-x border-white/30 hover:border-white/50"
+              title="Expand header"
+            >
+              <ChevronDown className="w-4 h-4 text-white/95 group-hover:text-white drop-shadow-sm" />
+            </button>
+          </div>
+        ) : (
+        <div className="contents">
+        {/* Maroon section - top bar + nav only */}
+        <div className={`relative z-[60] ${
+          isScrolled 
+            ? 'bg-gradient-to-r from-[#7B0F2B]/95 to-[#A4163A]/95 backdrop-blur-lg shadow-lg' 
+            : 'bg-gradient-to-r from-[#7B0F2B] to-[#A4163A] shadow-md'
+        }`}>
         {/* TOP BAR */}
         <div className="px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between">
@@ -204,6 +221,20 @@
             </div>
           </div>
         )}
+        </div>
+
+        {/* Collapse indicator - floating at bottom edge, no layout space */}
+        <div className="hidden md:flex absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-[calc(50%+14px)] z-40">
+          <button
+            onClick={() => setHeaderCollapsed(true)}
+            className="group flex items-center justify-center w-16 h-7 rounded-b-2xl bg-white/95 hover:bg-white shadow-md border border-t-0 border-x border-gray-200 hover:shadow-lg"
+            title="Collapse header"
+          >
+            <ChevronUp className="w-4 h-4 text-[#7B0F2B] group-hover:text-[#5E0C20] transition-colors" />
+          </button>
+        </div>
+        </div>
+      )}
 
       </header>
     )
@@ -212,7 +243,7 @@
   /* helpers */
 
   const Dropdown = ({children}:any)=>(
-    <div className="absolute top-full left-0 bg-white rounded-lg shadow-xl border min-w-[200px] z-50 py-2">
+    <div className="absolute top-full left-0 bg-white rounded-lg shadow-xl border min-w-[200px] z-[60] py-2">
       {children}
     </div>
   )

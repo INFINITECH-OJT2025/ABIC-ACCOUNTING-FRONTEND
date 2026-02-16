@@ -26,7 +26,7 @@ export default function FailModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center px-4"
+        className="fixed inset-0 z-[100] flex items-center justify-center px-4"
         onClick={onClose}
         style={{ background: darkMode ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.45)" }}
       >

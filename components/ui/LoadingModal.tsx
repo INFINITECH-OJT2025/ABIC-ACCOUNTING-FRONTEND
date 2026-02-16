@@ -22,7 +22,7 @@ export default function LoadingModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center px-4"
+        className="fixed inset-0 z-[100] flex items-center justify-center px-4"
         style={{ background: darkMode ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.45)" }}
       >
         <div className="relative">

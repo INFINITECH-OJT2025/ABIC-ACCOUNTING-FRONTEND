@@ -131,16 +131,19 @@ export default function LoginPage() {
           return
         }
 
-        // Handle first login redirect - only for non-super-admins
-        if (data.data?.user?.first_login && data.data?.user?.role !== 'super_admin') {
-          // Show success modal for first login
+        // Handle first login - show welcome modal (no auto-redirect), user clicks to proceed
+        const role = data.data?.user?.role
+        const isFirstLogin = data.data?.user?.first_login
+        const needsPasswordChange = role === 'admin' || role === 'employee'
+        if (isFirstLogin && needsPasswordChange) {
           setIsFirstLoginModal(true)
           setSuccessModalContent({
-            title: 'Welcome to ABIC Accounting!',
-            message: "Before we proceed to your dashboard, we need to set up some things first. Let's get your account secured.",
+            title: 'Welcome to ABIC Realty & Consultancy Corporation',
+            message: "Welcome! Before we proceed to your dashboard, you must set up some things first. Let's get your account secured.",
             buttonText: 'Get Started'
           })
           setShowSuccessModal(true)
+          setLoading(false)
           return
         }
 
@@ -187,6 +190,9 @@ export default function LoginPage() {
             } else if (userRole === 'accountant_head' || userRole === 'accountant') {
               console.log('✅ Frontend routing: accountant → /admin/accountant')
               router.push('/admin/accountant')
+            } else if (userRole === 'employee') {
+              console.log('✅ Frontend routing: employee → /employee')
+              router.push('/employee')
             } else {
               console.log('✅ Frontend routing: default → /dashboard for role:', userRole)
               router.push('/dashboard')
@@ -232,10 +238,12 @@ export default function LoginPage() {
         const userRole = userData?.user?.role
         if (userRole === 'super_admin') {
           router.push("/super/")
-        } else if (userRole === 'admin') {
+        } else if (userRole === 'admin' || userRole === 'admin_head') {
           router.push("/admin/dashboard") 
-        } else if (userRole === 'accountant') {
+        } else if (userRole === 'accountant' || userRole === 'accountant_head') {
           router.push("/accountant/dashboard")
+        } else if (userRole === 'employee') {
+          router.push("/employee")
         } else {
           router.push("/dashboard")
         }

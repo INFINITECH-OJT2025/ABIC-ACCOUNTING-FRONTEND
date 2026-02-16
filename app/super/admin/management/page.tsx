@@ -1,19 +1,15 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import { Search, ChevronDown, Grid, List, X, Eye } from "lucide-react";
+import React, { useMemo, useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { Search, Grid, List, X, Eye } from "lucide-react";
 import SuperAdminHeader from "@/components/layout/SuperAdminHeader";
+import Sidebar from "@/components/layout/Sidebar";
+import { managementSidebarItems } from "@/components/layout/ManagementSidebar";
 import SuccessModal from "@/components/ui/SuccessModal";
 import LoadingModal from "@/components/ui/LoadingModal";
-
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
+import FailModal from "@/components/ui/FailModal";
+import ConfirmationModal from "@/components/ui/ConfirmationModal";
 
 type Status = "Active" | "Inactive" | "Suspended";
 
@@ -22,8 +18,8 @@ type AdminAccount = {
   name: string;
   email: string;
   status: Status;
-  created_at: string;
-  activated_at?: string | null;
+  promoted_at?: string | null;
+  updated_at?: string;
 };
 
 type FormErrors = {
@@ -110,6 +106,7 @@ export default function ManagementPage() {
   // Admin management states
   const [query, setQuery] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [createPanelClosing, setCreatePanelClosing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showCreateSuccess, setShowCreateSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState("accounts");
@@ -166,6 +163,7 @@ export default function ManagementPage() {
 
   const [accounts, setAccounts] = useState<AdminAccount[]>([]);
   const [editing, setEditing] = useState<AdminAccount | null>(null);
+  const [editPanelClosing, setEditPanelClosing] = useState(false);
   const [editForm, setEditForm] = useState({
     name: "",
     email: "",
@@ -178,6 +176,115 @@ export default function ManagementPage() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [showSaveSearchModal, setShowSaveSearchModal] = useState(false);
   const [searchName, setSearchName] = useState("");
+
+  const searchParams = useSearchParams();
+
+  // Sync activeTab with URL
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "permission" || tab === "placeholder" || tab === "accounts") {
+      setActiveTab(tab);
+    } else {
+      setActiveTab("accounts");
+    }
+  }, [searchParams]);
+
+  const closeCreatePanel = () => {
+    setCreatePanelClosing(true);
+    setTimeout(() => {
+      setShowCreate(false);
+      setCreatePanelClosing(false);
+      setForm({ name: "", email: "" });
+      setFormErrors({});
+      setApprovedEmployees([]);
+      setPromoteSearchQuery("");
+    }, 350);
+  };
+
+  // Approved employees for promotion to admin
+  const [approvedEmployees, setApprovedEmployees] = useState<Array<{ id: number; first_name: string; last_name: string; email: string; position: string }>>([]);
+  const [approvedEmployeesLoading, setApprovedEmployeesLoading] = useState(false);
+  const [promotingId, setPromotingId] = useState<number | null>(null);
+  const [promoteSearchQuery, setPromoteSearchQuery] = useState("");
+  const [promoteConfirmEmployee, setPromoteConfirmEmployee] = useState<{
+    id: number;
+    first_name: string;
+    last_name: string;
+    email: string;
+  } | null>(null);
+  const [showPromoteLoading, setShowPromoteLoading] = useState(false);
+  const [showPromoteFail, setShowPromoteFail] = useState(false);
+  const [promoteFailMessage, setPromoteFailMessage] = useState("");
+  const [revertConfirmAdmin, setRevertConfirmAdmin] = useState<AdminAccount | null>(null);
+  const [isReverting, setIsReverting] = useState(false);
+  const [showRevertSuccess, setShowRevertSuccess] = useState(false);
+  const [showRevertFail, setShowRevertFail] = useState(false);
+  const [showRevertLoading, setShowRevertLoading] = useState(false);
+  const [revertFailMessage, setRevertFailMessage] = useState("");
+
+  const filteredApprovedEmployees = useMemo(() => {
+    if (!promoteSearchQuery.trim()) return approvedEmployees;
+    const q = promoteSearchQuery.trim().toLowerCase();
+    return approvedEmployees.filter(
+      (emp) =>
+        (emp.first_name?.toLowerCase() ?? "").includes(q) ||
+        (emp.last_name?.toLowerCase() ?? "").includes(q) ||
+        (emp.email?.toLowerCase() ?? "").includes(q) ||
+        (emp.position?.toLowerCase() ?? "").includes(q)
+    );
+  }, [approvedEmployees, promoteSearchQuery]);
+
+  const fetchApprovedEmployees = async () => {
+    setApprovedEmployeesLoading(true);
+    try {
+      const res = await fetch("/api/employees?eligible_for_promotion=1");
+      const data = await res.json();
+      if (res.ok && data.success && Array.isArray(data.data)) {
+        setApprovedEmployees(data.data);
+      } else {
+        setApprovedEmployees([]);
+      }
+    } catch {
+      setApprovedEmployees([]);
+    } finally {
+      setApprovedEmployeesLoading(false);
+    }
+  };
+
+  // Fetch approved employees when Create panel opens
+  useEffect(() => {
+    if (showCreate && !createPanelClosing) {
+      fetchApprovedEmployees();
+    }
+  }, [showCreate, createPanelClosing]);
+
+  const handlePromoteToAdmin = async (employeeId: number) => {
+    setPromoteConfirmEmployee(null);
+    setPromotingId(employeeId);
+    setShowPromoteLoading(true);
+    try {
+      const res = await fetch("/api/admin/accounts/promote-from-employee", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employee_id: employeeId }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        await fetchAdminAccounts();
+        setApprovedEmployees((prev) => prev.filter((e) => e.id !== employeeId));
+        setShowCreateSuccess(true);
+      } else {
+        setPromoteFailMessage(data.message || "Failed to promote employee to admin");
+        setShowPromoteFail(true);
+      }
+    } catch {
+      setPromoteFailMessage("Failed to promote employee to admin");
+      setShowPromoteFail(true);
+    } finally {
+      setPromotingId(null);
+      setShowPromoteLoading(false);
+    }
+  };
 
   // Auth effect
   React.useEffect(() => {
@@ -235,8 +342,7 @@ export default function ManagementPage() {
     // Apply date range filter
     if (dateRange.start || dateRange.end) {
       filteredAccounts = filteredAccounts.filter(a => {
-        // Use created_at for non-activated accounts, activated_at for activated ones
-        const accountDate = new Date(a.activated_at || a.created_at);
+        const accountDate = new Date(a.promoted_at || a.updated_at || 0);
         const startDate = dateRange.start ? new Date(dateRange.start) : new Date('1900-01-01');
         const endDate = dateRange.end ? new Date(dateRange.end) : new Date('2100-12-31');
         return accountDate >= startDate && accountDate <= endDate;
@@ -283,9 +389,9 @@ export default function ManagementPage() {
       // Refresh the accounts list
       await fetchAdminAccounts();
       
-      // Reset form
+      // Reset form and close panel
       setForm({ name: '', email: '' });
-      setShowCreate(false);
+      closeCreatePanel();
       setShowCreateSuccess(true);
     } catch (error: any) {
       console.error('Error creating admin:', error);
@@ -341,7 +447,7 @@ export default function ManagementPage() {
     setQuery("");
   }
 
-  function openEditModal(item: AdminAccount) {
+  function openEditPanel(item: AdminAccount) {
     setEditing(item);
     setEditForm({
       name: item.name,
@@ -349,8 +455,42 @@ export default function ManagementPage() {
     });
   }
 
-  function closeEditModal() {
-    setEditing(null);
+  function closeEditPanel() {
+    setEditPanelClosing(true);
+    setTimeout(() => {
+      setEditing(null);
+      setEditPanelClosing(false);
+    }, 350);
+  }
+
+  async function handleRevertToEmployee() {
+    if (!revertConfirmAdmin) return;
+    const adminId = revertConfirmAdmin.id;
+    setRevertConfirmAdmin(null);
+    setIsReverting(true);
+    setShowRevertLoading(true);
+    try {
+      const res = await fetch(`/api/admin/accounts/${adminId}/revert-to-employee`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        closeEditPanel();
+        await fetchAdminAccounts();
+        setAccounts((prev) => prev.filter((a) => a.id !== adminId));
+        setShowRevertSuccess(true);
+      } else {
+        setRevertFailMessage(data.message || "Failed to revert to employee");
+        setShowRevertFail(true);
+      }
+    } catch {
+      setRevertFailMessage("Failed to revert to employee");
+      setShowRevertFail(true);
+    } finally {
+      setIsReverting(false);
+      setShowRevertLoading(false);
+    }
   }
 
   async function handleSuspendUnsuspend() {
@@ -405,7 +545,7 @@ export default function ManagementPage() {
 
         // Show success modal   
         setShowSuspendSuccess(true);
-        setEditing(null);
+        closeEditPanel();
       } else {
         throw new Error(data.message || 'Failed to update admin status');
       }
@@ -443,7 +583,7 @@ export default function ManagementPage() {
       );
 
       setShowEditSuccess(true);
-      setEditing(null);
+      closeEditPanel();
     } catch (error) {
       console.error('Failed to save admin:', error);
     } finally {
@@ -452,7 +592,7 @@ export default function ManagementPage() {
     }
   }
 
-  const tableCols = "minmax(140px, 1.15fr) minmax(180px, 1.2fr) 96px 120px";
+  const tableCols = "minmax(140px, 1.15fr) minmax(180px, 1.2fr) 120px";
 
   // Validation functions
   const validateEmail = (email: string): boolean => {
@@ -579,389 +719,236 @@ export default function ManagementPage() {
   const loadingContent = getLoadingModalContent();
 
   return (
-    <div className="bg-white min-h-screen">
+    <div className="min-h-screen flex flex-col">
       <SuperAdminHeader user={user} onLogout={handleLogout} />
-      <main className="mx-auto max-w-7xl px-4 py-8">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-extrabold text-[#5f0c18]">ADMINS</h1>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onRefresh}
-              className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold hover:bg-neutral-50"
-              style={{ borderColor: BORDER, height: 40, color: "#111" }}
-            >
-              <Icons.Refresh />
-              Refresh
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-7">
-          {/* Tab Navigation */}
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
+      <div className="flex flex-1 overflow-hidden">
+        <Sidebar
+          user={user}
+          items={managementSidebarItems}
+          onLogout={handleLogout}
+          showProfile={false}
+        />
+        <main className="flex-1 overflow-auto bg-gray-100">
+          <div className=" mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Maroon Gradient Header */}
+          <div className="bg-gradient-to-br from-[#800020] via-[#A0153E] to-[#C9184A] text-white rounded-lg shadow-lg p-8 mb-8">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <h1 className="text-4xl font-bold">Admins</h1>
               <button
-                onClick={() => setActiveTab("accounts")}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === "accounts"
-                    ? "border-[#7a0f1f] text-[#7a0f1f]"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                }`}
+                onClick={onRefresh}
+                className="inline-flex items-center gap-2 rounded-md border border-white/50 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
+                style={{ height: 40 }}
               >
-                Accounts
+                <Icons.Refresh />
+                Refresh
               </button>
-              <button
-                onClick={() => setActiveTab("permission")}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === "permission"
-                    ? "border-[#7a0f1f] text-[#7a0f1f]"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                }`}
-              >
-                Permission
-              </button>
-              <button
-                onClick={() => setActiveTab("placeholder")}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === "placeholder"
-                    ? "border-[#7a0f1f] text-[#7a0f1f]"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                }`}
-              >
-                Placeholder
-              </button>
-            </nav>
+            </div>
           </div>
 
           {/* Tab Content */}
-          <div className="mt-6">
+          <div>
             {activeTab === "accounts" && (
-              <div className="flex flex-col gap-6">
-                {/* Create Admin Button - Top Section */}
-                <div className="flex items-center justify-between">
+              <section
+                className="rounded-lg bg-white p-5 shadow-sm border"
+                style={{ borderColor: BORDER }}
+              >
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <h2 className="text-lg font-bold text-[#5f0c18]">Accounts </h2>
+                    <h2 className="text-lg font-bold text-[#5f0c18]">Admin List</h2>
                     <p className="text-sm text-gray-600 mt-1">Create and manage admin accounts</p>
                   </div>
-                  <button
-                    onClick={() => setShowCreate((v) => !v)}
-                    className="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold text-white hover:opacity-95"
-                    style={{ background: "#7a0f1f", height: 40 }}
-                  >
-                    <Icons.Plus />
-                    Create Admin
-                  </button>
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      onClick={() => setShowCreate(true)}
+                      className="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold text-white hover:opacity-95"
+                      style={{ background: "#7a0f1f", height: 40 }}
+                    >
+                      <Icons.Plus />
+                      Create Admin
+                    </button>
+                  </div>
                 </div>
 
-                {/* Cards Layout */}
-                <div className="flex flex-col gap-6 lg:grid lg:grid-cols-3 lg:gap-6">
-                  {/* Create */}
-                  {showCreate && (
-                    <div
-                      className="transition-opacity duration-[500ms] ease-in-out opacity-100"
-                      style={{ gridColumn: "span 1" }}
-                    >
-                      <section
-                        className="rounded-lg bg-white p-5 shadow-sm border"
-                        style={{ borderColor: BORDER }}
-                      >
-                        <div className="transition-opacity duration-[500ms] ease-in-out opacity-100 delay-300">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <h2 className="text-lg font-bold text-[#5f0c18]">Create Admin</h2>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => setShowCreate(false)}
-                              className="p-2 text-white hover:opacity-95 rounded-md border"
-                              style={{ borderColor: BORDER, background: "#7a0f1f" }}
-                              title="Close"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-
-                          <form className="mt-4 grid gap-3" onSubmit={onCreate}>
-                          <Field label="Account Name">
-                            <input
-                              value={form.name}
-                              onChange={(e) => handleInputChange('name', e.target.value)}
-                              className={`w-full rounded-md border px-3 py-2 text-sm outline-none transition-colors ${
-                                formErrors.name ? 'border-red-500' : form.name && !formErrors.name ? 'border-green-500' : ''
-                              }`}
-                              style={{ borderColor: formErrors.name ? '#ef4444' : form.name && !formErrors.name ? '#10b981' : BORDER, color: "#111" }}
-                            />
-                            {formErrors.name && (
-                              <div className="text-red-500 text-xs mt-1">{formErrors.name}</div>
-                            )}
-                          </Field>
-
-                          <Field label="Email">
-                            <div className="relative">
-                              <input
-                                type="email"
-                                value={form.email}
-                                onChange={(e) => handleInputChange('email', e.target.value)}
-                                className={`w-full rounded-md border px-3 py-2 text-sm outline-none transition-colors pr-8 ${
-                                  formErrors.email || emailExists ? 'border-red-500' : form.email && !formErrors.email && !emailExists ? 'border-green-500' : ''
-                                }`}
-                                style={{ borderColor: formErrors.email || emailExists ? '#ef4444' : form.email && !formErrors.email && !emailExists ? '#10b981' : BORDER, color: "#111" }}
-                              />
-                              {isCheckingEmail && (
-                                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                  <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
-                                </div>
-                              )}
-                              {!isCheckingEmail && form.email && !formErrors.email && (
-                                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                  {emailExists ? (
-                                    <div className="w-4 h-4 text-red-500">✕</div>
-                                  ) : (
-                                    <div className="w-4 h-4 text-green-500">✓</div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                            {formErrors.email && (
-                              <div className="text-red-500 text-xs mt-1">{formErrors.email}</div>
-                            )}
-                            {emailExists && !formErrors.email && (
-                              <div className="text-red-500 text-xs mt-1">This email is already in use</div>
-                            )}
-                          </Field>
-
-                          <button
-                            type="submit"
-                            className="mt-2 inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold text-white hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                            style={{ background: "#7a0f1f", height: 40 }}
-                            disabled={!isFormValid || isCreating}
-                          >
-                            {isCreating ? (
-                              <>
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                Creating Account...
-                              </>
-                            ) : (
-                              <>
-                                <Icons.Plus />
-                                Create Account
-                              </>
-                            )}
-                          </button>
-                        </form>
-                        </div>
-                      </section>
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mt-6">
+                  <div className="flex-1" />
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="relative w-full md:w-80">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+                      <input
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Search accounts..."
+                        className="w-full rounded-md border bg-white px-10 py-2 text-sm outline-none"
+                        style={{ borderColor: BORDER, height: 40, color: "#111" }}
+                      />
                     </div>
-                  )}
 
-                  {/* List */}
-                  <section
-                    className="rounded-lg bg-white p-5 shadow-sm border transition-all duration-[500ms] ease-in-out"
-                    style={{ 
-                      borderColor: BORDER, 
-                      gridColumn: showCreate ? "span 2" : "span 3"
-                    }}
-                  >
-                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <h2 className="text-lg font-bold text-[#5f0c18]">Admin List</h2>
-                      </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setStatusFilter("all")}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                          statusFilter === "all" ? "bg-[#7a0f1f] text-white" : "bg-white text-gray-700 border hover:bg-gray-50"
+                        }`}
+                        style={{ borderColor: statusFilter !== "all" ? BORDER : undefined }}
+                      >
+                        All
+                      </button>
+                      <button
+                        onClick={() => setStatusFilter("Active")}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                          statusFilter === "Active" ? "bg-green-500 text-white" : "bg-white text-gray-700 border hover:bg-gray-50"
+                        }`}
+                        style={{ borderColor: statusFilter !== "Active" ? BORDER : undefined }}
+                      >
+                        Active
+                      </button>
+                      <button
+                        onClick={() => setStatusFilter("Inactive")}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                          statusFilter === "Inactive" ? "bg-gray-500 text-white" : "bg-white text-gray-700 border hover:bg-gray-50"
+                        }`}
+                        style={{ borderColor: statusFilter !== "Inactive" ? BORDER : undefined }}
+                      >
+                        Inactive
+                      </button>
+                      <button
+                        onClick={() => setStatusFilter("Suspended")}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                          statusFilter === "Suspended" ? "bg-red-500 text-white" : "bg-white text-gray-700 border hover:bg-gray-50"
+                        }`}
+                        style={{ borderColor: statusFilter !== "Suspended" ? BORDER : undefined }}
+                      >
+                        Suspended
+                      </button>
+                    </div>
 
-                      <div className="flex items-center gap-3">
-                        <div className="relative w-full md:w-80">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+                    <button
+                      onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                      className={`px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                        showAdvancedFilters ? "bg-[#7a0f1f] text-white" : "bg-white text-gray-700 border hover:bg-gray-50"
+                      }`}
+                      style={{ borderColor: showAdvancedFilters ? undefined : BORDER }}
+                    >
+                      {showAdvancedFilters ? "Hide Filters" : "Show Filters"}
+                    </button>
+
+                    <div className="flex border rounded-md" style={{ borderColor: BORDER }}>
+                      <button
+                        onClick={() => setViewMode("cards")}
+                        className={`p-2 ${viewMode === "cards" ? "bg-[#7a0f1f] text-white" : "text-gray-500 hover:text-gray-700"}`}
+                        style={{ borderRadius: "6px 0 0 6px" }}
+                        title="Card View"
+                      >
+                        <Grid className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setViewMode("table")}
+                        className={`p-2 ${viewMode === "table" ? "bg-[#7a0f1f] text-white" : "text-gray-500 hover:text-gray-700"}`}
+                        style={{ borderRadius: "0 6px 6px 0" }}
+                        title="Table View"
+                      >
+                        <List className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Advanced Filters - Toggled */}
+                {showAdvancedFilters && (
+                  <div className="mt-4 p-4 bg-gray-50 rounded-lg border animate-in slide-in-from-top-2 duration-200" style={{ borderColor: BORDER }}>
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+                      {/* Date Range Filter */}
+                      <div className="flex-1">
+                        <label className="block text-xs font-semibold text-gray-700 mb-2">Activation Date Range</label>
+                        <div className="flex gap-2">
                           <input
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            placeholder="Search accounts..."
-                            className="w-full rounded-md border bg-white px-10 py-2 text-sm outline-none"
-                            style={{ borderColor: BORDER, height: 40, color: "#111" }}
+                            type="date"
+                            value={dateRange.start}
+                            onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                            className="flex-1 rounded-md border px-2 py-1.5 text-xs"
+                            style={{ borderColor: BORDER }}
+                          />
+                          <span className="text-gray-500 self-center">to</span>
+                          <input
+                            type="date"
+                            value={dateRange.end}
+                            onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                            className="flex-1 rounded-md border px-2 py-1.5 text-xs"
+                            style={{ borderColor: BORDER }}
                           />
                         </div>
-                        
+                      </div>
+
+                      {/* Save Search */}
+                      <div>
                         <button
-                          onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                          className={`px-3 py-2 text-xs font-medium rounded-md transition-colors ${
-                            showAdvancedFilters 
-                              ? "bg-[#7a0f1f] text-white" 
-                              : "bg-white text-gray-700 border hover:bg-gray-50"
-                          }`}
-                          style={{ borderColor: showAdvancedFilters ? undefined : BORDER }}
+                          onClick={() => setShowSaveSearchModal(true)}
+                          className="px-4 py-1.5 text-xs font-medium rounded-md bg-[#7a0f1f] text-white hover:opacity-95 disabled:opacity-50"
+                          disabled={!query && statusFilter === "all" && !dateRange.start && !dateRange.end}
                         >
-                          {showAdvancedFilters ? "Hide Filters" : "Show Filters"}
+                          Save Search
                         </button>
-                        
-                        <div className="flex items-center border border-gray-200 rounded-md" style={{ borderColor: BORDER }}>
-                          <button
-                            onClick={() => setViewMode("cards")}
-                            className={`p-2 ${viewMode === "cards" ? "bg-[#7a0f1f] text-white" : "text-gray-500 hover:text-gray-700"}`}
-                            style={{ borderRadius: "6px 0 0 6px" }}
-                            title="Card View"
-                          >
-                            <Grid className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setViewMode("table")}
-                            className={`p-2 ${viewMode === "table" ? "bg-[#7a0f1f] text-white" : "text-gray-500 hover:text-gray-700"}`}
-                            style={{ borderRadius: "0 6px 6px 0" }}
-                            title="Table View"
-                          >
-                            <List className="w-4 h-4" />
-                          </button>
-                        </div>
+                      </div>
+
+                      {/* Clear Filters */}
+                      <div>
+                        <button
+                          onClick={() => {
+                            setQuery("");
+                            setStatusFilter("all");
+                            setDateRange({ start: "", end: "" });
+                          }}
+                          className="px-4 py-1.5 text-xs font-medium rounded-md border text-gray-700 hover:bg-gray-50"
+                          style={{ borderColor: BORDER }}
+                        >
+                          Clear Filters
+                        </button>
                       </div>
                     </div>
 
-                    {/* Advanced Filters - Toggled */}
-                    {showAdvancedFilters && (
-                      <div className="mt-4 p-4 bg-gray-50 rounded-lg border animate-in slide-in-from-top-2 duration-200" style={{ borderColor: BORDER }}>
-                        <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
-                          {/* Status Filter */}
-                          <div className="flex-1">
-                            <label className="block text-xs font-semibold text-gray-700 mb-2">Status Filter</label>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => setStatusFilter("all")}
-                                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                                  statusFilter === "all" 
-                                    ? "bg-[#7a0f1f] text-white" 
-                                    : "bg-white text-gray-700 border hover:bg-gray-50"
-                                }`}
-                                style={{ borderColor: statusFilter !== "all" ? BORDER : undefined }}
-                              >
-                                All
-                              </button>
-                              <button
-                                onClick={() => setStatusFilter("Active")}
-                                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                                  statusFilter === "Active" 
-                                    ? "bg-green-500 text-white" 
-                                    : "bg-white text-gray-700 border hover:bg-gray-50"
-                                }`}
-                                style={{ borderColor: statusFilter !== "Active" ? BORDER : undefined }}
-                              >
-                                Active
-                              </button>
-                              <button
-                                onClick={() => setStatusFilter("Inactive")}
-                                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                                  statusFilter === "Inactive" 
-                                    ? "bg-gray-500 text-white" 
-                                    : "bg-white text-gray-700 border hover:bg-gray-50"
-                                }`}
-                                style={{ borderColor: statusFilter !== "Inactive" ? BORDER : undefined }}
-                              >
-                                Inactive
-                              </button>
-                              <button
-                                onClick={() => setStatusFilter("Suspended")}
-                                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                                  statusFilter === "Suspended" 
-                                    ? "bg-red-500 text-white" 
-                                    : "bg-white text-gray-700 border hover:bg-gray-50"
-                                }`}
-                                style={{ borderColor: statusFilter !== "Suspended" ? BORDER : undefined }}
-                              >
-                                Suspended
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Date Range Filter */}
-                          <div className="flex-1">
-                            <label className="block text-xs font-semibold text-gray-700 mb-2">Activation Date Range</label>
-                            <div className="flex gap-2">
-                              <input
-                                type="date"
-                                value={dateRange.start}
-                                onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-                                className="flex-1 rounded-md border px-2 py-1.5 text-xs"
-                                style={{ borderColor: BORDER }}
-                              />
-                              <span className="text-gray-500 self-center">to</span>
-                              <input
-                                type="date"
-                                value={dateRange.end}
-                                onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-                                className="flex-1 rounded-md border px-2 py-1.5 text-xs"
-                                style={{ borderColor: BORDER }}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Save Search */}
-                          <div>
-                            <button
-                              onClick={() => setShowSaveSearchModal(true)}
-                              className="px-4 py-1.5 text-xs font-medium rounded-md bg-[#7a0f1f] text-white hover:opacity-95 disabled:opacity-50"
-                              disabled={!query && statusFilter === "all" && !dateRange.start && !dateRange.end}
-                            >
-                              Save Search
-                            </button>
-                          </div>
-
-                          {/* Clear Filters */}
-                          <div>
-                            <button
-                              onClick={() => {
-                                setQuery("");
-                                setStatusFilter("all");
-                                setDateRange({ start: "", end: "" });
-                              }}
-                              className="px-4 py-1.5 text-xs font-medium rounded-md border text-gray-700 hover:bg-gray-50"
+                    {/* Saved Searches */}
+                    {savedSearches.length > 0 && (
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <div className="text-xs font-semibold text-gray-700 mb-2">Saved Searches</div>
+                        <div className="flex flex-wrap gap-2">
+                          {savedSearches.map((search, index) => (
+                            <div
+                              key={index}
+                              className="group relative flex items-center gap-1 px-3 py-1 text-xs bg-white border rounded-md hover:bg-gray-50 transition-colors"
                               style={{ borderColor: BORDER }}
                             >
-                              Clear Filters
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Saved Searches */}
-                        {savedSearches.length > 0 && (
-                          <div className="mt-4 pt-4 border-t border-gray-200">
-                            <div className="text-xs font-semibold text-gray-700 mb-2">Saved Searches</div>
-                            <div className="flex flex-wrap gap-2">
-                              {savedSearches.map((search, index) => (
-                                <div
-                                  key={index}
-                                  className="group relative flex items-center gap-1 px-3 py-1 text-xs bg-white border rounded-md hover:bg-gray-50 transition-colors"
-                                  style={{ borderColor: BORDER }}
-                                >
-                                  <button
-                                    onClick={() => {
-                                      setQuery(search.query);
-                                      setStatusFilter(search.status);
-                                      setDateRange(search.dateRange);
-                                    }}
-                                    className="flex-1 text-left"
-                                  >
-                                    {search.name}
-                                  </button>
-                                  <button
-                                    onClick={() => removeSavedSearch(index)}
-                                    className="text-gray-400 hover:text-red-500 ml-1 transition-colors"
-                                    title="Remove search"
-                                  >
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                  </button>
-                                </div>
-                              ))}
+                              <button
+                                onClick={() => {
+                                  setQuery(search.query);
+                                  setStatusFilter(search.status);
+                                  setDateRange(search.dateRange);
+                                }}
+                                className="flex-1 text-left"
+                              >
+                                {search.name}
+                              </button>
+                              <button
+                                onClick={() => removeSavedSearch(index)}
+                                className="text-gray-400 hover:text-red-500 ml-1 transition-colors"
+                                title="Remove search"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
                             </div>
-                          </div>
-                        )}
+                          ))}
+                        </div>
                       </div>
                     )}
+                  </div>
+                )}
 
-                    <div className="mt-4">
-                      {isLoading ? (
-                        viewMode === "cards" ? (
-                          <div className={`grid gap-4 ${showCreate ? "md:grid-cols-2" : "md:grid-cols-2 lg:grid-cols-3"}`} style={{ gridAutoRows: 'min-content' }}>
+                <div className="mt-4">
+                  {isLoading ? (
+                    viewMode === "cards" ? (
+                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" style={{ gridAutoRows: 'min-content' }}>
                             {[...Array(6)].map((_, index) => (
                               <AdminCardSkeleton key={index} />
                             ))}
@@ -977,8 +964,8 @@ export default function ManagementPage() {
                           <div className="text-3xl font-bold text-[#5f0c18]">No data</div>
                           <div className="mt-2 text-xs text-neutral-800">Create a record or adjust your search.</div>
                         </div>
-                      ) : viewMode === "cards" ? (
-                        <div className={`grid gap-4 ${showCreate ? "md:grid-cols-2" : "md:grid-cols-2 lg:grid-cols-3"}`} style={{ gridAutoRows: 'min-content' }}>
+                    ) : viewMode === "cards" ? (
+                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" style={{ gridAutoRows: 'min-content' }}>
                           {filtered.map((a) => (
                             <div
                               key={a.id}
@@ -997,28 +984,14 @@ export default function ManagementPage() {
                                     <p className="text-sm text-neutral-600">{a.email}</p>
                                   </div>
                                 </div>
-                                <div
-                                  className={`px-2 py-1 text-[11px] font-semibold rounded-md ${
-                                    a.status === "Active" 
-                                      ? "bg-green-100 text-green-700" 
-                                      : a.status === "Suspended"
-                                      ? "bg-red-100 text-red-700"
-                                      : "bg-gray-100 text-gray-700"
-                                  }`}
-                                >
-                                  {a.status}
-                                </div>
                               </div>
                               
                               <div className="flex items-center justify-between">
-                                <div className="text-[11px] text-neutral-500 space-y-1">
-                                  <div>Created on: {formatDate(a.created_at)}</div>
-                                  <div>
-                                    Activated on: {a.activated_at ? formatDate(a.activated_at) : 'Not activated yet'}
-                                  </div>
+                                <div className="text-[11px] text-neutral-500">
+                                  Promoted on: {a.promoted_at ? formatDate(a.promoted_at) : '—'}
                                 </div>
                                 <button
-                                  onClick={() => openEditModal(a)}
+                                  onClick={() => openEditPanel(a)}
                                   className="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold text-white hover:opacity-95"
                                   style={{ background: "#7a0f1f", height: 32 }}
                                   title="View"
@@ -1039,7 +1012,6 @@ export default function ManagementPage() {
                           >
                             <div>Account Name</div>
                             <div>Email</div>
-                            <div className="text-center">Status</div>
                             <div className="text-right">Actions</div>
                           </div>
 
@@ -1051,30 +1023,16 @@ export default function ManagementPage() {
                             >
                               <div className="min-w-0">
                                 <div className="font-semibold text-neutral-900 truncate">{a.name}</div>
-                                <div className="text-[11px] text-neutral-800">Created: {formatDate(a.created_at)}</div>
                                 <div className="text-[11px] text-neutral-800">
-                                  Activated: {a.activated_at ? formatDate(a.activated_at) : 'Not activated yet'}
+                                  Promoted on: {a.promoted_at ? formatDate(a.promoted_at) : '—'}
                                 </div>
                               </div>
 
                               <div className="min-w-0 text-neutral-900 truncate">{a.email}</div>
-                              <div className="flex items-center justify-center">
-                                <div
-                                  className={`px-2 py-1 text-[11px] font-semibold rounded-md ${
-                                    a.status === "Active" 
-                                      ? "bg-green-100 text-green-700" 
-                                      : a.status === "Suspended"
-                                      ? "bg-red-100 text-red-700"
-                                      : "bg-gray-100 text-gray-700"
-                                  }`}
-                                >
-                                  {a.status}
-                                </div>
-                              </div>
 
                               <div className="flex items-center justify-end gap-2">
                                 <button
-                                  onClick={() => openEditModal(a)}
+                                  onClick={() => openEditPanel(a)}
                                   className="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold text-white hover:opacity-95"
                                   style={{ background: "#7a0f1f", height: 32 }}
                                   title="View"
@@ -1088,10 +1046,8 @@ export default function ManagementPage() {
                           ))}
                         </div>
                       )}
-                    </div>
-                  </section>
                 </div>
-            </div>
+              </section>
             )}
 
             {activeTab === "permission" && (
@@ -1118,50 +1074,222 @@ export default function ManagementPage() {
           </div>
         </div>
       </main>
+      </div>
 
-      {/* Edit Modal */}
-      {editing && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center px-4"
-          onClick={closeEditModal}
-          style={{ background: "rgba(0,0,0,0.45)" }}
-        >
+      {/* Create Admin Side Panel */}
+      {(showCreate || createPanelClosing) && (
+        <>
           <div
-            className="w-full max-w-xl rounded-lg bg-white p-5 shadow-xl border"
-            style={{ borderColor: BORDER }}
-            onClick={(e) => e.stopPropagation()}
+            className={`fixed inset-0 bg-black/50 z-40 transition-opacity duration-[350ms] ${
+              createPanelClosing ? "opacity-0" : "opacity-100"
+            }`}
+            onClick={closeCreatePanel}
+            aria-hidden="true"
+          />
+          <div
+            className="fixed top-0 right-0 bottom-0 w-full max-w-lg h-screen bg-white z-50 flex flex-col rounded-l-2xl overflow-hidden shadow-xl"
+            style={{
+              animation: createPanelClosing
+                ? "slideOut 0.35s cubic-bezier(0.32, 0.72, 0, 1) forwards"
+                : "slideIn 0.4s cubic-bezier(0.32, 0.72, 0, 1)",
+              boxShadow: "-8px 0 24px rgba(0,0,0,0.15)",
+            }}
           >
-            <div className="flex items-start justify-between gap-4 p-5 -mx-5 -mt-5 mb-6 rounded-t-lg" style={{ background: "#7a0f1f" }}>
+            <div className="flex-shrink-0 flex items-center justify-between p-4 bg-gradient-to-r from-[#800020] via-[#A0153E] to-[#C9184A] text-white">
               <div>
-                <h3 className="text-lg font-bold text-white">{editing?.email}</h3>
-                <div className="flex items-center gap-3">
-                  <div className="mt-1 text-xs text-white/90">
-                    Created: {formatDate(editing?.created_at)}
-                  </div>
-                  <div
-                    className={`px-2 py-1 text-[10px] mt-1 font-semibold rounded-md ${
-                      editing?.status === "Active" 
-                        ? "bg-white/20 text-white" 
-                        : editing?.status === "Suspended"
-                        ? "bg-red-500/80 text-white"
-                        : "bg-gray-500/80 text-white"
-                    }`}
-                  >
-                    {editing?.status}
-                  </div>
-                </div>
+                <h2 className="text-lg font-bold">Promote to Admin</h2>
+                <p className="text-sm text-white/90 mt-0.5">
+                  Select an approved employee to promote as admin.
+                </p>
               </div>
-
               <button
-                onClick={closeEditModal}
-                className="p-2 text-white hover:bg-white/20 rounded-md"
-                title="Close"
+                onClick={closeCreatePanel}
+                className="p-2 rounded-md hover:bg-white/20 transition-colors"
+                aria-label="Close"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-shrink-0 px-4 pt-4 pb-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by name, email, or position..."
+                  value={promoteSearchQuery}
+                  onChange={(e) => setPromoteSearchQuery(e.target.value)}
+                  className="w-full rounded-md border pl-9 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/30"
+                  style={{ borderColor: BORDER, color: "#111" }}
+                />
+              </div>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4 pb-6">
+              {approvedEmployeesLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#7a0f1f]"></div>
+                </div>
+              ) : approvedEmployees.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <p className="text-sm">No approved employees available for promotion.</p>
+                  <p className="text-xs mt-2">Approve employees from the Masterfile first.</p>
+                </div>
+              ) : filteredApprovedEmployees.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <p className="text-sm">No employees match your search.</p>
+                </div>
+              ) : (
+                <ul className="space-y-3">
+                  {filteredApprovedEmployees.map((emp) => (
+                    <li
+                      key={emp.id}
+                      className="flex items-center justify-between gap-4 p-3 rounded-lg border"
+                      style={{ borderColor: BORDER }}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-gray-900 truncate">
+                          {emp.first_name} {emp.last_name}
+                        </p>
+                        <p className="text-sm text-gray-500 truncate">{emp.email}</p>
+                        <p className="text-xs text-gray-400">{emp.position}</p>
+                      </div>
+                      <button
+                        onClick={() => setPromoteConfirmEmployee({ id: emp.id, first_name: emp.first_name, last_name: emp.last_name, email: emp.email })}
+                        disabled={promotingId !== null}
+                        className="flex-shrink-0 inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-white hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{ background: "#7a0f1f" }}
+                      >
+                        {promotingId === emp.id ? (
+                          <>
+                            <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div>
+                            Promoting...
+                          </>
+                        ) : (
+                          <>
+                            <Icons.Plus />
+                            Promote to Admin
+                          </>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Promote to Admin Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={!!promoteConfirmEmployee}
+        onClose={() => setPromoteConfirmEmployee(null)}
+        onConfirm={() => promoteConfirmEmployee && handlePromoteToAdmin(promoteConfirmEmployee.id)}
+        title="Confirm Promotion"
+        message={
+          promoteConfirmEmployee
+            ? `Are you sure you want to promote ${promoteConfirmEmployee.first_name} ${promoteConfirmEmployee.last_name} (${promoteConfirmEmployee.email}) to admin? An email notification will be sent to them.`
+            : ""
+        }
+        confirmText="Confirm Promote"
+        cancelText="Cancel"
+      />
+
+      {/* Promote Loading Modal */}
+      <LoadingModal
+        isOpen={showPromoteLoading}
+        title="Promoting to Admin"
+        message="Please wait while we promote the employee and send the notification email..."
+      />
+
+      {/* Promote Fail Modal */}
+      <FailModal
+        isOpen={showPromoteFail}
+        onClose={() => setShowPromoteFail(false)}
+        title="Failed to Promote"
+        message={promoteFailMessage}
+        buttonText="OK"
+      />
+
+      {/* Revert to Employee Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={!!revertConfirmAdmin}
+        onClose={() => setRevertConfirmAdmin(null)}
+        onConfirm={() => handleRevertToEmployee()}
+        title="Revert to Employee"
+        message={
+          revertConfirmAdmin
+            ? `Are you sure you want to revert ${revertConfirmAdmin.name} (${revertConfirmAdmin.email}) back to employee? They will lose admin access.`
+            : ""
+        }
+        confirmText="Revert to Employee"
+        cancelText="Cancel"
+      />
+
+      {/* Revert Loading Modal */}
+      <LoadingModal
+        isOpen={showRevertLoading}
+        title="Reverting to Employee"
+        message="Please wait while we revert the admin back to employee..."
+      />
+
+      {showRevertSuccess && (
+        <SuccessModal
+          isOpen={showRevertSuccess}
+          onClose={() => setShowRevertSuccess(false)}
+          title="Reverted to Employee"
+          message="The admin has been reverted to employee successfully. They will no longer have admin access."
+        />
+      )}
+
+      <FailModal
+        isOpen={showRevertFail}
+        onClose={() => setShowRevertFail(false)}
+        title="Failed to Revert"
+        message={revertFailMessage}
+        buttonText="OK"
+      />
+
+      {/* Admin View Side Panel */}
+      {(editing || editPanelClosing) && (
+        <>
+          <div
+            className={`fixed inset-0 bg-black/50 z-40 transition-opacity duration-[350ms] ${
+              editPanelClosing ? "opacity-0" : "opacity-100"
+            }`}
+            onClick={closeEditPanel}
+            aria-hidden="true"
+          />
+          <div
+            className="fixed top-0 right-0 bottom-0 w-full max-w-lg h-screen bg-white z-50 flex flex-col rounded-l-2xl overflow-hidden shadow-xl"
+            style={{
+              animation: editPanelClosing
+                ? "slideOut 0.35s cubic-bezier(0.32, 0.72, 0, 1) forwards"
+                : "slideIn 0.4s cubic-bezier(0.32, 0.72, 0, 1)",
+              boxShadow: "-8px 0 24px rgba(0,0,0,0.15)",
+            }}
+          >
+            <div className="flex-shrink-0 flex items-center justify-between p-4 bg-gradient-to-r from-[#800020] via-[#A0153E] to-[#C9184A] text-white">
+              <div>
+                <h2 className="text-lg font-bold">{editing?.name}</h2>
+                <p className="text-sm text-white/90 mt-0.5">{editing?.email}</p>
+              </div>
+              <button
+                onClick={closeEditPanel}
+                className="p-2 rounded-md hover:bg-white/20 transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="mt-6 space-y-4">
+            <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Promoted on</label>
+                <div className="w-full rounded-md border px-3 py-2 text-sm bg-gray-50" style={{ borderColor: BORDER }}>
+                  {editing?.promoted_at ? formatDate(editing.promoted_at) : "—"}
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Account Name</label>
                 <input
@@ -1179,9 +1307,9 @@ export default function ManagementPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4">
+              <div className="flex flex-wrap gap-3 pt-4">
                 <button
-                  onClick={closeEditModal}
+                  onClick={closeEditPanel}
                   className="rounded-md border px-4 py-2 text-sm font-semibold hover:bg-neutral-50"
                   style={{ borderColor: BORDER, color: "#111", height: 40 }}
                 >
@@ -1201,49 +1329,22 @@ export default function ManagementPage() {
                         Saving...
                       </>
                     ) : (
-                      'Save Changes'
+                      "Save Changes"
                     )}
                   </button>
                 )}
 
-                {editing?.status !== "Inactive" && (
-                  <button
-                    onClick={handleSuspendUnsuspend}
-                    disabled={isSuspending}
-                    className={`rounded-md px-4 py-2 text-sm font-semibold hover:opacity-95 disabled:opacity-50 ${
-                      editing?.status === "Suspended" 
-                        ? "bg-green-500 text-white" 
-                        : "bg-orange-500 text-white"
-                    }`}
-                    style={{ height: 40 }}
-                  >
-                    {isSuspending ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2 inline-block"></div>
-                        {editing?.status === "Suspended" ? "Unsuspending..." : "Suspending..."}
-                      </>
-                    ) : (
-                      editing?.status === "Suspended" ? "Unsuspend" : "Suspend"
-                    )}
-                  </button>
-                )}
-
-                {editing?.status !== "Inactive" && (
-                  <button
-                    onClick={() => {
-                      // Handle assign permission
-                      console.log("Assign permission for:", editing?.email);
-                    }}
-                    className="rounded-md px-4 py-2 text-sm font-semibold text-white hover:opacity-95"
-                    style={{ background: "#7a0f1f", height: 40 }}
-                  >
-                    Assign Permission
-                  </button>
-                )}
+                <button
+                  onClick={() => setRevertConfirmAdmin(editing)}
+                  className="rounded-md px-4 py-2 text-sm font-semibold text-white hover:opacity-95 border border-orange-300 bg-orange-500 hover:bg-orange-600"
+                  style={{ height: 40 }}
+                >
+                  Revert to Employee
+                </button>
               </div>
             </div>
           </div>
-        </div>
+        </>
       )}
 
       {showSuccess && (
@@ -1277,16 +1378,8 @@ export default function ManagementPage() {
         <SuccessModal
           isOpen={showCreateSuccess}
           onClose={() => setShowCreateSuccess(false)}
-          title="Admin Account Created Successfully"
-          message="Admin account has been created successfully. Login credentials have been sent to the user's email address."
-        />
-      )}
-
-      {showLoadingModal && (
-        <LoadingModal
-          isOpen={showLoadingModal}
-          title="Creating Admin Account"
-          message="Please wait while we create the admin account and send the login credentials..."
+          title="Employee Promoted to Admin"
+          message="The employee has been promoted to admin successfully. A notification email has been sent to them."
         />
       )}
 
@@ -1409,11 +1502,10 @@ function AdminTableSkeleton() {
     <div className="overflow-hidden rounded-lg border" style={{ borderColor: BORDER }}>
       <div
         className="grid bg-neutral-50 px-4 py-3 text-xs font-semibold text-neutral-900"
-        style={{ gridTemplateColumns: "minmax(140px, 1.15fr) minmax(180px, 1.2fr) 96px 120px" }}
+        style={{ gridTemplateColumns: "minmax(140px, 1.15fr) minmax(180px, 1.2fr) 120px" }}
       >
         <div>Account Name</div>
         <div>Email</div>
-        <div className="text-center">Status</div>
         <div className="text-right">Actions</div>
       </div>
 
@@ -1421,17 +1513,13 @@ function AdminTableSkeleton() {
         <div
           key={index}
           className="grid items-center px-4 py-3 text-sm border-t animate-pulse"
-          style={{ borderColor: BORDER, gridTemplateColumns: "minmax(140px, 1.15fr) minmax(180px, 1.2fr) 96px 120px" }}
+          style={{ borderColor: BORDER, gridTemplateColumns: "minmax(140px, 1.15fr) minmax(180px, 1.2fr) 120px" }}
         >
           <div className="min-w-0">
             <div className="h-4 bg-gray-200 rounded w-3/4 mb-1"></div>
             <div className="h-3 bg-gray-200 rounded w-20"></div>
-            <div className="h-3 bg-gray-200 rounded w-24 mt-1"></div>
           </div>
           <div className="h-4 bg-gray-200 rounded w-40"></div>
-          <div className="flex items-center justify-center">
-            <div className="h-6 bg-gray-200 rounded w-16"></div>
-          </div>
           <div className="flex items-center justify-end">
             <div className="h-8 bg-gray-200 rounded w-16"></div>
           </div>
