@@ -4,9 +4,10 @@
 
 'use client'
 
-import { useState } from 'react'
-import { ChevronDown, Clock, Plus, Search, Users, ChevronLeft, ChevronRight, FileDown, FileText, Check, AlertTriangle } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { ChevronDown, Clock, Plus, Search, Users, ChevronLeft, ChevronRight, FileDown, FileText, Check, AlertTriangle, Loader2 } from 'lucide-react'
 import * as XLSX from 'xlsx'
+import { toast } from 'sonner'
 
 // shadcn/ui components
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -51,39 +52,29 @@ import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
 // ---------- TYPES & MOCK INITIAL DATA ----------
+// ---------- TYPES & MOCK INITIAL DATA ----------
 interface LateEntry {
-  id: string
-  employeeName: string
+  id: string | number
+  employee_id: number
+  employeeName: string // for backward compatibility in some components
+  employee_name: string
   date: string
-  actualIn: string
+  actual_in: string
+  actualIn?: string // for compatibility with existing display logic
   minutesLate: number
   warningLevel?: number
+  warning_level?: number
+  cutoff_period?: string
   cutoffPeriod?: string
   month: string
   year: number
 }
-// Employees master list
-const ALL_EMPLOYEES = [
-  { nickname: 'Joe', fullName: 'Joelyn Rendon' },
-  { nickname: 'Kaila', fullName: 'Kaila Rose Dapiaoen' },
-  { nickname: 'Janina', fullName: 'Elma Janina Caliboso' },
-  { nickname: 'Darlene', fullName: 'Darlene Angel G. Fajarito' },
-  { nickname: 'Justin', fullName: 'Justin M. De Castro' },
-  { nickname: 'Mike', fullName: 'Michael M. Tapec' },
-  { nickname: 'Aizle', fullName: 'Aizle Marie Atienza' },
-  { nickname: 'Armand', fullName: 'Armand Cajucom' },
-  { nickname: 'Jaypee', fullName: 'Jaypee Panes' },
-  { nickname: 'Eirene', fullName: 'Eirene Grace Armilla' },
-  { nickname: 'Hazel', fullName: 'Hazel Anne Mendoza' },
-  { nickname: 'Raiza', fullName: 'Raiza Mae Boy Habaña' },
-  { nickname: 'Jhoanna', fullName: 'Jhoanna Mae M. Papio' },
-  { nickname: 'Margel', fullName: 'Margelle R. Lodovice' },
-  { nickname: 'Wil', fullName: 'Wilfredo T. Aliado Jr.' },
-  { nickname: 'Meah', fullName: 'Meah Mae M. Rivera' },
-  { nickname: 'Gab', fullName: 'Gabriela V. Mariano' },
-  { nickname: 'Kate', fullName: 'Kate Owen L. Perez' },
-  { nickname: 'Gie', fullName: 'Giesel Mae B. Villasan' },
-]
+
+interface Employee {
+  id: number
+  name: string
+  nickname?: string
+}
 
 // Available years & months
 const availableYears = [2025, 2026, 2027]
@@ -91,19 +82,35 @@ const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 
 // ---------- TIME PARSING UTILITY ----------
 function parseTimeToMinutes(timeStr: string): number {
-  const regex = /(\d{1,2}):(\d{2})\s*(AM|PM)/i
-  const match = timeStr.match(regex)
+  if (!timeStr) return 0
 
-  if (!match) return 0
+  // Support 12h format: HH:MM AM/PM
+  const regex12 = /(\d{1,2}):(\d{2})\s*(AM|PM)/i
+  const match12 = timeStr.match(regex12)
 
-  let hours = parseInt(match[1])
-  const minutes = parseInt(match[2])
-  const period = match[3].toUpperCase()
+  if (match12) {
+    let hours = parseInt(match12[1])
+    const minutes = parseInt(match12[2])
+    const period = match12[3].toUpperCase()
 
-  if (period === 'PM' && hours !== 12) hours += 12
-  if (period === 'AM' && hours === 12) hours = 0
+    if (period === 'PM' && hours !== 12) hours += 12
+    if (period === 'AM' && hours === 12) hours = 0
 
-  return hours * 60 + minutes
+    return hours * 60 + minutes
+  }
+
+  // Support 24h format: HH:MM:SS (standard MySQL TIME format) or HH:MM
+  const regex24 = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/
+  const match24 = timeStr.match(regex24)
+
+  if (match24) {
+    const hours = parseInt(match24[1])
+    const minutes = parseInt(match24[2])
+    // Seconds are ignored as lates are counted by minutes
+    return hours * 60 + minutes
+  }
+
+  return 0
 }
 
 // Calculate minutes from 8:00 AM (no grace period) - for table display
@@ -124,11 +131,23 @@ function exceedsGracePeriod(actualIn: string): boolean {
   return actualTimeMinutes > graceTimeMinutes
 }
 
+// Normalizes date input to YYYY-MM-DD using local time to avoid timezone shifts
+function formatDate(dateInput: any): string {
+  if (!dateInput) return ''
+  const date = new Date(dateInput)
+  if (isNaN(date.getTime())) return String(dateInput)
+  
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 // Calculate warning level for an employee based on their late count across cutoffs
 function calculateWarningLevel(employeeName: string, cutoffNumber: number, allEntries: LateEntry[]): number {
   // Count how many times this employee has been late in cutoffs
-  const latesInCutoff1 = allEntries.filter(e => e.employeeName === employeeName && e.cutoffPeriod === 'cutoff1' && exceedsGracePeriod(e.actualIn)).length
-  const latesInCutoff2 = allEntries.filter(e => e.employeeName === employeeName && e.cutoffPeriod === 'cutoff2' && exceedsGracePeriod(e.actualIn)).length
+  const latesInCutoff1 = allEntries.filter(e => e.employee_name === employeeName && e.cutoff_period === 'cutoff1' && exceedsGracePeriod(e.actual_in || e.actualIn || '')).length
+  const latesInCutoff2 = allEntries.filter(e => e.employee_name === employeeName && e.cutoff_period === 'cutoff2' && exceedsGracePeriod(e.actual_in || e.actualIn || '')).length
 
   if (cutoffNumber === 1 && latesInCutoff1 > 0) return 1 // 1st warning
   if (cutoffNumber === 2 && latesInCutoff2 > 0) return 2 // 2nd warning
@@ -212,10 +231,12 @@ function exportToExcel(summaryArray: { name: string; totalMinutes: number; occur
 // ---------- EMPLOYEE SELECTOR COMPONENT ----------
 function EmployeeSelector({
   value,
-  onChange
+  onChange,
+  employees
 }: {
   value: string
   onChange: (name: string) => void
+  employees: Employee[]
 }) {
   const [open, setOpen] = useState(false)
 
@@ -238,10 +259,10 @@ function EmployeeSelector({
           <CommandEmpty>No employee found.</CommandEmpty>
           <CommandList>
             <CommandGroup>
-              {ALL_EMPLOYEES.map((employee) => (
+              {employees.map((employee) => (
                 <CommandItem
-                  key={employee.nickname}
-                  value={employee.nickname}
+                  key={employee.id}
+                  value={employee.name}
                   onSelect={(currentValue) => {
                     onChange(currentValue === value ? "" : currentValue)
                     setOpen(false)
@@ -250,10 +271,10 @@ function EmployeeSelector({
                   <Check
                     className={cn(
                       "mr-2 h-4 w-4",
-                      value === employee.nickname ? "opacity-100" : "opacity-0"
+                      value === employee.name ? "opacity-100" : "opacity-0"
                     )}
                   />
-                  {employee.nickname}
+                  {employee.name}
                 </CommandItem>
               ))}
             </CommandGroup>
@@ -273,41 +294,40 @@ interface SummarySheetProps {
   entries: LateEntry[]
   selectedYear: number
   selectedMonth: string
+  employees: Employee[]
 }
 
-function SummarySheet({ isOpen, onClose, cutoffTitle, entries, selectedYear, selectedMonth }: SummarySheetProps) {
+function SummarySheet({ isOpen, onClose, cutoffTitle, entries, selectedYear, selectedMonth, employees }: SummarySheetProps) {
   // Search state
   const [searchQuery, setSearchQuery] = useState('')
 
   // Calculate summary from entries - ONLY from this specific cutoff range
-  const summaryMap = new Map<string, { totalMinutes: number; occurrences: number }>()
+  const summaryMap = new Map<number, { totalMinutes: number; occurrences: number; name: string }>()
 
   // Initialize all employees with 0 values
-  ALL_EMPLOYEES.forEach(emp => {
-    summaryMap.set(emp.nickname, { totalMinutes: 0, occurrences: 0 })
+  employees.forEach(emp => {
+    summaryMap.set(emp.id, { totalMinutes: 0, occurrences: 0, name: emp.name })
   })
 
   // Add actual data
   entries.forEach(entry => {
-    if (!entry.employeeName) return
-
-    const current = summaryMap.get(entry.employeeName)
-    // Only process if employee is in our master list
+    const current = summaryMap.get(entry.employee_id)
     if (current) {
       current.totalMinutes += entry.minutesLate
-      if (exceedsGracePeriod(entry.actualIn)) {
+      // Use helper to check if late (assuming 8:05 AM grace)
+      const actualTime = entry.actual_in || entry.actualIn || ''
+      if (actualTime && exceedsGracePeriod(actualTime)) {
         current.occurrences += 1
       }
-      summaryMap.set(entry.employeeName, current)
     }
   })
 
-  // Convert to array preserving the order of ALL_EMPLOYEES
-  const summaryArray = ALL_EMPLOYEES.map(emp => {
-    const data = summaryMap.get(emp.nickname) || { totalMinutes: 0, occurrences: 0 }
+  // Convert to array preserving the order of employees
+  const summaryArray = employees.map(emp => {
+    const data = summaryMap.get(emp.id) || { totalMinutes: 0, occurrences: 0, name: emp.name }
     const warnings = Math.floor(data.occurrences / 3) // 3 lates = 1 warning
     return {
-      name: emp.fullName,
+      name: data.name,
       totalMinutes: data.totalMinutes,
       occurrences: data.occurrences,
       warnings: warnings
@@ -459,6 +479,47 @@ export default function AttendanceDashboard() {
 
   // State for all entries (Master Record)
   const [allEntries, setAllEntries] = useState<LateEntry[]>([])
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+
+  // Fetch employees and entries
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true)
+      try {
+        // Fetch employees
+        const empRes = await fetch('/api/admin-head/employees')
+        const empData = await empRes.json()
+        if (empData.success) {
+          setEmployees(empData.data)
+        }
+
+        // Fetch entries for current month/year
+        const entRes = await fetch(`/api/admin-head/attendance/tardiness?month=${selectedMonth}&year=${selectedYear}`)
+        const entData = await entRes.json()
+        if (entData.success) {
+          // Map backend fields to frontend interface
+          const mappedEntries = entData.data.map((e: any) => ({
+            ...e,
+            date: formatDate(e.date),
+            employeeName: e.employee_name,
+            cutoffPeriod: e.cutoff_period,
+            actualIn: e.actual_in,
+            minutesLate: e.minutes_late,
+            warningLevel: e.warning_level
+          }))
+          setAllEntries(mappedEntries)
+        }
+      } catch (error) {
+        console.error('Failed to fetch data:', error)
+        toast.error('Failed to load data from server')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [selectedMonth, selectedYear])
 
   // Derive cutoff data for the SELECTED month and year
   const filteredByPeriod = allEntries.filter(
@@ -480,11 +541,11 @@ export default function AttendanceDashboard() {
 
   // Filter entries based on search before pagination
   const filteredFirstEntries = firstCutoffEntries.filter(entry =>
-    entry.employeeName.toLowerCase().includes(searchQuery.toLowerCase())
+    entry.employee_name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   const filteredSecondEntries = secondCutoffEntries.filter(entry =>
-    entry.employeeName.toLowerCase().includes(searchQuery.toLowerCase())
+    entry.employee_name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   // Pagination states for each table (using filtered entries)
@@ -502,23 +563,18 @@ export default function AttendanceDashboard() {
 
 
   // Handler to update time - auto sets date to current date when time is entered
-  const updateFirstCutoffTime = (id: string, newTime: string) => {
+  const updateFirstCutoffTime = async (id: string | number, newTime: string) => {
+    // In a real app, this should send a PATCH/PUT request to the backend.
+    // For now, updating local state only, but adding warning calculations.
     setAllEntries(prev =>
       prev.map(entry => {
         if (entry.id === id) {
           const minutesLate = calculateMinutesFrom8AM(newTime)
-          const currentDate = new Date()
-          const dateStr = `${String(currentDate.getMonth() + 1).padStart(2, '0')}/${String(currentDate.getDate()).padStart(2, '0')}/${currentDate.getFullYear()}`
-
-          // Calculate warning level using the filtered entries context
-          const warningLevel = calculateWarningLevel(entry.employeeName, 1, filteredByPeriod)
-
           return {
             ...entry,
+            actual_in: newTime,
             actualIn: newTime,
             minutesLate,
-            date: dateStr,
-            warningLevel
           }
         }
         return entry
@@ -526,23 +582,16 @@ export default function AttendanceDashboard() {
     )
   }
 
-  const updateSecondCutoffTime = (id: string, newTime: string) => {
+  const updateSecondCutoffTime = async (id: string | number, newTime: string) => {
     setAllEntries(prev =>
       prev.map(entry => {
         if (entry.id === id) {
           const minutesLate = calculateMinutesFrom8AM(newTime)
-          const currentDate = new Date()
-          const dateStr = `${String(currentDate.getMonth() + 1).padStart(2, '0')}/${String(currentDate.getDate()).padStart(2, '0')}/${currentDate.getFullYear()}`
-
-          // Calculate warning level
-          const warningLevel = calculateWarningLevel(entry.employeeName, 2, filteredByPeriod)
-
           return {
             ...entry,
+            actual_in: newTime,
             actualIn: newTime,
             minutesLate,
-            date: dateStr,
-            warningLevel
           }
         }
         return entry
@@ -550,7 +599,6 @@ export default function AttendanceDashboard() {
     )
   }
 
-  // Handler to add new empty row
   const [addEntryModalOpen, setAddEntryModalOpen] = useState(false)
   const [newEntryEmployee, setNewEntryEmployee] = useState('')
   const [newEntryTime, setNewEntryTime] = useState('')
@@ -564,56 +612,83 @@ export default function AttendanceDashboard() {
 
 
   // Handler to save new entry from modal
-  const handleSaveNewEntry = () => {
+  const handleSaveNewEntry = async () => {
     if (!newEntryEmployee || !newEntryTime) {
-      alert('Please select an employee and enter the actual in time.')
+      toast.error('Please select an employee and enter the actual in time.')
       return
     }
 
-    const currentDate = new Date()
-    const currentYear = currentDate.getFullYear()
-    const currentMonthName = months[currentDate.getMonth()]
+    const selectedEmployee = employees.find(e => e.name === newEntryEmployee)
+    if (!selectedEmployee) return
 
-    // Validation: Check if selected year AND month match the current real-time period
-    if (selectedYear !== currentYear || selectedMonth !== currentMonthName) {
-      alert(`You can only add entries for the current active period (${currentMonthName} ${currentYear}). You cannot add entries to previous or future months/years.`)
-      return
-    }
-
-    const minutesLate = calculateMinutesFrom8AM(newEntryTime)
-    const dateStr = `${String(currentDate.getMonth() + 1).padStart(2, '0')}/${String(currentDate.getDate()).padStart(2, '0')}/${currentDate.getFullYear()}`
-
-    // Automatically determine cutoff based on current date
-    const dayOfMonth = currentDate.getDate()
+    // ALWAYS use today's date for new entries as requested
+    const dateObj = new Date()
+    const entryYear = dateObj.getFullYear()
+    const entryMonth = months[dateObj.getMonth()]
+    const dayOfMonth = dateObj.getDate()
+    const dateStr = `${entryYear}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dayOfMonth).padStart(2, '0')}`
+    
+    // Determine cutoff
     const autoCutoff: 'cutoff1' | 'cutoff2' = dayOfMonth <= 15 ? 'cutoff1' : 'cutoff2'
 
-    // Validation 2: Check if employee already has an entry for today
+    // Minutes calculation (parseTimeToMinutes now supports the 24h output from <input type="time">)
+    const minutesLate = calculateMinutesFrom8AM(newEntryTime)
+    
+    // Validation 2: Check if employee already has an entry for this date (Strict Prevention)
+    // Normalize dates for robust comparison
     const duplicateEntry = allEntries.find(
-      entry => entry.employeeName === newEntryEmployee && entry.date === dateStr
+      entry => entry.employee_id === selectedEmployee.id && formatDate(entry.date) === dateStr
     )
 
     if (duplicateEntry) {
-      alert(`${newEntryEmployee} already has a late entry recorded for today (${dateStr}). Each employee can only have one entry per day.`)
+      toast.error(`${newEntryEmployee} already has a late entry recorded for today (${dateStr}).`)
       return
     }
 
-    const newEntry: LateEntry = {
-      id: `new-${autoCutoff}-${Date.now()}`,
-      employeeName: newEntryEmployee,
-      date: dateStr,
-      actualIn: newEntryTime,
-      minutesLate: minutesLate,
-      warningLevel: 0,
-      cutoffPeriod: autoCutoff,
-      month: selectedMonth,
-      year: selectedYear
+    try {
+      const response = await fetch('/api/admin-head/attendance/tardiness', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employeeId: selectedEmployee.id,
+          employeeName: selectedEmployee.name,
+          date: dateStr,
+          actualIn: newEntryTime, // Save as 24h time in DB
+          minutesLate: minutesLate,
+          warningLevel: 0,
+          cutoffPeriod: autoCutoff,
+          month: entryMonth,
+          year: entryYear
+        })
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        toast.success('Entry saved successfully')
+        // Refresh entries with corrected mapping
+        const entRes = await fetch(`/api/admin-head/attendance/tardiness?month=${selectedMonth}&year=${selectedYear}`)
+        const entData = await entRes.json()
+        if (entData.success) {
+          setAllEntries(entData.data.map((e: any) => ({
+            ...e,
+            date: formatDate(e.date),
+            employeeName: e.employee_name,
+            cutoffPeriod: e.cutoff_period,
+            actualIn: e.actual_in,
+            minutesLate: e.minutes_late,
+            warningLevel: e.warning_level
+          })))
+        }
+        setAddEntryModalOpen(false)
+        setNewEntryEmployee('')
+        setNewEntryTime('')
+      } else {
+        toast.error(data.message || 'Failed to save entry')
+      }
+    } catch (error) {
+      console.error('Save error:', error)
+      toast.error('An error occurred while saving')
     }
-
-    setAllEntries(prev => [...prev, newEntry])
-
-    setAddEntryModalOpen(false)
-    setNewEntryEmployee('')
-    setNewEntryTime('')
   }
 
   // Summary button handler - opens summary sheet for specific cutoff
@@ -679,13 +754,8 @@ export default function AttendanceDashboard() {
 
                 <Button
                   onClick={openAddEntryModal}
-                  disabled={selectedYear !== new Date().getFullYear() || selectedMonth !== months[new Date().getMonth()]}
-                  className="bg-white/95 backdrop-blur-sm border-stone-200 text-red-900 hover:bg-white hover:border-red-200 shadow-sm hover:shadow-md transition-all duration-200 text-sm h-10 px-4 font-bold rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={
-                    (selectedYear !== new Date().getFullYear() || selectedMonth !== months[new Date().getMonth()])
-                      ? `Can only add entries for current period (${months[new Date().getMonth()]} ${new Date().getFullYear()})`
-                      : 'Add new late entry'
-                  }
+                  className="bg-white/95 backdrop-blur-sm border-stone-200 text-red-900 hover:bg-white hover:border-red-200 shadow-sm hover:shadow-md transition-all duration-200 text-sm h-10 px-4 font-bold rounded-lg border cursor-pointer"
+                  title="Add new late entry"
                 >
                   <Plus className="w-4 h-4 mr-1" /> Add Entry
                 </Button>
@@ -792,42 +862,51 @@ export default function AttendanceDashboard() {
 
           {/* ----- CUTOFF TABLES - WITH SUMMARY BUTTONS ----- */}
           <div className={`grid ${showCutoff === 'both' ? 'grid-cols-1 lg:grid-cols-2 gap-6' : 'grid-cols-1'} w-full`}>
-            {(showCutoff === 'first' || showCutoff === 'both') && (
-              <CutoffTable
-                title={`${selectedMonth} ${selectedYear} – 1-15`}
-                entries={firstPagination.paginatedItems}
-                onUpdateTime={updateFirstCutoffTime}
-                onSummaryClick={() => handleSummaryClick(
-                  `${selectedMonth} ${selectedYear} – 1-15`,
-                  firstCutoffEntries
+            {isLoading ? (
+              <div className="flex items-center justify-center p-12 col-span-full">
+                <Loader2 className="w-8 h-8 animate-spin text-red-600" />
+                <span className="ml-3 text-stone-500 font-medium">Loading attendance records...</span>
+              </div>
+            ) : (
+              <>
+                {(showCutoff === 'first' || showCutoff === 'both') && (
+                  <CutoffTable
+                    title={`${selectedMonth} ${selectedYear} – 1-15`}
+                    entries={firstPagination.paginatedItems}
+                    onUpdateTime={updateFirstCutoffTime}
+                    onSummaryClick={() => handleSummaryClick(
+                      `${selectedMonth} ${selectedYear} – 1-15`,
+                      firstCutoffEntries
+                    )}
+                    pagination={{
+                      currentPage: firstPagination.currentPage,
+                      totalPages: firstPagination.totalPages,
+                      setPage: firstPagination.setCurrentPage,
+                      hasNext: firstPagination.hasNext,
+                      hasPrev: firstPagination.hasPrev
+                    }}
+                  />
                 )}
-                pagination={{
-                  currentPage: firstPagination.currentPage,
-                  totalPages: firstPagination.totalPages,
-                  setPage: firstPagination.setCurrentPage,
-                  hasNext: firstPagination.hasNext,
-                  hasPrev: firstPagination.hasPrev
-                }}
-              />
-            )}
 
-            {(showCutoff === 'second' || showCutoff === 'both') && (
-              <CutoffTable
-                title={`${selectedMonth} ${selectedYear} – ${selectedMonth === 'February' ? '16-28/29' : '16-30/31'}`}
-                entries={secondPagination.paginatedItems}
-                onUpdateTime={updateSecondCutoffTime}
-                onSummaryClick={() => handleSummaryClick(
-                  `${selectedMonth} ${selectedYear} – ${selectedMonth === 'February' ? '16-28/29' : '16-30/31'}`,
-                  secondCutoffEntries
+                {(showCutoff === 'second' || showCutoff === 'both') && (
+                  <CutoffTable
+                    title={`${selectedMonth} ${selectedYear} – ${selectedMonth === 'February' ? '16-28/29' : '16-30/31'}`}
+                    entries={secondPagination.paginatedItems}
+                    onUpdateTime={updateSecondCutoffTime}
+                    onSummaryClick={() => handleSummaryClick(
+                      `${selectedMonth} ${selectedYear} – ${selectedMonth === 'February' ? '16-28/29' : '16-30/31'}`,
+                      secondCutoffEntries
+                    )}
+                    pagination={{
+                      currentPage: secondPagination.currentPage,
+                      totalPages: secondPagination.totalPages,
+                      setPage: secondPagination.setCurrentPage,
+                      hasNext: secondPagination.hasNext,
+                      hasPrev: secondPagination.hasPrev
+                    }}
+                  />
                 )}
-                pagination={{
-                  currentPage: secondPagination.currentPage,
-                  totalPages: secondPagination.totalPages,
-                  setPage: secondPagination.setCurrentPage,
-                  hasNext: secondPagination.hasNext,
-                  hasPrev: secondPagination.hasPrev
-                }}
-              />
+              </>
             )}
           </div>
 
@@ -894,6 +973,7 @@ export default function AttendanceDashboard() {
           entries={activeCutoffSummary.entries}
           selectedYear={selectedYear}
           selectedMonth={selectedMonth}
+          employees={employees}
         />
       )}
 
@@ -903,11 +983,7 @@ export default function AttendanceDashboard() {
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold text-stone-900">Add Late Entry</DialogTitle>
             <DialogDescription className="text-stone-500">
-              Record a new tardiness entry for {selectedMonth} {selectedYear}
-              <br />
-              <span className="text-xs text-stone-400 mt-1 inline-block">
-                Cutoff period will be automatically determined based on today&apos;s date
-              </span>
+              Record a new tardiness entry for today ({new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}).
             </DialogDescription>
           </DialogHeader>
 
@@ -920,6 +996,7 @@ export default function AttendanceDashboard() {
               <EmployeeSelector
                 value={newEntryEmployee}
                 onChange={setNewEntryEmployee}
+                employees={employees}
               />
             </div>
 
@@ -929,16 +1006,14 @@ export default function AttendanceDashboard() {
                 <Label htmlFor="time" className="text-sm font-semibold text-stone-700">
                   Actual In Time
                 </Label>
-                <span className="text-[10px] uppercase font-bold text-stone-400">Format: HH:MM AM/PM</span>
               </div>
               <Input
                 id="time"
-                placeholder="08:15 AM"
+                type="time"
                 value={newEntryTime}
-                onChange={(e) => setNewEntryTime(e.target.value.toUpperCase())}
-                className="bg-white border-stone-200 text-stone-900 placeholder:text-stone-400 focus-visible:ring-red-500 font-mono"
+                onChange={(e) => setNewEntryTime(e.target.value)}
+                className="bg-white border-stone-200 text-stone-900 focus-visible:ring-red-500"
               />
-              <p className="text-[11px] text-stone-500 italic">Example: 08:30 AM or 01:45 PM</p>
             </div>
           </div>
 
@@ -987,7 +1062,7 @@ function CutoffTable({
 }: {
   title: string
   entries: LateEntry[]
-  onUpdateTime: (id: string, newTime: string) => void
+  onUpdateTime: (id: string | number, newTime: string) => void
   onSummaryClick: () => void
   pagination: {
     currentPage: number
@@ -1045,7 +1120,7 @@ function CutoffTable({
                   </td>
                   <td className="px-3 py-2">
                     <Input
-                      value={entry.actualIn}
+                      value={entry.actual_in || entry.actualIn || ''}
                       onChange={(e) => onUpdateTime(entry.id, e.target.value.toUpperCase())}
                       placeholder="8:00 AM"
                       className="bg-white border-stone-200 text-stone-900 placeholder:text-stone-400 h-7 md:h-8 text-xs md:text-sm w-24 md:w-28 font-mono focus-visible:ring-red-500 uppercase"
