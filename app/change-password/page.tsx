@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react'
+import LoadingModal from '@/components/ui/LoadingModal'
+import SuccessModal from '@/components/ui/SuccessModal'
+import FailModal from '@/components/ui/FailModal'
+import { AlertCircle, CheckCircle2, Eye, EyeOff, Lock, Moon, Sun } from 'lucide-react'
 
 export default function ChangePasswordPage() {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -18,6 +21,11 @@ export default function ChangePasswordPage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
+  const [showLoadingModal, setShowLoadingModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showFailModal, setShowFailModal] = useState(false);
+  const [failModalMessage, setFailModalMessage] = useState('');
   const [passwordValidation, setPasswordValidation] = useState({
     minLength: false,
     hasUppercase: false,
@@ -68,16 +76,23 @@ export default function ChangePasswordPage() {
     setError("");
     setSuccess("");
     setFieldErrors({});
+    
+    // Show loading modal
+    setShowLoadingModal(true);
 
     // Client-side validation
     if (newPassword !== confirmPassword) {
-      setError("New passwords do not match");
+      setShowLoadingModal(false);
+      setFailModalMessage("New passwords do not match");
+      setShowFailModal(true);
       setLoading(false);
       return;
     }
 
     if (!isPasswordValid) {
-      setError("Password does not meet all requirements");
+      setShowLoadingModal(false);
+      setFailModalMessage("Password does not meet all requirements");
+      setShowFailModal(true);
       setLoading(false);
       return;
     }
@@ -94,18 +109,23 @@ export default function ChangePasswordPage() {
       });
 
       const data = await res.json();
+      setShowLoadingModal(false);
 
       if (res.ok && data.success) {
-        setSuccess("Password changed successfully! Redirecting to login...");
+        setShowSuccessModal(true);
         setTimeout(() => {
+          setShowSuccessModal(false);
           router.push("/login");
         }, 2000);
       } else {
-        setError(data.message || "Failed to change password");
+        setFailModalMessage(data.message || "Failed to change password");
+        setShowFailModal(true);
         setFieldErrors(data.errors || {});
       }
     } catch (err) {
-      setError("Network error. Please try again.");
+      setShowLoadingModal(false);
+      setFailModalMessage("Network error. Please try again.");
+      setShowFailModal(true);
     } finally {
       setLoading(false);
     }
@@ -116,281 +136,414 @@ export default function ChangePasswordPage() {
     return errors && errors.length > 0 ? errors[0] : ''
   }
 
+  const handleCloseSuccessModal = () => {
+    setShowSuccessModal(false)
+  }
+
+  const handleCloseFailModal = () => {
+    setShowFailModal(false)
+  }
+
   return (
     <div 
-      className="min-h-screen bg-gray-50 flex items-center justify-center relative"
+      className={`min-h-screen flex transition-all duration-500 ease-in-out ${darkMode ? 'dark' : ''}`}
       style={{
-        backgroundImage: 'url(/images/background/abic-background.png)',
+        backgroundImage: `url(/images/background/${darkMode ? 'changep_dark.png' : 'changep_light.png'})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat'
+        backgroundRepeat: 'no-repeat',
+        transition: 'background-image 0.5s ease-in-out'
       }}
     >
-      {/* Overlay for better readability */}
-      <div className="absolute inset-0 bg-white/80 backdrop-blur-sm"></div>
-      
-      <div className="relative z-10 w-full max-w-md">
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-8">
-          {/* Logo and Header */}
-          <div className="text-center mb-8">
-            <div className="flex justify-center mb-6">
-              <img 
-                src="/images/logo/abic-logo-black.png" 
-                alt="ABIC Logo" 
-                className="w-32 h-8 object-contain"
-              />
+      {/* Dark Mode Toggle */}
+      <div className="absolute top-4 right-4 sm:top-6 sm:right-6 lg:top-12 lg:right-16 z-20">
+        <button
+          onClick={() => setDarkMode(!darkMode)}
+          className={`p-2 sm:p-3 rounded-full transition-all duration-300 ease-in-out transform hover:scale-105 ${
+            darkMode 
+              ? 'bg-white/20 backdrop-blur-sm text-white hover:bg-white/30' 
+              : 'bg-white/80 backdrop-blur-sm text-gray-700 hover:bg-white/90'
+          }`}
+          aria-label="Toggle dark mode"
+        >
+          <div className="transition-all duration-300 ease-in-out">
+            {darkMode ? (
+              <Sun className="h-4 w-4 sm:h-5 sm:w-5" />
+            ) : (
+              <Moon className="h-4 w-4 sm:h-5 sm:w-5" />
+            )}
+          </div>
+        </button>
+      </div>
+
+      {/* Left Side - Empty (background shows through) */}
+      <div className="hidden lg:flex lg:flex-1 relative">
+        {/* Logo - Left Side */}
+        <div className="absolute top-12 left-16">
+          <div className="transition-opacity duration-300 ease-in-out">
+            <img 
+              src={darkMode ? "/images/logo/abic-logo.png" : "/images/logo/abic-logo-black.png"} 
+              alt="ABIC Logo" 
+              className="w-48 h-12 object-contain"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Right Side - Form */}
+      <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-16 relative py-8">
+        {/* Logo - Top Left (Mobile Only) */}
+        <div className="absolute top-4 left-4 sm:top-6 sm:left-6 lg:hidden">
+          <div className="transition-opacity duration-300 ease-in-out">
+            <img 
+              src={darkMode ? "/images/logo/abic-logo.png" : "/images/logo/abic-logo-black.png"} 
+              alt="ABIC Logo" 
+              className="w-32 sm:w-40 h-8 sm:h-10 object-contain"
+            />
+          </div>
+        </div>
+        
+        <div className="w-full max-w-sm sm:max-w-md">
+          {/* Change Password Form Card */}
+          <div className={`rounded-xl shadow-lg border p-4 sm:p-6 lg:p-8 transition-colors duration-300 ${
+            darkMode 
+              ? 'bg-gray-900/90 backdrop-blur-sm border-gray-700' 
+              : 'bg-white border-gray-200'
+          }`}>
+            {/* Header */}
+            <div className="mb-6 sm:mb-8 flex justify-center">
+              <div className="text-center">
+                <h1 className={`text-xl sm:text-2xl font-bold mb-2 transition-colors duration-300 ${
+                  darkMode ? 'text-white' : 'text-gray-900'
+                }`}>
+                  Change Password
+                </h1>
+                <p className={`text-xs sm:text-sm transition-colors duration-300 ${
+                  darkMode ? 'text-gray-300' : 'text-gray-600'
+                }`}>
+                  Set your permanent password for security
+                </p>
+              </div>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Change Password
-            </h1>
-            <p className="text-gray-600 text-sm">
-              Set your permanent password for security
-            </p>
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <div className={`p-3 border rounded-lg ${
+                  darkMode 
+                    ? 'bg-red-900/50 border-red-700 text-red-200' 
+                    : 'bg-red-50 border-red-200'
+                }`}>
+                  <p className="text-sm">{error}</p>
+                </div>
+              )}
+              
+              {success && (
+                <div className={`p-3 border rounded-lg ${
+                  darkMode 
+                    ? 'bg-green-900/50 border-green-700 text-green-200' 
+                    : 'bg-green-50 border-green-200'
+                }`}>
+                  <p className="text-sm">{success}</p>
+                </div>
+              )}
+
+              {/* Current Password Input */}
+              <div>
+                <label htmlFor="current_password" className={`block text-sm font-medium mb-1 transition-colors duration-300 ${
+                  darkMode ? 'text-gray-200' : 'text-gray-700'
+                }`}>
+                  Current Password
+                </label>
+                <div className="relative">
+                  <div className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors duration-300 ${
+                    darkMode ? 'text-gray-400' : 'text-gray-400'
+                  }`}>
+                    <Lock className="h-4 w-4" />
+                  </div>
+                  <Input
+                    id="current_password"
+                    type={showCurrentPassword ? 'text' : 'password'}
+                    placeholder="Enter your current password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    required
+                    disabled={loading}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck="false"
+                    className={`h-10 pl-10 pr-10 rounded-lg transition-colors duration-300 disabled:opacity-50 ${
+                      darkMode 
+                        ? 'bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 focus:border-[#7B0F2B] focus:ring-[#7B0F2B]/20' 
+                        : 'border-gray-300 text-gray-900 placeholder-gray-400 focus:border-[#7B0F2B] focus:ring-[#7B0F2B]/20'
+                    } ${
+                      getFieldError('current_password') 
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                        : ''
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                    className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors duration-300 ${
+                      darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'
+                    }`}
+                    disabled={loading}
+                  >
+                    {showCurrentPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+                {getFieldError('current_password') && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {getFieldError('current_password')}
+                  </p>
+                )}
+              </div>
+
+              {/* New Password Input */}
+              <div>
+                <label htmlFor="new_password" className={`block text-sm font-medium mb-1 transition-colors duration-300 ${
+                  darkMode ? 'text-gray-200' : 'text-gray-700'
+                }`}>
+                  New Password
+                </label>
+                <div className="relative">
+                  <div className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors duration-300 ${
+                    darkMode ? 'text-gray-400' : 'text-gray-400'
+                  }`}>
+                    <Lock className="h-4 w-4" />
+                  </div>
+                  <Input
+                    id="new_password"
+                    type={showNewPassword ? 'text' : 'password'}
+                    placeholder="Enter your new password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    minLength={8}
+                    disabled={loading}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck="false"
+                    className={`h-10 pl-10 pr-10 rounded-lg transition-colors duration-300 disabled:opacity-50 ${
+                      darkMode 
+                        ? 'bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 focus:border-[#7B0F2B] focus:ring-[#7B0F2B]/20' 
+                        : 'border-gray-300 text-gray-900 placeholder-gray-400 focus:border-[#7B0F2B] focus:ring-[#7B0F2B]/20'
+                    } ${
+                      getFieldError('new_password') 
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                        : ''
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors duration-300 ${
+                      darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'
+                    }`}
+                    disabled={loading}
+                  >
+                    {showNewPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+                {getFieldError('new_password') && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {getFieldError('new_password')}
+                  </p>
+                )}
+
+                {/* Password Validation Indicators */}
+                {newPassword && (
+                  <div className={`mt-3 p-3 rounded-lg border transition-colors duration-300 ${
+                    darkMode 
+                      ? 'bg-gray-800/50 border-gray-600' 
+                      : 'bg-gray-50 border-gray-200'
+                  }`}>
+                    <p className={`text-xs font-medium mb-2 transition-colors duration-300 ${
+                      darkMode ? 'text-gray-200' : 'text-gray-700'
+                    }`}>
+                      Password must contain:
+                    </p>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 text-xs">
+                        {passwordValidation.minLength ? (
+                          <CheckCircle2 className="h-3 w-3 text-green-500" />
+                        ) : (
+                          <div className="h-3 w-3 rounded-full border border-gray-300" />
+                        )}
+                        <span className={passwordValidation.minLength ? "text-green-600" : darkMode ? "text-gray-400" : "text-gray-500"}>
+                          At least 8 characters
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        {passwordValidation.hasUppercase ? (
+                          <CheckCircle2 className="h-3 w-3 text-green-500" />
+                        ) : (
+                          <div className="h-3 w-3 rounded-full border border-gray-300" />
+                        )}
+                        <span className={passwordValidation.hasUppercase ? "text-green-600" : darkMode ? "text-gray-400" : "text-gray-500"}>
+                          One uppercase letter (A-Z)
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        {passwordValidation.hasLowercase ? (
+                          <CheckCircle2 className="h-3 w-3 text-green-500" />
+                        ) : (
+                          <div className="h-3 w-3 rounded-full border border-gray-300" />
+                        )}
+                        <span className={passwordValidation.hasLowercase ? "text-green-600" : darkMode ? "text-gray-400" : "text-gray-500"}>
+                          One lowercase letter (a-z)
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        {passwordValidation.hasNumber ? (
+                          <CheckCircle2 className="h-3 w-3 text-green-500" />
+                        ) : (
+                          <div className="h-3 w-3 rounded-full border border-gray-300" />
+                        )}
+                        <span className={passwordValidation.hasNumber ? "text-green-600" : darkMode ? "text-gray-400" : "text-gray-500"}>
+                          One number (0-9)
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        {passwordValidation.hasSymbol ? (
+                          <CheckCircle2 className="h-3 w-3 text-green-500" />
+                        ) : (
+                          <div className="h-3 w-3 rounded-full border border-gray-300" />
+                        )}
+                        <span className={passwordValidation.hasSymbol ? "text-green-600" : darkMode ? "text-gray-400" : "text-gray-500"}>
+                          One symbol (!@#$%^&* etc.)
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Confirm New Password Input */}
+              <div>
+                <label htmlFor="new_password_confirmation" className={`block text-sm font-medium mb-1 transition-colors duration-300 ${
+                  darkMode ? 'text-gray-200' : 'text-gray-700'
+                }`}>
+                  Confirm New Password
+                </label>
+                <div className="relative">
+                  <div className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors duration-300 ${
+                    darkMode ? 'text-gray-400' : 'text-gray-400'
+                  }`}>
+                    <Lock className="h-4 w-4" />
+                  </div>
+                  <Input
+                    id="new_password_confirmation"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    placeholder="Confirm your new password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    minLength={8}
+                    disabled={loading}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck="false"
+                    className={`h-10 pl-10 pr-10 rounded-lg transition-colors duration-300 disabled:opacity-50 ${
+                      darkMode 
+                        ? 'bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 focus:border-[#7B0F2B] focus:ring-[#7B0F2B]/20' 
+                        : 'border-gray-300 text-gray-900 placeholder-gray-400 focus:border-[#7B0F2B] focus:ring-[#7B0F2B]/20'
+                    } ${
+                      getFieldError('new_password_confirmation') 
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                        : ''
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors duration-300 ${
+                      darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'
+                    }`}
+                    disabled={loading}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+                {getFieldError('new_password_confirmation') && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {getFieldError('new_password_confirmation')}
+                  </p>
+                )}
+              </div>
+
+              {/* Change Password Button */}
+              <Button
+                type="submit"
+                disabled={loading || !currentPassword.trim() || !newPassword.trim() || !confirmPassword.trim() || !isPasswordValid}
+                className={`w-full h-10 font-medium rounded-lg transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed ${
+                  darkMode 
+                    ? 'bg-[#7B0F2B] hover:bg-[#5E0C20] text-white' 
+                    : 'bg-[#7B0F2B] hover:bg-[#5E0C20] text-white'
+                }`}
+                tabIndex={0}
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center">
+                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-r-transparent mr-2"></span>
+                    Changing Password...
+                  </span>
+                ) : (
+                  'Change Password'
+                )}
+              </Button>
+            </form>
           </div>
 
-          {/* Success Message */}
-          {success && (
-            <Alert className="bg-green-50 border-green-200 text-green-700 rounded-lg mb-6">
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-              <AlertDescription className="ml-2 text-sm">{success}</AlertDescription>
-            </Alert>
-          )}
-
-          {/* Error Message */}
-          {error && (
-            <Alert variant="destructive" className="bg-red-50 border-red-200 text-red-700 rounded-lg mb-6">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="ml-2 text-sm">{error}</AlertDescription>
-            </Alert>
-          )}
-
-          {/* Field Errors */}
-          {Object.keys(fieldErrors).length > 0 && (
-            <Alert variant="destructive" className="bg-red-50 border-red-200 text-red-700 rounded-lg mb-6">
-              <AlertCircle className="h-4 w-4" />
-              <div className="ml-2 text-sm">
-                {Object.entries(fieldErrors).map(([field, errors]) => (
-                  <div key={field} className="mb-1">
-                    <strong className="capitalize">{field.replace('_', '')}:</strong>
-                    <ul className="ml-4 mt-1">
-                      {errors.map((error, index) => (
-                        <li key={index} className="text-xs">• {error}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            </Alert>
-          )}
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Current Password Input */}
-            <div className="space-y-2">
-              <label htmlFor="current_password" className="block text-sm font-medium text-gray-700">
-                Current Password
-              </label>
-              <div className="relative">
-                <Input
-                  id="current_password"
-                  type={showCurrentPassword ? 'text' : 'password'}
-                  placeholder="Enter your current password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  required
-                  disabled={loading}
-                  className={`h-10 text-sm bg-white border text-gray-900 placeholder-gray-400 transition-colors duration-200 focus:border-[#7B0F2B] focus:ring-1 focus:ring-[#7B0F2B]/20 disabled:opacity-50 pr-10 rounded-md ${
-                    getFieldError('current_password') 
-                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
-                      : 'border-gray-300'
-                  }`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-200"
-                  disabled={loading}
-                >
-                  {showCurrentPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </button>
-              </div>
-              {getFieldError('current_password') && (
-                <div className="text-red-500 text-xs mt-1">
-                  {getFieldError('current_password')}
-                </div>
-              )}
-            </div>
-
-            {/* New Password Input */}
-            <div className="space-y-2">
-              <label htmlFor="new_password" className="block text-sm font-medium text-gray-700">
-                New Password
-              </label>
-              <div className="relative">
-                <Input
-                  id="new_password"
-                  type={showNewPassword ? 'text' : 'password'}
-                  placeholder="Enter your new password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                  minLength={8}
-                  disabled={loading}
-                  className={`h-10 text-sm bg-white border text-gray-900 placeholder-gray-400 transition-colors duration-200 focus:border-[#7B0F2B] focus:ring-1 focus:ring-[#7B0F2B]/20 disabled:opacity-50 pr-10 rounded-md ${
-                    getFieldError('new_password') 
-                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
-                      : 'border-gray-300'
-                  }`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowNewPassword(!showNewPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-200"
-                  disabled={loading}
-                >
-                  {showNewPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </button>
-              </div>
-              {getFieldError('new_password') && (
-                <div className="text-red-500 text-xs mt-1">
-                  {getFieldError('new_password')}
-                </div>
-              )}
-
-              {/* Password Validation Indicators */}
-              {newPassword && (
-                <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-xs font-medium text-gray-700 mb-2">Password must contain:</p>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-xs">
-                      {passwordValidation.minLength ? (
-                        <CheckCircle2 className="h-3 w-3 text-green-500" />
-                      ) : (
-                        <div className="h-3 w-3 rounded-full border border-gray-300" />
-                      )}
-                      <span className={passwordValidation.minLength ? "text-green-600" : "text-gray-500"}>
-                        At least 8 characters
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      {passwordValidation.hasUppercase ? (
-                        <CheckCircle2 className="h-3 w-3 text-green-500" />
-                      ) : (
-                        <div className="h-3 w-3 rounded-full border border-gray-300" />
-                      )}
-                      <span className={passwordValidation.hasUppercase ? "text-green-600" : "text-gray-500"}>
-                        One uppercase letter (A-Z)
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      {passwordValidation.hasLowercase ? (
-                        <CheckCircle2 className="h-3 w-3 text-green-500" />
-                      ) : (
-                        <div className="h-3 w-3 rounded-full border border-gray-300" />
-                      )}
-                      <span className={passwordValidation.hasLowercase ? "text-green-600" : "text-gray-500"}>
-                        One lowercase letter (a-z)
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      {passwordValidation.hasNumber ? (
-                        <CheckCircle2 className="h-3 w-3 text-green-500" />
-                      ) : (
-                        <div className="h-3 w-3 rounded-full border border-gray-300" />
-                      )}
-                      <span className={passwordValidation.hasNumber ? "text-green-600" : "text-gray-500"}>
-                        One number (0-9)
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      {passwordValidation.hasSymbol ? (
-                        <CheckCircle2 className="h-3 w-3 text-green-500" />
-                      ) : (
-                        <div className="h-3 w-3 rounded-full border border-gray-300" />
-                      )}
-                      <span className={passwordValidation.hasSymbol ? "text-green-600" : "text-gray-500"}>
-                        One symbol (!@#$%^&* etc.)
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Confirm New Password Input */}
-            <div className="space-y-2">
-              <label htmlFor="new_password_confirmation" className="block text-sm font-medium text-gray-700">
-                Confirm New Password
-              </label>
-              <div className="relative">
-                <Input
-                  id="new_password_confirmation"
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  placeholder="Confirm your new password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  minLength={8}
-                  disabled={loading}
-                  className={`h-10 text-sm bg-white border text-gray-900 placeholder-gray-400 transition-colors duration-200 focus:border-[#7B0F2B] focus:ring-1 focus:ring-[#7B0F2B]/20 disabled:opacity-50 pr-10 rounded-md ${
-                    getFieldError('new_password_confirmation') 
-                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
-                      : 'border-gray-300'
-                  }`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-200"
-                  disabled={loading}
-                >
-                  {showConfirmPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </button>
-              </div>
-              {getFieldError('new_password_confirmation') && (
-                <div className="text-red-500 text-xs mt-1">
-                  {getFieldError('new_password_confirmation')}
-                </div>
-              )}
-            </div>
-
-            {/* Change Password Button */}
-            <Button
-              type="submit"
-              disabled={loading || !currentPassword.trim() || !newPassword.trim() || !confirmPassword.trim() || !isPasswordValid}
-              className="w-full h-10 text-sm font-medium bg-[#7B0F2B] hover:bg-[#5E0C20] transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md"
-            >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-r-transparent"></span>
-                  Changing Password...
-                </span>
-              ) : (
-                'Change Password'
-              )}
-            </Button>
-          </form>
-
           {/* Footer */}
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-xs text-gray-500 text-center">
-              Password must be at least 8 characters long.
+          <div className="mt-6 text-center">
+            <p className={`text-xs transition-colors duration-300 ${
+              darkMode ? 'text-white/60' : 'text-white/80'
+            }`}>
+              2026 ABIC Realty & Consultancy Corporation
             </p>
           </div>
         </div>
       </div>
+
+      {/* Modals */}
+      <LoadingModal
+        isOpen={showLoadingModal}
+        title="Changing Password"
+        message="Please wait while we update your password..."
+      />
+
+      <SuccessModal
+        isOpen={showSuccessModal}
+        onClose={handleCloseSuccessModal}
+        title="Password Changed"
+        message="Your password has been successfully updated! Redirecting to login..."
+        buttonText="Continue"
+      />
+
+      <FailModal
+        isOpen={showFailModal}
+        onClose={handleCloseFailModal}
+        title="Password Change Failed"
+        message={failModalMessage}
+        buttonText="Try Again"
+      />
     </div>
   );
 }

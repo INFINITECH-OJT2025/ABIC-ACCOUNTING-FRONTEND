@@ -156,6 +156,7 @@ export default function ManagementPage() {
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [showLoadingModal, setShowLoadingModal] = useState(false);
+  const [loadingActionType, setLoadingActionType] = useState<'create' | 'update' | 'suspend' | 'edit'>('create');
 
   // Form state
   const [form, setForm] = useState({
@@ -258,6 +259,7 @@ export default function ManagementPage() {
 
     setIsCreating(true);
     setShowLoadingModal(true);
+    setLoadingActionType('create');
     setFormErrors({});
 
     try {
@@ -358,6 +360,7 @@ export default function ManagementPage() {
 
     setIsSuspending(true);
     setShowLoadingModal(true);
+    setLoadingActionType('suspend');
 
     try {
       const newStatus = editing.status === "Suspended" ? "Active" : "Suspended";
@@ -397,10 +400,10 @@ export default function ManagementPage() {
 
         // Update editing state
         setEditing((prev) => 
-          prev ? { ...prev, status: newStatus } : null
+          prev ? { ...prev, status: newStatus } : null  
         );
 
-        // Show success modal
+        // Show success modal   
         setShowSuspendSuccess(true);
         setEditing(null);
       } else {
@@ -421,6 +424,7 @@ export default function ManagementPage() {
 
     setIsEditing(true);
     setShowLoadingModal(true);
+    setLoadingActionType('edit');
 
     try {
       // Simulate API call delay
@@ -546,6 +550,33 @@ export default function ManagementPage() {
     const hasNoErrors = !formErrors.name && !formErrors.email;
     return hasName && hasValidEmail && hasNoErrors && !isCheckingEmail;
   }, [form.name, form.email, formErrors, emailExists, isCheckingEmail]);
+
+  const getLoadingModalContent = () => {
+    switch (loadingActionType) {
+      case 'create':
+        return {
+          title: 'Creating Admin Account',
+          message: 'Please wait while we create the new admin account...'
+        };
+      case 'edit':
+        return {
+          title: 'Updating Admin Account',
+          message: 'Please wait while we update the admin account details...'
+        };
+      case 'suspend':
+        return {
+          title: 'Updating Admin Status',
+          message: 'Please wait while we update the admin account status...'
+        };
+      default:
+        return {
+          title: 'Processing',
+          message: 'Please wait...'
+        };
+    }
+  };
+
+  const loadingContent = getLoadingModalContent();
 
   return (
     <div className="bg-white min-h-screen">
@@ -1335,8 +1366,8 @@ export default function ManagementPage() {
       {showLoadingModal && (
         <LoadingModal
           isOpen={showLoadingModal}
-          title="Updating Admin Account"
-          message="Please wait while we update the admin account details..."
+          title={loadingContent.title}
+          message={loadingContent.message}
         />
       )}
     </div>

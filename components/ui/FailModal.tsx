@@ -2,7 +2,7 @@
 
 import React from "react";
 
-interface SuccessModalProps {
+interface FailModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
@@ -11,14 +11,14 @@ interface SuccessModalProps {
   darkMode?: boolean;
 }
 
-export default function SuccessModal({ 
+export default function FailModal({ 
   isOpen, 
   onClose, 
   title, 
   message, 
-  buttonText = "OK",
+  buttonText = "Try Again",
   darkMode = false
-}: SuccessModalProps) {
+}: FailModalProps) {
   if (!isOpen) return null;
 
   const BORDER = darkMode ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)";
@@ -31,15 +31,11 @@ export default function SuccessModal({
         style={{ background: darkMode ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.45)" }}
       >
         <div className="relative">
-          {/* Checkmark Circle - positioned above the card */}
+          {/* X Circle - positioned above the card */}
           <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 z-10">
-            <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
+            <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center shadow-lg">
               <svg 
                 className="w-8 h-8 text-white"
-                style={{ 
-                  animation: "checkmark 0.5s ease-in-out",
-                  animationFillMode: "both"
-                }}
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -47,7 +43,8 @@ export default function SuccessModal({
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
-                <polyline points="20,6 9,17 4,12"></polyline>
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
               </svg>
             </div>
           </div>
@@ -62,7 +59,7 @@ export default function SuccessModal({
           >
             <div className="flex flex-col items-center">
               <div className={`text-lg font-bold text-center transition-colors duration-300 ${
-                darkMode ? 'text-green-400' : 'text-[#5f0c18]'
+                darkMode ? 'text-red-400' : 'text-red-600'
               }`}>{title}</div>
               <div className={`mt-2 text-sm text-center transition-colors duration-300 ${
                 darkMode ? 'text-gray-300' : 'text-neutral-800'
@@ -71,10 +68,10 @@ export default function SuccessModal({
               <button
                 onClick={onClose}
                 className={`mt-6 rounded-md px-6 py-2 text-sm font-semibold hover:opacity-95 transition-colors duration-300 ${
-                  darkMode ? 'bg-green-600 hover:bg-green-700' : ''
+                  darkMode ? 'bg-red-600 hover:bg-red-700' : ''
                 }`}
                 style={{ 
-                  background: darkMode ? undefined : "#7a0f1f", 
+                  background: darkMode ? undefined : "#dc2626", 
                   height: 40,
                   color: 'white'
                 }}
@@ -87,26 +84,17 @@ export default function SuccessModal({
       </div>
 
       <style jsx>{`
-        @keyframes checkmark {
+        @keyframes xmark {
           0% {
-            transform: scale(0);
+            transform: scale(0) rotate(45deg);
             opacity: 0;
           }
           50% {
-            transform: scale(1.2);
+            transform: scale(1.2) rotate(45deg);
           }
           100% {
-            transform: scale(1);
+            transform: scale(1) rotate(45deg);
             opacity: 1;
-          }
-        }
-
-        @keyframes checkPath {
-          0% {
-            stroke-dashoffset: 100;
-          }
-          100% {
-            stroke-dashoffset: 0;
           }
         }
       `}</style>
