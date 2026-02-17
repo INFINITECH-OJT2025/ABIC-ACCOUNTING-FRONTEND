@@ -105,20 +105,10 @@ export default function LoginPage() {
       })
 
       const responseText = await res.text()
-      console.log('Raw response text:', responseText)
       const data: LoginResponse = JSON.parse(responseText)
 
       // Hide loading modal
       setShowLoadingModal(false)
-
-      // Debug logging
-      console.log('=== LOGIN RESPONSE DEBUG ===')
-      console.log('Response status:', res.status)
-      console.log('Response ok:', res.ok)
-      console.log('Response headers:', res.headers)
-      console.log('Full response:', data)
-      console.log('Response success:', data.success)
-      console.log('Response data.user:', data.data?.user)
 
       if (res.ok && data.success) {
         // Store user data for navigation
@@ -162,41 +152,24 @@ export default function LoginPage() {
           buttonText: 'Continue'
         })
         setShowSuccessModal(true)
-        
-        console.log('=== FRONTEND ROUTING DEBUG ===')
-        console.log('Raw data.data:', data.data)
-        console.log('Raw data.data?.user:', data.data?.user)
-        console.log('Type of data.data?.user?.role:', typeof data.data?.user?.role)
-        console.log('Value of data.data?.user?.role:', data.data?.user?.role)
-        
+
         const userRole = data.data?.user?.role
-        
-        console.log('Final userRole variable:', userRole)
-        console.log('Type of userRole:', typeof userRole)
-        console.log('String comparison - userRole === "super_admin":', userRole === 'super_admin')
-        console.log('String comparison - userRole === "super_admin" (strict):', userRole === 'super_admin')
-        
+
         // Redirect after showing success modal
         setTimeout(() => {
           setShowSuccessModal(false)
-          
-          // Immediate routing without nested timeouts
+
           if (userRole === 'super_admin') {
-              console.log('✅ Frontend routing: super_admin → /super')
-              router.push('/super')
-            } else if (userRole === 'admin_head') {
-              console.log('✅ Frontend routing: admin_head → /admin')
-              router.push('/admin')
-            } else if (userRole === 'accountant_head' || userRole === 'accountant') {
-              console.log('✅ Frontend routing: accountant → /admin/accountant')
-              router.push('/admin/accountant')
-            } else if (userRole === 'employee') {
-              console.log('✅ Frontend routing: employee → /employee')
-              router.push('/employee')
-            } else {
-              console.log('✅ Frontend routing: default → /dashboard for role:', userRole)
-              router.push('/dashboard')
-            }
+            router.push('/super')
+          } else if (userRole === 'admin' || userRole === 'admin_head') {
+            router.push('/admin')
+          } else if (userRole === 'accountant_head' || userRole === 'accountant') {
+            router.push('/admin/accountant')
+          } else if (userRole === 'employee') {
+            router.push('/employee')
+          } else {
+            router.push('/dashboard')
+          }
         }, 1500)
       } else {
         // Check if it's an authentication error (wrong credentials)
@@ -237,11 +210,11 @@ export default function LoginPage() {
         // Normal login - redirect to appropriate dashboard based on role
         const userRole = userData?.user?.role
         if (userRole === 'super_admin') {
-          router.push("/super/")
+          router.push("/super")
         } else if (userRole === 'admin' || userRole === 'admin_head') {
-          router.push("/admin/dashboard") 
+          router.push("/admin")
         } else if (userRole === 'accountant' || userRole === 'accountant_head') {
-          router.push("/accountant/dashboard")
+          router.push("/admin/accountant")
         } else if (userRole === 'employee') {
           router.push("/employee")
         } else {

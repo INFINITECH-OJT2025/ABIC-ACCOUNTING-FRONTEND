@@ -2,10 +2,7 @@
 
 import React, { useMemo, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { Search, Grid, List, X, Eye } from "lucide-react";
-import SuperAdminHeader from "@/components/layout/SuperAdminHeader";
-import Sidebar from "@/components/layout/Sidebar";
-import { managementSidebarItems } from "@/components/layout/ManagementSidebar";
+import { Search, Grid, List, X, Eye, Inbox, ArrowUp, ArrowDown } from "lucide-react";
 import SuccessModal from "@/components/ui/SuccessModal";
 import LoadingModal from "@/components/ui/LoadingModal";
 import FailModal from "@/components/ui/FailModal";
@@ -99,8 +96,6 @@ const Icons = {
 };
 
 export default function ManagementPage() {
-  // Auth states
-  const [user, setUser] = useState<any>(null);
   const [error, setError] = useState("");
 
   // Admin management states
@@ -110,7 +105,8 @@ export default function ManagementPage() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [showCreateSuccess, setShowCreateSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState("accounts");
-  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
+  const [viewMode, setViewMode] = useState<"cards" | "table">("table");
+  const [currentPage, setCurrentPage] = useState(1);
   const [isEditing, setIsEditing] = useState(false);
   const [showEditSuccess, setShowEditSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -168,14 +164,6 @@ export default function ManagementPage() {
     name: "",
     email: "",
   });
-
-  // Search and filter states
-  const [statusFilter, setStatusFilter] = useState<Status | "all">("all");
-  const [dateRange, setDateRange] = useState({ start: "", end: "" });
-  const [savedSearches, setSavedSearches] = useState<Array<{name: string, query: string, status: Status | "all", dateRange: {start: string, end: string}}>>([]);
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [showSaveSearchModal, setShowSaveSearchModal] = useState(false);
-  const [searchName, setSearchName] = useState("");
 
   const searchParams = useSearchParams();
 
@@ -286,21 +274,6 @@ export default function ManagementPage() {
     }
   };
 
-  // Auth effect
-  React.useEffect(() => {
-    const fetchMe = async () => {
-      try {
-        const res = await fetch("/api/auth/me");
-        const data = await res.json();
-        if (res.ok && data.success) setUser(data.user);
-        else window.location.href = "/login";
-      } catch {
-        setError("Network error");
-      }
-    };
-    fetchMe();
-  }, []);
-
   React.useEffect(() => {
     const fetchAccounts = async () => {
       try {
@@ -314,43 +287,29 @@ export default function ManagementPage() {
     fetchAccounts();
   }, []);
 
-  const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    window.location.href = "/login";
-  };
-
   const filtered = useMemo(() => {
-    let filteredAccounts = accounts;
-
-    // Apply search query filter
+    let filtered = accounts;
     const q = query.trim().toLowerCase();
     if (q) {
-      filteredAccounts = filteredAccounts.filter((a) => {
-        return (
+      filtered = filtered.filter(
+        (a) =>
           a.name.toLowerCase().includes(q) ||
           a.email.toLowerCase().includes(q) ||
           a.status.toLowerCase().includes(q)
-        );
-      });
+      );
     }
+    return filtered;
+  }, [accounts, query]);
 
-    // Apply status filter
-    if (statusFilter !== "all") {
-      filteredAccounts = filteredAccounts.filter(a => a.status === statusFilter);
-    }
+  const itemsPerPage = viewMode === "table" ? 10 : 30;
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedAdmins = filtered.slice(startIndex, endIndex);
 
-    // Apply date range filter
-    if (dateRange.start || dateRange.end) {
-      filteredAccounts = filteredAccounts.filter(a => {
-        const accountDate = new Date(a.promoted_at || a.updated_at || 0);
-        const startDate = dateRange.start ? new Date(dateRange.start) : new Date('1900-01-01');
-        const endDate = dateRange.end ? new Date(dateRange.end) : new Date('2100-12-31');
-        return accountDate >= startDate && accountDate <= endDate;
-      });
-    }
-
-    return filteredAccounts;
-  }, [accounts, query, statusFilter, dateRange]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query, viewMode]);
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -424,25 +383,6 @@ export default function ManagementPage() {
     }
   }
 
-  function saveSearch() {
-    if (!searchName.trim()) return;
-    if (!query && statusFilter === "all" && !dateRange.start && !dateRange.end) return;
-
-    const newSearch = {
-      name: searchName.trim(),
-      query,
-      status: statusFilter,
-      dateRange: { ...dateRange }
-    };
-    setSavedSearches(prev => [...prev, newSearch]);
-    setSearchName("");
-    setShowSaveSearchModal(false);
-  }
-
-  function removeSavedSearch(index: number) {
-    setSavedSearches(prev => prev.filter((_, i) => i !== index));
-  }
-
   function onRefresh() {
     setQuery("");
   }
@@ -481,11 +421,11 @@ export default function ManagementPage() {
         setAccounts((prev) => prev.filter((a) => a.id !== adminId));
         setShowRevertSuccess(true);
       } else {
-        setRevertFailMessage(data.message || "Failed to revert to employee");
+        setRevertFailMessage(data.message || "Failed to remove admin access");
         setShowRevertFail(true);
       }
     } catch {
-      setRevertFailMessage("Failed to revert to employee");
+      setRevertFailMessage("Failed to remove admin access");
       setShowRevertFail(true);
     } finally {
       setIsReverting(false);
@@ -719,37 +659,39 @@ export default function ManagementPage() {
   const loadingContent = getLoadingModalContent();
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <SuperAdminHeader user={user} onLogout={handleLogout} />
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar
-          user={user}
-          items={managementSidebarItems}
-          onLogout={handleLogout}
-          showProfile={false}
-        />
-        <main className="flex-1 overflow-auto bg-gray-100">
-          <div className=" mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Maroon Gradient Header */}
-          <div className="bg-gradient-to-br from-[#800020] via-[#A0153E] to-[#C9184A] text-white rounded-lg shadow-lg p-8 mb-8">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <h1 className="text-4xl font-bold">Admins</h1>
+    <div className="min-h-full flex flex-col">
+      <div className="bg-gradient-to-r from-[#7B0F2B] via-[#8B1535] to-[#A4163A] text-white px-6 py-5 flex items-center shrink-0 border-b border-[#6A0D25]/30">
+        <h1 className="text-lg font-semibold tracking-wide">Admins</h1>
+      </div>
+      <div className="flex-1 px-4 sm:px-6 lg:px-8 py-8">
+          {/* Tab Switcher */}
+          <div className="flex gap-2 mb-6">
+            {(["accounts", "permission", "placeholder"] as const).map((tab) => (
               <button
-                onClick={onRefresh}
-                className="inline-flex items-center gap-2 rounded-md border border-white/50 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
-                style={{ height: 40 }}
+                key={tab}
+                onClick={() => {
+                  const params = new URLSearchParams(window.location.search);
+                  params.set("tab", tab);
+                  window.history.replaceState({}, "", `${window.location.pathname}?${params.toString()}`);
+                  setActiveTab(tab);
+                }}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === tab
+                    ? "bg-[#7a0f1f] text-white"
+                    : "bg-white border text-gray-600 hover:bg-gray-50"
+                }`}
+                style={activeTab !== tab ? { borderColor: BORDER } : undefined}
               >
-                <Icons.Refresh />
-                Refresh
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
-            </div>
+            ))}
           </div>
 
           {/* Tab Content */}
           <div>
             {activeTab === "accounts" && (
               <section
-                className="rounded-lg bg-white p-5 shadow-sm border"
+                className="rounded-md bg-white p-5 shadow-sm border"
                 style={{ borderColor: BORDER }}
               >
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -764,15 +706,22 @@ export default function ManagementPage() {
                       className="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold text-white hover:opacity-95"
                       style={{ background: "#7a0f1f", height: 40 }}
                     >
-                      <Icons.Plus />
-                      Create Admin
+                      <ArrowUp className="w-4 h-4" />
+                      Promote to Admin
                     </button>
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mt-6">
-                  <div className="flex-1" />
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-end mt-6">
                   <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      onClick={onRefresh}
+                      className="p-2 rounded-md border hover:bg-gray-50 transition-colors"
+                      style={{ borderColor: BORDER }}
+                      title="Refresh"
+                    >
+                      <Icons.Refresh />
+                    </button>
                     <div className="relative w-full md:w-80">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
                       <input
@@ -784,68 +733,17 @@ export default function ManagementPage() {
                       />
                     </div>
 
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setStatusFilter("all")}
-                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                          statusFilter === "all" ? "bg-[#7a0f1f] text-white" : "bg-white text-gray-700 border hover:bg-gray-50"
-                        }`}
-                        style={{ borderColor: statusFilter !== "all" ? BORDER : undefined }}
-                      >
-                        All
-                      </button>
-                      <button
-                        onClick={() => setStatusFilter("Active")}
-                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                          statusFilter === "Active" ? "bg-green-500 text-white" : "bg-white text-gray-700 border hover:bg-gray-50"
-                        }`}
-                        style={{ borderColor: statusFilter !== "Active" ? BORDER : undefined }}
-                      >
-                        Active
-                      </button>
-                      <button
-                        onClick={() => setStatusFilter("Inactive")}
-                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                          statusFilter === "Inactive" ? "bg-gray-500 text-white" : "bg-white text-gray-700 border hover:bg-gray-50"
-                        }`}
-                        style={{ borderColor: statusFilter !== "Inactive" ? BORDER : undefined }}
-                      >
-                        Inactive
-                      </button>
-                      <button
-                        onClick={() => setStatusFilter("Suspended")}
-                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                          statusFilter === "Suspended" ? "bg-red-500 text-white" : "bg-white text-gray-700 border hover:bg-gray-50"
-                        }`}
-                        style={{ borderColor: statusFilter !== "Suspended" ? BORDER : undefined }}
-                      >
-                        Suspended
-                      </button>
-                    </div>
-
-                    <button
-                      onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                      className={`px-3 py-2 text-xs font-medium rounded-md transition-colors ${
-                        showAdvancedFilters ? "bg-[#7a0f1f] text-white" : "bg-white text-gray-700 border hover:bg-gray-50"
-                      }`}
-                      style={{ borderColor: showAdvancedFilters ? undefined : BORDER }}
-                    >
-                      {showAdvancedFilters ? "Hide Filters" : "Show Filters"}
-                    </button>
-
-                    <div className="flex border rounded-md" style={{ borderColor: BORDER }}>
+                    <div className="flex rounded-md border" style={{ borderColor: BORDER }}>
                       <button
                         onClick={() => setViewMode("cards")}
-                        className={`p-2 ${viewMode === "cards" ? "bg-[#7a0f1f] text-white" : "text-gray-500 hover:text-gray-700"}`}
-                        style={{ borderRadius: "6px 0 0 6px" }}
+                        className={`p-2 rounded-l-md ${viewMode === "cards" ? "bg-[#7a0f1f] text-white" : "text-gray-500 hover:text-gray-700"}`}
                         title="Card View"
                       >
                         <Grid className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => setViewMode("table")}
-                        className={`p-2 ${viewMode === "table" ? "bg-[#7a0f1f] text-white" : "text-gray-500 hover:text-gray-700"}`}
-                        style={{ borderRadius: "0 6px 6px 0" }}
+                        className={`p-2 rounded-r-md ${viewMode === "table" ? "bg-[#7a0f1f] text-white" : "text-gray-500 hover:text-gray-700"}`}
                         title="Table View"
                       >
                         <List className="w-4 h-4" />
@@ -853,97 +751,6 @@ export default function ManagementPage() {
                     </div>
                   </div>
                 </div>
-
-                {/* Advanced Filters - Toggled */}
-                {showAdvancedFilters && (
-                  <div className="mt-4 p-4 bg-gray-50 rounded-lg border animate-in slide-in-from-top-2 duration-200" style={{ borderColor: BORDER }}>
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
-                      {/* Date Range Filter */}
-                      <div className="flex-1">
-                        <label className="block text-xs font-semibold text-gray-700 mb-2">Activation Date Range</label>
-                        <div className="flex gap-2">
-                          <input
-                            type="date"
-                            value={dateRange.start}
-                            onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-                            className="flex-1 rounded-md border px-2 py-1.5 text-xs"
-                            style={{ borderColor: BORDER }}
-                          />
-                          <span className="text-gray-500 self-center">to</span>
-                          <input
-                            type="date"
-                            value={dateRange.end}
-                            onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-                            className="flex-1 rounded-md border px-2 py-1.5 text-xs"
-                            style={{ borderColor: BORDER }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Save Search */}
-                      <div>
-                        <button
-                          onClick={() => setShowSaveSearchModal(true)}
-                          className="px-4 py-1.5 text-xs font-medium rounded-md bg-[#7a0f1f] text-white hover:opacity-95 disabled:opacity-50"
-                          disabled={!query && statusFilter === "all" && !dateRange.start && !dateRange.end}
-                        >
-                          Save Search
-                        </button>
-                      </div>
-
-                      {/* Clear Filters */}
-                      <div>
-                        <button
-                          onClick={() => {
-                            setQuery("");
-                            setStatusFilter("all");
-                            setDateRange({ start: "", end: "" });
-                          }}
-                          className="px-4 py-1.5 text-xs font-medium rounded-md border text-gray-700 hover:bg-gray-50"
-                          style={{ borderColor: BORDER }}
-                        >
-                          Clear Filters
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Saved Searches */}
-                    {savedSearches.length > 0 && (
-                      <div className="mt-4 pt-4 border-t border-gray-200">
-                        <div className="text-xs font-semibold text-gray-700 mb-2">Saved Searches</div>
-                        <div className="flex flex-wrap gap-2">
-                          {savedSearches.map((search, index) => (
-                            <div
-                              key={index}
-                              className="group relative flex items-center gap-1 px-3 py-1 text-xs bg-white border rounded-md hover:bg-gray-50 transition-colors"
-                              style={{ borderColor: BORDER }}
-                            >
-                              <button
-                                onClick={() => {
-                                  setQuery(search.query);
-                                  setStatusFilter(search.status);
-                                  setDateRange(search.dateRange);
-                                }}
-                                className="flex-1 text-left"
-                              >
-                                {search.name}
-                              </button>
-                              <button
-                                onClick={() => removeSavedSearch(index)}
-                                className="text-gray-400 hover:text-red-500 ml-1 transition-colors"
-                                title="Remove search"
-                              >
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 <div className="mt-4">
                   {isLoading ? (
@@ -957,24 +764,23 @@ export default function ManagementPage() {
                           <AdminTableSkeleton />
                         )
                       ) : filtered.length === 0 ? (
-                        <div className="px-4 py-10 text-center">
-                          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Search className="w-8 h-8 text-gray-400" />
-                          </div>
+                        <div className="px-4 py-10 flex flex-col items-center justify-center text-center">
+                          <Inbox className="w-16 h-16 text-gray-300 mx-auto mb-4" aria-hidden />
                           <div className="text-3xl font-bold text-[#5f0c18]">No data</div>
                           <div className="mt-2 text-xs text-neutral-800">Create a record or adjust your search.</div>
                         </div>
                     ) : viewMode === "cards" ? (
-                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" style={{ gridAutoRows: 'min-content' }}>
-                          {filtered.map((a) => (
+                      <>
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" style={{ gridAutoRows: 'min-content' }}>
+                          {paginatedAdmins.map((a) => (
                             <div
                               key={a.id}
-                              className="rounded-lg bg-white border shadow-sm p-4 hover:shadow-md transition-shadow"
+                              className="rounded-md bg-white border shadow-sm p-4 hover:shadow-md transition-shadow"
                               style={{ borderColor: BORDER }}
                             >
                               <div className="flex items-start justify-between mb-3">
                                 <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 bg-[#7a0f1f]/10 rounded-full flex items-center justify-center">
+                                  <div className="w-10 h-10 rounded-md bg-[#7a0f1f]/10 flex items-center justify-center">
                                     <span className="text-sm font-semibold text-[#7a0f1f]">
                                       {a.name.charAt(0).toUpperCase()}
                                     </span>
@@ -1004,46 +810,183 @@ export default function ManagementPage() {
                             </div>
                           ))}
                         </div>
-                      ) : (
-                        <div className="overflow-hidden rounded-lg border" style={{ borderColor: BORDER }}>
-                          <div
-                            className="grid bg-neutral-50 px-4 py-3 text-xs font-semibold text-neutral-900"
-                            style={{ gridTemplateColumns: tableCols }}
-                          >
-                            <div>Account Name</div>
-                            <div>Email</div>
-                            <div className="text-right">Actions</div>
+                        {totalPages > 1 && (
+                          <div className="flex items-center justify-between mt-6 pt-4 border-t" style={{ borderColor: BORDER }}>
+                            <div className="text-sm text-neutral-600">
+                              Showing {startIndex + 1} to {Math.min(endIndex, filtered.length)} of {filtered.length} admins
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                disabled={currentPage === 1}
+                                className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                                style={{ borderColor: BORDER }}
+                              >
+                                Previous
+                              </button>
+                              <div className="flex items-center gap-1">
+                                {[...Array(totalPages)].map((_, i) => {
+                                  const page = i + 1;
+                                  if (
+                                    page === 1 ||
+                                    page === totalPages ||
+                                    (page >= currentPage - 1 && page <= currentPage + 1)
+                                  ) {
+                                    return (
+                                      <button
+                                        key={page}
+                                        onClick={() => setCurrentPage(page)}
+                                        className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+                                          currentPage === page
+                                            ? "bg-[#7a0f1f] text-white"
+                                            : "border hover:bg-gray-50"
+                                        }`}
+                                        style={currentPage !== page ? { borderColor: BORDER } : undefined}
+                                      >
+                                        {page}
+                                      </button>
+                                    );
+                                  } else if (page === currentPage - 2 || page === currentPage + 2) {
+                                    return <span key={page} className="px-2 text-neutral-500">...</span>;
+                                  }
+                                  return null;
+                                })}
+                              </div>
+                              <button
+                                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                disabled={currentPage === totalPages}
+                                className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                                style={{ borderColor: BORDER }}
+                              >
+                                Next
+                              </button>
+                            </div>
                           </div>
-
-                          {filtered.map((a) => (
-                            <div
-                              key={a.id}
-                              className="grid items-center px-4 py-3 text-sm border-t"
-                              style={{ borderColor: BORDER, color: "#111", gridTemplateColumns: tableCols }}
-                            >
-                              <div className="min-w-0">
-                                <div className="font-semibold text-neutral-900 truncate">{a.name}</div>
-                                <div className="text-[11px] text-neutral-800">
-                                  Promoted on: {a.promoted_at ? formatDate(a.promoted_at) : '—'}
+                        )}
+                      </>
+                      ) : (
+                        <div>
+                          <div className="rounded-md border bg-neutral-50 px-4 py-0 mb-3" style={{ borderColor: BORDER }}>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-4 flex-1 min-w-0">
+                                <div className="w-12 h-12 shrink-0"></div>
+                                <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-2 gap-2 text-sm font-bold text-neutral-900">
+                                  <div>Account Name</div>
+                                  <div>Email</div>
                                 </div>
                               </div>
-
-                              <div className="min-w-0 text-neutral-900 truncate">{a.email}</div>
-
-                              <div className="flex items-center justify-end gap-2">
-                                <button
-                                  onClick={() => openEditPanel(a)}
-                                  className="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold text-white hover:opacity-95"
-                                  style={{ background: "#7a0f1f", height: 32 }}
-                                  title="View"
-                                  aria-label="View"
-                                >
-                                  <Icons.Eye />
-                                  View
-                                </button>
+                              <div className="flex items-center gap-3 shrink-0">
+                                <div className="text-right text-sm font-bold text-neutral-900 w-20">Promoted</div>
+                                <div className="text-sm font-bold text-neutral-900 w-20">Status</div>
+                                <div className="w-20"></div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="space-y-3">
+                            {paginatedAdmins.map((a) => (
+                            <div
+                              key={a.id}
+                              className="rounded-md bg-white border shadow-sm p-4 hover:shadow-md transition-shadow"
+                              style={{ borderColor: BORDER }}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-4 flex-1 min-w-0">
+                                  <div className="w-12 h-12 rounded-md bg-[#7a0f1f]/10 flex items-center justify-center shrink-0">
+                                    <span className="text-base font-semibold text-[#7a0f1f]">{a.name.charAt(0).toUpperCase()}</span>
+                                  </div>
+                                  <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    <div className="min-w-0">
+                                      <div className="font-semibold text-neutral-900 truncate">{a.name}</div>
+                                      <div className="text-xs text-neutral-500 mt-0.5">Account Name</div>
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="text-sm text-neutral-900 truncate">{a.email}</div>
+                                      <div className="text-xs text-neutral-500 mt-0.5">Email</div>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-3 shrink-0">
+                                  <div className="text-right">
+                                    <div className="text-xs text-neutral-500 mb-1">Promoted</div>
+                                    <div className="text-xs text-neutral-700">{a.promoted_at ? formatDate(a.promoted_at) : "—"}</div>
+                                  </div>
+                                  <div
+                                    className={`px-3 py-1.5 rounded-md text-xs font-semibold ${
+                                      a.status === "Active" ? "bg-green-100 text-green-700" :
+                                      a.status === "Suspended" ? "bg-red-100 text-red-700" :
+                                      "bg-gray-100 text-gray-700"
+                                    }`}
+                                  >
+                                    {a.status}
+                                  </div>
+                                  <button
+                                    onClick={() => openEditPanel(a)}
+                                    className="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold text-white hover:opacity-95"
+                                    style={{ background: "#7a0f1f", height: 32 }}
+                                    title="View"
+                                    aria-label="View"
+                                  >
+                                    <Icons.Eye />
+                                    View
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           ))}
+                          </div>
+                          {totalPages > 1 && (
+                            <div className="flex items-center justify-between mt-6 pt-4 border-t" style={{ borderColor: BORDER }}>
+                              <div className="text-sm text-neutral-600">
+                                Showing {startIndex + 1} to {Math.min(endIndex, filtered.length)} of {filtered.length} admins
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                  disabled={currentPage === 1}
+                                  className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                                  style={{ borderColor: BORDER }}
+                                >
+                                  Previous
+                                </button>
+                                <div className="flex items-center gap-1">
+                                  {[...Array(totalPages)].map((_, i) => {
+                                    const page = i + 1;
+                                    if (
+                                      page === 1 ||
+                                      page === totalPages ||
+                                      (page >= currentPage - 1 && page <= currentPage + 1)
+                                    ) {
+                                      return (
+                                        <button
+                                          key={page}
+                                          onClick={() => setCurrentPage(page)}
+                                          className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+                                            currentPage === page
+                                              ? "bg-[#7a0f1f] text-white"
+                                              : "border hover:bg-gray-50"
+                                          }`}
+                                          style={currentPage !== page ? { borderColor: BORDER } : undefined}
+                                        >
+                                          {page}
+                                        </button>
+                                      );
+                                    } else if (page === currentPage - 2 || page === currentPage + 2) {
+                                      return <span key={page} className="px-2 text-neutral-500">...</span>;
+                                    }
+                                    return null;
+                                  })}
+                                </div>
+                                <button
+                                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                  disabled={currentPage === totalPages}
+                                  className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                                  style={{ borderColor: BORDER }}
+                                >
+                                  Next
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                 </div>
@@ -1051,7 +994,7 @@ export default function ManagementPage() {
             )}
 
             {activeTab === "permission" && (
-              <div className="rounded-lg bg-white p-6 shadow-sm border" style={{ borderColor: BORDER }}>
+              <div className="rounded-md bg-white p-6 shadow-sm border" style={{ borderColor: BORDER }}>
                 <h2 className="text-lg font-bold text-[#5f0c18] mb-4">Permission Management</h2>
                 <p className="text-gray-600">Manage user permissions and access controls.</p>
                 <div className="mt-6 text-center py-12">
@@ -1062,7 +1005,7 @@ export default function ManagementPage() {
             )}
 
             {activeTab === "placeholder" && (
-              <div className="rounded-lg bg-white p-6 shadow-sm border" style={{ borderColor: BORDER }}>
+              <div className="rounded-md bg-white p-6 shadow-sm border" style={{ borderColor: BORDER }}>
                 <h2 className="text-lg font-bold text-[#5f0c18] mb-4">Placeholder</h2>
                 <p className="text-gray-600">Additional management features.</p>
                 <div className="mt-6 text-center py-12">
@@ -1073,10 +1016,8 @@ export default function ManagementPage() {
             )}
           </div>
         </div>
-      </main>
-      </div>
 
-      {/* Create Admin Side Panel */}
+      {/* Promote to Admin Side Panel */}
       {(showCreate || createPanelClosing) && (
         <>
           <div
@@ -1087,7 +1028,7 @@ export default function ManagementPage() {
             aria-hidden="true"
           />
           <div
-            className="fixed top-0 right-0 bottom-0 w-full max-w-lg h-screen bg-white z-50 flex flex-col rounded-l-2xl overflow-hidden shadow-xl"
+            className="fixed top-0 right-0 bottom-0 w-full max-w-lg h-screen bg-white z-50 flex flex-col rounded-md overflow-hidden shadow-xl"
             style={{
               animation: createPanelClosing
                 ? "slideOut 0.35s cubic-bezier(0.32, 0.72, 0, 1) forwards"
@@ -1125,9 +1066,11 @@ export default function ManagementPage() {
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4 pb-6">
               {approvedEmployeesLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#7a0f1f]"></div>
-                </div>
+                <ul className="space-y-3">
+                  {[...Array(5)].map((_, i) => (
+                    <PromotePanelEmployeeSkeleton key={i} />
+                  ))}
+                </ul>
               ) : approvedEmployees.length === 0 ? (
                 <div className="text-center py-12 text-gray-500">
                   <p className="text-sm">No approved employees available for promotion.</p>
@@ -1142,7 +1085,7 @@ export default function ManagementPage() {
                   {filteredApprovedEmployees.map((emp) => (
                     <li
                       key={emp.id}
-                      className="flex items-center justify-between gap-4 p-3 rounded-lg border"
+                      className="flex items-center justify-between gap-4 p-3 rounded-md border"
                       style={{ borderColor: BORDER }}
                     >
                       <div className="min-w-0 flex-1">
@@ -1160,12 +1103,12 @@ export default function ManagementPage() {
                       >
                         {promotingId === emp.id ? (
                           <>
-                            <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div>
+                            <div className="animate-spin  h-3.5 w-3.5 border-b-2 border-white"></div>
                             Promoting...
                           </>
                         ) : (
                           <>
-                            <Icons.Plus />
+                            <ArrowUp className="w-4 h-4" />
                             Promote to Admin
                           </>
                         )}
@@ -1210,41 +1153,40 @@ export default function ManagementPage() {
         buttonText="OK"
       />
 
-      {/* Revert to Employee Confirmation Modal */}
+      {/* Remove Admin Access Confirmation Modal */}
       <ConfirmationModal
         isOpen={!!revertConfirmAdmin}
         onClose={() => setRevertConfirmAdmin(null)}
         onConfirm={() => handleRevertToEmployee()}
-        title="Revert to Employee"
+        title="Remove Admin Access"
         message={
           revertConfirmAdmin
-            ? `Are you sure you want to revert ${revertConfirmAdmin.name} (${revertConfirmAdmin.email}) back to employee? They will lose admin access.`
+            ? `Are you sure you want to remove admin access from ${revertConfirmAdmin.name} (${revertConfirmAdmin.email})? They will be reverted to employee.`
             : ""
         }
-        confirmText="Revert to Employee"
+        confirmText="Remove Admin Access"
         cancelText="Cancel"
       />
 
-      {/* Revert Loading Modal */}
       <LoadingModal
         isOpen={showRevertLoading}
-        title="Reverting to Employee"
-        message="Please wait while we revert the admin back to employee..."
+        title="Removing Admin Access"
+        message="Please wait while we remove admin access..."
       />
 
       {showRevertSuccess && (
         <SuccessModal
           isOpen={showRevertSuccess}
           onClose={() => setShowRevertSuccess(false)}
-          title="Reverted to Employee"
-          message="The admin has been reverted to employee successfully. They will no longer have admin access."
+          title="Admin Access Removed"
+          message="Admin access has been removed successfully. They will no longer have admin privileges."
         />
       )}
 
       <FailModal
         isOpen={showRevertFail}
         onClose={() => setShowRevertFail(false)}
-        title="Failed to Revert"
+        title="Failed to Remove Admin Access"
         message={revertFailMessage}
         buttonText="OK"
       />
@@ -1260,7 +1202,7 @@ export default function ManagementPage() {
             aria-hidden="true"
           />
           <div
-            className="fixed top-0 right-0 bottom-0 w-full max-w-lg h-screen bg-white z-50 flex flex-col rounded-l-2xl overflow-hidden shadow-xl"
+            className="fixed top-0 right-0 bottom-0 w-full max-w-lg h-screen bg-white z-50 flex flex-col rounded-md overflow-hidden shadow-xl"
             style={{
               animation: editPanelClosing
                 ? "slideOut 0.35s cubic-bezier(0.32, 0.72, 0, 1) forwards"
@@ -1283,31 +1225,35 @@ export default function ManagementPage() {
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Promoted on</label>
-                <div className="w-full rounded-md border px-3 py-2 text-sm bg-gray-50" style={{ borderColor: BORDER }}>
-                  {editing?.promoted_at ? formatDate(editing.promoted_at) : "—"}
-                </div>
-              </div>
+              {isEditing ? (
+                <EditPanelSkeleton />
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Promoted on</label>
+                    <div className="w-full rounded-md border px-3 py-2 text-sm bg-gray-50" style={{ borderColor: BORDER }}>
+                      {editing?.promoted_at ? formatDate(editing.promoted_at) : "—"}
+                    </div>
+                  </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Account Name</label>
-                <input
-                  value={editForm.name}
-                  onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))}
-                  className="w-full rounded-md border px-3 py-2 text-sm outline-none"
-                  style={{ borderColor: BORDER, color: "#111" }}
-                />
-              </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Account Name</label>
+                    <input
+                      value={editForm.name}
+                      onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))}
+                      className="w-full rounded-md border px-3 py-2 text-sm outline-none"
+                      style={{ borderColor: BORDER, color: "#111" }}
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                <div className="w-full rounded-md border px-3 py-2 text-sm bg-gray-50" style={{ borderColor: BORDER }}>
-                  {editing?.email}
-                </div>
-              </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                    <div className="w-full rounded-md border px-3 py-2 text-sm bg-gray-50" style={{ borderColor: BORDER }}>
+                      {editing?.email}
+                    </div>
+                  </div>
 
-              <div className="flex flex-wrap gap-3 pt-4">
+                  <div className="flex flex-wrap gap-3 pt-4">
                 <button
                   onClick={closeEditPanel}
                   className="rounded-md border px-4 py-2 text-sm font-semibold hover:bg-neutral-50"
@@ -1325,23 +1271,26 @@ export default function ManagementPage() {
                   >
                     {isEditing ? (
                       <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2 inline-block"></div>
+                        <div className="animate-spin  h-4 w-4 border-b-2 border-white mr-2 inline-block"></div>
                         Saving...
                       </>
                     ) : (
-                      "Save Changes"
+                     "Save Changes"
                     )}
                   </button>
                 )}
 
                 <button
                   onClick={() => setRevertConfirmAdmin(editing)}
-                  className="rounded-md px-4 py-2 text-sm font-semibold text-white hover:opacity-95 border border-orange-300 bg-orange-500 hover:bg-orange-600"
+                  className="rounded-md px-4 py-2 text-sm font-semibold text-white hover:opacity-95 border border-orange-300 bg-orange-500 hover:bg-orange-600 inline-flex items-center gap-2"
                   style={{ height: 40 }}
                 >
-                  Revert to Employee
+                  <ArrowDown className="w-4 h-4" />
+                  Remove Admin Access
                 </button>
               </div>
+                </>
+              )}
             </div>
           </div>
         </>
@@ -1354,7 +1303,7 @@ export default function ManagementPage() {
           style={{ background: "rgba(0,0,0,0.45)" }}
         >
           <div
-            className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl border"
+            className="w-full max-w-sm rounded-md bg-white p-5 shadow-xl border"
             style={{ borderColor: BORDER }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1381,61 +1330,6 @@ export default function ManagementPage() {
           title="Employee Promoted to Admin"
           message="The employee has been promoted to admin successfully. A notification email has been sent to them."
         />
-      )}
-
-      {/* Save Search Modal */}
-      {showSaveSearchModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center px-4"
-          onClick={() => setShowSaveSearchModal(false)}
-          style={{ background: "rgba(0,0,0,0.45)" }}
-        >
-          <div
-            className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl border"
-            style={{ borderColor: BORDER }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="text-lg font-bold text-[#5f0c18]">Save Search</div>
-            <div className="mt-4">
-              <label className="block text-xs font-semibold text-gray-700 mb-2">Search Name</label>
-              <input
-                type="text"
-                value={searchName}
-                onChange={(e) => setSearchName(e.target.value)}
-                placeholder="Enter search name..."
-                className="w-full rounded-md border px-3 py-2 text-sm outline-none"
-                style={{ borderColor: BORDER, color: "#111" }}
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    saveSearch();
-                  }
-                }}
-              />
-            </div>
-
-            <div className="mt-5 flex items-center justify-end gap-2">
-              <button
-                onClick={() => {
-                  setShowSaveSearchModal(false);
-                  setSearchName("");
-                }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-md"
-                style={{ borderColor: BORDER }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={saveSearch}
-                className="px-4 py-2 text-sm font-semibold text-white hover:opacity-95 rounded-md disabled:opacity-50"
-                style={{ background: "#7a0f1f", height: 40 }}
-                disabled={!searchName.trim()}
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {showEditSuccess && (
@@ -1472,26 +1366,63 @@ export default function ManagementPage() {
 function AdminCardSkeleton() {
   return (
     <div
-      className="rounded-lg bg-white border shadow-sm p-4 animate-pulse"
+      className="rounded-md bg-white border shadow-sm p-4 animate-pulse"
       style={{ borderColor: BORDER }}
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
+          <div className="w-10 h-10 rounded-md bg-gray-200"></div>
           <div className="flex-1">
-            <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-            <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+            <div className="h-4 rounded-md bg-gray-200 w-3/4 mb-2"></div>
+            <div className="h-3 rounded-md bg-gray-200 w-1/2"></div>
           </div>
         </div>
-        <div className="h-6 bg-gray-200 rounded w-16"></div>
+        <div className="h-6 rounded-md bg-gray-200 w-16"></div>
       </div>
       
       <div className="flex items-center justify-between">
         <div className="text-[11px] space-y-1 flex-1">
-          <div className="h-3 bg-gray-200 rounded w-20"></div>
-          <div className="h-3 bg-gray-200 rounded w-24"></div>
+          <div className="h-3 rounded-md bg-gray-200 w-20"></div>
+          <div className="h-3 rounded-md bg-gray-200 w-24"></div>
         </div>
-        <div className="h-8 bg-gray-200 rounded w-16"></div>
+        <div className="h-8 rounded-md bg-gray-200 w-16"></div>
+      </div>
+    </div>
+  );
+}
+
+function PromotePanelEmployeeSkeleton() {
+  return (
+    <li className="flex items-center justify-between gap-4 p-3 rounded-md border animate-pulse" style={{ borderColor: BORDER }}>
+      <div className="min-w-0 flex-1 space-y-2">
+        <div className="h-4 rounded-md bg-gray-200 w-3/4"></div>
+        <div className="h-3 rounded-md bg-gray-200 w-1/2"></div>
+        <div className="h-3 rounded-md bg-gray-200 w-1/3"></div>
+      </div>
+      <div className="h-9 rounded-md bg-gray-200 w-28 flex-shrink-0"></div>
+    </li>
+  );
+}
+
+function EditPanelSkeleton() {
+  return (
+    <div className="space-y-4 animate-pulse">
+      <div>
+        <div className="h-3 rounded-md bg-gray-200 w-20 mb-2"></div>
+        <div className="h-10 rounded-md bg-gray-200 w-full"></div>
+      </div>
+      <div>
+        <div className="h-3 rounded-md bg-gray-200 w-24 mb-2"></div>
+        <div className="h-10 rounded-md bg-gray-200 w-full"></div>
+      </div>
+      <div>
+        <div className="h-3 rounded-md bg-gray-200 w-16 mb-2"></div>
+        <div className="h-10 rounded-md bg-gray-200 w-full"></div>
+      </div>
+      <div className="flex flex-wrap gap-3 pt-4">
+        <div className="h-10 rounded-md bg-gray-200 w-20"></div>
+        <div className="h-10 rounded-md bg-gray-200 w-28"></div>
+        <div className="h-10 rounded-md bg-gray-200 w-36"></div>
       </div>
     </div>
   );
@@ -1499,29 +1430,35 @@ function AdminCardSkeleton() {
 
 function AdminTableSkeleton() {
   return (
-    <div className="overflow-hidden rounded-lg border" style={{ borderColor: BORDER }}>
-      <div
-        className="grid bg-neutral-50 px-4 py-3 text-xs font-semibold text-neutral-900"
-        style={{ gridTemplateColumns: "minmax(140px, 1.15fr) minmax(180px, 1.2fr) 120px" }}
-      >
-        <div>Account Name</div>
-        <div>Email</div>
-        <div className="text-right">Actions</div>
-      </div>
-
-      {[...Array(5)].map((_, index) => (
+    <div className="space-y-3">
+      {[...Array(5)].map((_, i) => (
         <div
-          key={index}
-          className="grid items-center px-4 py-3 text-sm border-t animate-pulse"
-          style={{ borderColor: BORDER, gridTemplateColumns: "minmax(140px, 1.15fr) minmax(180px, 1.2fr) 120px" }}
+          key={i}
+          className="rounded-md bg-white border shadow-sm p-4 animate-pulse"
+          style={{ borderColor: BORDER }}
         >
-          <div className="min-w-0">
-            <div className="h-4 bg-gray-200 rounded w-3/4 mb-1"></div>
-            <div className="h-3 bg-gray-200 rounded w-20"></div>
-          </div>
-          <div className="h-4 bg-gray-200 rounded w-40"></div>
-          <div className="flex items-center justify-end">
-            <div className="h-8 bg-gray-200 rounded w-16"></div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4 flex-1 min-w-0">
+              <div className="w-12 h-12 rounded-md bg-gray-200 shrink-0"></div>
+              <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div className="min-w-0">
+                  <div className="h-4 rounded-md bg-gray-200 w-3/4 mb-2"></div>
+                  <div className="h-3 rounded-md bg-gray-200 w-24"></div>
+                </div>
+                <div className="min-w-0">
+                  <div className="h-4 rounded-md bg-gray-200 w-full mb-2"></div>
+                  <div className="h-3 rounded-md bg-gray-200 w-16"></div>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="text-right">
+                <div className="h-3 rounded-md bg-gray-200 w-20 mb-1"></div>
+                <div className="h-3 rounded-md bg-gray-200 w-16"></div>
+              </div>
+              <div className="h-6 rounded-md bg-gray-200 w-20"></div>
+              <div className="h-8 rounded-md bg-gray-200 w-16"></div>
+            </div>
           </div>
         </div>
       ))}

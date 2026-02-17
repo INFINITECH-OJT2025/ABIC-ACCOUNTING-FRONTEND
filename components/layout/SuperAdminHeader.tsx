@@ -169,7 +169,7 @@
           {/* Admin — SECTION */}
           <div
             className={`relative px-6 py-4 border-r border-[#8E1B3E]/30 hover:bg-[#5E0C20]/50 transition-all duration-200 ${
-              isSection("/super/admin") ? "bg-[#5E0C20]/50" : ""
+              isSection("/super/employee") || isSection("/super/head") || isSection("/super/forms") || isSection("/super/directory") ? "bg-[#5E0C20]/50" : ""
             }`}
             onMouseEnter={() => setAdminDropdownOpen(true)}
             onMouseLeave={() => setAdminDropdownOpen(false)}
@@ -180,10 +180,10 @@
 
             {adminDropdownOpen && (
               <Dropdown>
-                <SubBtn active={isSection('/super/admin/employee')} onClick={()=>router.push('/super/admin/employee')} label="Employee"/>
-                <SubBtn active={isSection('/super/admin/forms')} onClick={()=>router.push('/super/admin/forms')} label="Forms"/>
-                <SubBtn active={isSection('/super/admin/directory')} onClick={()=>router.push('/super/admin/directory')} label="Directory"/>
-                <SubBtn active={isSection('/super/admin/management')} onClick={()=>router.push('/super/admin/management')} label="Management"/>
+                <SubBtn active={isSection('/super/employee')} onClick={()=>router.push('/super/employee/masterfile')} label="Employee"/>
+                <SubBtn active={isSection('/super/forms')} onClick={()=>router.push('/super/forms/onboarding-checklist')} label="Forms"/>
+                <SubBtn active={isSection('/super/directory')} onClick={()=>router.push('/super/directory/process')} label="Directory"/>
+                <SubBtn active={isSection('/super/head/admins')} onClick={()=>router.push('/super/head/admins')} label="Admins"/>
               </Dropdown>
             )}
           </div>
@@ -202,8 +202,9 @@
 
             {accountantDropdownOpen && (
               <Dropdown>
-                <SubBtn active={isSection('/super/accountant')} onClick={()=>router.push('/super/accountant')} label="SCB Banks"/>
+                <SubBtn active={isExact('/super/accountant')} onClick={()=>router.push('/super/accountant')} label="SCB Banks"/>
                 <SubBtn active={isSection('/super/accountant/account-summary')} onClick={()=>router.push('/super/accountant/account-summary')} label="Account Summary"/>
+                <SubBtn active={isSection('/super/accountant/management')} onClick={()=>router.push('/super/accountant/management')} label="Management"/>
               </Dropdown>
             )}
           </div>
@@ -215,9 +216,10 @@
           <div className="md:hidden bg-[#6A0D25]/95 backdrop-blur-sm">
             <div className="px-6 py-4 space-y-2">
               <MobileBtn active={isExact('/super')} label="Dashboard" onClick={()=>router.push('/super')}/>
-              <MobileBtn active={isSection('/super/admin/employee')} label="Employee" onClick={()=>router.push('/super/admin/employee')}/>
-              <MobileBtn active={isSection('/super/admin/management')} label="Management" onClick={()=>router.push('/super/admin/management')}/>
-              <MobileBtn active={isSection('/super/accountant')} label="Accountant" onClick={()=>router.push('/super/accountant')}/>
+              <MobileBtn active={isSection('/super/employee')} label="Employee" onClick={()=>router.push('/super/employee/masterfile')}/>
+              <MobileBtn active={isSection('/super/head/admins')} label="Admins" onClick={()=>router.push('/super/head/admins')}/>
+              <MobileBtn active={isExact('/super/accountant')} label="Accountant" onClick={()=>router.push('/super/accountant')}/>
+              <MobileBtn active={isSection('/super/accountant/management')} label="Accountant Management" onClick={()=>router.push('/super/accountant/management')}/>
             </div>
           </div>
         )}

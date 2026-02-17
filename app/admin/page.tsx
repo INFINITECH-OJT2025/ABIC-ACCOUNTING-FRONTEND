@@ -32,6 +32,7 @@ export default function AdminDashboard() {
   const router = useRouter()
   const [user, setUser] = useState<any | null>(null)
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -67,8 +68,9 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const fetchMe = async () => {
+      setLoading(true)
       try {
-        const res = await fetch('/api/auth/me')
+        const res = await fetch('/api/auth/me', { credentials: 'include' })
         const data = await res.json()
         if (res.ok && data.success) {
           setUser(data.user)
@@ -77,6 +79,8 @@ export default function AdminDashboard() {
         }
       } catch (err) {
         setError('Network error')
+      } finally {
+        setLoading(false)
       }
     }
 
@@ -341,7 +345,12 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* DASHBOARD HEADER */}
+        {/* Loading Skeleton */}
+        {loading ? (
+          <AdminDashboardSkeleton />
+        ) : (
+          <>
+            {/* DASHBOARD HEADER */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div>
             <h2 className="text-2xl font-bold text-[#7B0F2B] mb-2">Dashboard Overview</h2>
@@ -540,6 +549,8 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
+          </>
+        )}
       </div>
 
       {/* FOOTER */}
@@ -555,5 +566,101 @@ export default function AdminDashboard() {
         </div>
       </footer>
     </div>
+  )
+}
+
+function AdminDashboardSkeleton() {
+  return (
+    <>
+      {/* Dashboard Header Skeleton */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 animate-pulse">
+        <div className="space-y-2">
+          <div className="h-8 bg-gray-200 rounded-md w-64"></div>
+          <div className="h-4 bg-gray-200 rounded-md w-96"></div>
+        </div>
+        <div className="flex gap-3">
+          <div className="h-10 bg-gray-200 rounded-xl w-24"></div>
+          <div className="h-10 bg-gray-200 rounded-xl w-32"></div>
+        </div>
+      </div>
+
+      {/* Summary Cards Skeleton */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="rounded-2xl shadow-lg border-none bg-white p-6 animate-pulse">
+            <div className="flex flex-row items-center justify-between mb-4">
+              <div className="h-4 bg-gray-200 rounded-md w-32"></div>
+              <div className="h-8 w-8 bg-gray-200 rounded-lg"></div>
+            </div>
+            <div className="space-y-2">
+              <div className="h-8 bg-gray-200 rounded-md w-16"></div>
+              <div className="h-3 bg-gray-200 rounded-md w-40"></div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Charts and Analytics Skeleton */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* User Activity Chart Skeleton */}
+        <div className="rounded-2xl shadow-lg border-none bg-white p-6 animate-pulse">
+          <div className="space-y-4 mb-6">
+            <div className="h-6 bg-gray-200 rounded-md w-40"></div>
+            <div className="h-4 bg-gray-200 rounded-md w-64"></div>
+          </div>
+          <div className="h-64 bg-gray-100 rounded-md"></div>
+        </div>
+
+        {/* Recent Activities Skeleton */}
+        <div className="rounded-2xl shadow-lg border-none bg-white p-6 animate-pulse">
+          <div className="space-y-4 mb-6">
+            <div className="h-6 bg-gray-200 rounded-md w-40"></div>
+            <div className="h-4 bg-gray-200 rounded-md w-48"></div>
+          </div>
+          <div className="space-y-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="flex items-start gap-3 p-3">
+                <div className="h-10 w-10 bg-gray-200 rounded-lg"></div>
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-gray-200 rounded-md w-3/4"></div>
+                  <div className="h-3 bg-gray-200 rounded-md w-1/2"></div>
+                  <div className="h-3 bg-gray-200 rounded-md w-24"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Actions Skeleton */}
+      <div className="rounded-2xl shadow-lg border-none bg-white p-6 animate-pulse">
+        <div className="space-y-4 mb-6">
+          <div className="h-6 bg-gray-200 rounded-md w-32"></div>
+          <div className="h-4 bg-gray-200 rounded-md w-48"></div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-20 bg-gray-200 rounded-xl"></div>
+          ))}
+        </div>
+      </div>
+
+      {/* System Status Skeleton */}
+      <div className="rounded-2xl shadow-lg border-none bg-white p-6 animate-pulse">
+        <div className="space-y-4 mb-6">
+          <div className="h-6 bg-gray-200 rounded-md w-36"></div>
+          <div className="h-4 bg-gray-200 rounded-md w-56"></div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="text-center space-y-2">
+              <div className="h-8 bg-gray-200 rounded-md w-20 mx-auto"></div>
+              <div className="h-4 bg-gray-200 rounded-md w-24 mx-auto"></div>
+              <div className="h-2 bg-gray-200 rounded-full w-full"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
   )
 }

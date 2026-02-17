@@ -10,14 +10,19 @@ export default function Home() {
   useEffect(() => {
     const checkAuthAndRedirect = async () => {
       try {
-        const res = await fetch('/api/auth/me')
+        const res = await fetch('/api/auth/me', { credentials: 'include' })
         const data = await res.json()
         if (res.ok && data.success) {
           const role = data.user?.role
+          // Match login redirect matrix
           if (role === 'super_admin') {
+            router.push('/super')
+          } else if (role === 'admin' || role === 'admin_head') {
             router.push('/admin')
-          } else if (role === 'accountant') {
-            router.push('/accountant')
+          } else if (role === 'accountant' || role === 'accountant_head') {
+            router.push('/admin/accountant')
+          } else if (role === 'employee') {
+            router.push('/employee')
           } else {
             router.push('/login')
           }

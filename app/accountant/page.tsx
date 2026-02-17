@@ -13,7 +13,7 @@ export default function AccountantDashboard() {
     const fetchMe = async () => {
       setLoading(true)
       try {
-        const res = await fetch('/api/auth/me')
+        const res = await fetch('/api/auth/me', { credentials: 'include' })
         const data = await res.json()
         if (res.ok && data.success) {
           setUser(data.user)

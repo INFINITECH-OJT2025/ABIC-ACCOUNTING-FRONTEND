@@ -359,7 +359,7 @@ export default function EmployeeDashboardPage() {
   useEffect(() => {
     const checkAuthAndFetchProfile = async () => {
       try {
-        const meRes = await fetch('/api/auth/me')
+        const meRes = await fetch('/api/auth/me', { credentials: 'include' })
         const meData = await meRes.json()
 
         if (!meRes.ok || !meData.success) {

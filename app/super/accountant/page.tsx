@@ -16,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import Link from "next/link"
 import {
   Menu,
   User,
@@ -31,23 +32,21 @@ import {
   Trash2,
   Mail,
   CheckCircle,
+  Settings,
 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import SuperAdminHeader from "@/components/layout/SuperAdminHeader"
 
 interface Accountant {
   id: number
   name: string
   email: string
-  status: string
-  lastLogin: string
-  createdAt: string
+  account_status?: string
+  created_at?: string
 }
 
 export default function SuperAdminAccountantPage() {
   const router = useRouter()
-  const [user, setUser] = useState<any | null>(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [accountants, setAccountants] = useState<Accountant[]>([])
@@ -58,30 +57,12 @@ export default function SuperAdminAccountantPage() {
   const rowsPerPage = 15
 
   useEffect(() => {
-    const fetchMe = async () => {
-      try {
-        const res = await fetch('/api/auth/me')
-        const data = await res.json()
-        if (res.ok && data.success) {
-          setUser(data.user)
-        } else {
-          router.push('/login')
-        }
-      } catch (err) {
-        setError('Network error')
-      }
-    }
-
-    fetchMe()
-  }, [router])
-
-  useEffect(() => {
     const load = async () => {
       try {
         const res = await fetch('/api/accountant')
         const data = await res.json()
         if (res.ok && data.success) {
-          setAccountants(data.accountants)
+          setAccountants(Array.isArray(data.data) ? data.data : [])
         } else {
           setError(data.message || 'Failed to load accountants')
         }
@@ -94,19 +75,6 @@ export default function SuperAdminAccountantPage() {
 
     load()
   }, [])
-
-  const handleLogout = async () => {
-    try {
-      const res = await fetch('/api/auth/logout', { method: 'POST' })
-      if (res.ok) {
-        router.push('/login')
-      } else {
-        setError('Logout failed')
-      }
-    } catch (err) {
-      setError('Network error')
-    }
-  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -121,7 +89,7 @@ export default function SuperAdminAccountantPage() {
     }
   }
 
-  const filteredAccountants = accountants.filter(accountant =>
+  const filteredAccountants = (accountants || []).filter(accountant =>
     accountant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     accountant.email.toLowerCase().includes(searchTerm.toLowerCase())
   )
@@ -133,21 +101,17 @@ export default function SuperAdminAccountantPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col bg-[#F9F6F7]">
-        <SuperAdminHeader user={user} onLogout={handleLogout} />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-8 h-8 border-4 border-[#7B0F2B] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading accountants...</p>
-          </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-[#7B0F2B] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading accountants...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F9F6F7]">
-      <SuperAdminHeader user={user} onLogout={handleLogout} />
+    <div className="min-h-full">
 
       {/* CONTENT - Constrained Width */}
       <div className="flex-1 p-6 space-y-6">
@@ -175,9 +139,11 @@ export default function SuperAdminAccountantPage() {
                 <RefreshCcw className="w-4 h-4 mr-2" />
                 Refresh
               </Button>
-              <Button className="bg-gradient-to-r from-[#7B0F2B] to-[#A4163A] text-white rounded-xl hover:from-[#5E0C20] hover:to-[#7C102E]">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Accountant
+              <Button asChild className="bg-gradient-to-r from-[#7B0F2B] to-[#A4163A] text-white rounded-xl hover:from-[#5E0C20] hover:to-[#7C102E]">
+                <Link href="/super/accountant/management">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Accountant Management
+                </Link>
               </Button>
             </div>
           </div>
@@ -192,7 +158,7 @@ export default function SuperAdminAccountantPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-[#7B0F2B]">{accountants.length}</div>
+                <div className="text-2xl font-bold text-[#7B0F2B]">{accountants?.length ?? 0}</div>
                 <p className="text-xs text-gray-500 mt-1">Registered accountants</p>
               </CardContent>
             </Card>
@@ -206,7 +172,7 @@ export default function SuperAdminAccountantPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600">
-                  {accountants.filter(a => a.status === 'active').length}
+                  {(accountants || []).filter(a => a.account_status === 'active').length}
                 </div>
                 <p className="text-xs text-gray-500 mt-1">Currently active</p>
               </CardContent>
@@ -221,7 +187,7 @@ export default function SuperAdminAccountantPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-yellow-600">
-                  {accountants.filter(a => a.status === 'pending').length}
+                  {(accountants || []).filter(a => a.account_status === 'pending').length}
                 </div>
                 <p className="text-xs text-gray-500 mt-1">Awaiting approval</p>
               </CardContent>
@@ -265,12 +231,12 @@ export default function SuperAdminAccountantPage() {
                         <TableCell className="font-medium">{accountant.name}</TableCell>
                         <TableCell>{accountant.email}</TableCell>
                         <TableCell>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(accountant.status)}`}>
-                            {accountant.status}
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(accountant.account_status || '')}`}>
+                            {accountant.account_status || '—'}
                           </span>
                         </TableCell>
-                        <TableCell>{accountant.lastLogin}</TableCell>
-                        <TableCell>{accountant.createdAt}</TableCell>
+                        <TableCell>—</TableCell>
+                        <TableCell>{accountant.created_at ? new Date(accountant.created_at).toLocaleDateString() : '—'}</TableCell>
                         <TableCell className="text-center">
                           <div className="flex gap-2 justify-center">
                             <Button
@@ -360,18 +326,6 @@ export default function SuperAdminAccountantPage() {
         </div>
       </div>
 
-      {/* FOOTER */}
-      <footer className="bg-gradient-to-r from-[#7B0F2B] to-[#A4163A] text-white">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row items-center justify-between text-xs">
-          <p className="tracking-wide">
-            © 2026 ABIC Realty & Consultancy Corporation - Super Admin Portal
-          </p>
-
-          <p className="opacity-80">
-            All Rights Reserved
-          </p>
-        </div>
-      </footer>
     </div>
   )
 }

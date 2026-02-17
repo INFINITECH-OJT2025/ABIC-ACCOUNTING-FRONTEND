@@ -1,13 +1,9 @@
 "use client"
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Search, Grid, List, X } from 'lucide-react'
+import { Search, Grid, List, X, Plus, Inbox } from 'lucide-react'
 import { EmployeeRegistrationForm } from '@/components/employee-registration-form'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import Sidebar from '@/components/layout/Sidebar'
-import SuperAdminHeader from '@/components/layout/SuperAdminHeader'
-import { employeeSidebarItems } from '@/components/layout/EmployeeSidebar'
 import SuccessModal from '@/components/ui/SuccessModal'
 import LoadingModal from '@/components/ui/LoadingModal'
 import FailModal from '@/components/ui/FailModal'
@@ -95,15 +91,13 @@ function hasAllRequiredFields(data: Record<string, any> | null | undefined): boo
   })
 }
 
-type StatusFilter = 'all' | 'pending' | 'approved' | 'terminated'
-
 export default function MasterfilePage() {
-  const [user, setUser] = useState<any>(null)
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards')
+  const [statusFilter, setStatusFilter] = useState<'pending' | 'approved' | 'terminated'>('pending')
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
+  const [currentPage, setCurrentPage] = useState(1)
   const [showRegistrationModal, setShowRegistrationModal] = useState(false)
   const [registrationPanelClosing, setRegistrationPanelClosing] = useState(false)
   const [showCreateSuccess, setShowCreateSuccess] = useState(false)
@@ -124,79 +118,60 @@ export default function MasterfilePage() {
   const [showSaveLoading, setShowSaveLoading] = useState(false)
   const [saveLoadingAction, setSaveLoadingAction] = useState<'save' | 'approve'>('save')
 
-  // Auth effect - same pattern as management page (cookie-based via /api/auth/me)
   useEffect(() => {
-    const fetchMe = async () => {
-      try {
-        const res = await fetch('/api/auth/me')
-        const data = await res.json()
-        if (res.ok && data.success) {
-          setUser(data.user)
-        } else {
-          window.location.href = '/login'
-          return
-        }
-      } catch {
-        window.location.href = '/login'
-        return
-      }
-    }
-    fetchMe()
+    fetchEmployees()
   }, [])
 
-  // Fetch employees from API
-  useEffect(() => {
-    if (!user) return
-    const fetchEmployees = async () => {
-      setLoading(true)
-      try {
-        const res = await fetch('/api/employees')
-        const data = await res.json()
-        if (res.ok && data.success && Array.isArray(data.data)) {
-          const mapped = data.data.map((e: { id: number; first_name: string; last_name: string; email: string; position: string; status?: string; created_at: string }) => ({
-            id: e.id,
-            first_name: e.first_name,
-            last_name: e.last_name,
-            email: e.email,
-            position: e.position ?? '',
-            status: mapStatus(e.status),
-            created_at: e.created_at ?? '',
-          }))
-          setEmployees(mapped)
-        }
-      } catch {
-        setEmployees([])
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchEmployees()
-  }, [user])
-
   const filteredEmployees = useMemo(() => {
-    let result = employees
+    let filtered = employees.filter((emp) => emp.status === statusFilter)
     const q = searchQuery.trim().toLowerCase()
     if (q) {
-      result = result.filter((emp) =>
+      filtered = filtered.filter((emp) =>
         emp.first_name?.toLowerCase().includes(q) ||
         emp.last_name?.toLowerCase().includes(q) ||
         emp.email?.toLowerCase().includes(q) ||
         emp.position?.toLowerCase().includes(q)
       )
     }
-    if (statusFilter !== 'all') {
-      result = result.filter((emp) => emp.status === statusFilter)
-    }
-    return result
+    return filtered
   }, [employees, searchQuery, statusFilter])
+
+  const itemsPerPage = viewMode === 'table' ? 10 : 30
+  const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedEmployees = filteredEmployees.slice(startIndex, endIndex)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [statusFilter, searchQuery, viewMode])
+
+  const fetchEmployees = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/employees')
+      const data = await res.json()
+      if (res.ok && data.success && Array.isArray(data.data)) {
+        const mapped = data.data.map((e: { id: number; first_name: string; last_name: string; email: string; position: string; status?: string; created_at: string }) => ({
+          id: e.id,
+          first_name: e.first_name,
+          last_name: e.last_name,
+          email: e.email,
+          position: e.position ?? '',
+          status: mapStatus(e.status),
+          created_at: e.created_at ?? '',
+        }))
+        setEmployees(mapped)
+      }
+    } catch {
+      setEmployees([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleEmployeeCreated = (newEmployee: Employee) => {
     setEmployees((prev) => [newEmployee, ...prev])
-  }
-
-  const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' })
-    window.location.href = '/login'
   }
 
   const openDetailDrawer = async (id: number) => {
@@ -319,49 +294,79 @@ export default function MasterfilePage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <SuperAdminHeader user={user} onLogout={handleLogout} />
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar
-          user={user}
-          items={employeeSidebarItems}
-          onLogout={handleLogout}
-          showProfile={false}
-        />
-        <main className="flex-1 overflow-auto bg-gray-100">
-          <div className="max-w-10xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Maroon Gradient Header */}
-        <div className="bg-gradient-to-br from-[#800020] via-[#A0153E] to-[#C9184A] text-white rounded-lg shadow-lg p-8 mb-8">
-          <h1 className="text-4xl font-bold ">Masterfile</h1>
-        </div>
+    <div className="min-h-full flex flex-col">
+      {/* Compact Masterfile bar - extension of sidebar */}
+      <div className="bg-gradient-to-r from-[#7B0F2B] via-[#8B1535] to-[#A4163A] text-white px-6 py-5 flex items-center shrink-0 border-b border-[#6A0D25]/30">
+        <h1 className="text-lg font-semibold tracking-wide">Masterfile</h1>
+      </div>
 
-        <section
-          className="rounded-lg bg-white p-5 shadow-sm border"
-          style={{ borderColor: BORDER }}
-        >
+      <div className="flex-1 px-4 sm:px-6 lg:px-8 py-8">
+        <section className="rounded-md bg-white p-5 shadow-sm border" style={{ borderColor: BORDER }}>
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-lg font-bold text-[#5f0c18]">Employee List</h2>
               <p className="text-sm text-gray-600 mt-1">Manage employee master data and records</p>
             </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                onClick={() => setShowRegistrationModal(true)}
-                className="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold text-white hover:opacity-95"
-                style={{ background: '#7a0f1f', height: 40 }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-                </svg>
-                Create Employee
-              </button>
-            </div>
+            <button
+              onClick={() => setShowRegistrationModal(true)}
+              className="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold text-white hover:opacity-95"
+              style={{ background: '#7a0f1f', height: 40 }}
+            >
+              <Plus className="w-4 h-4" />
+              Create Employee
+            </button>
           </div>
 
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mt-6">
-            <div className="flex-1" />
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium text-gray-700">Status:</span>
+              <button
+                onClick={() => setStatusFilter('pending')}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  statusFilter === 'pending'
+                    ? 'bg-[#7a0f1f] text-white'
+                    : 'bg-white border text-gray-600 hover:bg-gray-50'
+                }`}
+                style={statusFilter !== 'pending' ? { borderColor: BORDER } : undefined}
+              >
+                Pending
+              </button>
+              <button
+                onClick={() => setStatusFilter('approved')}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  statusFilter === 'approved'
+                    ? 'bg-[#7a0f1f] text-white'
+                    : 'bg-white border text-gray-600 hover:bg-gray-50'
+                }`}
+                style={statusFilter !== 'approved' ? { borderColor: BORDER } : undefined}
+              >
+                Approved
+              </button>
+              <button
+                onClick={() => setStatusFilter('terminated')}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  statusFilter === 'terminated'
+                    ? 'bg-[#7a0f1f] text-white'
+                    : 'bg-white border text-gray-600 hover:bg-gray-50'
+                }`}
+                style={statusFilter !== 'terminated' ? { borderColor: BORDER } : undefined}
+              >
+                Terminated
+              </button>
+            </div>
             <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={() => fetchEmployees()}
+                className="p-2 rounded-md border hover:bg-gray-50 transition-colors"
+                style={{ borderColor: BORDER }}
+                title="Refresh"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M4 12a8 8 0 0 1 14.9-3M20 12a8 8 0 0 1-14.9 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  <path d="M18 5v4h-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  <path d="M6 19v-4h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </button>
               <div className="relative w-full md:w-80">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
                 <input
@@ -372,59 +377,17 @@ export default function MasterfilePage() {
                   style={{ borderColor: BORDER, height: 40, color: '#111' }}
                 />
               </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setStatusFilter('all')}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                    statusFilter === 'all' ? 'bg-[#7a0f1f] text-white' : 'bg-white text-gray-700 border hover:bg-gray-50'
-                  }`}
-                  style={{ borderColor: statusFilter !== 'all' ? BORDER : undefined }}
-                >
-                  All
-                </button>
-                <button
-                  onClick={() => setStatusFilter('pending')}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                    statusFilter === 'pending' ? 'bg-amber-500 text-white' : 'bg-white text-gray-700 border hover:bg-gray-50'
-                  }`}
-                  style={{ borderColor: statusFilter !== 'pending' ? BORDER : undefined }}
-                >
-                  Pending
-                </button>
-                <button
-                  onClick={() => setStatusFilter('approved')}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                    statusFilter === 'approved' ? 'bg-green-500 text-white' : 'bg-white text-gray-700 border hover:bg-gray-50'
-                  }`}
-                  style={{ borderColor: statusFilter !== 'approved' ? BORDER : undefined }}
-                >
-                  Approved
-                </button>
-                <button
-                  onClick={() => setStatusFilter('terminated')}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                    statusFilter === 'terminated' ? 'bg-red-500 text-white' : 'bg-white text-gray-700 border hover:bg-gray-50'
-                  }`}
-                  style={{ borderColor: statusFilter !== 'terminated' ? BORDER : undefined }}
-                >
-                  Terminated
-                </button>
-              </div>
-
-              <div className="flex border rounded-md" style={{ borderColor: BORDER }}>
+              <div className="flex rounded-md border" style={{ borderColor: BORDER }}>
                 <button
                   onClick={() => setViewMode('cards')}
-                  className={`p-2 ${viewMode === 'cards' ? 'bg-[#7a0f1f] text-white' : 'text-gray-500 hover:text-gray-700'}`}
-                  style={{ borderRadius: '6px 0 0 6px' }}
+                  className={`p-2 rounded-l-md ${viewMode === 'cards' ? 'bg-[#7a0f1f] text-white' : 'text-gray-500 hover:text-gray-700'}`}
                   title="Card View"
                 >
                   <Grid className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => setViewMode('table')}
-                  className={`p-2 ${viewMode === 'table' ? 'bg-[#7a0f1f] text-white' : 'text-gray-500 hover:text-gray-700'}`}
-                  style={{ borderRadius: '0 6px 6px 0' }}
+                  className={`p-2 rounded-r-md ${viewMode === 'table' ? 'bg-[#7a0f1f] text-white' : 'text-gray-500 hover:text-gray-700'}`}
                   title="Table View"
                 >
                   <List className="w-4 h-4" />
@@ -445,24 +408,23 @@ export default function MasterfilePage() {
                 <EmployeeTableSkeleton />
               )
             ) : filteredEmployees.length === 0 ? (
-              <div className="px-4 py-10 text-center">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Search className="w-8 h-8 text-gray-400" />
-                </div>
+              <div className="px-4 py-10 flex flex-col items-center justify-center text-center">
+                <Inbox className="w-16 h-16 text-gray-300 mx-auto mb-4" aria-hidden />
                 <div className="text-3xl font-bold text-[#5f0c18]">No data</div>
-                <div className="mt-2 text-xs text-neutral-800">Create a record or adjust your search.</div>
+                <div className="mt-2 text-xs text-neutral-800">Create an employee or adjust your search.</div>
               </div>
             ) : viewMode === 'cards' ? (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" style={{ gridAutoRows: 'min-content' }}>
-                {filteredEmployees.map((emp) => (
+              <>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" style={{ gridAutoRows: 'min-content' }}>
+                  {paginatedEmployees.map((emp) => (
                   <div
                     key={emp.id}
-                    className="rounded-lg bg-white border shadow-sm p-4 hover:shadow-md transition-shadow"
+                    className="rounded-md bg-white border shadow-sm p-4 hover:shadow-md transition-shadow"
                     style={{ borderColor: BORDER }}
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-[#7a0f1f]/10 rounded-full flex items-center justify-center">
+                        <div className="w-10 h-10 bg-[#7a0f1f]/10  flex items-center justify-center">
                           <span className="text-sm font-semibold text-[#7a0f1f]">
                             {(emp.first_name || '?').charAt(0).toUpperCase()}
                           </span>
@@ -474,7 +436,7 @@ export default function MasterfilePage() {
                         </div>
                       </div>
                       <div
-                        className={`px-2 py-1 text-[11px] font-semibold rounded-md ${
+                        className={`px-2 py-1 text-[11px] font-semibold  ${
                           emp.status === 'approved' ? 'bg-green-100 text-green-700' :
                           emp.status === 'terminated' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
                         }`}
@@ -495,61 +457,196 @@ export default function MasterfilePage() {
                       </button>
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="overflow-hidden rounded-lg border" style={{ borderColor: BORDER }}>
-                <div
-                  className="grid bg-neutral-50 px-4 py-3 text-xs font-semibold text-neutral-900"
-                  style={{ gridTemplateColumns: 'minmax(140px, 1.15fr) minmax(160px, 1.2fr) minmax(120px, 1fr) 96px 100px' }}
-                >
-                  <div>Name</div>
-                  <div>Email</div>
-                  <div>Position</div>
-                  <div className="text-center">Status</div>
-                  <div className="text-right">Actions</div>
+                  ))}
                 </div>
-                {filteredEmployees.map((emp) => (
-                  <div
-                    key={emp.id}
-                    className="grid items-center px-4 py-3 text-sm border-t"
-                    style={{ borderColor: BORDER, gridTemplateColumns: 'minmax(140px, 1.15fr) minmax(160px, 1.2fr) minmax(120px, 1fr) 96px 100px' }}
-                  >
-                    <div className="min-w-0">
-                      <div className="font-semibold text-neutral-900 truncate">{emp.first_name} {emp.last_name}</div>
-                      <div className="text-[11px] text-neutral-800">Created: {formatDate(emp.created_at)}</div>
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-6 pt-4 border-t" style={{ borderColor: BORDER }}>
+                    <div className="text-sm text-neutral-600">
+                      Showing {startIndex + 1} to {Math.min(endIndex, filteredEmployees.length)} of {filteredEmployees.length} employees
                     </div>
-                    <div className="min-w-0 text-neutral-900 truncate">{emp.email}</div>
-                    <div className="min-w-0 text-neutral-900 truncate">{emp.position || '-'}</div>
-                    <div className="flex items-center justify-center">
-                      <div
-                        className={`px-2 py-1 text-[11px] font-semibold rounded-md ${
-                          emp.status === 'approved' ? 'bg-green-100 text-green-700' :
-                          emp.status === 'terminated' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
-                        }`}
-                      >
-                        {statusLabels[emp.status]}
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-end">
+                    <div className="flex items-center gap-2">
                       <button
-                        onClick={() => openDetailDrawer(emp.id)}
-                        className="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold text-white hover:opacity-95"
-                        style={{ background: '#7a0f1f', height: 32 }}
-                        title="View"
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                        style={{ borderColor: BORDER }}
                       >
-                        <EyeIcon />
-                        View
+                        Previous
+                      </button>
+                      <div className="flex items-center gap-1">
+                        {[...Array(totalPages)].map((_, i) => {
+                          const page = i + 1
+                          if (
+                            page === 1 ||
+                            page === totalPages ||
+                            (page >= currentPage - 1 && page <= currentPage + 1)
+                          ) {
+                            return (
+                              <button
+                                key={page}
+                                onClick={() => setCurrentPage(page)}
+                                className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+                                  currentPage === page
+                                    ? 'bg-[#7a0f1f] text-white'
+                                    : 'border hover:bg-gray-50'
+                                }`}
+                                style={currentPage !== page ? { borderColor: BORDER } : undefined}
+                              >
+                                {page}
+                              </button>
+                            )
+                          } else if (page === currentPage - 2 || page === currentPage + 2) {
+                            return <span key={page} className="px-2 text-neutral-500">...</span>
+                          }
+                          return null
+                        })}
+                      </div>
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                        className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                        style={{ borderColor: BORDER }}
+                      >
+                        Next
                       </button>
                     </div>
                   </div>
-                ))}
+                )}
+              </>
+            ) : (
+              <div>
+                <div className="rounded-md border bg-neutral-50 px-4 py-0 mb-3" style={{ borderColor: BORDER }}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      <div className="w-12 h-12 shrink-0"></div>
+                      <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-3 gap-2 text-sm font-bold text-neutral-900">
+                        <div>Name</div>
+                        <div>Email</div>
+                        <div>Position</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="text-right text-sm font-bold text-neutral-900 w-20">Created</div>
+                      <div className="text-sm font-bold text-neutral-900 w-20">Status</div>
+                      <div className="w-20"></div>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  {paginatedEmployees.map((emp) => (
+                  <div
+                    key={emp.id}
+                    className="rounded-md bg-white border shadow-sm p-4 hover:shadow-md transition-shadow"
+                    style={{ borderColor: BORDER }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4 flex-1 min-w-0">
+                        <div className="w-12 h-12 rounded-md bg-[#7a0f1f]/10 flex items-center justify-center shrink-0">
+                          <span className="text-base font-semibold text-[#7a0f1f]">
+                            {(emp.first_name || '?').charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-3 gap-2">
+                          <div className="min-w-0">
+                            <div className="font-semibold text-neutral-900 truncate">{emp.first_name} {emp.last_name}</div>
+                            <div className="text-xs text-neutral-500 mt-0.5">Name</div>
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-sm text-neutral-900 truncate">{emp.email}</div>
+                            <div className="text-xs text-neutral-500 mt-0.5">Email</div>
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-sm text-neutral-900 truncate">{emp.position || '-'}</div>
+                            <div className="text-xs text-neutral-500 mt-0.5">Position</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <div className="text-right">
+                          <div className="text-xs text-neutral-500 mb-1">Created</div>
+                          <div className="text-xs text-neutral-700">{formatDate(emp.created_at)}</div>
+                        </div>
+                        <div
+                          className={`px-3 py-1.5 rounded-md text-xs font-semibold ${
+                            emp.status === 'approved' ? 'bg-green-100 text-green-700' :
+                            emp.status === 'terminated' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                          }`}
+                        >
+                          {statusLabels[emp.status]}
+                        </div>
+                        <button
+                          onClick={() => openDetailDrawer(emp.id)}
+                          className="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold text-white hover:opacity-95"
+                          style={{ background: '#7a0f1f', height: 32 }}
+                          title="View"
+                        >
+                          <EyeIcon />
+                          View
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  ))}
+                </div>
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-6 pt-4 border-t" style={{ borderColor: BORDER }}>
+                    <div className="text-sm text-neutral-600">
+                      Showing {startIndex + 1} to {Math.min(endIndex, filteredEmployees.length)} of {filteredEmployees.length} employees
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                        style={{ borderColor: BORDER }}
+                      >
+                        Previous
+                      </button>
+                      <div className="flex items-center gap-1">
+                        {[...Array(totalPages)].map((_, i) => {
+                          const page = i + 1
+                          if (
+                            page === 1 ||
+                            page === totalPages ||
+                            (page >= currentPage - 1 && page <= currentPage + 1)
+                          ) {
+                            return (
+                              <button
+                                key={page}
+                                onClick={() => setCurrentPage(page)}
+                                className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+                                  currentPage === page
+                                    ? 'bg-[#7a0f1f] text-white'
+                                    : 'border hover:bg-gray-50'
+                                }`}
+                                style={currentPage !== page ? { borderColor: BORDER } : undefined}
+                              >
+                                {page}
+                              </button>
+                            )
+                          } else if (page === currentPage - 2 || page === currentPage + 2) {
+                            return <span key={page} className="px-2 text-neutral-500">...</span>
+                          }
+                          return null
+                        })}
+                      </div>
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                        className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                        style={{ borderColor: BORDER }}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
         </section>
 
-        {/* Employee Registration Side Panel */}
+        {/* Create Employee Side Panel - Full Height */}
         {(showRegistrationModal || registrationPanelClosing) && (
           <>
             <div
@@ -560,7 +657,7 @@ export default function MasterfilePage() {
               aria-hidden="true"
             />
             <div
-              className="fixed top-1/2 right-0 -translate-y-1/2 w-full max-w-lg max-h-[90vh] bg-white z-50 flex flex-col rounded-l-2xl overflow-hidden shadow-xl"
+              className="fixed top-0 right-0 bottom-0 w-full max-w-lg h-screen bg-white z-50 flex flex-col rounded-md overflow-hidden shadow-xl"
               style={{
                 animation: registrationPanelClosing
                   ? 'slideOut 0.35s cubic-bezier(0.32, 0.72, 0, 1) forwards'
@@ -581,9 +678,8 @@ export default function MasterfilePage() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                <div className="flex-1 overflow-y-auto p-6">
-                  <EmployeeRegistrationForm
+              <div className="flex-1 min-h-0 overflow-y-auto p-6">
+                <EmployeeRegistrationForm
                     onSuccess={() => {
                       closeRegistrationPanel()
                       setSuccessModalTitle('Employee Created Successfully')
@@ -600,14 +696,6 @@ export default function MasterfilePage() {
                       }
                     }}
                   />
-                </div>
-                {/* <div className="flex-shrink-0 min-h-48 bg-slate-50/50 flex items-end justify-center p-4">
-                  <img
-                    src="/images/background/create_employee.png"
-                    alt=""
-                    className="max-w-full max-h-56 w-auto h-auto object-contain object-left-bottom"
-                  />
-                </div> */}
               </div>
             </div>
           </>
@@ -672,7 +760,7 @@ export default function MasterfilePage() {
               aria-hidden="true"
             />
             <div
-              className="fixed top-0 right-0 h-full w-full max-w-4xl bg-white z-50 flex flex-col rounded-l-2xl overflow-hidden"
+              className="fixed top-0 right-0 bottom-0 w-full max-w-4xl h-screen bg-white z-50 flex flex-col rounded-md overflow-hidden shadow-xl"
               style={{
                 animation: detailDrawerClosing
                   ? 'slideOut 0.35s cubic-bezier(0.32, 0.72, 0, 1) forwards'
@@ -780,8 +868,6 @@ export default function MasterfilePage() {
           </>
         )}
       </div>
-        </main>
-      </div>
     </div>
   )
 }
@@ -792,17 +878,17 @@ function EmployeeDetailSkeleton() {
       <div className="flex-shrink-0 w-52 py-2 border-r" style={{ borderColor: BORDER }}>
         <div className="flex flex-col gap-0.5 px-2">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="h-10 bg-slate-100 rounded-md mx-2" />
+            <div key={i} className="h-10 bg-slate-100  mx-2" />
           ))}
         </div>
       </div>
       <div className="flex-1 p-6 min-w-0">
-        <div className="h-5 bg-slate-200 rounded w-1/3 mb-4" />
+        <div className="h-5 bg-slate-200 w-1/3 mb-4" />
         <div className="grid grid-cols-2 gap-4">
           {[1, 2, 3, 4].map((j) => (
             <div key={j}>
-              <div className="h-3 bg-slate-100 rounded w-20 mb-2" />
-              <div className="h-4 bg-slate-200 rounded w-full" />
+              <div className="h-3 bg-slate-100 w-20 mb-2" />
+              <div className="h-4 bg-slate-200 w-full" />
             </div>
           ))}
         </div>
@@ -969,8 +1055,8 @@ function EmployeeDetailContent({
     }
   }
 
-  const inputCls = 'flex h-9 w-full rounded-md border px-3 py-1 text-sm'
-  const selectCls = 'flex h-9 w-full rounded-md border border-slate-200 px-3 py-2 text-sm'
+  const inputCls = 'flex h-9 w-full  border px-3 py-1 text-sm'
+  const selectCls = 'flex h-9 w-full  border border-slate-200 px-3 py-2 text-sm'
 
   return (
     <div className="flex gap-0 min-h-0 flex-1">
@@ -991,7 +1077,7 @@ function EmployeeDetailContent({
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 min-w-0 space-y-6">
-        <div data-section="employee" className={`scroll-mt-4 rounded-lg p-4 transition-all duration-200 ${activeTab === 'employee' ? 'bg-[#800020]/8 ring-2 ring-[#800020]/40' : ''}`}>
+        <div data-section="employee" className={`scroll-mt-4 rounded-md p-4 transition-all duration-200 ${activeTab === 'employee' ? 'bg-[#800020]/8 ring-2 ring-[#800020]/40' : ''}`}>
           <DetailSection title="EMPLOYEE DETAILS">
             {isEditing ? (
               <>
@@ -1018,7 +1104,7 @@ function EmployeeDetailContent({
           </DetailSection>
         </div>
 
-        <div data-section="personal" className={`scroll-mt-4 rounded-lg p-4 transition-all duration-200 ${activeTab === 'personal' ? 'bg-[#800020]/8 ring-2 ring-[#800020]/40' : ''}`}>
+        <div data-section="personal" className={`scroll-mt-4 rounded-md p-4 transition-all duration-200 ${activeTab === 'personal' ? 'bg-[#800020]/8 ring-2 ring-[#800020]/40' : ''}`}>
           <DetailSection title="PERSONAL INFORMATION">
             {isEditing ? (
               <>
@@ -1065,7 +1151,7 @@ function EmployeeDetailContent({
           </DetailSection>
         </div>
 
-        <div data-section="contact" className={`scroll-mt-4 rounded-lg p-4 transition-all duration-200 ${activeTab === 'contact' ? 'bg-[#800020]/8 ring-2 ring-[#800020]/40' : ''}`}>
+        <div data-section="contact" className={`scroll-mt-4 rounded-md p-4 transition-all duration-200 ${activeTab === 'contact' ? 'bg-[#800020]/8 ring-2 ring-[#800020]/40' : ''}`}>
           <DetailSection title="CONTACT INFORMATION">
             {isEditing ? (
               <>
@@ -1083,7 +1169,7 @@ function EmployeeDetailContent({
           </DetailSection>
         </div>
 
-        <div data-section="government" className={`scroll-mt-4 rounded-lg p-4 transition-all duration-200 ${activeTab === 'government' ? 'bg-[#800020]/8 ring-2 ring-[#800020]/40' : ''}`}>
+        <div data-section="government" className={`scroll-mt-4 rounded-md p-4 transition-all duration-200 ${activeTab === 'government' ? 'bg-[#800020]/8 ring-2 ring-[#800020]/40' : ''}`}>
           <DetailSection title="GOVERNMENT ID NUMBERS">
             {isEditing ? (
               <>
@@ -1103,7 +1189,7 @@ function EmployeeDetailContent({
           </DetailSection>
         </div>
 
-        <div data-section="family" className={`scroll-mt-4 rounded-lg p-4 transition-all duration-200 ${activeTab === 'family' ? 'bg-[#800020]/8 ring-2 ring-[#800020]/40' : ''}`}>
+        <div data-section="family" className={`scroll-mt-4 rounded-md p-4 transition-all duration-200 ${activeTab === 'family' ? 'bg-[#800020]/8 ring-2 ring-[#800020]/40' : ''}`}>
           <DetailSection title="FAMILY INFORMATION" grid={false}>
             <p className="text-slate-700 font-semibold mb-2 text-sm">MOTHER&apos;S MAIDEN NAME</p>
             <div className="grid grid-cols-2 gap-4 mb-4">
@@ -1144,7 +1230,7 @@ function EmployeeDetailContent({
           </DetailSection>
         </div>
 
-        <div data-section="address" className={`scroll-mt-4 rounded-lg p-4 transition-all duration-200 ${activeTab === 'address' ? 'bg-[#800020]/8 ring-2 ring-[#800020]/40' : ''}`}>
+        <div data-section="address" className={`scroll-mt-4 rounded-md p-4 transition-all duration-200 ${activeTab === 'address' ? 'bg-[#800020]/8 ring-2 ring-[#800020]/40' : ''}`}>
           <DetailSection title="ADDRESS INFORMATION">
             {isEditing ? (
               <>
@@ -1246,59 +1332,63 @@ function DetailRow({ label, value }: { label: string; value: string | null | und
 function EmployeeCardSkeleton() {
   return (
     <div
-      className="rounded-lg bg-white border shadow-sm p-4 animate-pulse"
+      className="bg-white border shadow-sm p-4 animate-pulse"
       style={{ borderColor: BORDER }}
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gray-200 rounded-full" />
+          <div className="w-10 h-10 bg-gray-200 " />
           <div className="flex-1">
-            <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
-            <div className="h-3 bg-gray-200 rounded w-1/2" />
-            <div className="h-3 bg-gray-200 rounded w-1/3 mt-1" />
+            <div className="h-4 bg-gray-200 w-3/4 mb-2" />
+            <div className="h-3 bg-gray-200 w-1/2" />
+            <div className="h-3 bg-gray-200 w-1/3 mt-1" />
           </div>
         </div>
-        <div className="h-6 bg-gray-200 rounded w-16" />
+        <div className="h-6 bg-gray-200 w-16" />
       </div>
       <div className="flex items-center justify-between">
-        <div className="h-3 bg-gray-200 rounded w-24" />
-        <div className="h-8 bg-gray-200 rounded w-16" />
+        <div className="h-3 bg-gray-200 w-24" />
+        <div className="h-8 bg-gray-200 w-16" />
       </div>
     </div>
   )
 }
 
 function EmployeeTableSkeleton() {
-  const cols = 'minmax(140px, 1.15fr) minmax(160px, 1.2fr) minmax(120px, 1fr) 96px 100px'
   return (
-    <div className="overflow-hidden rounded-lg border" style={{ borderColor: BORDER }}>
-      <div
-        className="grid bg-neutral-50 px-4 py-3 text-xs font-semibold text-neutral-900"
-        style={{ gridTemplateColumns: cols }}
-      >
-        <div>Name</div>
-        <div>Email</div>
-        <div>Position</div>
-        <div className="text-center">Status</div>
-        <div className="text-right">Actions</div>
-      </div>
+    <div className="space-y-3">
       {[...Array(5)].map((_, i) => (
         <div
           key={i}
-          className="grid items-center px-4 py-3 text-sm border-t animate-pulse"
-          style={{ borderColor: BORDER, gridTemplateColumns: cols }}
+          className="rounded-md bg-white border shadow-sm p-4 animate-pulse"
+          style={{ borderColor: BORDER }}
         >
-          <div className="min-w-0">
-            <div className="h-4 bg-gray-200 rounded w-3/4 mb-1" />
-            <div className="h-3 bg-gray-200 rounded w-20" />
-          </div>
-          <div className="h-4 bg-gray-200 rounded w-40" />
-          <div className="h-4 bg-gray-200 rounded w-28" />
-          <div className="flex justify-center">
-            <div className="h-6 bg-gray-200 rounded w-16" />
-          </div>
-          <div className="flex justify-end">
-            <div className="h-8 bg-gray-200 rounded w-16" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4 flex-1 min-w-0">
+              <div className="w-12 h-12 rounded-md bg-gray-200 shrink-0"></div>
+              <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-3 gap-2">
+                <div className="min-w-0">
+                  <div className="h-4 rounded-md bg-gray-200 w-3/4 mb-2"></div>
+                  <div className="h-3 rounded-md bg-gray-200 w-16"></div>
+                </div>
+                <div className="min-w-0">
+                  <div className="h-4 rounded-md bg-gray-200 w-full mb-2"></div>
+                  <div className="h-3 rounded-md bg-gray-200 w-12"></div>
+                </div>
+                <div className="min-w-0">
+                  <div className="h-4 rounded-md bg-gray-200 w-2/3 mb-2"></div>
+                  <div className="h-3 rounded-md bg-gray-200 w-20"></div>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="text-right">
+                <div className="h-3 rounded-md bg-gray-200 w-16 mb-1"></div>
+                <div className="h-3 rounded-md bg-gray-200 w-20"></div>
+              </div>
+              <div className="h-6 rounded-md bg-gray-200 w-20"></div>
+              <div className="h-8 rounded-md bg-gray-200 w-16"></div>
+            </div>
           </div>
         </div>
       ))}
