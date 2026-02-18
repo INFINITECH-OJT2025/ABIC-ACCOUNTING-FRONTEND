@@ -62,6 +62,7 @@ export default function TerminatePage() {
   const [showTerminatedModal, setShowTerminatedModal] = useState(false)
   const [showDetailDialog, setShowDetailDialog] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [rehireLoading, setRehireLoading] = useState<number | null>(null)
   const [formData, setFormData] = useState<TerminationFormData>({
     termination_date: new Date().toISOString().split('T')[0],
     reason: '',
@@ -177,6 +178,39 @@ export default function TerminatePage() {
       toast.error('Failed to terminate employee')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleRehire = async (employeeId: number) => {
+    if (!confirm('Are you sure you want to re-hire this employee? This will restore their active status.')) {
+      return
+    }
+
+    try {
+      setRehireLoading(employeeId)
+      const response = await fetch(`${getApiUrl()}/api/employees/${employeeId}/rehire`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast.success(data.message || 'Employee re-hired successfully')
+        // Refresh data
+        fetchData()
+        // If details modal is open, close it to avoid inconsistent state
+        setShowDetailDialog(false)
+      } else {
+        toast.error(data.message || 'Failed to re-hire employee')
+      }
+    } catch (error) {
+      console.error('Error re-hiring:', error)
+      toast.error('Failed to re-hire employee')
+    } finally {
+      setRehireLoading(null)
     }
   }
 
@@ -429,6 +463,15 @@ export default function TerminatePage() {
                           >
                             View details
                           </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200 ml-2"
+                            onClick={() => handleRehire(record.employee_id)}
+                            disabled={rehireLoading === record.employee_id}
+                          >
+                            {rehireLoading === record.employee_id ? 'Wait...' : 'Re-hire'}
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -514,6 +557,17 @@ export default function TerminatePage() {
               className="bg-white text-[#800020] hover:bg-rose-50 border-[#800020] border font-bold"
             >
               Back to History
+            </Button>
+            <Button 
+              onClick={() => {
+                if (selectedTermination) {
+                  handleRehire(selectedTermination.employee_id)
+                }
+              }}
+              disabled={rehireLoading === selectedTermination?.employee_id}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+            >
+              {rehireLoading === selectedTermination?.employee_id ? 'Processing...' : 'Re-hire Employee'}
             </Button>
           </div>
         </DialogContent>
