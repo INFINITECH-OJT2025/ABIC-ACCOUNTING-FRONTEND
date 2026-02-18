@@ -13,7 +13,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
 
 interface Employee {
@@ -22,7 +21,7 @@ interface Employee {
   last_name: string
   email: string
   position: string
-  status: 'pending' | 'approved' | 'terminated'
+  status: 'pending' | 'employed' | 'terminated'
   created_at: string
 }
 
@@ -39,20 +38,19 @@ interface AdditionalFieldValue {
 
 const statusBadgeColors = {
   pending: 'bg-amber-50 text-[#A0153E] border-[#C9184A]',
-  approved: 'bg-emerald-50 text-[#800020] border-[#A0153E]',
+  employed: 'bg-emerald-50 text-[#065f46] border-[#059669]',
   terminated: 'bg-rose-50 text-[#800020] border-[#C9184A]',
 }
 
 const statusLabels = {
   pending: 'Pending',
-  approved: 'Approved',
+  employed: 'Employed',
   terminated: 'Terminated',
 }
 
 export default function MasterfilePage() {
   const router = useRouter()
   const [employees, setEmployees] = useState<Employee[]>([])
-  const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeDetails | null>(null)
@@ -64,19 +62,6 @@ export default function MasterfilePage() {
   useEffect(() => {
     fetchEmployees()
   }, [])
-
-  useEffect(() => {
-    const filtered = employees.filter((emp) => {
-      const query = searchQuery.toLowerCase()
-      return (
-        emp.first_name?.toLowerCase().includes(query) ||
-        emp.last_name?.toLowerCase().includes(query) ||
-        emp.email?.toLowerCase().includes(query) ||
-        emp.position?.toLowerCase().includes(query)
-      )
-    })
-    setFilteredEmployees(filtered)
-  }, [searchQuery, employees])
 
   const fetchEmployees = async () => {
     try {
@@ -160,7 +145,7 @@ export default function MasterfilePage() {
     }
   }
 
-  const handleStatusUpdate = async (newStatus: 'pending' | 'approved' | 'terminated') => {
+  const handleStatusUpdate = async (newStatus: 'pending' | 'employed' | 'terminated') => {
     if (!selectedEmployee) return
 
     setUpdatingStatus(true)
@@ -241,11 +226,74 @@ export default function MasterfilePage() {
     return true
   }
 
+  // Filter employees by search query
+  const filterEmployees = (list: Employee[]) => {
+    if (!searchQuery) return list
+    const query = searchQuery.toLowerCase()
+    return list.filter((emp) =>
+      emp.first_name?.toLowerCase().includes(query) ||
+      emp.last_name?.toLowerCase().includes(query) ||
+      emp.email?.toLowerCase().includes(query) ||
+      emp.position?.toLowerCase().includes(query)
+    )
+  }
+
+  const employedList = filterEmployees(employees.filter(e => e.status === 'employed'))
+  const terminatedList = filterEmployees(employees.filter(e => e.status === 'terminated'))
+  const pendingList = filterEmployees(employees.filter(e => e.status === 'pending'))
+
+  const EmployeeTable = ({ list, emptyMessage }: { list: Employee[], emptyMessage: string }) => (
+    list.length === 0 ? (
+      <p className="text-slate-500 py-4">{emptyMessage}</p>
+    ) : (
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-gradient-to-r from-[#FFE5EC] to-rose-50">
+            <tr className="border-b-2 border-[#C9184A]">
+              <th className="text-left py-3 px-4 font-semibold text-[#800020]">Name</th>
+              <th className="text-left py-3 px-4 font-semibold text-[#800020]">Email</th>
+              <th className="text-left py-3 px-4 font-semibold text-[#800020]">Position</th>
+              <th className="text-left py-3 px-4 font-semibold text-[#800020]">Status</th>
+              <th className="text-left py-3 px-4 font-semibold text-[#800020]">Created</th>
+              <th className="text-left py-3 px-4 font-semibold text-[#800020]">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.map((employee) => (
+              <tr key={employee.id} className="border-b border-slate-100 hover:bg-[#FFE5EC] transition-colors duration-200">
+                <td className="py-3 px-4 text-slate-700 font-medium">{employee.first_name} {employee.last_name}</td>
+                <td className="py-3 px-4 text-slate-700">{employee.email}</td>
+                <td className="py-3 px-4 text-slate-700">{employee.position || '-'}</td>
+                <td className="py-3 px-4">
+                  <Badge className={`${statusBadgeColors[employee.status]} border`}>
+                    {statusLabels[employee.status]}
+                  </Badge>
+                </td>
+                <td className="py-3 px-4 text-slate-500 text-sm">
+                  {new Date(employee.created_at).toLocaleDateString()}
+                </td>
+                <td className="py-3 px-4">
+                  <Button
+                    size="sm"
+                    className="bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white border-0 transition-all duration-300"
+                    onClick={() => fetchEmployeeDetails(employee.id)}
+                  >
+                    View
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  )
+
   return (
     <div className="min-h-screen">
       {/* Maroon Gradient Header */}
       <div className="bg-gradient-to-br from-[#800020] via-[#A0153E] to-[#C9184A] text-white rounded-lg shadow-lg p-8 mb-8">
-        <h1 className="text-4xl font-bold mb-3">Employee Masterfile</h1>
+        <h1 className="text-4xl font-bold mb-3">Employee Record</h1>
         <p className="text-rose-100 text-lg">Manage employee master data and records</p>
       </div>
 
@@ -282,52 +330,83 @@ export default function MasterfilePage() {
 
         {loading ? (
           <p className="text-slate-500">Loading employees...</p>
-        ) : filteredEmployees.length === 0 ? (
-          <p className="text-slate-500">
-            {employees.length === 0
-              ? 'No employees found. Create one using the button above.'
-              : 'No employees match your search.'}
-          </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gradient-to-r from-[#FFE5EC] to-rose-50">
-                <tr className="border-b-2 border-[#C9184A]">
-                  <th className="text-left py-3 px-4 font-semibold text-[#800020]">Name</th>
-                  <th className="text-left py-3 px-4 font-semibold text-[#800020]">Email</th>
-                  <th className="text-left py-3 px-4 font-semibold text-[#800020]">Position</th>
-                  <th className="text-left py-3 px-4 font-semibold text-[#800020]">Status</th>
-                  <th className="text-left py-3 px-4 font-semibold text-[#800020]">Created</th>
-                  <th className="text-left py-3 px-4 font-semibold text-[#800020]">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredEmployees.map((employee) => (
-                  <tr key={employee.id} className="border-b border-slate-100 hover:bg-[#FFE5EC] transition-colors duration-200">
-                    <td className="py-3 px-4 text-slate-700 font-medium">{employee.first_name} {employee.last_name}</td>
-                    <td className="py-3 px-4 text-slate-700">{employee.email}</td>
-                    <td className="py-3 px-4 text-slate-700">{employee.position || '-'}</td>
-                    <td className="py-3 px-4">
-                      <Badge className={`${statusBadgeColors[employee.status]} border`}>
-                        {statusLabels[employee.status]}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-4 text-slate-500 text-sm">
-                      {new Date(employee.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="py-3 px-4">
-                      <Button
-                        size="sm"
-                        className="bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white border-0 transition-all duration-300"
-                        onClick={() => fetchEmployeeDetails(employee.id)}
-                      >
-                        View
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-10">
+            {/* Pending Employees — Card Grid */}
+            {pendingList.length > 0 && (
+              <div>
+                <h3 className="text-lg font-bold text-amber-700 mb-4 flex items-center gap-2">
+                  <span className="inline-block w-3 h-3 rounded-full bg-amber-400"></span>
+                  Pending Approval
+                  <span className="ml-2 text-sm font-normal text-slate-500">({pendingList.length})</span>
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                  {pendingList.map((employee) => (
+                    <div
+                      key={employee.id}
+                      onClick={() => fetchEmployeeDetails(employee.id)}
+                      className="group relative bg-gradient-to-br from-white to-amber-50 border-2 border-amber-100 hover:border-amber-400 rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden"
+                    >
+                      {/* Top accent bar */}
+                      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 rounded-t-2xl" />
+
+                      {/* Avatar initials */}
+                      <div className="w-14 h-14 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-xl font-bold mb-4 shadow-md group-hover:scale-110 transition-transform duration-300">
+                        {employee.first_name.charAt(0)}{employee.last_name.charAt(0)}
+                      </div>
+
+                      {/* Name */}
+                      <h1 className="text-xl font-extrabold text-slate-800 leading-tight mb-1 truncate">
+                        {employee.first_name} {employee.last_name}
+                      </h1>
+
+                      {/* Position */}
+                      <h3 className="text-sm font-semibold text-slate-500 mb-3 truncate">
+                        {employee.position || 'No Position Assigned'}
+                      </h3>
+
+                      {/* Status badge */}
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-300">
+                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                        Pending
+                      </span>
+
+                      {/* Hover CTA */}
+                      <div className="mt-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <span className="text-xs font-semibold text-amber-600">View details →</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+
+            {/* Employed Employees */}
+            <div>
+              <h3 className="text-lg font-bold text-emerald-700 mb-3 flex items-center gap-2">
+                <span className="inline-block w-3 h-3 rounded-full bg-emerald-500"></span>
+                Employed
+                <span className="ml-2 text-sm font-normal text-slate-500">({employedList.length})</span>
+              </h3>
+              <EmployeeTable
+                list={employedList}
+                emptyMessage={searchQuery ? 'No employed employees match your search.' : 'No employed employees found.'}
+              />
+            </div>
+
+            {/* Terminated Employees */}
+            <div>
+              <h3 className="text-lg font-bold text-rose-700 mb-3 flex items-center gap-2">
+                <span className="inline-block w-3 h-3 rounded-full bg-rose-500"></span>
+                Terminated
+                <span className="ml-2 text-sm font-normal text-slate-500">({terminatedList.length})</span>
+              </h3>
+              <EmployeeTable
+                list={terminatedList}
+                emptyMessage={searchQuery ? 'No terminated employees match your search.' : 'No terminated employees found.'}
+              />
+            </div>
           </div>
         )}
       </div>
@@ -466,7 +545,7 @@ export default function MasterfilePage() {
               <div className="mb-8">
                 <h3 className="text-lg font-bold text-[#800020] mb-4 pb-2 border-b-2 border-[#C9184A]">FAMILY INFORMATION</h3>
                 <div className="mb-6">
-                  <p className="text-slate-700 font-semibold mb-3">MOTHER'S MAIDEN NAME</p>
+                  <p className="text-slate-700 font-semibold mb-3">MOTHER&apos;S MAIDEN NAME</p>
                   <div className="grid grid-cols-2 gap-6 ml-4">
                     <div>
                       <p className="text-slate-600 text-sm font-medium mb-1">MLAST NAME <span className="text-red-500">*</span></p>
@@ -487,7 +566,7 @@ export default function MasterfilePage() {
                   </div>
                 </div>
                 <div>
-                  <p className="text-slate-700 font-semibold mb-3">FATHER'S NAME <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
+                  <p className="text-slate-700 font-semibold mb-3">FATHER&apos;S NAME <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
                   <div className="grid grid-cols-2 gap-6 ml-4">
                     <div>
                       <p className="text-slate-600 text-sm font-medium mb-1">FLAST NAME <span className="text-red-500">*</span></p>
@@ -570,7 +649,7 @@ export default function MasterfilePage() {
               {/* Status Requirements Check */}
               <div className="mb-6 p-4 bg-[#FFE5EC] rounded-lg border-2 border-[#C9184A]">
                 <p className="text-slate-700 text-sm font-medium">
-                  <span className="text-[#800020] font-semibold">ℹ️ Required fields check:</span> All fields marked with <span className="text-red-500">*</span> must be filled to approve this employee.
+                  <span className="text-[#800020] font-semibold">ℹ️ Required fields check:</span> All fields marked with <span className="text-red-500">*</span> must be filled to set this employee as Employed.
                 </p>
               </div>
             </div>
@@ -585,11 +664,11 @@ export default function MasterfilePage() {
                   Close
                 </Button>
                 <Button
-                  onClick={() => handleStatusUpdate('approved')}
-                  disabled={updatingStatus || selectedEmployee.status === 'approved' || !isEmployeeComplete(selectedEmployee)}
+                  onClick={() => handleStatusUpdate('employed')}
+                  disabled={updatingStatus || selectedEmployee.status === 'employed' || !isEmployeeComplete(selectedEmployee)}
                   className={`${!isEmployeeComplete(selectedEmployee) ? 'opacity-50 cursor-not-allowed' : 'bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A]'} text-white transition-all duration-300`}
                 >
-                  {updatingStatus ? 'Updating...' : 'Approve Employee'}
+                  {updatingStatus ? 'Updating...' : 'Set as Employed'}
                 </Button>
               </div>
             </div>

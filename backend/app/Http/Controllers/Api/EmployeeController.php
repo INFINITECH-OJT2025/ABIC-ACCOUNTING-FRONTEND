@@ -134,7 +134,7 @@ class EmployeeController extends Controller
                 'zip_code' => 'sometimes|nullable|string|max:255',
                 'email_address' => 'sometimes|nullable|string|max:255',
                 'password' => 'sometimes|nullable|string|min:6',
-                'status' => 'sometimes|in:pending,approved,terminated',
+                'status' => 'sometimes|in:pending,employed,terminated',
             ]);
 
             if (isset($validated['password'])) {
@@ -448,8 +448,8 @@ class EmployeeController extends Controller
                 ], 400);
             }
 
-            // Update employee status back to approved
-            $employee->update(['status' => 'approved']);
+            // Update employee status back to employed
+            $employee->update(['status' => 'employed']);
 
             // Update the termination records for this employee to 'cancelled'
             Termination::where('employee_id', $employee->id)
