@@ -245,7 +245,7 @@ export default function AddClearanceChecklistPage() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-12">
-      <header className="bg-[#a0153e] text-white p-10 rounded-b-[3rem] shadow-lg">
+      <header className="-mx-8 -mt-8 mb-8 bg-[#a0153e] text-white px-10 py-10 shadow-lg">
         <div className="max-w-[1000px] mx-auto flex justify-between items-end gap-4">
           <div>
             <h1 className="text-4xl font-extrabold tracking-tight italic">Add Clearance Record</h1>

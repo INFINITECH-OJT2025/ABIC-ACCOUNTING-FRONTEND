@@ -409,7 +409,7 @@ export default function OnboardingChecklistPage() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-12 font-sans">
-      <header className="bg-[#a0153e] text-white p-10 rounded-b-[3rem] shadow-lg relative overflow-hidden">
+      <header className="-mx-8 -mt-8 mb-8 bg-[#a0153e] text-white px-10 py-10 shadow-lg relative overflow-hidden">
         <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <div className="space-y-4">
             <h1 className="text-4xl font-extrabold tracking-tight italic">Onboarding Checklist</h1>
