@@ -1,0 +1,333 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { ChevronDown, ChevronUp, Menu, Search, X } from "lucide-react";
+
+type User = {
+  name?: string;
+  email?: string;
+};
+
+export interface SuperAdminHeaderProps {
+  user: User | null;
+  onLogout: () => void;
+}
+
+function Dropdown({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="absolute top-full left-0 bg-white rounded-lg shadow-xl border min-w-[200px] z-[60] py-2">
+      {children}
+    </div>
+  );
+}
+
+function SubBtn({
+  label,
+  onClick,
+  active,
+}: {
+  label: string;
+  onClick: () => void;
+  active: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full text-left px-4 py-2 text-sm ${
+        active ? "bg-[#7B0F2B]/10 text-[#7B0F2B] font-semibold" : "hover:bg-gray-100"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function MobileBtn({
+  label,
+  onClick,
+  active,
+}: {
+  label: string;
+  onClick: () => void;
+  active: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full text-left px-4 py-2 rounded-lg cursor-pointer text-white ${
+        active ? "bg-[#5E0C20]/50" : "hover:bg-[#5E0C20]/50"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+export default function SuperAdminHeader({ user, onLogout }: SuperAdminHeaderProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [adminDropdownOpen, setAdminDropdownOpen] = useState(false);
+  const [accountantDropdownOpen, setAccountantDropdownOpen] = useState(false);
+  const [headerCollapsed, setHeaderCollapsed] = useState(false);
+
+  const isSection = (href: string) => pathname === href || pathname.startsWith(href + "/");
+  const isExact = (href: string) => pathname === href;
+
+  useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 10);
+    handleScroll();
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  return (
+    <header className="sticky top-0 z-50 relative">
+      {headerCollapsed ? (
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-[calc(50%+6px)] z-40">
+          <button
+            type="button"
+            onClick={() => setHeaderCollapsed(false)}
+            className="group flex items-center justify-center w-16 h-8 rounded-b-2xl bg-gradient-to-b from-[#7B0F2B] via-[#8B1535] to-[#A4163A] shadow-lg shadow-[#7B0F2B]/40 hover:shadow-xl hover:shadow-[#7B0F2B]/50 border border-b-0 border-x border-white/30 hover:border-white/50"
+            title="Expand header"
+          >
+            <ChevronDown className="w-4 h-4 text-white/95 group-hover:text-white drop-shadow-sm" />
+          </button>
+        </div>
+      ) : (
+        <div className="contents">
+          <div
+            className={`relative z-[60] ${
+              isScrolled
+                ? "bg-gradient-to-r from-[#7B0F2B]/95 to-[#A4163A]/95 backdrop-blur-lg shadow-lg"
+                : "bg-gradient-to-r from-[#7B0F2B] to-[#A4163A] shadow-md"
+            }`}
+          >
+            <div className="px-4 sm:px-6 py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                    className="md:hidden text-white hover:bg-white/10 p-2 rounded-lg transition-all duration-200"
+                    aria-label="Toggle mobile menu"
+                  >
+                    {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                  </button>
+
+                  <div className="flex items-center gap-3">
+                    <img src="/images/logo/abic-logo.png" alt="ABIC Logo" className="w-50 h-auto object-contain" />
+                  </div>
+                </div>
+
+                <div className="hidden lg:flex flex-1 max-w-xl mx-8">
+                  <div className="relative w-full">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60" />
+                    <input
+                      type="text"
+                      placeholder="Search anything..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onFocus={() => setSearchOpen(true)}
+                      onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
+                      className="w-full pl-10 pr-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/30 focus:bg-white/20 transition-all duration-200"
+                    />
+                    {searchOpen && searchQuery && (
+                      <div className="absolute top-full mt-2 w-full bg-white rounded-lg shadow-xl border border-gray-200 max-h-64 overflow-y-auto">
+                        <div className="p-4">
+                          <p className="text-gray-500 text-sm">No results found for &quot;{searchQuery}&quot;</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 sm:gap-4">
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setUserMenuOpen(!userMenuOpen)}
+                      className="flex items-center gap-2 text-white hover:bg-white/10 px-3 py-2 rounded-lg transition-all duration-200"
+                      aria-label="Open user menu"
+                    >
+                      <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-sm font-medium">
+                        {user?.name?.charAt(0) || "U"}
+                      </div>
+                      <span className="hidden sm:block text-sm">{user?.name}</span>
+                      <ChevronDown className="w-4 h-4" />
+                    </button>
+
+                    {userMenuOpen && (
+                      <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden z-50">
+                        <div className="p-4 border-b border-gray-200">
+                          <p className="font-medium text-gray-900">{user?.name}</p>
+                          <p className="text-gray-600 text-sm">{user?.email}</p>
+                        </div>
+
+                        <div className="py-2">
+                          <button type="button" className="w-full text-left px-4 py-2 hover:bg-gray-100">
+                            Profile
+                          </button>
+                          <button type="button" className="w-full text-left px-4 py-2 hover:bg-gray-100">
+                            Settings
+                          </button>
+                          <button type="button" className="w-full text-left px-4 py-2 hover:bg-gray-100">
+                            Help
+                          </button>
+                        </div>
+
+                        <div className="border-t p-2">
+                          <button
+                            type="button"
+                            onClick={onLogout}
+                            className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 rounded"
+                          >
+                            Logout
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <nav className="hidden md:flex bg-[#6A0D25]/50 backdrop-blur-sm text-sm px-6 justify-center">
+              <button
+                type="button"
+                className={`group relative px-6 py-4 border-r border-[#8E1B3E]/30 hover:bg-[#5E0C20]/50 cursor-pointer transition-all duration-200 ${
+                  isExact("/super") ? "bg-[#5E0C20]/50" : ""
+                }`}
+                onClick={() => router.push("/super")}
+              >
+                <span className="relative z-10 text-white">Dashboard</span>
+                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-white scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
+              </button>
+
+              <div
+                className={`relative px-6 py-4 border-r border-[#8E1B3E]/30 hover:bg-[#5E0C20]/50 transition-all duration-200 ${
+                  isSection("/super/employee") ||
+                  isSection("/super/head") ||
+                  isSection("/super/forms") ||
+                  isSection("/super/directory")
+                    ? "bg-[#5E0C20]/50"
+                    : ""
+                }`}
+                onMouseEnter={() => setAdminDropdownOpen(true)}
+                onMouseLeave={() => setAdminDropdownOpen(false)}
+              >
+                <span className="flex items-center gap-1 text-white">
+                  Admin <ChevronDown className="w-3 h-3" />
+                </span>
+
+                {adminDropdownOpen && (
+                  <Dropdown>
+                    <SubBtn
+                      active={isSection("/super/employee")}
+                      onClick={() => router.push("/super/employee/masterfile")}
+                      label="Employee"
+                    />
+                    <SubBtn
+                      active={isSection("/super/forms")}
+                      onClick={() => router.push("/super/forms/onboarding-checklist")}
+                      label="Forms"
+                    />
+                    <SubBtn
+                      active={isSection("/super/directory")}
+                      onClick={() => router.push("/super/directory/process")}
+                      label="Directory"
+                    />
+                    <SubBtn
+                      active={isSection("/super/head/admins")}
+                      onClick={() => router.push("/super/head/admins")}
+                      label="Admins"
+                    />
+                  </Dropdown>
+                )}
+              </div>
+
+              <div
+                className={`relative px-6 py-4 border-r border-[#8E1B3E]/30 hover:bg-[#5E0C20]/50 transition-all duration-200 ${
+                  isSection("/super/accountant") ? "bg-[#5E0C20]/50" : ""
+                }`}
+                onMouseEnter={() => setAccountantDropdownOpen(true)}
+                onMouseLeave={() => setAccountantDropdownOpen(false)}
+              >
+                <span className="flex items-center gap-1 text-white">
+                  Accountant <ChevronDown className="w-3 h-3" />
+                </span>
+
+                {accountantDropdownOpen && (
+                  <Dropdown>
+                    <SubBtn
+                      active={isExact("/super/accountant")}
+                      onClick={() => router.push("/super/accountant")}
+                      label="SCB Banks"
+                    />
+                    <SubBtn
+                      active={isSection("/super/accountant/account-summary")}
+                      onClick={() => router.push("/super/accountant/account-summary")}
+                      label="Account Summary"
+                    />
+                    <SubBtn
+                      active={isSection("/super/accountant/management")}
+                      onClick={() => router.push("/super/accountant/management")}
+                      label="Management"
+                    />
+                  </Dropdown>
+                )}
+              </div>
+            </nav>
+
+            {mobileMenuOpen && (
+              <div className="md:hidden bg-[#6A0D25]/95 backdrop-blur-sm">
+                <div className="px-6 py-4 space-y-2">
+                  <MobileBtn active={isExact("/super")} label="Dashboard" onClick={() => router.push("/super")} />
+                  <MobileBtn
+                    active={isSection("/super/employee")}
+                    label="Employee"
+                    onClick={() => router.push("/super/employee/masterfile")}
+                  />
+                  <MobileBtn
+                    active={isSection("/super/head/admins")}
+                    label="Admins"
+                    onClick={() => router.push("/super/head/admins")}
+                  />
+                  <MobileBtn
+                    active={isExact("/super/accountant")}
+                    label="Accountant"
+                    onClick={() => router.push("/super/accountant")}
+                  />
+                  <MobileBtn
+                    active={isSection("/super/accountant/management")}
+                    label="Accountant Management"
+                    onClick={() => router.push("/super/accountant/management")}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="hidden md:flex absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-[calc(50%+14px)] z-40">
+            <button
+              type="button"
+              onClick={() => setHeaderCollapsed(true)}
+              className="group flex items-center justify-center w-16 h-7 rounded-b-2xl bg-white/95 hover:bg-white shadow-md border border-t-0 border-x border-gray-200 hover:shadow-lg"
+              title="Collapse header"
+            >
+              <ChevronUp className="w-4 h-4 text-[#7B0F2B] group-hover:text-[#5E0C20] transition-colors" />
+            </button>
+          </div>
+        </div>
+      )}
+    </header>
+  );
+}
