@@ -658,7 +658,8 @@ export default function MasterfilePage() {
               <div className="border-r-2 border-slate-400"></div>
               <button 
                 onClick={() => setView('list')}
-                className="py-1 px-4 border-r-2 border-slate-400 bg-[#D1D5DB] hover:bg-slate-300 font-bold text-slate-800 text-sm transition-colors"
+                disabled={Object.keys(completedTasks).length < onboardingTasks.length}
+                className="py-1 px-4 border-r-2 border-slate-400 bg-[#D1D5DB] hover:bg-slate-300 font-bold text-slate-800 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:text-slate-500"
               >
                 ADD TO MASTERFILE
               </button>
