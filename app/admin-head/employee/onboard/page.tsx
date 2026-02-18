@@ -94,7 +94,7 @@ export default function OnboardPage() {
       const response = await fetch(`${getApiUrl()}/api/positions`)
       const data = await response.json()
       if (data.success) {
-        setPositions(data.data)
+        setPositions([...data.data].sort((a: Position, b: Position) => a.name.localeCompare(b.name)))
       }
     } catch (error) {
       console.error('Error fetching positions:', error)
@@ -106,7 +106,7 @@ export default function OnboardPage() {
       const response = await fetch(`${getApiUrl()}/api/departments`)
       const data = await response.json()
       if (data.success) {
-        setDepartments(data.data)
+        setDepartments([...data.data].sort((a: Department, b: Department) => a.name.localeCompare(b.name)))
       }
     } catch (error) {
       console.error('Error fetching departments:', error)

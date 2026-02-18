@@ -81,6 +81,15 @@ interface Employee {
   email_address?: string
 }
 
+interface AdditionalFieldValue {
+  field_id: number
+  field_label: string
+  field_key: string
+  field_type: string
+  field_unit: string | null
+  value: string | null
+}
+
 const batches = [
   { id: 1, title: 'Employee Details', icon: Briefcase, description: 'Basic employment information' },
   { id: 2, title: 'Personal Information', icon: User, description: 'Your personal details' },
@@ -88,6 +97,7 @@ const batches = [
   { id: 4, title: 'Government IDs', icon: CreditCard, description: 'Official identification numbers' },
   { id: 5, title: 'Family Information', icon: Users, description: 'Parent information' },
   { id: 6, title: 'Address Details', icon: MapPin, description: 'Complete address information' },
+  { id: 7, title: 'Additional Info', icon: CheckCircle2, description: 'Extra information fields' },
 ]
 
 export default function EmployeeDashboardPage() {
@@ -100,6 +110,11 @@ export default function EmployeeDashboardPage() {
   const [dataLoaded, setDataLoaded] = useState(false)
   const [currentBatch, setCurrentBatch] = useState(1)
 
+  // Additional fields state
+  const [additionalFields, setAdditionalFields] = useState<AdditionalFieldValue[]>([])
+  // keyed by field_key (string) for easy inclusion in PUT body
+  const [additionalValues, setAdditionalValues] = useState<Record<string, string>>({})
+
   // Address dropdown states
   const [regions, setRegions] = useState<{ code: string; name: string }[]>([])
   const [provinces, setProvinces] = useState<{ code: string; name: string }[]>([])
@@ -110,12 +125,34 @@ export default function EmployeeDashboardPage() {
   const [loadingCities, setLoadingCities] = useState(false)
   const [loadingBarangays, setLoadingBarangays] = useState(false)
 
-  const totalBatches = 6
+  const totalBatches = 7
 
   // Fetch regions on component mount
   useEffect(() => {
     fetchRegions()
+    fetchAdditionalFields()
   }, [])
+
+  const fetchAdditionalFields = async () => {
+    try {
+      const res = await fetch(`${getApiUrl()}/api/employee-additional-fields`, {
+        headers: { 'Accept': 'application/json' },
+      })
+      const data = await res.json()
+      if (data.success) {
+        setAdditionalFields(data.data.map((f: any) => ({
+          field_id:    f.id,
+          field_label: f.field_label,
+          field_key:   f.field_key,
+          field_type:  f.field_type  ?? 'text',
+          field_unit:  f.field_unit  ?? null,
+          value:       null,
+        })))
+      }
+    } catch (err) {
+      console.error('Error fetching additional fields:', err)
+    }
+  }
 
   const fetchRegions = async () => {
     setLoadingRegions(true)
@@ -297,6 +334,25 @@ export default function EmployeeDashboardPage() {
           setDataLoaded(true)
           localStorage.setItem('employee_data', JSON.stringify(data.data))
 
+          // Fetch additional values for this employee
+          try {
+            const addlRes = await fetch(`${getApiUrl()}/api/employees/${data.data.id}/additional-values`, {
+              headers: { 'Accept': 'application/json' },
+            })
+            const addlData = await addlRes.json()
+            if (addlData.success) {
+              const valMap: Record<string, string> = {}
+              addlData.data.forEach((item: AdditionalFieldValue) => {
+                valMap[item.field_key] = item.value || ''
+              })
+              setAdditionalValues(valMap)
+              // Also update additionalFields with values
+              setAdditionalFields(addlData.data)
+            }
+          } catch (err) {
+            console.error('Error fetching additional values:', err)
+          }
+
           if (!cachedData) {
             toast.success('Profile loaded successfully!')
           }
@@ -385,6 +441,12 @@ export default function EmployeeDashboardPage() {
         return acc
       }, {} as any)
 
+      // Merge additional field values directly into the PUT body
+      // since they are now real columns on the employees table
+      additionalFields.forEach(f => {
+        cleanedData[f.field_key] = additionalValues[f.field_key] ?? null
+      })
+
       const response = await fetch(`${getApiUrl()}/api/employees/${employee?.id}`, {
         method: 'PUT',
         headers: {
@@ -400,6 +462,12 @@ export default function EmployeeDashboardPage() {
         setFormData(data.data)
         setIsEditing(false)
         localStorage.setItem('employee_data', JSON.stringify(data.data))
+        // Refresh additional values from the updated employee data
+        const valMap: Record<string, string> = {}
+        additionalFields.forEach(f => {
+          valMap[f.field_key] = data.data[f.field_key] || ''
+        })
+        setAdditionalValues(valMap)
         toast.success('Profile updated successfully!')
       } else {
         toast.error(data.message || 'Failed to update profile')
@@ -721,6 +789,30 @@ export default function EmployeeDashboardPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Additional Information */}
+              {additionalFields.length > 0 && (
+                <Card className="border-slate-200 shadow-sm overflow-hidden md:col-span-2">
+                  <CardHeader className="bg-slate-50 border-b border-slate-200 py-4">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-5 w-5 text-maroon-600" />
+                      <CardTitle className="text-lg">Additional Information</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {additionalFields.map((field) => (
+                      <div key={field.field_key}>
+                        <p className="text-sm text-slate-500 uppercase font-semibold">{field.field_label}</p>
+                        <p className="text-slate-900 font-medium">
+                          {field.value
+                            ? `${field.value}${field.field_unit ? ' ' + field.field_unit : ''}`
+                            : '---'}
+                        </p>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
         ) : (
@@ -824,23 +916,23 @@ export default function EmployeeDashboardPage() {
                         className="flex h-12 w-full rounded-lg border-2 border-slate-300 bg-white px-4 py-2 text-base focus-visible:ring-2 focus-visible:ring-maroon-500 transition-all"
                       >
                         <option value="">Select Position...</option>
-                        <option value="Executive Assistant">Executive Assistant</option>
+                        <option value="Accounting Assistant">Accounting Assistant</option>
+                        <option value="Accounting Supervisor">Accounting Supervisor</option>
                         <option value="Admin Assistant">Admin Assistant</option>
                         <option value="Admin Head">Admin Head</option>
-                        <option value="Accounting Supervisor">Accounting Supervisor</option>
-                        <option value="Accounting Assistant">Accounting Assistant</option>
-                        <option value="Property Specialist">Property Specialist</option>
-                        <option value="Senior Property Specialist">Senior Property Specialist</option>
-                        <option value="Junior Web Developer">Junior Web Developer</option>
-                        <option value="Senior Web Developer">Senior Web Developer</option>
-                        <option value="IT Supervisor">IT Supervisor</option>
-                        <option value="Sales Supervisor">Sales Supervisor</option>
-                        <option value="Junior IT Manager">Junior IT Manager</option>
-                        <option value="Senior IT Manager">Senior IT Manager</option>
-                        <option value="Marketing Staff">Marketing Staff</option>
                         <option value="Assistant Studio Manager">Assistant Studio Manager</option>
-                        <option value="Studio Manager">Studio Manager</option>
+                        <option value="Executive Assistant">Executive Assistant</option>
+                        <option value="IT Supervisor">IT Supervisor</option>
+                        <option value="Junior IT Manager">Junior IT Manager</option>
+                        <option value="Junior Web Developer">Junior Web Developer</option>
+                        <option value="Marketing Staff">Marketing Staff</option>
                         <option value="Multimedia Manager">Multimedia Manager</option>
+                        <option value="Property Specialist">Property Specialist</option>
+                        <option value="Sales Supervisor">Sales Supervisor</option>
+                        <option value="Senior IT Manager">Senior IT Manager</option>
+                        <option value="Senior Property Specialist">Senior Property Specialist</option>
+                        <option value="Senior Web Developer">Senior Web Developer</option>
+                        <option value="Studio Manager">Studio Manager</option>
                       </select>
                     </div>
 
@@ -1019,6 +1111,84 @@ export default function EmployeeDashboardPage() {
                       <Label htmlFor="email_address" className="text-sm font-semibold">Email Address <span className="text-red-500">*</span></Label>
                       <Input id="email_address" type="email" name="email_address" value={formData.email_address || ''} onChange={handleChange} />
                     </div>
+                  </div>
+                )}
+
+                {/* BATCH 7: Additional Information */}
+                {currentBatch === 7 && (
+                  <div className="space-y-6">
+                    {additionalFields.length === 0 ? (
+                      <div className="text-center py-12 text-slate-400">
+                        <CheckCircle2 className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                        <p className="text-lg font-medium mb-2">No additional fields configured</p>
+                        <p className="text-sm">An administrator can add custom fields from the Employee Masterfile page.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {additionalFields.map((field) => (
+                          <div key={field.field_key} className="space-y-2">
+                            <Label className="text-sm font-semibold">
+                              {field.field_label}
+                              {field.field_unit && (
+                                <span className="ml-1 text-xs font-normal text-slate-400">({field.field_unit})</span>
+                              )}
+                            </Label>
+
+                            {/* Render the correct input based on field_type */}
+                            {field.field_type === 'textarea' ? (
+                              <textarea
+                                value={additionalValues[field.field_key] ?? ''}
+                                onChange={(e) =>
+                                  setAdditionalValues((prev) => ({
+                                    ...prev,
+                                    [field.field_key]: e.target.value,
+                                  }))
+                                }
+                                placeholder={`Enter ${field.field_label}...`}
+                                rows={3}
+                                className="flex w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-transparent resize-y min-h-[80px]"
+                              />
+                            ) : field.field_type === 'number' ? (
+                              <div className="flex gap-2 items-center">
+                                <Input
+                                  type="number"
+                                  value={additionalValues[field.field_key] ?? ''}
+                                  onChange={(e) =>
+                                    setAdditionalValues((prev) => ({
+                                      ...prev,
+                                      [field.field_key]: e.target.value,
+                                    }))
+                                  }
+                                  placeholder="0"
+                                  className="flex-1"
+                                />
+                                {field.field_unit && (
+                                  <span className="text-sm text-slate-500 font-semibold whitespace-nowrap bg-slate-100 px-3 py-2 rounded-md border border-slate-200">
+                                    {field.field_unit}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <Input
+                                type={field.field_type === 'date' ? 'date'
+                                  : field.field_type === 'time' ? 'time'
+                                  : field.field_type === 'email' ? 'email'
+                                  : field.field_type === 'url' ? 'url'
+                                  : 'text'}
+                                value={additionalValues[field.field_key] ?? ''}
+                                onChange={(e) =>
+                                  setAdditionalValues((prev) => ({
+                                    ...prev,
+                                    [field.field_key]: e.target.value,
+                                  }))
+                                }
+                                placeholder={`Enter ${field.field_label}...`}
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>

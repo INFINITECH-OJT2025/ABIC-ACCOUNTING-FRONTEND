@@ -4,7 +4,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ChevronDown, Clock, Plus, Search, Users, ChevronLeft, ChevronRight, FileDown, FileText, Check, AlertTriangle, Loader2 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
@@ -606,14 +606,18 @@ export default function AttendanceDashboard() {
   }
 
 
-  // Handler to update time - auto sets date to current date when time is entered
-  const updateFirstCutoffTime = async (id: string | number, newTime: string) => {
-    // In a real app, this should send a PATCH/PUT request to the backend.
-    // For now, updating local state only, but adding warning calculations.
+  // Debounce refs to avoid firing API on every keystroke
+  const debounceTimers = useRef<Record<string | number, ReturnType<typeof setTimeout>>>({})
+
+  // Shared handler to update actual_in time — updates local state immediately
+  // and persists to the database after a short debounce
+  const updateEntryTime = (id: string | number, newTime: string) => {
+    const minutesLate = calculateMinutesFrom8AM(newTime)
+
+    // Optimistic local update
     setAllEntries(prev =>
       prev.map(entry => {
         if (entry.id === id) {
-          const minutesLate = calculateMinutesFrom8AM(newTime)
           return {
             ...entry,
             actual_in: newTime,
@@ -624,24 +628,29 @@ export default function AttendanceDashboard() {
         return entry
       })
     )
+
+    // Debounce the API call (600ms)
+    if (debounceTimers.current[id]) clearTimeout(debounceTimers.current[id])
+    debounceTimers.current[id] = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/admin-head/attendance/tardiness/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ actualIn: newTime, minutesLate }),
+        })
+        const data = await res.json()
+        if (!data.success) {
+          toast.error(data.message || 'Failed to update entry')
+        }
+      } catch (err) {
+        console.error('Update error:', err)
+        toast.error('An error occurred while updating the entry')
+      }
+    }, 600)
   }
 
-  const updateSecondCutoffTime = async (id: string | number, newTime: string) => {
-    setAllEntries(prev =>
-      prev.map(entry => {
-        if (entry.id === id) {
-          const minutesLate = calculateMinutesFrom8AM(newTime)
-          return {
-            ...entry,
-            actual_in: newTime,
-            actualIn: newTime,
-            minutesLate,
-          }
-        }
-        return entry
-      })
-    )
-  }
+  const updateFirstCutoffTime = (id: string | number, newTime: string) => updateEntryTime(id, newTime)
+  const updateSecondCutoffTime = (id: string | number, newTime: string) => updateEntryTime(id, newTime)
 
   const [addEntryModalOpen, setAddEntryModalOpen] = useState(false)
   const [newEntryEmployee, setNewEntryEmployee] = useState('')
