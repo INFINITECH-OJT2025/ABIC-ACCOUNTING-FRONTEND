@@ -5,11 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\Termination;
-use App\Mail\EmployeeWelcome;
 use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
 
@@ -44,32 +42,19 @@ class EmployeeController extends Controller
                 'email' => 'required|string|email|max:255|unique:employees',
             ]);
 
-            // Generate a random password
-            $password = Str::random(12);
-            $hashedPassword = Hash::make($password);
-
             $employee = Employee::create([
                 'first_name' => $validated['first_name'],
                 'last_name' => $validated['last_name'],
                 'email' => $validated['email'],
-                'password' => $hashedPassword,
                 'status' => 'pending', // Default status
             ]);
-
-            // Send welcome email with password
-            try {
-                Mail::to($employee->email)->send(new EmployeeWelcome($employee, $password));
-            } catch (\Exception $e) {
-                // Log email error but don't fail the creation
-                \Log::error('Failed to send welcome email: ' . $e->getMessage());
-            }
 
             // Log activity
             $this->activityLogService->logEmployeeCreated($employee, null, $request);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Employee created successfully. Welcome email sent to ' . $employee->email,
+                'message' => 'Employee created successfully.',
                 'data' => $employee
             ], 201);
         } catch (ValidationException $e) {
@@ -179,135 +164,6 @@ class EmployeeController extends Controller
         ]);
     }
 
-    /**
-     * Employee login
-     */
-    public function login(Request $request)
-    {
-        try {
-            $validated = $request->validate([
-                'email' => 'required|string|email',
-                'password' => 'required|string',
-            ]);
-
-            $employee = Employee::where('email', $validated['email'])->first();
-
-            if (!$employee || !Hash::check($validated['password'], $employee->password)) {
-                // Log failed login attempt
-                if ($employee) {
-                    $this->activityLogService->logLogin($employee, false, $request);
-                }
-
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid email or password'
-                ], 401);
-            }
-
-            // Log successful login
-            $this->activityLogService->logLogin($employee, true, $request);
-
-            // Generate a token (simple session token)
-            $token = Str::random(80);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Login successful',
-                'data' => [
-                    'employee' => $employee,
-                    'token' => $token
-                ]
-            ]);
-        } catch (ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $e->errors()
-            ], 422);
-        }
-    }
-
-    /**
-     * Change password
-     */
-    public function changePassword(Request $request)
-    {
-        try {
-            $validated = $request->validate([
-                'email' => 'required|string|email',
-                'old_password' => 'required|string',
-                'new_password' => 'required|string|min:6',
-                'new_password_confirmation' => 'required|string|same:new_password',
-            ]);
-
-            $employee = Employee::where('email', $validated['email'])->first();
-
-            if (!$employee) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Employee not found'
-                ], 404);
-            }
-
-            if (!Hash::check($validated['old_password'], $employee->password)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Current password is incorrect'
-                ], 401);
-            }
-
-            $employee->update([
-                'password' => Hash::make($validated['new_password'])
-            ]);
-
-            // Log activity
-            $this->activityLogService->logPasswordChange($employee, null, $request);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Password changed successfully',
-                'data' => $employee
-            ]);
-        } catch (ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $e->errors()
-            ], 422);
-        }
-    }
-
-    /**
-     * Get employee profile
-     */
-    public function getProfile(Request $request)
-    {
-        try {
-            $validated = $request->validate([
-                'email' => 'required|string|email',
-            ]);
-
-            $employee = Employee::where('email', $validated['email'])->first();
-
-            if (!$employee) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Employee not found'
-                ], 404);
-            }
-
-            return response()->json([
-                'success' => true,
-                'data' => $employee
-            ]);
-        } catch (ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $e->errors()
-            ], 422);
-        }
-    }
 
     /**
      * Onboard employee with additional details

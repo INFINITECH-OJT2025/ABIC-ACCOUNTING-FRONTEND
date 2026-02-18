@@ -24,11 +24,6 @@ Route::post('/positions/bulk', [PositionController::class, 'bulkCreate']);
 Route::apiResource('departments', DepartmentController::class);
 Route::post('/departments/bulk', [DepartmentController::class, 'bulkCreate']);
 
-// Authentication routes
-Route::post('/employees/login', [EmployeeController::class, 'login']);
-Route::post('/employees/change-password', [EmployeeController::class, 'changePassword']);
-Route::get('/employees-profile', [EmployeeController::class, 'getProfile']);
-
 // Onboarding routes
 Route::post('/employees/{id}/onboard', [EmployeeController::class, 'onboard']);
 Route::post('/onboarding-checklists', [OnboardingChecklistController::class, 'store']);
