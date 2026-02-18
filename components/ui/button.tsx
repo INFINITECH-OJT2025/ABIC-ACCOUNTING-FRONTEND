@@ -9,13 +9,13 @@ export interface ButtonProps
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className = "", variant = "default", size = "default", ...props }, ref) => {
     const baseStyles = "inline-flex items-center justify-center text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
-    
+
     const variants = {
       default: "bg-gradient-to-r from-[#8B0000] to-[#A52A2A] text-white hover:from-[#700000] hover:to-[#8B1A1A] shadow-lg",
       outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
       ghost: "hover:bg-accent hover:text-accent-foreground",
     }
-    
+
     const sizes = {
       default: "h-10 px-4 py-2",
       sm: "h-9 rounded-md px-3",
