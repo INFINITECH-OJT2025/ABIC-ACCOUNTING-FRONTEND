@@ -1,7 +1,6 @@
 "use client"
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table"
@@ -23,7 +22,10 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import {
-  Save, Edit3, ArrowLeft, Printer, Lock, ChevronLeft, ChevronRight, Check, Trash2, Plus, LayoutDashboard, ClipboardList
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  Save, Lock, ChevronLeft, ChevronRight, Check, Trash2, Plus, LayoutDashboard, ClipboardList, TriangleAlert, FolderPlus
 } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { getApiUrl } from '@/lib/api'
@@ -44,6 +46,8 @@ interface OnboardingRecord {
   startDate: string
   position: string
   department: string
+  status: string
+  updatedAt: string
   tasks: ChecklistTask[]
 }
 
@@ -89,16 +93,27 @@ const normalizeRecord = (record: any): OnboardingRecord => ({
   startDate: String(record?.startDate ?? ''),
   position: String(record?.position ?? ''),
   department: String(record?.department ?? ''),
+  status: String(record?.status ?? ''),
+  updatedAt: String(record?.updated_at ?? record?.updatedAt ?? ''),
   tasks: normalizeTasks(record?.tasks),
 })
 
+const getRecordCompletionPercentage = (record: OnboardingRecord) => {
+  if (!record.tasks.length) return 0
+  const doneCount = record.tasks.filter((task) => task.status === 'DONE').length
+  return Math.round((doneCount / record.tasks.length) * 100)
+}
+
+const isRecordDone = (record: OnboardingRecord) =>
+  String(record.status).toUpperCase() === 'DONE' || getRecordCompletionPercentage(record) === 100
+
 export default function OnboardingChecklistPage() {
-  const router = useRouter()
-  const [editMode, setEditMode] = useState(false)
+  const editMode = true
   const [saving, setSaving] = useState(false)
   const [creatingRecord, setCreatingRecord] = useState(false)
   const [addRecordOpen, setAddRecordOpen] = useState(false)
   const [tasks, setTasks] = useState<ChecklistTask[]>([])
+  const [taskIdToDelete, setTaskIdToDelete] = useState<number | null>(null)
   const [open, setOpen] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [records, setRecords] = useState<OnboardingRecord[]>([])
@@ -180,6 +195,15 @@ export default function OnboardingChecklistPage() {
     const doneTasks = tasks.filter(t => t.status === 'DONE').length;
     return Math.round((doneTasks / tasks.length) * 100);
   }, [tasks]);
+  const showCompletionDate = completionPercentage === 100 || String(employeeInfo?.status ?? '').toUpperCase() === 'DONE'
+  const completionDateText = useMemo(() => {
+    if (!showCompletionDate) return ''
+    const value = employeeInfo?.updatedAt
+    if (!value) return ''
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) return ''
+    return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }, [employeeInfo?.updatedAt, showCompletionDate])
   const emptyTaskColSpan = editMode ? 4 : 3
 
   const positionSelectOptions = useMemo(() => {
@@ -191,6 +215,15 @@ export default function OnboardingChecklistPage() {
     const current = employeeInfo?.department?.trim()
     return [...new Set([...(current ? [current] : []), ...departmentOptions])]
   }, [employeeInfo?.department, departmentOptions])
+
+  const doneRecords = useMemo(
+    () => records.map((record, index) => ({ record, index })).filter(({ record }) => isRecordDone(record)),
+    [records]
+  )
+  const pendingRecords = useMemo(
+    () => records.map((record, index) => ({ record, index })).filter(({ record }) => !isRecordDone(record)),
+    [records]
+  )
 
   const selectRecordByIndex = (index: number) => {
     const selected = records[index]
@@ -254,6 +287,7 @@ export default function OnboardingChecklistPage() {
       setEmployeeInfo(updated)
       setTasks(updated.tasks)
       setRecords(prev => prev.map((record, index) => index === currentIndex ? updated : record))
+      toast.success('Changes saved successfully!')
     } catch (err) {
       setTasks(previousTasks)
       const message = err instanceof Error ? err.message : 'Failed to update task status'
@@ -305,7 +339,6 @@ export default function OnboardingChecklistPage() {
       setEmployeeInfo(updated)
       setTasks(updated.tasks)
       setRecords(prev => prev.map((record, index) => index === currentIndex ? updated : record))
-      setEditMode(false)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save updates'
       toast.error('Save Failed', {
@@ -356,7 +389,6 @@ export default function OnboardingChecklistPage() {
       setTasks(created.tasks)
       setAddRecordOpen(false)
       resetNewRecord()
-      setEditMode(false)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create onboarding record'
       toast.error('Create Record Failed', {
@@ -395,14 +427,26 @@ export default function OnboardingChecklistPage() {
                     <CommandInput placeholder="Search records..." />
                     <CommandList>
                       <CommandEmpty>No records found.</CommandEmpty>
-                      <CommandGroup>
-                        {records.map((emp, index) => (
-                          <CommandItem key={emp.id} onSelect={() => { selectRecordByIndex(index); setOpen(false); }}>
-                            <Check className={cn("mr-2 h-4 w-4", currentIndex === index ? "opacity-100" : "opacity-0")} />
-                            {emp.name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
+                      {doneRecords.length > 0 && (
+                        <CommandGroup heading="DONE">
+                          {doneRecords.map(({ record: emp, index }) => (
+                            <CommandItem key={emp.id} onSelect={() => { selectRecordByIndex(index); setOpen(false); }}>
+                              <Check className={cn("mr-2 h-4 w-4", currentIndex === index ? "opacity-100" : "opacity-0")} />
+                              {emp.name} ({getRecordCompletionPercentage(emp)}%)
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      )}
+                      {pendingRecords.length > 0 && (
+                        <CommandGroup heading="PENDING">
+                          {pendingRecords.map(({ record: emp, index }) => (
+                            <CommandItem key={emp.id} onSelect={() => { selectRecordByIndex(index); setOpen(false); }}>
+                              <Check className={cn("mr-2 h-4 w-4", currentIndex === index ? "opacity-100" : "opacity-0")} />
+                              {emp.name} ({getRecordCompletionPercentage(emp)}%)
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      )}
                     </CommandList>
                   </Command>
                 </PopoverContent>
@@ -412,13 +456,17 @@ export default function OnboardingChecklistPage() {
                 <LayoutDashboard className="w-4 h-4 text-rose-300" />
                 <span className="text-xs font-black uppercase tracking-widest text-rose-100">Progress:</span>
                 <span className="text-sm font-black text-white">{completionPercentage}% Completed</span>
+                {completionDateText && (
+                  <>
+                    <span className="text-rose-200/70">|</span>
+                    <span className="text-xs font-black uppercase tracking-widest text-rose-100">Date:</span>
+                    <span className="text-sm font-black text-white">{completionDateText}</span>
+                  </>
+                )}
               </div>
             </div>
           </div>
 
-          <Button variant="outline" onClick={() => router.back()} className="rounded-full bg-transparent border-white/30 text-white hover:bg-white/20 h-12 px-8">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Masterfile
-          </Button>
         </div>
       </header>
 
@@ -525,7 +573,7 @@ export default function OnboardingChecklistPage() {
                   </TableCell>
                   {editMode && (
                     <TableCell className="py-6 text-center">
-                      <Button variant="ghost" size="icon" onClick={() => removeTask(item.id)} className="text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-full">
+                      <Button variant="ghost" size="icon" onClick={() => setTaskIdToDelete(item.id)} className="text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-full">
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </TableCell>
@@ -560,15 +608,15 @@ export default function OnboardingChecklistPage() {
               )}
             </div>
             <div className="flex gap-4">
-              <Button variant="outline" onClick={() => window.print()} className="rounded-full px-8 h-12 shadow-sm border-slate-200 font-bold text-slate-600 hover:bg-slate-100 transition-colors">
-                <Printer className="mr-2 h-4 w-4" /> Export
+              <Button variant="outline" className="rounded-full px-8 h-12 shadow-sm border-slate-200 font-bold text-slate-600 hover:bg-slate-100 transition-colors">
+                <FolderPlus className="mr-2 h-4 w-4" /> Add to Masterfile
               </Button>
               <Button
-                onClick={editMode ? handleSave : () => setEditMode(true)}
+                onClick={handleSave}
                 disabled={saving || !employeeInfo}
-                className={cn("rounded-full px-12 h-12 font-bold shadow-xl transition-all", editMode ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-[#a0153e] hover:bg-[#801030] text-white")}
+                className="rounded-full px-12 h-12 font-bold shadow-xl transition-all bg-emerald-600 hover:bg-emerald-700 text-white"
               >
-                {editMode ? <><Save className="mr-2 h-4 w-4" /> {saving ? 'Saving...' : 'Save Updates'}</> : <><Edit3 className="mr-2 h-4 w-4" /> Update Mode</>}
+                <><Save className="mr-2 h-4 w-4" /> {saving ? 'Saving...' : 'Save'}</>
               </Button>
             </div>
           </div>
@@ -635,6 +683,32 @@ export default function OnboardingChecklistPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={taskIdToDelete !== null} onOpenChange={(open) => { if (!open) setTaskIdToDelete(null) }}>
+        <AlertDialogContent className="border-2 border-rose-200">
+          <AlertDialogHeader>
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-rose-50 text-rose-600">
+              <TriangleAlert className="h-6 w-6" />
+            </div>
+            <AlertDialogTitle>Delete this task?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This task will be removed from the current checklist.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setTaskIdToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-rose-600 text-white hover:bg-rose-700"
+              onClick={() => {
+                if (taskIdToDelete !== null) removeTask(taskIdToDelete)
+                setTaskIdToDelete(null)
+              }}
+            >
+              Delete Task
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\ClearanceChecklistController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\PositionController;
 use App\Http\Controllers\Api\DepartmentController;
+use App\Http\Controllers\Api\DirectoryController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -26,6 +27,13 @@ Route::post('/positions/bulk', [PositionController::class, 'bulkCreate']);
 // Departments API Routes
 Route::apiResource('departments', DepartmentController::class);
 Route::post('/departments/bulk', [DepartmentController::class, 'bulkCreate']);
+
+// Directory API Routes
+Route::get('/directory/agencies', [DirectoryController::class, 'index']);
+Route::put('/directory/agencies/{code}', [DirectoryController::class, 'update']);
+Route::put('/directory/agencies/{code}/image', [DirectoryController::class, 'updateImage']);
+Route::get('/directory/cloudinary-images', [DirectoryController::class, 'cloudinaryImages']);
+Route::delete('/directory/cloudinary-images', [DirectoryController::class, 'deleteCloudinaryImage']);
 
 // Authentication routes
 Route::post('/employees/login', [EmployeeController::class, 'login']);

@@ -5,14 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
 
-class GovernmentContributionsProcess extends Model
+class AgencyContact extends Model
 {
     protected $fillable = [
         'agency_id',
-        'government_contribution_type',
-        'process_type',
-        'process',
-        'step_number',
+        'type',
+        'label',
+        'value',
+        'sort_order',
     ];
 
     public function agency(): BelongsTo
