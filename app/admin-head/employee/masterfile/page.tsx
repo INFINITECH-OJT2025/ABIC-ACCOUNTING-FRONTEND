@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { X } from 'lucide-react'
 
 interface Employee {
   id: number
@@ -37,9 +38,9 @@ interface AdditionalFieldValue {
 }
 
 const statusBadgeColors = {
-  pending: 'bg-amber-50 text-[#A0153E] border-[#C9184A]',
-  employed: 'bg-emerald-50 text-[#065f46] border-[#059669]',
-  terminated: 'bg-rose-50 text-[#800020] border-[#C9184A]',
+  pending: 'bg-amber-50 text-amber-700 border-amber-200',
+  employed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  terminated: 'bg-rose-50 text-rose-700 border-rose-200',
 }
 
 const statusLabels = {
@@ -246,36 +247,36 @@ export default function MasterfilePage() {
     list.length === 0 ? (
       <p className="text-slate-500 py-4">{emptyMessage}</p>
     ) : (
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto rounded-lg border border-slate-200">
         <table className="w-full">
-          <thead className="bg-gradient-to-r from-[#FFE5EC] to-rose-50">
-            <tr className="border-b-2 border-[#C9184A]">
-              <th className="text-left py-3 px-4 font-semibold text-[#800020]">Name</th>
-              <th className="text-left py-3 px-4 font-semibold text-[#800020]">Email</th>
-              <th className="text-left py-3 px-4 font-semibold text-[#800020]">Position</th>
-              <th className="text-left py-3 px-4 font-semibold text-[#800020]">Status</th>
-              <th className="text-left py-3 px-4 font-semibold text-[#800020]">Created</th>
-              <th className="text-left py-3 px-4 font-semibold text-[#800020]">Action</th>
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-200">
+              <th className="text-left py-4 px-4 font-semibold text-[#4A081A] text-sm uppercase tracking-wider">Name</th>
+              <th className="text-left py-4 px-4 font-semibold text-[#4A081A] text-sm uppercase tracking-wider">Email</th>
+              <th className="text-left py-4 px-4 font-semibold text-[#4A081A] text-sm uppercase tracking-wider">Position</th>
+              <th className="text-left py-4 px-4 font-semibold text-[#4A081A] text-sm uppercase tracking-wider">Status</th>
+              <th className="text-left py-4 px-4 font-semibold text-[#4A081A] text-sm uppercase tracking-wider">Created</th>
+              <th className="text-left py-4 px-4 font-semibold text-[#4A081A] text-sm uppercase tracking-wider">Action</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-slate-100">
             {list.map((employee) => (
-              <tr key={employee.id} className="border-b border-slate-100 hover:bg-[#FFE5EC] transition-colors duration-200">
-                <td className="py-3 px-4 text-slate-700 font-medium">{employee.first_name} {employee.last_name}</td>
-                <td className="py-3 px-4 text-slate-700">{employee.email}</td>
-                <td className="py-3 px-4 text-slate-700">{employee.position || '-'}</td>
-                <td className="py-3 px-4">
-                  <Badge className={`${statusBadgeColors[employee.status]} border`}>
+              <tr key={employee.id} className="hover:bg-slate-50 transition-colors duration-200">
+                <td className="py-4 px-4 text-slate-700 font-medium">{employee.first_name} {employee.last_name}</td>
+                <td className="py-4 px-4 text-slate-700">{employee.email}</td>
+                <td className="py-4 px-4 text-slate-700">{employee.position || '-'}</td>
+                <td className="py-4 px-4">
+                  <Badge className={`${statusBadgeColors[employee.status]} border shadow-none font-medium`}>
                     {statusLabels[employee.status]}
                   </Badge>
                 </td>
-                <td className="py-3 px-4 text-slate-500 text-sm">
+                <td className="py-4 px-4 text-slate-500 text-sm">
                   {new Date(employee.created_at).toLocaleDateString()}
                 </td>
-                <td className="py-3 px-4">
+                <td className="py-4 px-4">
                   <Button
                     size="sm"
-                    className="bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white border-0 transition-all duration-300"
+                    className="bg-[#630C22] hover:bg-[#4A081A] text-white border-0 transition-all duration-300 rounded-md"
                     onClick={() => fetchEmployeeDetails(employee.id)}
                   >
                     View
@@ -290,42 +291,43 @@ export default function MasterfilePage() {
   )
 
   return (
-    <div className="min-h-screen">
-      {/* Maroon Gradient Header */}
-      <div className="bg-gradient-to-br from-[#800020] via-[#A0153E] to-[#C9184A] text-white rounded-lg shadow-lg p-8 mb-8">
-        <h1 className="text-4xl font-bold mb-3">Employee Record</h1>
-        <p className="text-rose-100 text-lg">Manage employee master data and records</p>
+    <div className="min-h-screen p-8 bg-slate-50">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold text-[#4A081A] tracking-tight">Employee Records</h1>
+          <p className="text-slate-500 mt-1">Manage and monitor employee master data and records.</p>
+        </div>
+        <div className="flex gap-3">
+          <Button
+            onClick={() => router.push('/admin-head/employee/additional-info')}
+            variant="outline"
+            className="border-slate-200 text-slate-700 hover:bg-slate-100 font-medium px-4 h-11 rounded-lg transition-all"
+          >
+            Additional Information
+          </Button>
+          <Button
+            onClick={() => setShowRegistrationModal(true)}
+            className="bg-[#630C22] hover:bg-[#4A081A] text-white font-bold px-6 h-11 rounded-lg transition-all shadow-sm"
+          >
+            + CREATE EMPLOYEE
+          </Button>
+        </div>
       </div>
 
-      <div className="bg-white p-6 rounded-lg shadow-lg border-2 border-[#FFE5EC]">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-          <h2 className="text-2xl font-bold text-[#800020]">Employee List</h2>
-          <div className="flex gap-3">
-            <Button
-              onClick={() => router.push('/admin-head/employee/additional-info')}
-              variant="outline"
-              className="border-[#A0153E] text-[#800020] hover:bg-[#FFE5EC] font-semibold px-6 py-2 rounded-lg transition-all duration-300"
-            >
-              Additional Information
-            </Button>
-            <Button
-              onClick={() => setShowRegistrationModal(true)}
-              className="bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white font-bold px-6 py-2 rounded-lg transition-all duration-300 shadow-md hover:shadow-lg"
-            >
-              + CREATE EMPLOYEE
-            </Button>
+      <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200">
+        <div className="mb-8">
+          <div className="relative">
+            <Input
+              type="text"
+              placeholder="Search by name, email, or position..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-slate-50 border-slate-200 py-6 pl-10 focus:ring-[#630C22] focus:border-[#630C22] rounded-xl"
+            />
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            </div>
           </div>
-        </div>
-
-        {/* Search Bar */}
-        <div className="mb-6">
-          <Input
-            type="text"
-            placeholder="Search by name, email, or position..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A]"
-          />
         </div>
 
         {loading ? (
@@ -340,40 +342,32 @@ export default function MasterfilePage() {
                   Pending Approval
                   <span className="ml-2 text-sm font-normal text-slate-500">({pendingList.length})</span>
                 </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {pendingList.map((employee) => (
                     <div
                       key={employee.id}
                       onClick={() => fetchEmployeeDetails(employee.id)}
-                      className="group relative bg-gradient-to-br from-white to-amber-50 border-2 border-amber-100 hover:border-amber-400 rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden"
+                      className="group bg-white border border-slate-200 hover:border-[#630C22] rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer"
                     >
-                      {/* Top accent bar */}
-                      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 rounded-t-2xl" />
-
-                      {/* Avatar initials */}
-                      <div className="w-14 h-14 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-xl font-bold mb-4 shadow-md group-hover:scale-110 transition-transform duration-300">
-                        {employee.first_name.charAt(0)}{employee.last_name.charAt(0)}
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-[#4A081A] text-lg font-bold group-hover:bg-[#4A081A] group-hover:text-white transition-colors duration-200">
+                          {employee.first_name.charAt(0)}{employee.last_name.charAt(0)}
+                        </div>
+                        <div className="overflow-hidden">
+                          <h1 className="font-bold text-slate-800 truncate">
+                            {employee.first_name} {employee.last_name}
+                          </h1>
+                          <p className="text-xs text-slate-500 truncate">
+                            {employee.position || 'No Position'}
+                          </p>
+                        </div>
                       </div>
 
-                      {/* Name */}
-                      <h1 className="text-xl font-extrabold text-slate-800 leading-tight mb-1 truncate">
-                        {employee.first_name} {employee.last_name}
-                      </h1>
-
-                      {/* Position */}
-                      <h3 className="text-sm font-semibold text-slate-500 mb-3 truncate">
-                        {employee.position || 'No Position Assigned'}
-                      </h3>
-
-                      {/* Status badge */}
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-300">
-                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                        Pending
-                      </span>
-
-                      {/* Hover CTA */}
-                      <div className="mt-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                        <span className="text-xs font-semibold text-amber-600">View details →</span>
+                      <div className="flex justify-between items-center">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                          PENDING
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-medium">Click to view</span>
                       </div>
                     </div>
                   ))}
@@ -413,33 +407,36 @@ export default function MasterfilePage() {
 
       {/* Employee Detail Modal */}
       {showDetailModal && selectedEmployee && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[95vh] overflow-y-auto border-2 border-[#C9184A]">
-            <div className="p-6 border-b-2 border-[#C9184A] sticky top-0 bg-gradient-to-r from-[#800020] via-[#A0153E] to-[#C9184A]">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-bold text-white">
-                  {selectedEmployee.first_name} {selectedEmployee.last_name}
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-slate-200">
+            <div className="p-6 border-b border-slate-100 bg-white">
+              <div className="flex justify-between items-center mb-2">
+                <h2 className="text-2xl font-bold text-[#4A081A]">
+                  Employee Details
                 </h2>
                 <button
                   onClick={() => setShowDetailModal(false)}
-                  className="text-white hover:text-rose-100 text-2xl font-bold transition-colors"
+                  className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-all font-bold"
                 >
-                  ×
+                  <X size={20} />
                 </button>
               </div>
-              {/* Current Status Badge */}
-              <div className="flex items-center gap-3">
-                <span className="text-white font-medium">Current Status:</span>
-                <Badge className={`${statusBadgeColors[selectedEmployee.status]} border-2 text-base py-1 px-3`}>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-medium text-slate-700">{selectedEmployee.first_name} {selectedEmployee.last_name}</span>
+                <span className="text-slate-300 px-2">•</span>
+                <Badge className={`${statusBadgeColors[selectedEmployee.status]} border font-semibold shadow-none`}>
                   {statusLabels[selectedEmployee.status]}
                 </Badge>
               </div>
             </div>
 
-            <div className="p-6">
+            <div className="p-8 overflow-y-auto bg-slate-50/30">
               {/* EMPLOYEE DETAILS */}
-              <div className="mb-8">
-                <h3 className="text-lg font-bold text-[#800020] mb-4 pb-2 border-b-2 border-[#C9184A]">EMPLOYEE DETAILS</h3>
+                <div className="mb-10">
+                  <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-2">
+                    <span className="w-1 h-4 bg-[#630C22] rounded-full"></span>
+                    Employment Information
+                  </h3>
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <p className="text-slate-600 text-sm font-medium mb-1">POSITION <span className="text-red-500">*</span></p>
@@ -457,8 +454,11 @@ export default function MasterfilePage() {
               </div>
 
               {/* PERSONAL INFORMATION */}
-              <div className="mb-8">
-                <h3 className="text-lg font-bold text-[#800020] mb-4 pb-2 border-b-2 border-[#C9184A]">PERSONAL INFORMATION</h3>
+                <div className="mb-10">
+                  <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-2">
+                    <span className="w-1 h-4 bg-[#630C22] rounded-full"></span>
+                    Personal Information
+                  </h3>
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <p className="text-slate-600 text-sm font-medium mb-1">LAST NAME <span className="text-red-500">*</span></p>
@@ -500,8 +500,11 @@ export default function MasterfilePage() {
               </div>
 
               {/* CONTACT INFORMATION */}
-              <div className="mb-8">
-                <h3 className="text-lg font-bold text-[#800020] mb-4 pb-2 border-b-2 border-[#C9184A]">CONTACT INFORMATION</h3>
+                <div className="mb-10">
+                  <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-2">
+                    <span className="w-1 h-4 bg-[#630C22] rounded-full"></span>
+                    Contact Information
+                  </h3>
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <p className="text-slate-600 text-sm font-medium mb-1">MOBILE NUMBER <span className="text-red-500">*</span></p>
@@ -519,8 +522,11 @@ export default function MasterfilePage() {
               </div>
 
               {/* GOVERNMENT ID NUMBERS */}
-              <div className="mb-8">
-                <h3 className="text-lg font-bold text-[#800020] mb-4 pb-2 border-b-2 border-[#C9184A]">GOVERNMENT ID NUMBERS</h3>
+                <div className="mb-10">
+                  <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-2">
+                    <span className="w-1 h-4 bg-[#630C22] rounded-full"></span>
+                    Government ID Numbers
+                  </h3>
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <p className="text-slate-600 text-sm font-medium mb-1">SSS NUMBER <span className="text-slate-400 text-xs">(can be N/A)</span></p>
@@ -542,8 +548,11 @@ export default function MasterfilePage() {
               </div>
 
               {/* FAMILY INFORMATION */}
-              <div className="mb-8">
-                <h3 className="text-lg font-bold text-[#800020] mb-4 pb-2 border-b-2 border-[#C9184A]">FAMILY INFORMATION</h3>
+                <div className="mb-10">
+                  <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-2">
+                    <span className="w-1 h-4 bg-[#630C22] rounded-full"></span>
+                    Family Information
+                  </h3>
                 <div className="mb-6">
                   <p className="text-slate-700 font-semibold mb-3">MOTHER&apos;S MAIDEN NAME</p>
                   <div className="grid grid-cols-2 gap-6 ml-4">
@@ -589,8 +598,11 @@ export default function MasterfilePage() {
               </div>
 
               {/* ADDRESS INFORMATION */}
-              <div className="mb-8">
-                <h3 className="text-lg font-bold text-[#800020] mb-4 pb-2 border-b-2 border-[#C9184A]">ADDRESS INFORMATION</h3>
+                <div className="mb-10">
+                  <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-2">
+                    <span className="w-1 h-4 bg-[#630C22] rounded-full"></span>
+                    Address Information
+                  </h3>
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <p className="text-slate-600 text-sm font-medium mb-1">HOUSE NUMBER <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
@@ -633,8 +645,11 @@ export default function MasterfilePage() {
 
               {/* ADDITIONAL INFORMATION */}
               {additionalValues.length > 0 && (
-                <div className="mb-8">
-                  <h3 className="text-lg font-bold text-[#800020] mb-4 pb-2 border-b-2 border-[#C9184A]">ADDITIONAL INFORMATION</h3>
+                 <div className="mb-10">
+                  <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-2">
+                    <span className="w-1 h-4 bg-[#630C22] rounded-full"></span>
+                    Additional Information
+                  </h3>
                   <div className="grid grid-cols-2 gap-6">
                     {additionalValues.map((field) => (
                       <div key={field.field_id}>
@@ -647,30 +662,33 @@ export default function MasterfilePage() {
               )}
 
               {/* Status Requirements Check */}
-              <div className="mb-6 p-4 bg-[#FFE5EC] rounded-lg border-2 border-[#C9184A]">
-                <p className="text-slate-700 text-sm font-medium">
-                  <span className="text-[#800020] font-semibold">ℹ️ Required fields check:</span> All fields marked with <span className="text-red-500">*</span> must be filled to set this employee as Employed.
-                </p>
+               <div className="mb-4 pt-4 border-t border-slate-100">
+                <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-lg text-amber-800 text-sm">
+                  <span className="text-xl">!</span>
+                  <p>All fields marked with <span className="text-rose-600 font-bold">*</span> must be filled to set this employee as Employed.</p>
+                </div>
               </div>
             </div>
 
-            {/* Footer with Action Buttons */}
-            <div className="p-6 border-t-2 border-[#C9184A] bg-gradient-to-r from-[#FFE5EC] to-rose-50 sticky bottom-0">
-              <div className="flex gap-3 justify-end">
-                <Button
-                  onClick={() => setShowDetailModal(false)}
-                  variant="outline"
-                >
-                  Close
-                </Button>
-                <Button
-                  onClick={() => handleStatusUpdate('employed')}
-                  disabled={updatingStatus || selectedEmployee.status === 'employed' || !isEmployeeComplete(selectedEmployee)}
-                  className={`${!isEmployeeComplete(selectedEmployee) ? 'opacity-50 cursor-not-allowed' : 'bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A]'} text-white transition-all duration-300`}
-                >
-                  {updatingStatus ? 'Updating...' : 'Set as Employed'}
-                </Button>
-              </div>
+            <div className="p-6 border-t border-slate-100 bg-white shadow-[0_-4px_10px_rgba(0,0,0,0.03)] flex justify-end gap-3">
+              <Button
+                onClick={() => setShowDetailModal(false)}
+                variant="outline"
+                className="border-slate-200 text-slate-600 font-medium px-6"
+              >
+                Close
+              </Button>
+              <Button
+                onClick={() => handleStatusUpdate('employed')}
+                disabled={updatingStatus || selectedEmployee.status === 'employed' || !isEmployeeComplete(selectedEmployee)}
+                className={`px-8 font-semibold transition-all duration-300 ${
+                  !isEmployeeComplete(selectedEmployee)
+                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    : 'bg-[#630C22] hover:bg-[#4A081A] text-white shadow-md'
+                }`}
+              >
+                {updatingStatus ? 'Updating...' : 'Set as Employed'}
+              </Button>
             </div>
           </div>
         </div>
@@ -678,14 +696,14 @@ export default function MasterfilePage() {
 
       {/* Employee Registration Modal */}
       <Dialog open={showRegistrationModal} onOpenChange={setShowRegistrationModal}>
-        <DialogContent className="sm:max-w-[500px] border-2 border-[#C9184A] p-0 overflow-hidden">
-          <DialogHeader className="bg-gradient-to-r from-[#800020] via-[#A0153E] to-[#C9184A] p-6 text-white">
-            <DialogTitle className="text-2xl font-bold">Create New Employee</DialogTitle>
-            <DialogDescription className="text-rose-100">
+        <DialogContent className="sm:max-w-[500px] p-0 border-0 rounded-2xl overflow-hidden shadow-2xl">
+          <DialogHeader className="p-8 bg-white border-b border-slate-100">
+            <DialogTitle className="text-2xl font-bold text-[#4A081A] tracking-tight">Create New Employee</DialogTitle>
+            <DialogDescription className="text-slate-500 mt-1">
               Fill in the details below to register a new employee.
             </DialogDescription>
           </DialogHeader>
-          <div className="p-6">
+          <div className="p-8">
             <EmployeeRegistrationForm 
               onSuccess={() => {
                 setShowRegistrationModal(false)
