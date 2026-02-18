@@ -683,8 +683,6 @@ export default function MasterfilePage() {
       'zip_code',
       'mlast_name',
       'mfirst_name',
-      'flast_name',
-      'ffirst_name',
     ]
 
     for (const field of requiredFields) {
@@ -1830,11 +1828,11 @@ export default function MasterfilePage() {
                   <p className="text-slate-700 font-semibold mb-3">FATHER&apos;S NAME <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
                   <div className="grid grid-cols-2 gap-6 ml-4">
                     <div>
-                      <p className="text-slate-600 text-sm font-medium mb-1">FLAST NAME <span className="text-red-500">*</span></p>
+                      <p className="text-slate-600 text-sm font-medium mb-1">FLAST NAME</p>
                       <p className="text-slate-900 font-medium text-base">{selectedEmployee.flast_name || '-'}</p>
                     </div>
                     <div>
-                      <p className="text-slate-600 text-sm font-medium mb-1">FFIRST NAME <span className="text-red-500">*</span></p>
+                      <p className="text-slate-600 text-sm font-medium mb-1">FFIRST NAME</p>
                       <p className="text-slate-900 font-medium text-base">{selectedEmployee.ffirst_name || '-'}</p>
                     </div>
                     <div>
