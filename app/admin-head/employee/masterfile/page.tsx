@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { EmployeeRegistrationForm } from '@/components/employee-registration-form'
 import { getApiUrl } from '@/lib/api'
 import { Input } from '@/components/ui/input'
@@ -29,6 +30,13 @@ interface EmployeeDetails extends Employee {
   [key: string]: any
 }
 
+interface AdditionalFieldValue {
+  field_id: number
+  field_label: string
+  field_key: string
+  value: string | null
+}
+
 const statusBadgeColors = {
   pending: 'bg-amber-50 text-[#A0153E] border-[#C9184A]',
   approved: 'bg-emerald-50 text-[#800020] border-[#A0153E]',
@@ -42,6 +50,7 @@ const statusLabels = {
 }
 
 export default function MasterfilePage() {
+  const router = useRouter()
   const [employees, setEmployees] = useState<Employee[]>([])
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
@@ -50,6 +59,7 @@ export default function MasterfilePage() {
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [showRegistrationModal, setShowRegistrationModal] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
+  const [additionalValues, setAdditionalValues] = useState<AdditionalFieldValue[]>([])
 
   useEffect(() => {
     fetchEmployees()
@@ -112,27 +122,36 @@ export default function MasterfilePage() {
       const fullUrl = `${apiUrl}/api/employees/${employeeId}`
       console.log('Fetching employee details from:', fullUrl)
       
-      const response = await fetch(fullUrl, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        credentials: 'include',
-      })
+      const [empResponse, addlResponse] = await Promise.all([
+        fetch(fullUrl, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          credentials: 'include',
+        }),
+        fetch(`${apiUrl}/api/employees/${employeeId}/additional-values`, {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' },
+          credentials: 'include',
+        }),
+      ])
       
-      if (!response.ok) {
-        console.error(`API returned status ${response.status}: ${response.statusText}`)
-        throw new Error(`HTTP Error: ${response.status}`)
+      if (!empResponse.ok) {
+        console.error(`API returned status ${empResponse.status}: ${empResponse.statusText}`)
+        throw new Error(`HTTP Error: ${empResponse.status}`)
       }
       
-      const data = await response.json()
+      const data = await empResponse.json()
       if (data.success) {
         setSelectedEmployee(data.data)
         setShowDetailModal(true)
       } else {
         console.warn('API response not successful:', data)
         alert('Failed to load employee details')
+      }
+
+      if (addlResponse.ok) {
+        const addlData = await addlResponse.json()
+        if (addlData.success) setAdditionalValues(addlData.data)
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
@@ -233,12 +252,21 @@ export default function MasterfilePage() {
       <div className="bg-white p-6 rounded-lg shadow-lg border-2 border-[#FFE5EC]">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <h2 className="text-2xl font-bold text-[#800020]">Employee List</h2>
-          <Button
-            onClick={() => setShowRegistrationModal(true)}
-            className="bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white font-bold px-6 py-2 rounded-lg transition-all duration-300 shadow-md hover:shadow-lg"
-          >
-            + CREATE EMPLOYEE
-          </Button>
+          <div className="flex gap-3">
+            <Button
+              onClick={() => router.push('/admin-head/employee/additional-info')}
+              variant="outline"
+              className="border-[#A0153E] text-[#800020] hover:bg-[#FFE5EC] font-semibold px-6 py-2 rounded-lg transition-all duration-300"
+            >
+              Additional Information
+            </Button>
+            <Button
+              onClick={() => setShowRegistrationModal(true)}
+              className="bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white font-bold px-6 py-2 rounded-lg transition-all duration-300 shadow-md hover:shadow-lg"
+            >
+              + CREATE EMPLOYEE
+            </Button>
+          </div>
         </div>
 
         {/* Search Bar */}
@@ -523,6 +551,21 @@ export default function MasterfilePage() {
                   </div>
                 </div>
               </div>
+
+              {/* ADDITIONAL INFORMATION */}
+              {additionalValues.length > 0 && (
+                <div className="mb-8">
+                  <h3 className="text-lg font-bold text-[#800020] mb-4 pb-2 border-b-2 border-[#C9184A]">ADDITIONAL INFORMATION</h3>
+                  <div className="grid grid-cols-2 gap-6">
+                    {additionalValues.map((field) => (
+                      <div key={field.field_id}>
+                        <p className="text-slate-600 text-sm font-medium mb-1 uppercase">{field.field_label}</p>
+                        <p className="text-slate-900 font-medium text-base">{field.value || '-'}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Status Requirements Check */}
               <div className="mb-6 p-4 bg-[#FFE5EC] rounded-lg border-2 border-[#C9184A]">

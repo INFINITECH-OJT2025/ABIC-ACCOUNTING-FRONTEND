@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\EmployeeController;
+use App\Http\Controllers\Api\EmployeeAdditionalFieldController;
 use App\Http\Controllers\Api\PositionController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\ActivityLogController;
@@ -34,6 +35,13 @@ Route::post('/employees/{id}/onboard', [EmployeeController::class, 'onboard']);
 Route::post('/employees/{id}/terminate', [EmployeeController::class, 'terminate']);
 Route::post('/employees/{id}/rehire', [EmployeeController::class, 'rehire']);
 Route::get('/terminations', [EmployeeController::class, 'getTerminations']);
+
+// Additional Fields API Routes
+Route::get('/employee-additional-fields', [EmployeeAdditionalFieldController::class, 'index']);
+Route::post('/employee-additional-fields', [EmployeeAdditionalFieldController::class, 'store']);
+Route::delete('/employee-additional-fields/{id}', [EmployeeAdditionalFieldController::class, 'destroy']);
+Route::get('/employees/{id}/additional-values', [EmployeeAdditionalFieldController::class, 'getEmployeeValues']);
+Route::post('/employees/{id}/additional-values', [EmployeeAdditionalFieldController::class, 'saveEmployeeValues']);
 
 // Activity Log API Routes
 Route::get('/activity-logs', [ActivityLogController::class, 'index']);
