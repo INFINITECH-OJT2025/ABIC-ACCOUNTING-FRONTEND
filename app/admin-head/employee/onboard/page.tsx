@@ -44,6 +44,28 @@ interface OnboardingData {
   department: string
 }
 
+type TaskStatus = 'DONE' | 'PENDING'
+
+interface ChecklistTask {
+  id: number
+  task: string
+  status: TaskStatus
+}
+
+const DEFAULT_ONBOARDING_TASK_LABELS = [
+  'Submit documents',
+  'Attend orientation',
+  'Receive equipment',
+  'Setup email',
+]
+
+const buildTaskRows = (labels: string[]): ChecklistTask[] =>
+  labels.map((label, index) => ({
+    id: Date.now() + index + Math.floor(Math.random() * 1000),
+    task: label,
+    status: 'PENDING',
+  }))
+
 export default function OnboardPage() {
   const router = useRouter()
   const [employees, setEmployees] = useState<ApprovedEmployee[]>([])
@@ -63,6 +85,8 @@ export default function OnboardPage() {
   
   const [isSaving, setIsSaving] = useState(false)
   const [isActionLoading, setIsActionLoading] = useState(false)
+  const [taskMode, setTaskMode] = useState<'default' | 'custom'>('default')
+  const [modalTasks, setModalTasks] = useState<ChecklistTask[]>(() => buildTaskRows(DEFAULT_ONBOARDING_TASK_LABELS))
 
   useEffect(() => {
     const loadData = async () => {
@@ -125,12 +149,23 @@ export default function OnboardPage() {
     setPosition(employee.position || '')
     setDepartment('')
     setOnboardingDate('')
+    setTaskMode('default')
+    setModalTasks(buildTaskRows(DEFAULT_ONBOARDING_TASK_LABELS))
     setShowForm(true)
   }
 
   const handleStartOnboarding = async () => {
     if (!selectedEmployee || !onboardingDate || !department || !position) {
       alert('Please fill in all fields')
+      return
+    }
+
+    const cleanedTasks = modalTasks
+      .map(task => ({ ...task, task: task.task.trim(), status: 'PENDING' as TaskStatus }))
+      .filter(task => task.task.length > 0)
+
+    if (cleanedTasks.length === 0) {
+      alert('Please provide at least one onboarding task.')
       return
     }
 
@@ -145,6 +180,7 @@ export default function OnboardPage() {
           position: position,
           department: department,
           onboarding_date: onboardingDate,
+          tasks: cleanedTasks,
         }),
       })
 
@@ -247,6 +283,33 @@ export default function OnboardPage() {
     setOnboardingDate('')
     setDepartment('')
     setPosition('')
+    setTaskMode('default')
+    setModalTasks(buildTaskRows(DEFAULT_ONBOARDING_TASK_LABELS))
+  }
+
+  const handleTaskModeChange = (mode: 'default' | 'custom') => {
+    setTaskMode(mode)
+    if (mode === 'default') {
+      setModalTasks(buildTaskRows(DEFAULT_ONBOARDING_TASK_LABELS))
+      return
+    }
+
+    setModalTasks(prev => {
+      const seeded = prev.filter(task => task.task.trim().length > 0)
+      return seeded.length > 0 ? seeded : [{ id: Date.now(), task: '', status: 'PENDING' }]
+    })
+  }
+
+  const addModalTask = () => {
+    setModalTasks(prev => [...prev, { id: Date.now() + Math.floor(Math.random() * 1000), task: '', status: 'PENDING' }])
+  }
+
+  const updateModalTaskText = (id: number, text: string) => {
+    setModalTasks(prev => prev.map(task => task.id === id ? { ...task, task: text } : task))
+  }
+
+  const removeModalTask = (id: number) => {
+    setModalTasks(prev => prev.filter(task => task.id !== id))
   }
 
   return (
@@ -402,6 +465,77 @@ export default function OnboardPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div className="rounded-lg border border-[#C9184A]/20 bg-rose-50/50 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-semibold text-[#800020]">
+                    Task Source
+                  </label>
+                  <select
+                    value={taskMode}
+                    onChange={(e) => handleTaskModeChange(e.target.value as 'default' | 'custom')}
+                    className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A] bg-white"
+                  >
+                    <option value="default">Default Tasks</option>
+                    <option value="custom">Custom Tasks</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-600 font-medium">
+                    {taskMode === 'default'
+                      ? 'Preview (default tasks are locked)'
+                      : 'Preview (you can edit, add, or remove tasks)'}
+                  </p>
+
+                  {modalTasks.length === 0 ? (
+                    <p className="text-sm text-slate-500 bg-white rounded-lg border border-slate-200 p-3">No tasks yet.</p>
+                  ) : (
+                    modalTasks.map((task, index) => (
+                      <div key={task.id} className="flex items-center gap-2">
+                        <span className="h-7 w-7 rounded-full bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center">
+                          {index + 1}
+                        </span>
+                        {taskMode === 'default' ? (
+                          <div className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                            {task.task}
+                          </div>
+                        ) : (
+                          <Input
+                            value={task.task}
+                            onChange={(e) => updateModalTaskText(task.id, e.target.value)}
+                            placeholder="Enter task name"
+                            className="flex-1"
+                          />
+                        )}
+                        {taskMode === 'custom' && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeModalTask(task.id)}
+                            className="text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 h-9 w-9 p-0 rounded-lg"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {taskMode === 'custom' && (
+                  <Button
+                    type="button"
+                    onClick={addModalTask}
+                    variant="outline"
+                    className="border-[#C9184A] text-[#800020] hover:bg-rose-50"
+                  >
+                    <Plus className="mr-1 h-4 w-4" />
+                    Add Custom Task
+                  </Button>
+                )}
               </div>
             </div>
 

@@ -16,4 +16,11 @@ class ClearanceChecklist extends Model
         'tasks',
         'status'
     ];
+
+    protected $casts = [
+        'start_date' => 'date',
+        'resignation_date' => 'date',
+        'last_day' => 'date',
+        'tasks' => 'array',
+    ];
 }

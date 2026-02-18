@@ -14,4 +14,9 @@ class OnboardingChecklist extends Model
             'tasks',
             'status'
         ];
+
+        protected $casts = [
+            'start_date' => 'date',
+            'tasks' => 'array',
+        ];
 }

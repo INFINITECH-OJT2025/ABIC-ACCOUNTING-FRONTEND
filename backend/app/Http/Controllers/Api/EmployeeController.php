@@ -132,7 +132,9 @@ class EmployeeController extends Controller
                 $validated['password'] = Hash::make($validated['password']);
             }
 
-            $employee->update($validated);
+            $employeePayload = $validated;
+            unset($employeePayload['tasks']);
+            $employee->update($employeePayload);
 
             return response()->json([
                 'success' => true,
@@ -290,6 +292,11 @@ class EmployeeController extends Controller
                 'position' => 'required|string|max:255',
                 'department' => 'required|string|max:255',
                 'onboarding_date' => 'required|date',
+                'tasks' => 'sometimes|array|min:1',
+                'tasks.*.id' => 'sometimes',
+                'tasks.*.task' => 'required_with:tasks|string|max:1000',
+                'tasks.*.status' => 'required_with:tasks|string|in:DONE,PENDING',
+                'tasks.*.date' => 'sometimes|nullable|date',
                 'email_assigned' => 'sometimes|nullable|string|email|max:255',
                 'access_level' => 'sometimes|nullable|string|max:255',
                 'equipment_issued' => 'sometimes|nullable|string',
@@ -306,21 +313,25 @@ class EmployeeController extends Controller
                 ], 404);
             }
 
-            $employee->update($validated);
+            $employeePayload = $validated;
+            unset($employeePayload['tasks']);
+            $employee->update($employeePayload);
 
             // Prepare checklist data
+            $defaultTasks = [
+                ['id' => 1, 'task' => 'Submit documents', 'status' => 'PENDING'],
+                ['id' => 2, 'task' => 'Attend orientation', 'status' => 'PENDING'],
+                ['id' => 3, 'task' => 'Receive equipment', 'status' => 'PENDING'],
+                ['id' => 4, 'task' => 'Setup email', 'status' => 'PENDING'],
+            ];
+
             $checklistData = [
                 'employee_name' => $employee->first_name . ' ' . $employee->last_name,
                 'position' => $employee->position ?? $validated['position'],
                 'department' => $employee->department ?? $validated['department'],
                 'start_date' => $validated['onboarding_date'],
-                'tasks' => json_encode([
-                    ['task' => 'Submit documents', 'completed' => false],
-                    ['task' => 'Attend orientation', 'completed' => false],
-                    ['task' => 'Receive equipment', 'completed' => false],
-                    ['task' => 'Setup email', 'completed' => false],
-                ]),
-                'status' => 'pending',
+                'tasks' => $validated['tasks'] ?? $defaultTasks,
+                'status' => 'PENDING',
             ];
 
             // Create onboarding checklist

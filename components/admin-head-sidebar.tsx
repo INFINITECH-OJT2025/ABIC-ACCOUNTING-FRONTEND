@@ -109,105 +109,12 @@ export default function AdminHeadSidebar() {
           </div>
         </div>
 
-        {/* Directory with Dropdown */}
-        <div className="group" onMouseEnter={() => setIsDirectoryOpen(true)} onMouseLeave={() => setIsDirectoryOpen(false)}>
-          <button
-            onClick={() => setIsDirectoryOpen(!isDirectoryOpen)}
-            className="w-full flex items-center justify-between px-4 py-3 rounded-lg hover:bg-red-800/40 transition-all duration-200 font-semibold text-sm"
-          >
-            <span className="font-medium">DIRECTORY</span>
-            <ChevronDown
-              size={18}
-              className={`transition-transform ${isDirectoryOpen ? 'rotate-180' : ''} group-hover:rotate-180`}
-            />
-          </button>
-
-          {/* Directory Dropdown Menu (hover OR click) */}
-          <div className={`ml-4 mt-2 space-y-1 bg-red-950/60 rounded-lg p-3 border border-red-800/30 backdrop-blur-sm ${isDirectoryOpen ? 'block' : 'hidden'} group-hover:block`}>
-            {/* Adding with Dropdown */}
-            <div className="group" onMouseEnter={() => setIsAddingOpen(true)} onMouseLeave={() => setIsAddingOpen(false)}>
-              <button
-                onClick={() => setIsAddingOpen(!isAddingOpen)}
-                className="w-full flex items-center justify-between px-4 py-3 rounded-lg hover:bg-red-800/40 transition-all duration-200 font-semibold text-sm"
-              >
-                <span className="font-medium">Adding</span>
-                <ChevronDown
-                  size={18}
-                  className={`transition-transform ${isAddingOpen ? 'rotate-180' : ''} group-hover:rotate-180`}
-                />
-              </button>
-
-            {/* Adding Dropdown Menu (hover OR click) */}
-            <div className={`ml-4 mt-2 space-y-1 bg-red-950/60 rounded-lg p-3 border border-red-800/30 backdrop-blur-sm ${isAddingOpen ? 'block' : 'hidden'} group-hover:block`}>
-              <Link
-                href="/admin-head/directory/adding/sss"
-                className="block px-4 py-2 rounded-md hover:bg-red-800/50 transition-all duration-150 text-sm font-medium text-red-50 hover:text-white"
-              >
-                SSS
-              </Link>
-              <Link
-                href="/admin-head/directory/adding/philhealth"
-                className="block px-4 py-2 rounded-md hover:bg-red-800/50 transition-all duration-150 text-sm font-medium text-red-50 hover:text-white"
-              >
-                PhilHealth
-              </Link>
-              <Link
-                href="/admin-head/directory/adding/pag-ibig"
-                className="block px-4 py-2 rounded-md hover:bg-red-800/50 transition-all duration-150 text-sm font-medium text-red-50 hover:text-white"
-              >
-                PAG-IBIG
-              </Link>
-              <Link
-                href="/admin-head/directory/adding/tin"
-                className="block px-4 py-2 rounded-md hover:bg-red-800/50 transition-all duration-150 text-sm font-medium text-red-50 hover:text-white"
-              >
-                TIN
-              </Link>
-            </div>
-          </div>
-          {/* Removing with Dropdown */}
-          <div className="group" onMouseEnter={() => setIsRemovingOpen(true)} onMouseLeave={() => setIsRemovingOpen(false)}>
-            <button
-              onClick={() => setIsRemovingOpen(!isRemovingOpen)}
-              className="w-full flex items-center justify-between px-4 py-3 rounded-lg hover:bg-red-800/40 transition-all duration-200 font-semibold text-sm"
-            >
-              <span className="font-medium">Removing</span>
-              <ChevronDown
-                size={18}
-                className={`transition-transform ${isRemovingOpen ? 'rotate-180' : ''} group-hover:rotate-180`}
-              />
-            </button>
-
-            {/* Removing Dropdown Menu (hover OR click) */}
-            <div className={`ml-4 mt-2 space-y-1 bg-red-950/60 rounded-lg p-3 border border-red-800/30 backdrop-blur-sm ${isRemovingOpen ? 'block' : 'hidden'} group-hover:block`}>
-              <Link
-                href="/admin-head/directory/removing/sss"
-                className="block px-4 py-2 rounded-md hover:bg-red-800/50 transition-all duration-150 text-sm font-medium text-red-50 hover:text-white"
-              >
-                SSS
-              </Link>
-              <Link
-                href="/admin-head/directory/removing/philhealth"
-                className="block px-4 py-2 rounded-md hover:bg-red-800/50 transition-all duration-150 text-sm font-medium text-red-50 hover:text-white"
-              >
-                PhilHealth
-              </Link>
-              <Link
-                href="/admin-head/directory/removing/pag-ibig"
-                className="block px-4 py-2 rounded-md hover:bg-red-800/50 transition-all duration-150 text-sm font-medium text-red-50 hover:text-white"
-              >
-                PAG-IBIG
-              </Link>
-              <Link
-                href="/admin-head/directory/removing/tin"
-                className="block px-4 py-2 rounded-md hover:bg-red-800/50 transition-all duration-150 text-sm font-medium text-red-50 hover:text-white"
-              >
-                TIN
-              </Link>
-            </div>
-          </div>
-            </div>
-          </div>
+        <Link
+          href="/admin-head/directory"
+          className="block px-4 py-2 rounded-md hover:bg-red-800/50 transition-all duration-150 text-sm font-medium text-red-50 hover:text-white"
+        >
+          DIRECTORY
+        </Link>
 
         {/* ATTENDANCE with Dropdown */}
         <div className="group" onMouseEnter={() => setIsAttendanceOpen(true)} onMouseLeave={() => setIsAttendanceOpen(false)}>
