@@ -7,13 +7,27 @@ import { getApiUrl } from '@/lib/api'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
+import { Separator } from '@/components/ui/separator'
 import {
+  PlusCircle,
+  Briefcase,
+  User,
+  Phone,
+  CreditCard,
+  Users,
+  MapPin,
+  CheckCircle2,
+  Circle,
+  ChevronLeft,
+  ChevronRight,
+  Save as LucideSave,
   X,
   Settings2,
   Trash2,
   ChevronDown,
-  ChevronUp,
-  PlusCircle
+  ChevronUp
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -35,6 +49,8 @@ interface AdditionalFieldValue {
   field_id: number
   field_label: string
   field_key: string
+  field_type: string
+  field_unit: string | null
   value: string | null
 }
 
@@ -67,7 +83,7 @@ export default function MasterfilePage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeDetails | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
-  const [view, setView] = useState<'list' | 'onboard' | 'checklist'>('list')
+  const [view, setView] = useState<'list' | 'onboard' | 'checklist' | 'update-info'>('list')
   const [activeTab, setActiveTab] = useState<'employed' | 'terminated'>('employed')
   const [completedTasks, setCompletedTasks] = useState<{[key: string]: string}>({})
   const [checklistData, setChecklistData] = useState<{
@@ -97,11 +113,253 @@ export default function MasterfilePage() {
     department: '',
   })
 
+  // Progression Form States
+  const [currentBatch, setCurrentBatch] = useState(1)
+  const [onboardingEmployeeId, setOnboardingEmployeeId] = useState<number | null>(null)
+  const [progressionFormData, setProgressionFormData] = useState<Partial<EmployeeDetails>>({})
+  const [additionalFields, setAdditionalFields] = useState<AdditionalFieldValue[]>([])
+  const [progressionAdditionalValues, setProgressionAdditionalValues] = useState<Record<string, string>>({})
+
+  // Address dropdown states
+  const [regions, setRegions] = useState<{ code: string; name: string }[]>([])
+  const [provinces, setProvinces] = useState<{ code: string; name: string }[]>([])
+  const [cities, setCities] = useState<{ code: string; name: string }[]>([])
+  const [barangays, setBarangays] = useState<{ code: string; name: string }[]>([])
+  const [loadingRegions, setLoadingRegions] = useState(false)
+  const [loadingProvinces, setLoadingProvinces] = useState(false)
+  const [loadingCities, setLoadingCities] = useState(false)
+  const [loadingBarangays, setLoadingBarangays] = useState(false)
+
+  const batches = [
+    { id: 1, title: 'Employee Details', icon: Briefcase, description: 'Basic employment information' },
+    { id: 2, title: 'Personal Information', icon: User, description: 'Your personal details' },
+    { id: 3, title: 'Contact Information', icon: Phone, description: 'How to reach you' },
+    { id: 4, title: 'Government IDs', icon: CreditCard, description: 'Official identification numbers' },
+    { id: 5, title: 'Family Information', icon: Users, description: 'Parent information' },
+    { id: 6, title: 'Address Details', icon: MapPin, description: 'Complete address information' },
+    { id: 7, title: 'Additional Info', icon: CheckCircle2, description: 'Extra information fields' },
+  ]
+
   useEffect(() => {
     fetchEmployees()
     fetchPositions()
     fetchDepartments()
+    fetchRegions()
+    fetchProgressionAdditionalFields()
   }, [])
+
+  const fetchProgressionAdditionalFields = async () => {
+    try {
+      const res = await fetch(`${getApiUrl()}/api/employee-additional-fields`, {
+        headers: { 'Accept': 'application/json' },
+      })
+      const data = await res.json()
+      if (data.success) {
+        setAdditionalFields(data.data.map((f: any) => ({
+          field_id:    f.id,
+          field_label: f.field_label,
+          field_key:   f.field_key,
+          field_type:  f.field_type  ?? 'text',
+          field_unit:  f.field_unit  ?? null,
+          value:       null,
+        })))
+      }
+    } catch (err) {
+      console.error('Error fetching additional fields:', err)
+    }
+  }
+
+  const fetchRegions = async () => {
+    setLoadingRegions(true)
+    try {
+      const response = await fetch('https://psgc.gitlab.io/api/regions/')
+      if (!response.ok) throw new Error(`API error: ${response.status}`)
+      const data = await response.json()
+      const regionsArray = Array.isArray(data) ? data : data.data || []
+      const regionsList = regionsArray.map((region: any) => ({
+        code: region.code,
+        name: region.name,
+      }))
+      setRegions(regionsList)
+    } catch (error) {
+      console.error('Error fetching regions:', error)
+      setRegions([])
+    } finally {
+      setLoadingRegions(false)
+    }
+  }
+
+  const fetchProvinces = async (regionCode: string, preserveValues = false) => {
+    if (!regionCode) {
+      setProvinces([])
+      setCities([])
+      setBarangays([])
+      return
+    }
+    setLoadingProvinces(true)
+    try {
+      const response = await fetch(`https://psgc.gitlab.io/api/regions/${regionCode}/provinces/`)
+      if (!response.ok) throw new Error(`API error: ${response.status}`)
+      const data = await response.json()
+      const provincesArray = Array.isArray(data) ? data : data.data || []
+      const provincesList = provincesArray.map((province: any) => ({
+        code: province.code,
+        name: province.name,
+      }))
+      setProvinces(provincesList)
+      setCities([])
+      setBarangays([])
+      if (!preserveValues) {
+        setProgressionFormData((prev) => ({ ...prev, province: '', city_municipality: '', barangay: '' }))
+      }
+    } catch (error) {
+      console.error('Error fetching provinces:', error)
+      setProvinces([])
+    } finally {
+      setLoadingProvinces(false)
+    }
+  }
+
+  const fetchCities = async (provinceCode: string, preserveValues = false) => {
+    if (!provinceCode) {
+      setCities([])
+      setBarangays([])
+      return
+    }
+    setLoadingCities(true)
+    try {
+      const citiesResponse = await fetch(`https://psgc.gitlab.io/api/provinces/${provinceCode}/cities/`)
+      const municipalitiesResponse = await fetch(`https://psgc.gitlab.io/api/provinces/${provinceCode}/municipalities/`)
+      const citiesData = citiesResponse.ok ? await citiesResponse.json() : []
+      const municipalitiesData = municipalitiesResponse.ok ? await municipalitiesResponse.json() : []
+      const citiesArray = Array.isArray(citiesData) ? citiesData : citiesData.data || []
+      const municipalitiesArray = Array.isArray(municipalitiesData) ? municipalitiesData : municipalitiesData.data || []
+      const allCities = [...citiesArray, ...municipalitiesArray].map((city: any) => ({
+        code: city.code,
+        name: city.name,
+      }))
+      setCities(allCities)
+      setBarangays([])
+      if (!preserveValues) {
+        setProgressionFormData((prev) => ({ ...prev, city_municipality: '', barangay: '' }))
+      }
+    } catch (error) {
+      console.error('Error fetching cities:', error)
+      setCities([])
+    } finally {
+      setLoadingCities(false)
+    }
+  }
+
+  const fetchBarangays = async (cityCode: string, preserveValues = false) => {
+    if (!cityCode) {
+      setBarangays([])
+      return
+    }
+    setLoadingBarangays(true)
+    try {
+      const response = await fetch(`https://psgc.gitlab.io/api/cities/${cityCode}/barangays/`)
+      if (!response.ok) throw new Error(`API error: ${response.status}`)
+      const data = await response.json()
+      const barangaysArray = Array.isArray(data) ? data : data.data || []
+      const barangaysList = barangaysArray.map((barangay: any) => ({
+        code: barangay.code,
+        name: barangay.name,
+      }))
+      setBarangays(barangaysList)
+      if (!preserveValues) {
+        setProgressionFormData((prev) => ({ ...prev, barangay: '' }))
+      }
+    } catch (error) {
+      console.error('Error fetching barangays:', error)
+      setBarangays([])
+    } finally {
+      setLoadingBarangays(false)
+    }
+  }
+
+  const handleProgressionChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target
+    setProgressionFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }))
+
+    if (name === 'region') {
+      const selectedRegion = regions.find(r => r.name === value)
+      if (selectedRegion) fetchProvinces(selectedRegion.code)
+    } else if (name === 'province') {
+      const selectedProvince = provinces.find(p => p.name === value)
+      if (selectedProvince) fetchCities(selectedProvince.code)
+    } else if (name === 'city_municipality') {
+      const selectedCity = cities.find(c => c.name === value)
+      if (selectedCity) fetchBarangays(selectedCity.code)
+    }
+  }
+
+  const handleProgressionSave = async () => {
+    setIsSaving(true)
+    try {
+      const cleanedData = Object.entries(progressionFormData).reduce((acc, [key, value]) => {
+        acc[key] = value === '' ? null : value
+        return acc
+      }, {} as any)
+
+      additionalFields.forEach(f => {
+        cleanedData[f.field_key] = progressionAdditionalValues[f.field_key] ?? null
+      })
+
+      const response = await fetch(`${getApiUrl()}/api/employees/${onboardingEmployeeId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cleanedData),
+      })
+
+      const data = await response.json()
+      if (response.ok && data.success) {
+        toast.success('Employee record completed successfully!')
+        setView('list')
+        fetchEmployees()
+      } else {
+        toast.error(data.message || 'Failed to update profile')
+      }
+    } catch (error) {
+      console.error('Error:', error)
+      toast.error('Failed to update profile.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const calculateProgressionProgress = () => {
+    const allFields = [
+      'position', 'date_hired',
+      'last_name', 'first_name', 'birthday', 'birthplace', 'civil_status', 'gender',
+      'mobile_number', 'street',
+      'sss_number', 'philhealth_number', 'pagibig_number', 'tin_number',
+      'mlast_name', 'mfirst_name', 'flast_name', 'ffirst_name',
+      'region', 'province', 'city_municipality', 'barangay', 'zip_code', 'email_address'
+    ]
+
+    const filledFields = allFields.filter(field => {
+      const value = progressionFormData[field]
+      return value !== null && value !== undefined && value !== ''
+    }).length
+
+    return Math.round((filledFields / allFields.length) * 100)
+  }
+
+  const nextBatch = () => { if (currentBatch < 7) setCurrentBatch(currentBatch + 1) }
+  const prevBatch = () => { if (currentBatch > 1) setCurrentBatch(currentBatch - 1) }
+
+  const formatDateForInput = (dateString: string | null | undefined) => {
+    if (!dateString) return ''
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) return ''
+      return date.toISOString().split('T')[0]
+    } catch { return '' }
+  }
 
   const fetchPositions = async () => {
     try {
@@ -225,6 +483,14 @@ export default function MasterfilePage() {
       const onboardData = await onboardResponse.json()
       if (onboardData.success) {
         toast.success('Employee created and onboarding started')
+        setOnboardingEmployeeId(employeeId)
+        setProgressionFormData({
+          first_name,
+          last_name,
+          position,
+          department,
+          date_hired: onboarding_date,
+        })
         setChecklistData({
           name: `${first_name} ${last_name}`,
           position: position,
@@ -657,11 +923,11 @@ export default function MasterfilePage() {
             <div className="grid grid-cols-[1fr_200px_150px] bg-white">
               <div className="border-r-2 border-slate-400"></div>
               <button 
-                onClick={() => setView('list')}
+                onClick={() => setView('update-info')}
                 disabled={Object.keys(completedTasks).length < onboardingTasks.length}
                 className="py-1 px-4 border-r-2 border-slate-400 bg-[#D1D5DB] hover:bg-slate-300 font-bold text-slate-800 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:text-slate-500"
               >
-                ADD TO MASTERFILE
+                PROCEED TO DATA ENTRY
               </button>
               <button 
                 onClick={handleSaveChecklist}
@@ -671,6 +937,412 @@ export default function MasterfilePage() {
                 {isSaving ? 'SAVING...' : 'SAVE'}
               </button>
             </div>
+          </div>
+        </div>
+      ) : view === 'update-info' ? (
+        <div className="max-w-7xl mx-auto py-8">
+           <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+            {/* Horizontal Stepper Progress Card */}
+            <Card className="border-none shadow-lg overflow-hidden">
+              <div className="bg-gradient-to-br from-[#6B1C23] via-[#7B2431] to-[#8B2C3F] px-6 py-6">
+                {/* Header */}
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold text-white">Employee Data Entry</h2>
+                    <p className="text-rose-100 text-sm mt-1">Batch {currentBatch} of 7: {batches[currentBatch - 1].title}</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-5xl font-bold text-white">{calculateProgressionProgress()}%</div>
+                    <p className="text-rose-200 text-xs">Profile Completion</p>
+                  </div>
+                </div>
+
+                {/* Horizontal Stepper with Progress Bar */}
+                <div className="relative">
+                  {/* Progress Bar Background */}
+                  <div className="w-full bg-white/20 rounded-full h-2 overflow-hidden backdrop-blur-sm">
+                    <div
+                      className="bg-gradient-to-r from-rose-300 to-white h-2 rounded-full transition-all duration-500 ease-out"
+                      style={{ width: `${calculateProgressionProgress()}%` }}
+                    />
+                  </div>
+
+                  {/* Steps with Labels */}
+                  <div className="flex justify-between items-start mt-4">
+                    {batches.map((batch, index) => {
+                      const BatchIcon = batch.icon
+                      const isActive = currentBatch === batch.id
+                      const isCompleted = batch.id < currentBatch
+
+                      return (
+                        <div
+                          key={batch.id}
+                          className="flex flex-col items-center cursor-pointer group"
+                          style={{ width: `${100 / batches.length}%` }}
+                          onClick={() => setCurrentBatch(batch.id)}
+                        >
+                          <div className="relative mb-2">
+                            <div
+                              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${isActive
+                                ? 'bg-white text-maroon-700 scale-110 shadow-lg'
+                                : isCompleted
+                                  ? 'bg-emerald-500 text-white'
+                                  : 'bg-white/30 text-white/70 group-hover:bg-white/40'
+                                }`}
+                            >
+                              {isCompleted ? (
+                                <CheckCircle2 className="h-5 w-5" />
+                              ) : (
+                                <BatchIcon className="h-4 w-4" />
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-center hidden md:block">
+                            <p className={`text-[10px] font-semibold transition-colors ${isActive ? 'text-white' : isCompleted ? 'text-emerald-200' : 'text-rose-100/80 group-hover:text-white'}`}>
+                              {batch.title}
+                            </p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* Current Batch Form */}
+            <Card className="shadow-xl border-maroon-100">
+              <CardHeader className="bg-gradient-to-br from-[#6B1C23] via-[#7B2431] to-[#8B2C3F] text-white rounded-t-xl py-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                    {React.createElement(batches[currentBatch-1].icon, { className: "h-5 w-5" })}
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl text-white font-bold">Batch {currentBatch}: {batches[currentBatch-1].title}</CardTitle>
+                    <CardDescription className="text-white/80 text-xs font-medium">{batches[currentBatch-1].description}</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent className="p-6 md:p-10">
+                {/* BATCH 1: Employee Details */}
+                {currentBatch === 1 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-3">
+                      <Label htmlFor="position" className="text-base font-semibold text-slate-800">
+                        Position <span className="text-red-500">*</span>
+                      </Label>
+                      <select
+                        id="position"
+                        name="position"
+                        value={progressionFormData.position || ''}
+                        onChange={handleProgressionChange}
+                        className="flex h-12 w-full rounded-lg border-2 border-slate-300 bg-white px-4 py-2 text-base focus-visible:ring-2 focus-visible:ring-maroon-500 transition-all font-medium"
+                      >
+                        <option value="">Select Position...</option>
+                        {positions.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                      </select>
+                    </div>
+
+                    <div className="space-y-3">
+                      <Label htmlFor="date_hired" className="text-base font-semibold text-slate-800">
+                        Date Hired <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="date_hired"
+                        type="date"
+                        name="date_hired"
+                        value={formatDateForInput(progressionFormData.date_hired)}
+                        onChange={handleProgressionChange}
+                        className="h-12 text-base border-2 border-slate-300 rounded-lg font-medium"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* BATCH 2: Personal Information */}
+                {currentBatch === 2 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="last_name" className="text-sm font-semibold">Last Name <span className="text-red-500">*</span></Label>
+                      <Input id="last_name" name="last_name" value={progressionFormData.last_name || ''} onChange={handleProgressionChange} placeholder="e.g., Dela Cruz" className="font-medium" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="first_name" className="text-sm font-semibold">First Name <span className="text-red-500">*</span></Label>
+                      <Input id="first_name" name="first_name" value={progressionFormData.first_name || ''} onChange={handleProgressionChange} placeholder="e.g., Juan" className="font-medium" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="middle_name" className="text-sm font-semibold">Middle Name</Label>
+                      <Input id="middle_name" name="middle_name" value={progressionFormData.middle_name || ''} onChange={handleProgressionChange} placeholder="Optional" className="font-medium" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="suffix" className="text-sm font-semibold">Suffix</Label>
+                      <Input id="suffix" name="suffix" value={progressionFormData.suffix || ''} onChange={handleProgressionChange} placeholder="e.g., Jr." className="font-medium" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="birthday" className="text-sm font-semibold">Birthday <span className="text-red-500">*</span></Label>
+                      <Input id="birthday" type="date" name="birthday" value={formatDateForInput(progressionFormData.birthday)} onChange={handleProgressionChange} className="font-medium" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="birthplace" className="text-sm font-semibold">Birthplace <span className="text-red-500">*</span></Label>
+                      <Input id="birthplace" name="birthplace" value={progressionFormData.birthplace || ''} onChange={handleProgressionChange} placeholder="e.g., Manila" className="font-medium" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="gender" className="text-sm font-semibold">Gender <span className="text-red-500">*</span></Label>
+                      <select id="gender" name="gender" value={progressionFormData.gender || ''} onChange={handleProgressionChange} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
+                        <option value="">Select...</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="civil_status" className="text-sm font-semibold">Civil Status <span className="text-red-500">*</span></Label>
+                      <select id="civil_status" name="civil_status" value={progressionFormData.civil_status || ''} onChange={handleProgressionChange} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
+                        <option value="">Select...</option>
+                        <option value="Single">Single</option>
+                        <option value="Married">Married</option>
+                        <option value="Widowed">Widowed</option>
+                        <option value="Separated">Separated</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {/* BATCH 3: Contact Information */}
+                {currentBatch === 3 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="mobile_number" className="text-sm font-semibold">Mobile Number <span className="text-red-500">*</span></Label>
+                      <Input id="mobile_number" name="mobile_number" value={progressionFormData.mobile_number || ''} onChange={handleProgressionChange} placeholder="09XXXXXXXXX" className="font-medium" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="house_number" className="text-sm font-semibold">House number</Label>
+                      <Input id="house_number" name="house_number" value={progressionFormData.house_number || ''} onChange={handleProgressionChange} className="font-medium" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="street" className="text-sm font-semibold">Street <span className="text-red-500">*</span></Label>
+                      <Input id="street" name="street" value={progressionFormData.street || ''} onChange={handleProgressionChange} className="font-medium" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="village" className="text-sm font-semibold">Village</Label>
+                      <Input id="village" name="village" value={progressionFormData.village || ''} onChange={handleProgressionChange} className="font-medium" />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="subdivision" className="text-sm font-semibold">Subdivision</Label>
+                      <Input id="subdivision" name="subdivision" value={progressionFormData.subdivision || ''} onChange={handleProgressionChange} className="font-medium" />
+                    </div>
+                  </div>
+                )}
+
+                {/* BATCH 4: Government IDs */}
+                {currentBatch === 4 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="sss_number" className="text-sm font-semibold">SSS Number</Label>
+                      <Input id="sss_number" name="sss_number" value={progressionFormData.sss_number || ''} onChange={handleProgressionChange} className="font-medium" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="philhealth_number" className="text-sm font-semibold">PhilHealth Number</Label>
+                      <Input id="philhealth_number" name="philhealth_number" value={progressionFormData.philhealth_number || ''} onChange={handleProgressionChange} className="font-medium" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="pagibig_number" className="text-sm font-semibold">Pag-IBIG Number</Label>
+                      <Input id="pagibig_number" name="pagibig_number" value={progressionFormData.pagibig_number || ''} onChange={handleProgressionChange} className="font-medium" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="tin_number" className="text-sm font-semibold">TIN Number</Label>
+                      <Input id="tin_number" name="tin_number" value={progressionFormData.tin_number || ''} onChange={handleProgressionChange} className="font-medium" />
+                    </div>
+                  </div>
+                )}
+
+                {/* BATCH 5: Family Information */}
+                {currentBatch === 5 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <Card className="border-rose-100 bg-rose-50/30 p-4">
+                      <h4 className="font-bold text-rose-800 mb-4 flex items-center gap-2"><div className="w-1 h-4 bg-rose-500 rounded-full"></div>Mother's Maiden Name</h4>
+                      <div className="space-y-4">
+                        <Input placeholder="Last Name *" name="mlast_name" value={progressionFormData.mlast_name || ''} onChange={handleProgressionChange} className="font-medium" />
+                        <Input placeholder="First Name *" name="mfirst_name" value={progressionFormData.mfirst_name || ''} onChange={handleProgressionChange} className="font-medium" />
+                        <Input placeholder="Middle Name" name="mmiddle_name" value={progressionFormData.mmiddle_name || ''} onChange={handleProgressionChange} className="font-medium" />
+                        <Input placeholder="Suffix" name="msuffix" value={progressionFormData.msuffix || ''} onChange={handleProgressionChange} className="font-medium" />
+                      </div>
+                    </Card>
+                    <Card className="border-slate-100 bg-slate-50/30 p-4">
+                      <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><div className="w-1 h-4 bg-slate-500 rounded-full"></div>Father's Name (Optional)</h4>
+                      <div className="space-y-4">
+                        <Input placeholder="Last Name" name="flast_name" value={progressionFormData.flast_name || ''} onChange={handleProgressionChange} className="font-medium" />
+                        <Input placeholder="First Name" name="ffirst_name" value={progressionFormData.ffirst_name || ''} onChange={handleProgressionChange} className="font-medium" />
+                        <Input placeholder="Middle Name" name="fmiddle_name" value={progressionFormData.fmiddle_name || ''} onChange={handleProgressionChange} className="font-medium" />
+                        <Input placeholder="Suffix" name="fsuffix" value={progressionFormData.fsuffix || ''} onChange={handleProgressionChange} className="font-medium" />
+                      </div>
+                    </Card>
+                  </div>
+                )}
+
+                {/* BATCH 6: Address Details */}
+                {currentBatch === 6 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="region" className="text-sm font-semibold">Region <span className="text-red-500">*</span></Label>
+                      <select name="region" value={progressionFormData.region || ''} onChange={handleProgressionChange} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
+                        <option value="">Select Region...</option>
+                        {regions.map(r => <option key={r.code} value={r.name}>{r.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="province" className="text-sm font-semibold">Province <span className="text-red-500">*</span></Label>
+                      <select name="province" value={progressionFormData.province || ''} onChange={handleProgressionChange} disabled={!progressionFormData.region} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
+                        <option value="">Select Province...</option>
+                        {provinces.map(p => <option key={p.code} value={p.name}>{p.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="city_municipality" className="text-sm font-semibold">City/Municipality <span className="text-red-500">*</span></Label>
+                      <select name="city_municipality" value={progressionFormData.city_municipality || ''} onChange={handleProgressionChange} disabled={!progressionFormData.province} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
+                        <option value="">Select City...</option>
+                        {cities.map(c => <option key={c.code} value={c.name}>{c.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="barangay" className="text-sm font-semibold">Barangay <span className="text-red-500">*</span></Label>
+                      <select name="barangay" value={progressionFormData.barangay || ''} onChange={handleProgressionChange} disabled={!progressionFormData.city_municipality} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
+                        <option value="">Select Barangay...</option>
+                        {barangays.map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="zip_code" className="text-sm font-semibold">ZIP Code <span className="text-red-500">*</span></Label>
+                      <Input id="zip_code" name="zip_code" value={progressionFormData.zip_code || ''} onChange={handleProgressionChange} className="font-medium" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email_address" className="text-sm font-semibold">Email Address <span className="text-red-500">*</span></Label>
+                      <Input id="email_address" type="email" name="email_address" value={progressionFormData.email_address || ''} onChange={handleProgressionChange} className="font-medium" />
+                    </div>
+                  </div>
+                )}
+
+                {/* BATCH 7: Additional Information */}
+                {currentBatch === 7 && (
+                  <div className="space-y-6">
+                    {additionalFields.length === 0 ? (
+                      <div className="text-center py-12 text-slate-400">
+                        <CheckCircle2 className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                        <p className="text-lg font-medium mb-2">No additional fields configured</p>
+                        <p className="text-sm">Additional fields can be managed from the main dashboard.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {additionalFields.map((field) => (
+                          <div key={field.field_key} className="space-y-2">
+                            <Label className="text-sm font-semibold">
+                              {field.field_label}
+                              {field.field_unit && (
+                                <span className="ml-1 text-xs font-normal text-slate-400">({field.field_unit})</span>
+                              )}
+                            </Label>
+
+                            {field.field_type === 'textarea' ? (
+                              <textarea
+                                value={progressionAdditionalValues[field.field_key] ?? ''}
+                                onChange={(e) =>
+                                  setProgressionAdditionalValues((prev) => ({
+                                    ...prev,
+                                    [field.field_key]: e.target.value,
+                                  }))
+                                }
+                                placeholder={`Enter ${field.field_label}...`}
+                                rows={3}
+                                className="flex w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-transparent resize-y min-h-[80px]"
+                              />
+                            ) : field.field_type === 'number' ? (
+                              <div className="flex gap-2 items-center">
+                                <Input
+                                  type="number"
+                                  value={progressionAdditionalValues[field.field_key] ?? ''}
+                                  onChange={(e) =>
+                                    setProgressionAdditionalValues((prev) => ({
+                                      ...prev,
+                                      [field.field_key]: e.target.value,
+                                    }))
+                                  }
+                                  placeholder="0"
+                                  className="flex-1 font-medium"
+                                />
+                                {field.field_unit && (
+                                  <span className="text-sm text-slate-500 font-semibold whitespace-nowrap bg-slate-100 px-3 py-2 rounded-md border border-slate-200">
+                                    {field.field_unit}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <Input
+                                type={field.field_type === 'date' ? 'date'
+                                  : field.field_type === 'time' ? 'time'
+                                  : field.field_type === 'email' ? 'email'
+                                  : field.field_type === 'url' ? 'url'
+                                  : 'text'}
+                                value={progressionAdditionalValues[field.field_key] ?? ''}
+                                onChange={(e) =>
+                                  setProgressionAdditionalValues((prev) => ({
+                                    ...prev,
+                                    [field.field_key]: e.target.value,
+                                  }))
+                                }
+                                placeholder={`Enter ${field.field_label}...`}
+                                className="font-medium"
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+
+              <Separator />
+
+              {/* Navigation Footer */}
+              <CardContent className="py-6">
+                <div className="flex justify-between items-center">
+                  <Button
+                    onClick={prevBatch}
+                    disabled={currentBatch === 1}
+                    variant="outline"
+                    className="h-11 px-6 font-semibold"
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-2" />
+                    Previous
+                  </Button>
+
+                  <div className="flex items-center gap-1">
+                    {batches.map((b) => (
+                      <div key={b.id} className={`h-1.5 w-6 rounded-full transition-all ${currentBatch === b.id ? 'bg-maroon-600 w-10' : 'bg-slate-200'}`} />
+                    ))}
+                  </div>
+
+                  {currentBatch === 7 ? (
+                    <Button
+                      onClick={handleProgressionSave}
+                      disabled={isSaving}
+                      className="bg-green-600 hover:bg-green-700 text-white h-11 px-8 font-bold shadow-lg transition-all"
+                    >
+                      {isSaving ? 'Saving...' : 'Complete & Finish'}
+                      <LucideSave className="h-4 w-4 ml-2" />
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={nextBatch}
+                      className="bg-maroon-600 hover:bg-maroon-700 text-white h-11 px-8 font-bold shadow-md transition-all"
+                    >
+                      Next Step
+                      <ChevronRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       ) : (
