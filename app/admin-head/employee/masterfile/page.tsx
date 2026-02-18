@@ -56,7 +56,8 @@ export default function MasterfilePage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeDetails | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
-  const [showRegistrationModal, setShowRegistrationModal] = useState(false)
+  const [view, setView] = useState<'list' | 'onboard'>('list')
+  const [activeTab, setActiveTab] = useState<'employed' | 'terminated'>('employed')
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [additionalValues, setAdditionalValues] = useState<AdditionalFieldValue[]>([])
 
@@ -297,108 +298,152 @@ export default function MasterfilePage() {
           <h1 className="text-3xl font-extrabold text-[#4A081A] tracking-tight">Employee Records</h1>
           <p className="text-slate-500 mt-1">Manage and monitor employee master data and records.</p>
         </div>
-        <div className="flex gap-3">
-          <Button
-            onClick={() => router.push('/admin-head/employee/additional-info')}
-            variant="outline"
-            className="border-slate-200 text-slate-700 hover:bg-slate-100 font-medium px-4 h-11 rounded-lg transition-all"
-          >
-            Additional Information
-          </Button>
-          <Button
-            onClick={() => setShowRegistrationModal(true)}
-            className="bg-[#630C22] hover:bg-[#4A081A] text-white font-bold px-6 h-11 rounded-lg transition-all shadow-sm"
-          >
-            + CREATE EMPLOYEE
-          </Button>
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+          {view === 'list' && (
+            <div className="relative w-full sm:w-72">
+              <Input
+                type="text"
+                placeholder="Search employees..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-white border-slate-200 pl-10 h-11 focus:ring-[#630C22] focus:border-[#630C22] rounded-lg shadow-sm"
+              />
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              </div>
+            </div>
+          )}
+          <div className="flex gap-3 w-full sm:w-auto">
+            <Button
+              onClick={() => router.push('/admin-head/employee/additional-info')}
+              variant="outline"
+              className="flex-1 sm:flex-none border-slate-200 text-slate-700 hover:bg-slate-100 font-medium px-4 h-11 rounded-lg transition-all"
+            >
+              Additional Information
+            </Button>
+            <Button
+              onClick={() => setView('onboard')}
+              className="flex-1 sm:flex-none bg-[#630C22] hover:bg-[#4A081A] text-white font-bold px-6 h-11 rounded-lg transition-all shadow-sm"
+            >
+              + ONBOARD NEW EMPLOYEE
+            </Button>
+          </div>
         </div>
       </div>
 
       <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200">
-        <div className="mb-8">
-          <div className="relative">
-            <Input
-              type="text"
-              placeholder="Search by name, email, or position..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-50 border-slate-200 py-6 pl-10 focus:ring-[#630C22] focus:border-[#630C22] rounded-xl"
-            />
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-            </div>
-          </div>
-        </div>
+        {view === 'list' ? (
+          <>
 
-        {loading ? (
-          <p className="text-slate-500">Loading employees...</p>
-        ) : (
-          <div className="space-y-10">
-            {/* Pending Employees — Card Grid */}
-            {pendingList.length > 0 && (
-              <div>
-                <h3 className="text-lg font-bold text-amber-700 mb-4 flex items-center gap-2">
-                  <span className="inline-block w-3 h-3 rounded-full bg-amber-400"></span>
-                  Pending Approval
-                  <span className="ml-2 text-sm font-normal text-slate-500">({pendingList.length})</span>
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {pendingList.map((employee) => (
-                    <div
-                      key={employee.id}
-                      onClick={() => fetchEmployeeDetails(employee.id)}
-                      className="group bg-white border border-slate-200 hover:border-[#630C22] rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer"
-                    >
-                      <div className="flex items-center gap-4 mb-4">
-                        <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-[#4A081A] text-lg font-bold group-hover:bg-[#4A081A] group-hover:text-white transition-colors duration-200">
-                          {employee.first_name.charAt(0)}{employee.last_name.charAt(0)}
-                        </div>
-                        <div className="overflow-hidden">
-                          <h1 className="font-bold text-slate-800 truncate">
-                            {employee.first_name} {employee.last_name}
-                          </h1>
-                          <p className="text-xs text-slate-500 truncate">
-                            {employee.position || 'No Position'}
-                          </p>
-                        </div>
-                      </div>
 
-                      <div className="flex justify-between items-center">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                          PENDING
-                        </span>
-                        <span className="text-[10px] text-slate-400 font-medium">Click to view</span>
-                      </div>
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-20">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#630C22] mb-4"></div>
+                <p className="text-slate-500 font-medium">Loading employees...</p>
+              </div>
+            ) : (
+              <div className="space-y-12">
+                {/* Persistent Pending Approval Section */}
+                {pendingList.length > 0 && (
+                  <div className="bg-slate-50/50 rounded-2xl p-6 border border-slate-100">
+                    <h3 className="text-lg font-bold text-amber-800 mb-6 flex items-center gap-2">
+                      <div className="w-2 h-6 bg-amber-400 rounded-full" />
+                      Pending Approval
+                      <span className="ml-2 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">{pendingList.length}</span>
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                      {pendingList.map((employee) => (
+                        <div
+                          key={employee.id}
+                          onClick={() => fetchEmployeeDetails(employee.id)}
+                          className="group bg-white border border-slate-200 hover:border-amber-400 rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer"
+                        >
+                          <div className="flex items-center gap-4 mb-4">
+                            <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center text-amber-700 text-lg font-bold group-hover:bg-amber-500 group-hover:text-white transition-colors duration-200">
+                              {employee.first_name.charAt(0)}{employee.last_name.charAt(0)}
+                            </div>
+                            <div className="overflow-hidden">
+                              <h1 className="font-bold text-slate-800 truncate">
+                                {employee.first_name} {employee.last_name}
+                              </h1>
+                              <p className="text-xs text-slate-500 truncate">
+                                {employee.position || 'No Position'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center pt-2 border-t border-slate-50">
+                            <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Requires Review</span>
+                            <span className="text-[10px] text-slate-400 font-medium">View details →</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
+                )}
+
+                {/* Main Content Area with Employed/Terminated Tabs */}
+                <div>
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 border-b border-slate-100 pb-4">
+                    <h3 className="text-xl font-bold text-[#4A081A] flex items-center gap-2">
+                      Employee Master List
+                    </h3>
+                    <div className="flex items-center bg-slate-100 p-1 rounded-xl">
+                      <button
+                        onClick={() => setActiveTab('employed')}
+                        className={`px-6 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
+                          activeTab === 'employed'
+                            ? 'bg-white text-[#4A081A] shadow-sm'
+                            : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'
+                        }`}
+                      >
+                        Employed ({employees.filter(e => e.status === 'employed').length})
+                      </button>
+                      <button
+                        onClick={() => setActiveTab('terminated')}
+                        className={`px-6 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
+                          activeTab === 'terminated'
+                            ? 'bg-white text-[#4A081A] shadow-sm'
+                            : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'
+                        }`}
+                      >
+                        Terminated ({employees.filter(e => e.status === 'terminated').length})
+                      </button>
+                    </div>
+                  </div>
+
+                  <EmployeeTable
+                    list={activeTab === 'employed' ? employedList : terminatedList}
+                    emptyMessage={
+                      searchQuery 
+                        ? `No ${activeTab} employees match your search.` 
+                        : `No ${activeTab} employees found.`
+                    }
+                  />
                 </div>
               </div>
             )}
-
-
-            {/* Employed Employees */}
-            <div>
-              <h3 className="text-lg font-bold text-emerald-700 mb-3 flex items-center gap-2">
-                <span className="inline-block w-3 h-3 rounded-full bg-emerald-500"></span>
-                Employed
-                <span className="ml-2 text-sm font-normal text-slate-500">({employedList.length})</span>
-              </h3>
-              <EmployeeTable
-                list={employedList}
-                emptyMessage={searchQuery ? 'No employed employees match your search.' : 'No employed employees found.'}
-              />
+          </>
+        ) : (
+          <div className="max-w-3xl mx-auto py-4">
+            <div className="flex items-center gap-4 mb-8">
+              <Button
+                variant="ghost"
+                onClick={() => setView('list')}
+                className="hover:bg-slate-100 text-slate-500 hover:text-slate-800"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2"><path d="m15 18-6-6 6-6"/></svg>
+                Back to List
+              </Button>
+              <div className="h-6 w-[1px] bg-slate-200" />
+              <h2 className="text-2xl font-bold text-[#4A081A]">Onboard New Employee</h2>
             </div>
-
-            {/* Terminated Employees */}
-            <div>
-              <h3 className="text-lg font-bold text-rose-700 mb-3 flex items-center gap-2">
-                <span className="inline-block w-3 h-3 rounded-full bg-rose-500"></span>
-                Terminated
-                <span className="ml-2 text-sm font-normal text-slate-500">({terminatedList.length})</span>
-              </h3>
-              <EmployeeTable
-                list={terminatedList}
-                emptyMessage={searchQuery ? 'No terminated employees match your search.' : 'No terminated employees found.'}
+            
+            <div className="bg-white border border-slate-100 rounded-2xl p-8 shadow-sm">
+              <EmployeeRegistrationForm 
+                onSuccess={() => {
+                  setView('list')
+                  fetchEmployees()
+                }} 
               />
             </div>
           </div>
@@ -424,8 +469,8 @@ export default function MasterfilePage() {
               <div className="flex items-center gap-2">
                 <span className="text-lg font-medium text-slate-700">{selectedEmployee.first_name} {selectedEmployee.last_name}</span>
                 <span className="text-slate-300 px-2">•</span>
-                <Badge className={`${statusBadgeColors[selectedEmployee.status]} border font-semibold shadow-none`}>
-                  {statusLabels[selectedEmployee.status]}
+                <Badge className={`${statusBadgeColors[selectedEmployee?.status || 'pending']} border font-semibold shadow-none`}>
+                  {statusLabels[selectedEmployee?.status || 'pending']}
                 </Badge>
               </div>
             </div>
@@ -440,12 +485,12 @@ export default function MasterfilePage() {
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <p className="text-slate-600 text-sm font-medium mb-1">POSITION <span className="text-red-500">*</span></p>
-                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.position || '-'}</p>
+                    <p className="text-slate-900 font-medium text-base">{selectedEmployee?.position || '-'}</p>
                   </div>
                   <div>
                     <p className="text-slate-600 text-sm font-medium mb-1">DATE HIRED <span className="text-red-500">*</span></p>
                     <p className="text-slate-900 font-medium text-base">
-                      {selectedEmployee.date_hired
+                      {selectedEmployee?.date_hired
                         ? new Date(selectedEmployee.date_hired).toLocaleDateString()
                         : '-'}
                     </p>
@@ -695,24 +740,6 @@ export default function MasterfilePage() {
       )}
 
       {/* Employee Registration Modal */}
-      <Dialog open={showRegistrationModal} onOpenChange={setShowRegistrationModal}>
-        <DialogContent className="sm:max-w-[500px] p-0 border-0 rounded-2xl overflow-hidden shadow-2xl">
-          <DialogHeader className="p-8 bg-white border-b border-slate-100">
-            <DialogTitle className="text-2xl font-bold text-[#4A081A] tracking-tight">Create New Employee</DialogTitle>
-            <DialogDescription className="text-slate-500 mt-1">
-              Fill in the details below to register a new employee.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="p-8">
-            <EmployeeRegistrationForm 
-              onSuccess={() => {
-                setShowRegistrationModal(false)
-                fetchEmployees()
-              }} 
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
