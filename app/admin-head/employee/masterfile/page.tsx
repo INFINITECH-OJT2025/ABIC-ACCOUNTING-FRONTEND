@@ -76,6 +76,26 @@ const statusLabels = {
   terminated: 'Terminated',
 }
 
+const FIELD_TYPES = [
+  { value: 'text',     label: 'Text',           example: 'e.g. Nickname, Blood Type' },
+  { value: 'number',   label: 'Number',         example: 'e.g. Height, Weight' },
+  { value: 'date',     label: 'Date',           example: 'e.g. Contract Expiry' },
+  { value: 'textarea', label: 'Comment / Notes', example: 'e.g. Remarks, Description' },
+  { value: 'time',     label: 'Time',           example: 'e.g. Shift Start Time' },
+  { value: 'email',    label: 'Email',          example: 'e.g. Personal Email' },
+  { value: 'url',      label: 'URL / Link',     example: 'e.g. LinkedIn Profile' },
+]
+
+const TYPE_BADGE_COLORS: Record<string, string> = {
+  text:     'bg-blue-50 text-blue-700 border-blue-200',
+  number:   'bg-purple-50 text-purple-700 border-purple-200',
+  date:     'bg-green-50 text-green-700 border-green-200',
+  textarea: 'bg-amber-50 text-amber-700 border-amber-200',
+  time:     'bg-cyan-50 text-cyan-700 border-cyan-200',
+  email:    'bg-rose-50 text-rose-700 border-rose-200',
+  url:      'bg-slate-50 text-slate-700 border-slate-200',
+}
+
 export default function MasterfilePage() {
   const router = useRouter()
   const [employees, setEmployees] = useState<Employee[]>([])
@@ -120,6 +140,14 @@ export default function MasterfilePage() {
   const [additionalFields, setAdditionalFields] = useState<AdditionalFieldValue[]>([])
   const [progressionAdditionalValues, setProgressionAdditionalValues] = useState<Record<string, string>>({})
 
+  // Management state for Additional Fields (Consolidated)
+  const [newFieldLabel, setNewFieldLabel] = useState('')
+  const [newFieldType, setNewFieldType] = useState('text')
+  const [newFieldUnit, setNewFieldUnit] = useState('')
+  const [isSavingField, setIsSavingField] = useState(false)
+  const [deletingFieldId, setDeletingFieldId] = useState<number | null>(null)
+  const [isFieldListLoading, setIsFieldListLoading] = useState(false)
+
   // Address dropdown states
   const [regions, setRegions] = useState<{ code: string; name: string }[]>([])
   const [provinces, setProvinces] = useState<{ code: string; name: string }[]>([])
@@ -149,9 +177,11 @@ export default function MasterfilePage() {
   }, [])
 
   const fetchProgressionAdditionalFields = async () => {
+    setIsFieldListLoading(true)
     try {
       const res = await fetch(`${getApiUrl()}/api/employee-additional-fields`, {
         headers: { 'Accept': 'application/json' },
+        credentials: 'include',
       })
       const data = await res.json()
       if (data.success) {
@@ -166,6 +196,62 @@ export default function MasterfilePage() {
       }
     } catch (err) {
       console.error('Error fetching additional fields:', err)
+    } finally {
+      setIsFieldListLoading(false)
+    }
+  }
+
+  const handleFieldAdd = async () => {
+    if (!newFieldLabel.trim()) return
+    setIsSavingField(true)
+    try {
+      const res = await fetch(`${getApiUrl()}/api/employee-additional-fields`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          field_label: newFieldLabel.trim(),
+          field_type: newFieldType,
+          field_unit: newFieldUnit.trim() || null,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setNewFieldLabel('')
+        setNewFieldType('text')
+        setNewFieldUnit('')
+        toast.success('Additional field added successfully')
+        fetchProgressionAdditionalFields()
+      } else {
+        toast.error(data.message || 'Failed to add field')
+      }
+    } catch (err) {
+      toast.error('Error adding field')
+    } finally {
+      setIsSavingField(false)
+    }
+  }
+
+  const handleFieldDelete = async (id: number, label: string) => {
+    if (!confirm(`Delete field "${label}"? This will permanently remove the column and all employee data for this field.`)) return
+    setDeletingFieldId(id)
+    try {
+      const res = await fetch(`${getApiUrl()}/api/employee-additional-fields/${id}`, {
+        method: 'DELETE',
+        headers: { 'Accept': 'application/json' },
+        credentials: 'include',
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('Field deleted successfully')
+        fetchProgressionAdditionalFields()
+      } else {
+        toast.error(data.message || 'Failed to delete field')
+      }
+    } catch (err) {
+      toast.error('Error deleting field')
+    } finally {
+      setDeletingFieldId(null)
     }
   }
 
@@ -1219,44 +1305,105 @@ export default function MasterfilePage() {
                     </div>
                   </div>
                 )}
-
                 {/* BATCH 7: Additional Information */}
                 {currentBatch === 7 && (
-                  <div className="space-y-6">
-                    {additionalFields.length === 0 ? (
-                      <div className="text-center py-12 text-slate-400">
-                        <CheckCircle2 className="h-12 w-12 mx-auto mb-4 opacity-30" />
-                        <p className="text-lg font-medium mb-2">No additional fields configured</p>
-                        <p className="text-sm">Additional fields can be managed from the main dashboard.</p>
+                  <div className="space-y-10">
+                    {/* Add New Field Management Section */}
+                    <div className="bg-slate-50 border-2 border-slate-200 rounded-xl p-6 shadow-sm">
+                      <h4 className="text-lg font-bold text-maroon-800 mb-4 flex items-center gap-2">
+                        <Settings2 className="h-5 w-5" />
+                        Manage Custom Fields
+                      </h4>
+                      <p className="text-xs text-slate-500 mb-6">
+                        Define new fields that will appear for all employees. Deleting a field will remove all historical data for it.
+                      </p>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-bold text-slate-700">Field Label</Label>
+                          <Input
+                            placeholder="e.g. Height, Blood Type..."
+                            value={newFieldLabel}
+                            onChange={(e) => setNewFieldLabel(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleFieldAdd()}
+                            className="h-10 text-sm font-medium"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-bold text-slate-700">Field Type</Label>
+                          <select
+                            value={newFieldType}
+                            onChange={(e) => { setNewFieldType(e.target.value); setNewFieldUnit('') }}
+                            className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 font-medium"
+                          >
+                            {FIELD_TYPES.map(t => (
+                              <option key={t.value} value={t.value}>{t.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-bold text-slate-700">
+                            Unit {newFieldType === 'number' ? '(optional)' : ''}
+                          </Label>
+                          <Input
+                            placeholder={newFieldType === 'number' ? 'e.g. cm, kg...' : 'N/A'}
+                            value={newFieldUnit}
+                            onChange={(e) => setNewFieldUnit(e.target.value)}
+                            disabled={newFieldType !== 'number'}
+                            className="h-10 text-sm font-medium disabled:bg-slate-100 disabled:text-slate-400"
+                          />
+                        </div>
                       </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {additionalFields.map((field) => (
-                          <div key={field.field_key} className="space-y-2">
-                            <Label className="text-sm font-semibold">
-                              {field.field_label}
-                              {field.field_unit && (
-                                <span className="ml-1 text-xs font-normal text-slate-400">({field.field_unit})</span>
-                              )}
-                            </Label>
+                      
+                      <Button
+                        onClick={handleFieldAdd}
+                        disabled={isSavingField || !newFieldLabel.trim()}
+                        className="bg-maroon-600 hover:bg-maroon-700 text-white font-bold h-10 px-6 rounded-lg transition-all shadow-sm"
+                      >
+                        {isSavingField ? 'Adding...' : '+ Add Field'}
+                      </Button>
+                    </div>
 
-                            {field.field_type === 'textarea' ? (
-                              <textarea
-                                value={progressionAdditionalValues[field.field_key] ?? ''}
-                                onChange={(e) =>
-                                  setProgressionAdditionalValues((prev) => ({
-                                    ...prev,
-                                    [field.field_key]: e.target.value,
-                                  }))
-                                }
-                                placeholder={`Enter ${field.field_label}...`}
-                                rows={3}
-                                className="flex w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-transparent resize-y min-h-[80px]"
-                              />
-                            ) : field.field_type === 'number' ? (
-                              <div className="flex gap-2 items-center">
-                                <Input
-                                  type="number"
+                    {/* Existing Fields Management List */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-base font-bold text-slate-800 uppercase tracking-wider px-2 border-l-4 border-maroon-600">
+                          Field Values for {progressionFormData.first_name} {progressionFormData.last_name}
+                        </h4>
+                        {additionalFields.length > 0 && (
+                          <span className="text-xs font-bold text-slate-400">{additionalFields.length} Custom Fields Total</span>
+                        )}
+                      </div>
+
+                      {additionalFields.length === 0 ? (
+                        <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-xl bg-white/50">
+                          <CheckCircle2 className="h-10 w-10 mx-auto mb-3 opacity-20" />
+                          <p className="text-sm font-bold text-slate-400">No custom fields defined yet.</p>
+                          <p className="text-[10px] text-slate-400">Add fields using the management section above.</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-2">
+                          {additionalFields.map((field) => (
+                            <div key={field.field_key} className="group relative bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:border-maroon-200 transition-all">
+                              <div className="flex justify-between items-start mb-3">
+                                <Label className="text-xs font-bold text-slate-700 uppercase tracking-tight flex items-center gap-1.5">
+                                  {field.field_label}
+                                  <Badge className={`border text-[10px] font-bold px-1.5 py-0 h-4 ${TYPE_BADGE_COLORS[field.field_type] || 'bg-slate-50 text-slate-500'}`}>
+                                    {field.field_type}
+                                  </Badge>
+                                </Label>
+                                <button
+                                  onClick={() => handleFieldDelete(field.field_id, field.field_label)}
+                                  disabled={deletingFieldId === field.field_id}
+                                  className="text-slate-300 hover:text-rose-600 p-1 opacity-0 group-hover:opacity-100 transition-all rounded-md hover:bg-rose-50"
+                                  title="Delete Field"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+
+                              {field.field_type === 'textarea' ? (
+                                <textarea
                                   value={progressionAdditionalValues[field.field_key] ?? ''}
                                   onChange={(e) =>
                                     setProgressionAdditionalValues((prev) => ({
@@ -1264,37 +1411,53 @@ export default function MasterfilePage() {
                                       [field.field_key]: e.target.value,
                                     }))
                                   }
-                                  placeholder="0"
-                                  className="flex-1 font-medium"
+                                  placeholder={`Enter ${field.field_label}...`}
+                                  rows={3}
+                                  className="flex w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-transparent resize-y min-h-[80px]"
                                 />
-                                {field.field_unit && (
-                                  <span className="text-sm text-slate-500 font-semibold whitespace-nowrap bg-slate-100 px-3 py-2 rounded-md border border-slate-200">
-                                    {field.field_unit}
-                                  </span>
-                                )}
-                              </div>
-                            ) : (
-                              <Input
-                                type={field.field_type === 'date' ? 'date'
-                                  : field.field_type === 'time' ? 'time'
-                                  : field.field_type === 'email' ? 'email'
-                                  : field.field_type === 'url' ? 'url'
-                                  : 'text'}
-                                value={progressionAdditionalValues[field.field_key] ?? ''}
-                                onChange={(e) =>
-                                  setProgressionAdditionalValues((prev) => ({
-                                    ...prev,
-                                    [field.field_key]: e.target.value,
-                                  }))
-                                }
-                                placeholder={`Enter ${field.field_label}...`}
-                                className="font-medium"
-                              />
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                              ) : field.field_type === 'number' ? (
+                                <div className="flex gap-2 items-center">
+                                  <Input
+                                    type="number"
+                                    value={progressionAdditionalValues[field.field_key] ?? ''}
+                                    onChange={(e) =>
+                                      setProgressionAdditionalValues((prev) => ({
+                                        ...prev,
+                                        [field.field_key]: e.target.value,
+                                      }))
+                                    }
+                                    placeholder="0"
+                                    className="flex-1 font-medium"
+                                  />
+                                  {field.field_unit && (
+                                    <span className="text-sm text-slate-500 font-semibold whitespace-nowrap bg-slate-100 px-3 py-2 rounded-md border border-slate-200">
+                                      {field.field_unit}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <Input
+                                  type={field.field_type === 'date' ? 'date'
+                                    : field.field_type === 'time' ? 'time'
+                                    : field.field_type === 'email' ? 'email'
+                                    : field.field_type === 'url' ? 'url'
+                                    : 'text'}
+                                  value={progressionAdditionalValues[field.field_key] ?? ''}
+                                  onChange={(e) =>
+                                    setProgressionAdditionalValues((prev) => ({
+                                      ...prev,
+                                      [field.field_key]: e.target.value,
+                                    }))
+                                  }
+                                  placeholder={`Enter ${field.field_label}...`}
+                                  className="font-medium"
+                                />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -1367,13 +1530,6 @@ export default function MasterfilePage() {
             </div>
           )}
           <div className="flex gap-3 w-full sm:w-auto">
-            <Button
-              onClick={() => router.push('/admin-head/employee/additional-info')}
-              variant="outline"
-              className="flex-1 sm:flex-none border-slate-200 text-slate-700 hover:bg-slate-100 font-medium px-4 h-11 rounded-lg transition-all"
-            >
-              Additional Information
-            </Button>
             <Button
               onClick={() => setView('onboard')}
               className="flex-1 sm:flex-none bg-[#630C22] hover:bg-[#4A081A] text-white font-bold px-6 h-11 rounded-lg transition-all shadow-sm"
@@ -1824,7 +1980,6 @@ export default function MasterfilePage() {
                     </div>
                   </div>
                 </div>
-                <div>
                   <p className="text-slate-700 font-semibold mb-3">FATHER&apos;S NAME <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
                   <div className="grid grid-cols-2 gap-6 ml-4">
                     <div>
@@ -1845,7 +2000,6 @@ export default function MasterfilePage() {
                     </div>
                   </div>
                 </div>
-              </div>
 
               {/* ADDRESS INFORMATION */}
                 <div className="mb-10">
