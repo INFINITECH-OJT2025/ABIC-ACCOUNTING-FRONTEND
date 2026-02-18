@@ -398,7 +398,36 @@ export default function MasterfilePage() {
     return Math.round((filledFields / allFields.length) * 100)
   }
 
-  const nextBatch = () => { if (currentBatch < 6) setCurrentBatch(currentBatch + 1) }
+  const isCurrentBatchValid = () => {
+    const data = progressionFormData
+    switch (currentBatch) {
+      case 1:
+        return !!data.position && !!data.date_hired
+      case 2:
+        return !!data.last_name && !!data.first_name && !!data.birthday && 
+               !!data.birthplace && !!data.gender && !!data.civil_status
+      case 3:
+        return !!data.mobile_number && !!data.street
+      case 4:
+        return true // All government IDs are optional
+      case 5:
+        return !!data.mlast_name && !!data.mfirst_name
+      case 6:
+        return !!data.region && !!data.province && !!data.city_municipality && 
+               !!data.barangay && !!data.zip_code && !!data.email_address
+      default:
+        return true
+    }
+  }
+
+  const nextBatch = () => { 
+    if (isCurrentBatchValid() && currentBatch < 6) {
+      setCurrentBatch(currentBatch + 1)
+    } else if (!isCurrentBatchValid()) {
+      toast.error('Please fill in all required fields to proceed.')
+    }
+  }
+
   const prevBatch = () => { if (currentBatch > 1) setCurrentBatch(currentBatch - 1) }
 
   const formatDateForInput = (dateString: string | null | undefined) => {
@@ -1013,9 +1042,15 @@ export default function MasterfilePage() {
                       return (
                         <div
                           key={batch.id}
-                          className="flex flex-col items-center cursor-pointer group"
+                          className={`flex flex-col items-center group ${batch.id <= currentBatch || isCurrentBatchValid() ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
                           style={{ width: `${100 / batches.length}%` }}
-                          onClick={() => setCurrentBatch(batch.id)}
+                          onClick={() => {
+                            if (batch.id < currentBatch) {
+                              setCurrentBatch(batch.id)
+                            } else if (batch.id === currentBatch + 1 && isCurrentBatchValid()) {
+                              setCurrentBatch(batch.id)
+                            }
+                          }}
                         >
                           <div className="relative mb-2">
                             <div
@@ -1286,8 +1321,8 @@ export default function MasterfilePage() {
                         handleProgressionSave()
                         clearStorage()
                       }}
-                      disabled={isSaving}
-                      className="bg-green-600 hover:bg-green-700 text-white h-11 px-8 font-bold shadow-lg transition-all"
+                      disabled={isSaving || !isCurrentBatchValid()}
+                      className="bg-green-600 hover:bg-green-700 text-white h-11 px-8 font-bold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isSaving ? 'Saving...' : 'Complete & Finish'}
                       <LucideSave className="h-4 w-4 ml-2" />
@@ -1295,7 +1330,8 @@ export default function MasterfilePage() {
                   ) : (
                     <Button
                       onClick={nextBatch}
-                      className="bg-maroon-600 hover:bg-maroon-700 text-white h-11 px-8 font-bold shadow-md transition-all"
+                      disabled={!isCurrentBatchValid()}
+                      className="bg-maroon-600 hover:bg-maroon-700 text-white h-11 px-8 font-bold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Next Step
                       <ChevronRight className="h-4 w-4 ml-2" />
