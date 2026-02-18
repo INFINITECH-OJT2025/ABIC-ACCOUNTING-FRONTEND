@@ -5,7 +5,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { ChevronDown, Clock, Plus, Search, Users, ChevronLeft, ChevronRight, FileDown, FileText, Check, AlertTriangle, Loader2 } from 'lucide-react'
+import { ChevronDown, Clock, Plus, Search, Users, ChevronLeft, ChevronRight, FileDown, FileText, Check, AlertTriangle, Loader2, RotateCcw, X } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
 
@@ -247,7 +247,7 @@ function EmployeeSelector({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between h-7 md:h-8 text-xs md:text-sm border-stone-200 hover:bg-stone-50 font-medium"
+          className="w-full justify-between h-7 md:h-8 text-xl md:text-xl border-stone-200 hover:bg-stone-50 font-medium"
         >
           <span className="truncate">{value || "Select employee..."}</span>
           <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -478,7 +478,7 @@ function SummarySheet({ isOpen, onClose, cutoffTitle, entries, selectedYear, sel
 export default function AttendanceDashboard() {
   // State for year & month selection
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
-  const [selectedMonth, setSelectedMonth] = useState('February')
+  const [selectedMonth, setSelectedMonth] = useState(months[new Date().getMonth()])
   const [yearsList, setYearsList] = useState<number[]>(availableYears)
 
   // State for all entries (Master Record)
@@ -564,7 +564,9 @@ export default function AttendanceDashboard() {
   const [activeCutoffSummary, setActiveCutoffSummary] = useState<{ title: string; entries: LateEntry[] } | null>(null)
 
   // UI state for which cutoff table to show
-  const [showCutoff, setShowCutoff] = useState<'first' | 'second' | 'both'>('both')
+  const [showCutoff, setShowCutoff] = useState<'first' | 'second' | 'both'>(
+    new Date().getDate() <= 15 ? 'first' : 'second'
+  )
 
   // Global Search state for both cutoff tables
   const [searchQuery, setSearchQuery] = useState('')
@@ -582,9 +584,37 @@ export default function AttendanceDashboard() {
   const firstPagination = usePagination(filteredFirstEntries, 15)
   const secondPagination = usePagination(filteredSecondEntries, 15)
 
-  // Handler to add a new year
+  // New Year confirmation state
+  const [showNewYearConfirm, setShowNewYearConfirm] = useState(false)
+  const [isAddingYear, setIsAddingYear] = useState(false)
+
+  // Handler to add a new year after confirmation
+  const handleAddNewYearConfirm = () => {
+    setShowNewYearConfirm(true)
+  }
+
+  // Handler to undo year addition
+  const handleUndoYear = async (year: number) => {
+    try {
+      const res = await fetch(`/api/admin-head/attendance/tardiness/years?year=${year}`, {
+        method: 'DELETE'
+      })
+      const data = await res.json()
+      if (data.success) {
+        setYearsList(prev => prev.filter(y => y !== year).sort())
+        setSelectedYear(new Date().getFullYear()) // Fallback to current year
+        toast.success(`Year ${year} has been removed.`)
+      }
+    } catch (error) {
+      console.error('Undo error:', error)
+      toast.error('Failed to undo year addition')
+    }
+  }
+
+  // Actual logic to add year
   const addNewYear = async () => {
     const nextYear = Math.max(...yearsList) + 1
+    setIsAddingYear(true)
     try {
       const res = await fetch('/api/admin-head/attendance/tardiness/years', {
         method: 'POST',
@@ -595,13 +625,25 @@ export default function AttendanceDashboard() {
       if (data.success) {
         setYearsList(prev => [...prev, nextYear].sort())
         setSelectedYear(nextYear)
-        toast.success(`Year ${nextYear} added and saved to database`)
+        setShowNewYearConfirm(false)
+
+        // Show success with Undo action
+        toast.success(`Year ${nextYear} added`, {
+          description: "Click undo if this was a mistake",
+          action: {
+            label: "Undo",
+            onClick: () => handleUndoYear(nextYear)
+          },
+          duration: 10000, // 10 seconds for undo
+        })
       } else {
-        toast.error(data.message || 'Failed to save new year')
+        toast.error(data.message || 'Failed to add year')
       }
     } catch (error) {
-      console.error('Failed to add year:', error)
-      toast.error('An error occurred while saving the new year')
+      console.error('Save error:', error)
+      toast.error('An error occurred while saving')
+    } finally {
+      setIsAddingYear(false)
     }
   }
 
@@ -652,15 +694,15 @@ export default function AttendanceDashboard() {
   const updateFirstCutoffTime = (id: string | number, newTime: string) => updateEntryTime(id, newTime)
   const updateSecondCutoffTime = (id: string | number, newTime: string) => updateEntryTime(id, newTime)
 
-  const [addEntryModalOpen, setAddEntryModalOpen] = useState(false)
   const [newEntryEmployee, setNewEntryEmployee] = useState('')
   const [newEntryTime, setNewEntryTime] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [isEntryFormOpen, setIsEntryFormOpen] = useState(false)
 
-  // Open modal for adding entry
-  const openAddEntryModal = () => {
+  // Reset new entry fields
+  const resetAddEntryFields = () => {
     setNewEntryEmployee('')
     setNewEntryTime('')
-    setAddEntryModalOpen(true)
   }
 
 
@@ -698,6 +740,7 @@ export default function AttendanceDashboard() {
       return
     }
 
+    setIsSaving(true)
     try {
       const response = await fetch('/api/admin-head/attendance/tardiness', {
         method: 'POST',
@@ -742,15 +785,15 @@ export default function AttendanceDashboard() {
         }
 
 
-        setAddEntryModalOpen(false)
-        setNewEntryEmployee('')
-        setNewEntryTime('')
+        resetAddEntryFields()
       } else {
         toast.error(data.message || 'Failed to save entry')
       }
     } catch (error) {
       console.error('Save error:', error)
       toast.error('An error occurred while saving')
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -773,13 +816,13 @@ export default function AttendanceDashboard() {
       <div className="relative w-full">
 
         {/* ----- MAROON GRADIENT HEADER ----- */}
-        <div className="bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#7B0F2B] text-white shadow-lg p-8 mb-8">
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
+        <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md p-4 md:p-8 mb-4 md:mb-8">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <div>
-              <h1 className="text-4xl font-bold mb-3">Tardiness Monitoring System {selectedYear}</h1>
-              <p className="text-white/80 text-lg flex items-center gap-2">
-                <Clock className="w-5 h-5" />
-                ABIC REALTY & CONSULTANCY CORPORATION
+              <h1 className="text-2xl md:text-4xl font-bold mb-2 md:mb-3">Tardiness Monitoring</h1>
+              <p className="text-white/80 text-sm md:text-lg flex items-center gap-2">
+                <Clock className="w-4 h-4 md:w-5 h-5" />
+                ABIC REALTY & CONSULTANCY
               </p>
             </div>
 
@@ -789,7 +832,7 @@ export default function AttendanceDashboard() {
             <div className="flex items-center gap-3">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <div className="bg-white/95 backdrop-blur-sm border border-stone-200 text-red-900 hover:bg-white hover:border-red-200 transition-all duration-200 gap-2 text-sm h-10 px-4 shadow-sm hover:shadow-md font-bold inline-flex items-center justify-center whitespace-nowrap rounded-lg cursor-pointer group">
+                  <div className="bg-white/95 backdrop-blur-sm border border-stone-200 text-red-900 hover:bg-white hover:border-red-200 transition-all duration-200 gap-2 text-lg h-10 px-4 shadow-sm hover:shadow-md font-bold inline-flex items-center justify-center whitespace-nowrap rounded-lg cursor-pointer group">
                     {selectedYear} <ChevronDown className="w-4 h-4 ml-1 opacity-50 group-hover:opacity-100 transition-opacity" />
                   </div>
                 </DropdownMenuTrigger>
@@ -810,22 +853,27 @@ export default function AttendanceDashboard() {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <Button onClick={addNewYear} className="bg-white/95 backdrop-blur-sm border-stone-200 text-red-900 hover:bg-white hover:border-red-200 shadow-sm hover:shadow-md transition-all duration-200 text-sm h-10 px-4 font-bold rounded-lg border">
+              <Button onClick={handleAddNewYearConfirm} className="bg-white/95 backdrop-blur-sm border-stone-200 text-red-900 hover:bg-white hover:border-red-200 shadow-sm hover:shadow-md transition-all duration-200 text-lg h-10 px-4 font-bold rounded-lg border">
                 <Plus className="w-4 h-4 mr-1" /> New Year
               </Button>
-
               <Button
-                onClick={openAddEntryModal}
-                disabled={selectedYear !== new Date().getFullYear()}
+                onClick={() => setIsEntryFormOpen(!isEntryFormOpen)}
                 className={cn(
-                  "bg-white/95 backdrop-blur-sm border-stone-200 text-red-900 shadow-sm transition-all duration-200 text-sm h-10 px-4 font-bold rounded-lg border",
-                  selectedYear !== new Date().getFullYear()
-                    ? "opacity-50 cursor-not-allowed grayscale"
-                    : "hover:bg-white hover:border-red-200 hover:shadow-md cursor-pointer"
+                  "bg-white/95 backdrop-blur-sm border border-stone-200 text-red-900 hover:bg-white hover:border-red-200 shadow-sm hover:shadow-md transition-all duration-200 text-lg h-10 px-4 font-bold rounded-lg border flex items-center gap-2",
+                  isEntryFormOpen && "bg-red-50 border-red-200"
                 )}
-                title={selectedYear !== new Date().getFullYear() ? "Add Entry is only available for the current year" : "Add new late entry"}
               >
-                <Plus className="w-4 h-4 mr-1" /> Add Entry
+                {isEntryFormOpen ? (
+                  <>
+                    <X className="w-5 h-5" />
+                    <span>CLOSE</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-5 h-5" />
+                    <span>NEW RECORD</span>
+                  </>
+                )}
               </Button>
             </div>
           </div>
@@ -840,11 +888,11 @@ export default function AttendanceDashboard() {
 
               {/* Month Selection */}
               <div className="flex items-center gap-3">
-                <span className="text-xs font-bold text-black/70 uppercase tracking-wider">Month</span>
+                <span className="text-md font-bold text-black/70 uppercase tracking-wider">Month</span>
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <div className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 min-w-[140px] justify-between shadow-sm font-semibold inline-flex items-center whitespace-nowrap rounded-lg cursor-pointer group border-2">
+                    <div className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-lg h-10 px-4 min-w-[140px] justify-between shadow-sm font-semibold inline-flex items-center whitespace-nowrap rounded-lg cursor-pointer group border-2">
                       {selectedMonth} <ChevronDown className="w-4 h-4 ml-2 opacity-50 group-hover:opacity-100 transition-opacity" />
                     </div>
                   </DropdownMenuTrigger>
@@ -869,11 +917,11 @@ export default function AttendanceDashboard() {
 
               {/* Period Selection */}
               <div className="flex items-center gap-3">
-                <span className="text-xs font-bold text-black/70 uppercase tracking-wider">Period</span>
+                <span className="text-md font-bold text-black/70 uppercase tracking-wider">Period</span>
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <div className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 min-w-[180px] justify-between shadow-sm font-semibold inline-flex items-center whitespace-nowrap rounded-lg cursor-pointer group border-2">
+                    <div className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-lg h-10 px-4 min-w-[180px] justify-between shadow-sm font-semibold inline-flex items-center whitespace-nowrap rounded-lg cursor-pointer group border-2">
                       {showCutoff === 'first' ? '1st - 15th' : showCutoff === 'second' ? (selectedMonth === 'February' ? '16th - 28/29th' : '16th - 30/31st') : 'Show Both'}
                       <ChevronDown className="w-4 h-4 ml-2 opacity-50 group-hover:opacity-100 transition-opacity" />
                     </div>
@@ -915,10 +963,10 @@ export default function AttendanceDashboard() {
               </div>
 
               {/* Global Search Input */}
-              <div className="relative flex-1 min-w-[300px] md:ml-auto">
+              <div className="relative w-full md:w-[350px]">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-[#A0153E]" />
                 <Input
-                  placeholder="Search employee by name..."
+                  placeholder="Search employee..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="bg-white border-2 border-[#FFE5EC] text-slate-700 placeholder:text-slate-400 pl-10 h-10 w-full focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A] shadow-sm rounded-lg transition-all"
@@ -932,7 +980,77 @@ export default function AttendanceDashboard() {
       </div>
 
 
-      <div className="bg-white p-6 rounded-lg shadow-lg border-2 border-[#FFE5EC] space-y-6">
+      <div className="bg-white p-3 md:p-6 rounded-lg shadow-lg border-b-2 md:border-2 border-[#FFE5EC] space-y-6">
+        <div className="flex flex-col gap-4">
+          <div className="flex justify-between items-center">
+
+
+          </div>
+
+          <div className={cn(
+            "overflow-hidden transition-all duration-500 ease-in-out",
+            isEntryFormOpen ? "max-h-[500px] opacity-100 mb-2" : "max-h-0 opacity-0 pointer-events-none"
+          )}>
+            <div className="flex justify-center pt-2">
+              <Card className="w-full max-w-5xl bg-white border border-[#FFE5EC] shadow-lg rounded-xl overflow-hidden ring-4 ring-rose-50/50">
+                <CardContent className="p-4 md:p-5">
+                  <div className="flex flex-col lg:flex-row items-center gap-4 lg:gap-6">
+                    {/* Minimal Header Part */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="p-1.5 bg-rose-50 rounded-lg">
+                        <Plus className="w-4 h-4 text-[#4A081A]" />
+                      </div>
+                      <h2 className="text-lg font-black text-[#4A081A] uppercase tracking-wider whitespace-nowrap">
+                        New Late Entry
+                      </h2>
+                    </div>
+
+                    {/* Form Fields - Horizontal Inline */}
+                    <div className="flex flex-1 flex-col sm:flex-row items-center gap-4 w-full">
+                      <div className="flex-1 w-full min-w-[200px]">
+                        <EmployeeSelector
+                          value={newEntryEmployee}
+                          onChange={setNewEntryEmployee}
+                          employees={employees}
+                        />
+                      </div>
+
+                      <div className="relative group w-full sm:w-40 shrink-0">
+                        <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 group-focus-within:text-[#4A081A] transition-colors" />
+                        <Input
+                          id="time"
+                          type="time"
+                          value={newEntryTime}
+                          onChange={(e) => setNewEntryTime(e.target.value)}
+                          className="bg-white border border-[#FFE5EC] text-slate-800 pl-9 h-10 w-full rounded-lg text-lg font-bold focus:ring-[#800020]/10 focus:border-[#630C22] transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Button
+                        type="submit"
+                        onClick={handleSaveNewEntry}
+                        disabled={isSaving || selectedYear !== new Date().getFullYear()}
+                        className="bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#800020] hover:shadow-lg active:scale-95 text-white font-bold text-xl px-6 h-10 rounded-lg transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed min-w-[120px]"
+                      >
+                        {isSaving ? (
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Saving...</span>
+                          </div>
+                        ) : (
+                          "Save Record"
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
         {/* ----- CUTOFF TABLES - WITH SUMMARY BUTTONS ----- */}
         <div className={`grid ${showCutoff === 'both' ? 'grid-cols-1 lg:grid-cols-2 gap-4' : 'grid-cols-1'} w-full`}>
           {isLoading ? (
@@ -981,58 +1099,9 @@ export default function AttendanceDashboard() {
               )}
             </>
           )}
-        </div>
-
-        {/* ----- BOTTOM CARDS ----- */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
-          <Card className="bg-white border-2 border-[#FFE5EC] shadow-md">
-            <CardHeader className="pb-2 p-4">
-              <CardTitle className="text-lg text-[#800020] flex items-center gap-2 font-bold">
-                <Users className="w-5 h-5 text-[#A0153E]" /> Frequently Late
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 pt-0">
-              <div className="flex items-center gap-3">
-                <div className="flex -space-x-3">
-                  {Array.from(new Set([...firstCutoffEntries, ...secondCutoffEntries]
-                    .filter(e => e.minutesLate > 30)
-                    .map(e => e.employeeName)))
-                    .slice(0, 4)
-                    .map((name, i) => (
-                      <Avatar key={i} className="border-2 border-white bg-rose-50 w-12 h-12 shadow-sm">
-                        <AvatarFallback className="text-[#800020] font-bold bg-[#FFE5EC]">
-                          {name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                        </AvatarFallback>
-                      </Avatar>
-                    ))}
-                </div>
-                <span className="text-slate-500 text-sm ml-2 font-medium">...and others with high tardiness</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white border-2 border-[#FFE5EC] shadow-md">
-            <CardHeader className="pb-2 p-4">
-              <CardTitle className="text-lg text-[#800020] flex items-center gap-2 font-bold">
-                <Clock className="w-5 h-5 text-[#A0153E]" /> Grace Period Policy
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 pt-0">
-              <div className="flex items-baseline gap-2">
-                <span className="text-4xl font-bold text-[#800020]">5 min</span>
-                <span className="text-slate-500 font-medium">allowance</span>
-              </div>
-              <p className="text-sm text-slate-500 mt-2 italic">
-                Arrivals up to 8:05 AM are not counted as late occurrences.
-                <br />
-                <span className="text-xs text-[#C9184A] font-semibold">Occurrences strictly counted after 8:05 AM</span>
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="text-xs text-[#A0153E] text-right mt-2 font-medium">
-          * Table shows minutes from 8:00 AM • Summary occurrences counted after 8:05 AM grace period
+          <div className="col-span-full text-right mt-2 text-md text-[#A0153E] font-medium italic">
+            * Table shows minutes from 8:00 AM • Summary counted after 8:05 AM
+          </div>
         </div>
       </div>
 
@@ -1049,64 +1118,41 @@ export default function AttendanceDashboard() {
         />
       )}
 
-      {/* Add Entry Modal */}
-      <Dialog open={addEntryModalOpen} onOpenChange={setAddEntryModalOpen}>
-        <DialogContent className="sm:max-w-[500px] border-2 border-[#4A081A] p-0 overflow-hidden">
-          <DialogHeader className="bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#7B0F2B] p-6 text-white">
-            <DialogTitle className="text-2xl font-bold">Add Late Entry</DialogTitle>
-            <DialogDescription className="text-white/80">
-              Record a new tardiness entry for today ({new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}).
-            </DialogDescription>
+
+
+      {/* New Year Confirmation Dialog */}
+      <Dialog open={showNewYearConfirm} onOpenChange={setShowNewYearConfirm}>
+        <DialogContent className="bg-white border-2 border-[#FFE5EC] rounded-2xl max-w-sm">
+          <DialogHeader className="flex flex-col items-center gap-4 text-center">
+            <div className="p-4 bg-red-50 rounded-full">
+              <AlertTriangle className="w-8 h-8 text-[#4A081A]" />
+            </div>
+            <div className="space-y-2">
+              <DialogTitle className="text-2xl font-bold text-[#4A081A]">Confirm New Year</DialogTitle>
+              <DialogDescription className="text-stone-500 font-medium">
+                Are you sure you want to initialize year {Math.max(...yearsList) + 1}? This will add it to the selection menu.
+              </DialogDescription>
+            </div>
           </DialogHeader>
-
-          <div className="p-6 space-y-6">
-            {/* Employee Selection */}
-            <div className="grid gap-2">
-              <Label htmlFor="employee" className="text-sm font-bold text-[#4A081A] uppercase tracking-wider">
-                Employee Name
-              </Label>
-              <EmployeeSelector
-                value={newEntryEmployee}
-                onChange={setNewEntryEmployee}
-                employees={employees}
-              />
-            </div>
-
-            {/* Actual In Time */}
-            <div className="grid gap-2">
-              <Label htmlFor="time" className="text-sm font-bold text-[#4A081A] uppercase tracking-wider">
-                Actual In Time
-              </Label>
-              <Input
-                id="time"
-                type="time"
-                value={newEntryTime}
-                onChange={(e) => setNewEntryTime(e.target.value)}
-                className="bg-white border-2 border-[#FFE5EC] text-slate-700 focus:ring-2 focus:ring-[#630C22] h-11"
-              />
-            </div>
-          </div>
-
-          <DialogFooter className="bg-[#FFE5EC]/30 p-6 border-t-2 border-[#FFE5EC]">
+          <DialogFooter className="flex flex-col sm:flex-row gap-3 mt-6">
             <Button
-              type="button"
               variant="outline"
-              onClick={() => setAddEntryModalOpen(false)}
-              className="border-2 border-[#FFE5EC] text-[#4A081A] hover:bg-white"
+              onClick={() => setShowNewYearConfirm(false)}
+              disabled={isAddingYear}
+              className="flex-1 border-2 border-stone-100 text-stone-600 hover:bg-stone-50 font-bold h-12 rounded-xl"
             >
               Cancel
             </Button>
             <Button
-              type="submit"
-              onClick={handleSaveNewEntry}
-              className="bg-gradient-to-r from-[#4A081A] to-[#630C22] hover:from-[#630C22] hover:to-[#7B0F2B] text-white shadow-md font-bold px-6"
+              onClick={addNewYear}
+              disabled={isAddingYear}
+              className="flex-1 bg-gradient-to-r from-[#4A081A] to-[#800020] hover:from-[#630C22] hover:to-[#A0153E] text-white font-bold h-12 rounded-xl shadow-md transition-all active:scale-95"
             >
-              Save Entry
+              {isAddingYear ? "Initializing..." : "Confirm"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
     </div>
   )
 }
@@ -1142,7 +1188,7 @@ function CutoffTable({
             <Button
               size="sm"
               onClick={onSummaryClick}
-              className="bg-gradient-to-r from-[#4A081A] to-[#630C22] hover:from-[#630C22] hover:to-[#7B0F2B] text-white text-xs md:text-sm h-9 px-4 flex items-center gap-1 shrink-0 shadow-md transition-all duration-300"
+              className="bg-gradient-to-r from-[#4A081A] to-[#630C22] hover:from-[#630C22] hover:to-[#7B0F2B] text-white text-xl md:text-xl h-9 px-4 flex items-center gap-1 shrink-0 shadow-md transition-all duration-300"
             >
 
               <FileText className="w-3.5 h-3.5 md:w-4 md:h-4 text-white" />
@@ -1163,40 +1209,40 @@ function CutoffTable({
           <table className="w-full text-sm">
             <thead className="bg-[#FFE5EC]/30 sticky top-0 border-b border-[#FFE5EC]">
               <tr>
-                <th className="px-3 py-3 text-left font-bold text-[#800020] text-xs uppercase tracking-wider w-[30%]">Employee Name</th>
-                <th className="px-3 py-3 text-left font-bold text-[#800020] text-xs uppercase tracking-wider w-[20%]">Date</th>
-                <th className="px-3 py-3 text-left font-bold text-[#800020] text-xs uppercase tracking-wider w-[20%]">Actual In</th>
-                <th className="px-3 py-3 text-left font-bold text-[#800020] text-xs uppercase tracking-wider w-[20%]">Minutes Late</th>
-                <th className="px-3 py-3 text-left font-bold text-[#800020] text-xs uppercase tracking-wider w-[10%]">Warning</th>
+                <th className="px-3 py-4 text-left font-bold text-[#800020] text-sm md:text-base uppercase tracking-wider w-[30%]">Employee Name</th>
+                <th className="px-3 py-4 text-left font-bold text-[#800020] text-sm md:text-base uppercase tracking-wider w-[20%]">Date</th>
+                <th className="px-3 py-4 text-left font-bold text-[#800020] text-sm md:text-base uppercase tracking-wider w-[20%]">Actual In</th>
+                <th className="px-3 py-4 text-left font-bold text-[#800020] text-sm md:text-base uppercase tracking-wider w-[20%]">Minutes Late</th>
+                <th className="px-3 py-4 text-left font-bold text-[#800020] text-sm md:text-base uppercase tracking-wider w-[10%]">Warning</th>
               </tr>
             </thead>
 
             <tbody className="divide-y divide-stone-100">
               {entries.map((entry) => (
                 <tr key={entry.id} className="hover:bg-[#FFE5EC] border-b border-rose-50 transition-colors duration-200">
-                  <td className="px-3 py-3">
-                    <span className="font-semibold text-slate-700 text-sm">
+                  <td className="px-3 py-5">
+                    <span className="font-bold text-slate-800 text-base md:text-lg">
                       {entry.employeeName}
                     </span>
                   </td>
 
-                  <td className="px-3 py-3 text-slate-600 text-xs font-medium">
+                  <td className="px-3 py-5 text-slate-600 text-sm md:text-base font-semibold">
                     {entry.date || '—'}
                   </td>
-                  <td className="px-3 py-3">
+                  <td className="px-3 py-5">
                     <Input
                       value={entry.actual_in || entry.actualIn || ''}
                       onChange={(e) => onUpdateTime(entry.id, e.target.value.toUpperCase())}
                       placeholder="8:00 AM"
-                      className="bg-white border-[#FFE5EC] text-slate-700 placeholder:text-slate-300 h-8 text-xs w-24 font-mono focus:ring-2 focus:ring-[#A0153E] uppercase shadow-sm"
+                      className="bg-white border-[#FFE5EC] text-slate-800 placeholder:text-slate-300 h-10 text-base md:text-lg w-28 font-bold focus:ring-2 focus:ring-[#A0153E] uppercase shadow-sm"
                     />
                   </td>
 
-                  <td className="px-2.5 py-1">
+                  <td className="px-2.5 py-5">
                     {entry.minutesLate > 0 ? (
                       <span className={`
-                      inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold border
-                      ${entry.minutesLate > 30 ? 'bg-red-50 text-red-700 border-red-200' :
+                      inline-block px-4 py-1.5 rounded-full text-base md:text-lg font-bold border
+                      ${entry.minutesLate > 30 ? 'bg-red-50 text-red-700 border-red-200 shadow-sm' :
                           entry.minutesLate > 15 ? 'bg-orange-50 text-orange-700 border-orange-200' :
                             entry.minutesLate > 5 ? 'bg-amber-50 text-amber-700 border-amber-200' :
                               'bg-yellow-50 text-yellow-700 border-yellow-200'}
@@ -1204,17 +1250,17 @@ function CutoffTable({
                         {entry.minutesLate} min
                       </span>
                     ) : (
-                      <span className="text-stone-400">—</span>
+                      <span className="text-stone-400 font-bold">—</span>
                     )}
                   </td>
-                  <td className="px-2.5 py-1">
+                  <td className="px-2.5 py-5">
                     {entry.warningLevel && entry.warningLevel > 0 ? (
-                      <div className="flex items-center gap-1 text-red-600">
-                        <AlertTriangle className="w-4 h-4" />
-                        <span className="text-xs font-semibold">{entry.warningLevel}{entry.warningLevel === 1 ? 'st' : 'nd'}</span>
+                      <div className="flex items-center gap-2 text-red-600">
+                        <AlertTriangle className="w-5 h-5" />
+                        <span className="text-base md:text-lg font-bold">{entry.warningLevel}{entry.warningLevel === 1 ? 'st' : 'nd'}</span>
                       </div>
                     ) : (
-                      <span className="text-stone-400">—</span>
+                      <span className="text-stone-400 font-bold">—</span>
                     )}
                   </td>
                 </tr>

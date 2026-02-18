@@ -55,3 +55,30 @@ export async function POST(request: NextRequest) {
         )
     }
 }
+// DELETE /api/admin-head/attendance/tardiness/years
+export async function DELETE(request: NextRequest) {
+    try {
+        const { searchParams } = new URL(request.url)
+        const year = searchParams.get('year')
+
+        if (!year) {
+            return NextResponse.json(
+                { success: false, message: 'Year is required' },
+                { status: 400 }
+            )
+        }
+
+        await query(
+            'DELETE FROM tardiness_years WHERE year = ?',
+            [year]
+        )
+
+        return NextResponse.json({ success: true, message: 'Year removed' })
+    } catch (error: any) {
+        console.error('API Error:', error)
+        return NextResponse.json(
+            { success: false, message: 'Failed to remove year' },
+            { status: 500 }
+        )
+    }
+}

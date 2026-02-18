@@ -26,6 +26,16 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { useRouter } from 'next/navigation'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
 
 
 export default function AdminHeadSidebar() {
@@ -34,14 +44,21 @@ export default function AdminHeadSidebar() {
   const [isAttendanceOpen, setIsAttendanceOpen] = useState(false)
   const [isFormsOpen, setIsFormsOpen] = useState(false)
   const [logoError, setLogoError] = useState(false)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const router = useRouter()
 
 
 
   const toggleSidebar = () => setIsCollapsed(!isCollapsed)
 
+  const handleLogout = () => {
+    // Perform any logout logic here (e.g., clearing tokens)
+    router.push('/logout')
+  }
+
 
   return (
-    <div className={`${isCollapsed ? 'w-20' : 'w-64'} bg-gradient-to-b from-[#4A081A] via-[#630C22] to-[#7B0F2B] text-white min-h-screen p-4 flex flex-col shadow-2xl transition-all duration-300 ease-in-out relative`}>
+    <div className={`${isCollapsed ? 'w-20' : 'w-64'} bg-gradient-to-r from-[#7B0F2B] to-[#A4163A] text-white min-h-screen p-4 flex flex-col transition-all duration-300 ease-in-out relative`}>
 
       <button
         onClick={toggleSidebar}
@@ -57,31 +74,58 @@ export default function AdminHeadSidebar() {
 
 
 
-      {/* Profile Summary Clickable Logo */}
-      <Link
-        href="/admin-head/update-profile"
-        className={`mb-6 flex flex-col items-center hover:bg-white/5 p-2 rounded-xl transition-all duration-200 group ${isCollapsed ? 'px-0 mt-2' : 'px-4 mt-8'}`}
-        title="View Profile"
+      {/* Profile Summary - Static Horizontal Display */}
+      <div
+        className={cn(
+          "mb-6 flex items-center transition-all duration-300",
+          isCollapsed ? "flex-col justify-center px-0 mt-2 gap-2" : "flex-row px-4 mt-8 gap-4"
+        )}
       >
-        <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center mb-2 shadow-lg ring-2 ring-white/20 backdrop-blur-sm group-hover:scale-110 transition-transform duration-200">
-          <User size={24} className="text-white" />
+        {/* Avatar with Ring */}
+        <div className={cn(
+          "bg-white/10 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white/50 backdrop-blur-md shrink-0 transition-all duration-300",
+          isCollapsed ? "w-8 h-8" : "w-12 h-12"
+        )}>
+          <div className="w-full h-full rounded-full overflow-hidden border border-transparent">
+            <div className="w-full h-full bg-gradient-to-br from-white/20 to-white/5 flex items-center justify-center">
+              <User size={isCollapsed ? 14 : 22} className="text-white opacity-90" />
+            </div>
+          </div>
         </div>
+
+        {/* Position & Name */}
         {!isCollapsed && (
-          <div className="text-center overflow-hidden transition-all duration-300">
-            <p className="text-sm font-bold truncate group-hover:text-red-100">Admin Head</p>
-            <p className="text-[10px] text-white/60 truncate uppercase tracking-wider">adminhead@gmail.com</p>
+          <div className="flex flex-col justify-center overflow-hidden">
+            <span className="text-[10px] font-bold text-white/50 uppercase tracking-[0.15em] mb-0.5 leading-none">
+              Admin Head
+            </span>
+            <h2 className="text-xl font-bold text-white truncate tracking-tight leading-tight">
+              Krissane
+            </h2>
           </div>
         )}
-      </Link>
+      </div>
+
+      <div className="flex justify-center mb-4">
+        <button
+          onClick={() => setShowLogoutConfirm(true)}
+          className={cn(
+            "flex items-center gap-2 rounded-lg transition-all duration-300 font-bold text-[10px] tracking-widest",
+            "bg-white/5 hover:bg-white/10 text-white/70 hover:text-white",
+            "group active:scale-95 py-1.5 px-3 uppercase border border-white/10",
+            isCollapsed ? "hidden" : "flex"
+          )}
+          title="Sign Out"
+        >
+          <LogOut size={12} className="group-hover:-translate-x-0.5 transition-transform duration-300" />
+          <span>LOGOUT</span>
+        </button>
+      </div>
+
+      <div className="mx-6 mb-4 border-t border-white/10" />
 
 
-      <Link
-        href="/admin-head"
-        className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-white/10 transition-all duration-200 font-semibold text-sm group"
-      >
-        <Activity size={20} className="shrink-0" />
-        {!isCollapsed && <span className="font-medium whitespace-nowrap">ACTIVITY LOGS</span>}
-      </Link>
+
       {/* Navigation Menu */}
       <nav className="flex-1 space-y-2 overflow-y-auto no-scrollbar py-2">
         {/* EMPLOYEE with Dropdown */}
@@ -187,11 +231,6 @@ export default function AdminHeadSidebar() {
 
 
 
-
-        {/* ACTIVITY LOGS */}
-
-
-
         {/* ATTENDANCE with Dropdown */}
         <div className="group relative" onMouseEnter={() => setIsAttendanceOpen(true)} onMouseLeave={() => setIsAttendanceOpen(false)}>
           <button
@@ -236,22 +275,53 @@ export default function AdminHeadSidebar() {
             </Link>
           </div>
         </div>
+
+        <Link
+          href="/admin-head"
+          className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-white/10 transition-all duration-200 font-semibold text-sm group"
+        >
+          <Activity size={20} className="shrink-0" />
+          {!isCollapsed && <span className="font-medium whitespace-nowrap">ACTIVITY LOGS</span>}
+        </Link>
+
       </nav>
 
+      {/* Logout Confirmation Dialog */}
+      <Dialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
+        <DialogContent className="bg-white border-2 border-[#FFE5EC] rounded-2xl max-w-sm">
+          <DialogHeader className="flex flex-col items-center gap-4 text-center">
+            <div className="p-4 bg-red-50 rounded-full">
+              <LogOut className="w-8 h-8 text-[#4A081A]" />
+            </div>
+            <div className="space-y-2">
+              <DialogTitle className="text-2xl font-bold text-[#4A081A]">Confirm Logout</DialogTitle>
+              <DialogDescription className="text-stone-500 font-medium">
+                Are you sure you want to sign out? You will need to log back in to access your dashboard.
+              </DialogDescription>
+            </div>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col sm:flex-row gap-3 mt-6">
+            <Button
+              variant="outline"
+              onClick={() => setShowLogoutConfirm(false)}
+              className="flex-1 border-2 border-stone-100 text-stone-600 hover:bg-stone-50 font-bold h-12 rounded-xl"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleLogout}
+              className="flex-1 bg-gradient-to-r from-[#4A081A] to-[#800020] hover:from-[#630C22] hover:to-[#A0153E] text-white font-bold h-12 rounded-xl shadow-md transition-all active:scale-95"
+            >
+              Logout
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {/* Logout Button (Optional but useful) */}
-      <div className="mt-auto pt-4 border-t border-white/10">
-        <Link
-          href="/logout"
-          className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-white/10 transition-all duration-200 font-semibold text-sm text-red-200 hover:text-white group"
-        >
-          <LogOut size={20} className="shrink-0" />
-          {!isCollapsed && <span className="font-medium whitespace-nowrap">Logout</span>}
-        </Link>
-      </div>
+
+
     </div>
   )
 }
-
 
 

@@ -1,10 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui'
 import { Badge } from '@/components/ui'
-import { Avatar, AvatarFallback } from '@/components/ui'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui'
 import { Button } from '@/components/ui'
 import {
   UserPlus,
@@ -18,15 +15,22 @@ import {
   Calendar,
   Search,
   RefreshCw,
-  Loader2
+  Loader2,
+  ChevronDown,
+  Check,
+  Activity
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from '@/components/ui'
 import {
   fetchActivityLogs,
-  fetchActivityStats,
-  formatRelativeTime,
-  type ActivityLog,
-  type ActivityLogStats
+  type ActivityLog
 } from '@/lib/api/activity-logs'
 
 // Activity types
@@ -46,48 +50,10 @@ const getActivityIcon = (type: string, action: string) => {
   return <AlertCircle className="w-5 h-5" />
 }
 
-const getStatusColor = (status: ActivityStatus) => {
-  switch (status) {
-    case 'success':
-      return 'bg-emerald-500/10 text-emerald-700 border-emerald-200'
-    case 'warning':
-      return 'bg-amber-500/10 text-amber-700 border-amber-200'
-    case 'error':
-      return 'bg-red-500/10 text-red-700 border-red-200'
-    case 'info':
-      return 'bg-blue-500/10 text-blue-700 border-blue-200'
-    default:
-      return 'bg-slate-500/10 text-slate-700 border-slate-200'
-  }
-}
-
-const getStatusIcon = (status: ActivityStatus) => {
-  switch (status) {
-    case 'success':
-      return <CheckCircle className="w-4 h-4" />
-    case 'warning':
-      return <AlertCircle className="w-4 h-4" />
-    case 'error':
-      return <XCircle className="w-4 h-4" />
-    default:
-      return <AlertCircle className="w-4 h-4" />
-  }
-}
-
-const getUserInitials = (name: string | null): string => {
-  if (!name) return 'SY'
-  const parts = name.split(' ')
-  if (parts.length >= 2) {
-    return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
-  }
-  return name.substring(0, 2).toUpperCase()
-}
-
 export default function AdminHeadPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState('all')
   const [activities, setActivities] = useState<ActivityLog[]>([])
-  const [stats, setStats] = useState<ActivityLogStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -107,7 +73,7 @@ export default function AdminHeadPage() {
         type: activeTab === 'all' ? undefined : activeTab,
         search: searchQuery || undefined,
         page: currentPage,
-        per_page: 20,
+        per_page: 15,
       })
 
       setActivities(response.data)
@@ -121,18 +87,8 @@ export default function AdminHeadPage() {
     }
   }
 
-  const loadStats = async () => {
-    try {
-      const response = await fetchActivityStats()
-      setStats(response.data)
-    } catch (err) {
-      console.error('Error loading stats:', err)
-    }
-  }
-
   useEffect(() => {
     loadActivities()
-    loadStats()
   }, [activeTab, currentPage])
 
   // Debounced search
@@ -150,7 +106,6 @@ export default function AdminHeadPage() {
 
   const handleRefresh = () => {
     loadActivities(true)
-    loadStats()
   }
 
   const handleTabChange = (value: string) => {
@@ -159,189 +114,156 @@ export default function AdminHeadPage() {
   }
 
   return (
-    <div className="p-8 space-y-8">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#7B0F2B] text-white shadow-lg p-8 mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-4xl font-bold text-slate-900 mb-2">Activity Logs</h1>
-            <p className="text-slate-600 text-lg">
-              Monitor all system activities and recent changes in real-time
-            </p>
-          </div>
-          <Button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            variant="outline"
-            className="gap-2"
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-        </div>
-      </header>
-
-      {/* Activity Feed */}
-      <Card className="shadow-xl">
-        <CardHeader>
-          <div className="flex items-center justify-between">
+    <div className="min-h-screen w-full bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-2">
+      <div className="relative w-full">
+        {/* ----- HEADER SECTION ----- */}
+        <header className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md p-4 md:p-8">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <div>
-              <CardTitle className="text-2xl">Recent Activities</CardTitle>
-              <CardDescription className="mt-1">
-                Track all system events and user actions
-              </CardDescription>
+              <h1 className="text-2xl md:text-3xl font-bold mb-1">Activity Logs</h1>
+              <p className="text-white/80 text-sm md:text-base flex items-center gap-2">
+                <Activity className="w-4 h-4" />
+                ABIC REALTY & CONSULTANCY • Real-time Monitoring
+              </p>
             </div>
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <Input
-                placeholder="Search activities..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
+
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                variant="outline"
+                className="bg-white/10 backdrop-blur-md border-white/20 text-white hover:bg-white/20 transition-all rounded-full px-5 py-2 h-auto text-sm font-bold uppercase tracking-wider flex items-center gap-2"
+              >
+                <RefreshCw className={cn("w-4 h-4", refreshing && "animate-spin")} />
+                <span>REFRESH</span>
+              </Button>
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="all" value={activeTab} onValueChange={handleTabChange}>
-            <TabsList className="grid w-full grid-cols-6 mb-6">
-              <TabsTrigger value="all" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white">
-                All
-              </TabsTrigger>
-              <TabsTrigger value="employee" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-                Employee
-              </TabsTrigger>
-              <TabsTrigger value="department" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white">
-                Department
-              </TabsTrigger>
-              <TabsTrigger value="position" className="data-[state=active]:bg-green-600 data-[state=active]:text-white">
-                Position
-              </TabsTrigger>
-              <TabsTrigger value="attendance" className="data-[state=active]:bg-amber-600 data-[state=active]:text-white">
-                Attendance
-              </TabsTrigger>
-              <TabsTrigger value="auth" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
-                Auth
-              </TabsTrigger>
-            </TabsList>
+        </header>
 
-            <TabsContent value={activeTab} className="space-y-4 mt-0">
-              {loading ? (
-                <div className="text-center py-12">
-                  <Loader2 className="w-12 h-12 text-slate-400 mx-auto mb-3 animate-spin" />
-                  <p className="text-slate-500 text-lg">Loading activities...</p>
-                </div>
-              ) : error ? (
-                <div className="text-center py-12">
-                  <XCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
-                  <p className="text-red-600 text-lg mb-2">{error}</p>
-                  <Button onClick={() => loadActivities()} variant="outline">
-                    Try Again
-                  </Button>
-                </div>
-              ) : activities.length === 0 ? (
-                <div className="text-center py-12">
-                  <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                  <p className="text-slate-500 text-lg">No activities found</p>
-                  <p className="text-slate-400 text-sm">Try adjusting your search or filter</p>
-                </div>
-              ) : (
-                <>
-                  {activities.map((activity, index) => (
-                    <div
-                      key={activity.id}
-                      className="group relative bg-gradient-to-r from-slate-50 to-white border border-slate-200 rounded-lg p-5 hover:shadow-md hover:border-slate-300 transition-all duration-300 hover:-translate-y-0.5"
-                      style={{
-                        animation: `fadeIn 0.3s ease-out ${index * 0.05}s both`
-                      }}
-                    >
-                      <div className="flex items-start gap-4">
-                        {/* Icon */}
-                        <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${activity.activity_type === 'employee' ? 'bg-blue-500/10 text-blue-600' :
-                          activity.activity_type === 'department' ? 'bg-purple-500/10 text-purple-600' :
-                            activity.activity_type === 'position' ? 'bg-green-500/10 text-green-600' :
-                              activity.activity_type === 'attendance' ? 'bg-amber-500/10 text-amber-600' :
-                                activity.activity_type === 'auth' ? 'bg-emerald-500/10 text-emerald-600' :
-                                  'bg-slate-500/10 text-slate-600'
-                          } group-hover:scale-110 transition-transform duration-300`}>
-                          {getActivityIcon(activity.activity_type, activity.action)}
-                        </div>
+        {/* ----- TOOLBAR SECTION - CATEGORIES & SEARCH ----- */}
+        <div className="bg-white border-b border-stone-200 sticky top-0 z-10">
+          <div className="w-full pl-6 pr-6 py-4">
+            <div className="flex flex-wrap items-center gap-6">
+              {/* Category Selection */}
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-bold text-stone-500 uppercase tracking-widest">CATEGORY</span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="flex items-center gap-2 px-4 py-2 rounded-full border border-rose-100 bg-rose-50/30 text-[#A4163A] font-semibold hover:bg-rose-50 transition-colors">
+                      <span className="capitalize">{activeTab} Activities</span>
+                      <ChevronDown className="w-4 h-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56 bg-white border-stone-200 shadow-xl rounded-xl p-1.5" align="start">
+                    {['all', 'employee', 'department', 'position', 'attendance', 'auth'].map(tab => (
+                      <DropdownMenuItem
+                        key={tab}
+                        onClick={() => handleTabChange(tab)}
+                        className={cn(
+                          "flex items-center justify-between rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors",
+                          activeTab === tab ? "bg-red-50 text-red-900 font-semibold" : "text-stone-600 hover:bg-stone-50"
+                        )}
+                      >
+                        <span className="capitalize">{tab}</span>
+                        {activeTab === tab && <Check className="w-4 h-4 text-red-600" />}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
 
-                        {/* Content */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-4 mb-2">
-                            <div className="flex-1">
-                              <h3 className="font-semibold text-slate-900 text-lg mb-1">
-                                {activity.title}
-                              </h3>
-                              <p className="text-slate-600 text-sm leading-relaxed">
-                                {activity.description}
-                              </p>
-                            </div>
-                            <Badge
-                              variant="outline"
-                              className={`flex items-center gap-1.5 px-3 py-1 ${getStatusColor(activity.status as ActivityStatus)}`}
-                            >
-                              {getStatusIcon(activity.status as ActivityStatus)}
-                              <span className="capitalize font-medium">{activity.status}</span>
-                            </Badge>
-                          </div>
+              {/* Global Search Input */}
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
+                <Input
+                  placeholder="Search activity descriptions, users, or titles..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="bg-stone-50/50 border-stone-200 pl-10 h-10 w-full focus:ring-2 focus:ring-[#A4163A] focus:border-transparent rounded-lg transition-all"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-                          {/* Footer */}
-                          <div className="flex items-center gap-4 mt-3">
-                            <div className="flex items-center gap-2">
-                              <Avatar className="w-6 h-6 border-2 border-white shadow-sm">
-                                <AvatarFallback className="text-xs font-semibold bg-gradient-to-br from-slate-600 to-slate-800 text-white">
-                                  {getUserInitials(activity.user_name)}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="text-sm text-slate-700 font-medium">
-                                {activity.user_name || 'System'}
-                              </span>
-                            </div>
-                            <span className="text-slate-400">•</span>
-                            <span className="text-sm text-slate-500">
-                              {formatRelativeTime(activity.created_at)}
-                            </span>
-                          </div>
-                        </div>
+      <div className="w-full pl-6 pr-6 py-6">
+        {/* Activity Feed */}
+        <div className="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-32 space-y-4">
+              <Loader2 className="w-12 h-12 text-[#A4163A] animate-spin" />
+              <p className="text-stone-400 font-medium">Loading activities...</p>
+            </div>
+          ) : error ? (
+            <div className="text-center py-20 px-4">
+              <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+              <p className="text-stone-600 font-medium">{error}</p>
+              <Button variant="outline" onClick={() => loadActivities()} className="mt-4">Retry</Button>
+            </div>
+          ) : activities.length === 0 ? (
+            <div className="text-center py-20 px-4">
+              <p className="text-stone-400">No activities found matching your criteria.</p>
+            </div>
+          ) : (
+            <>
+              <div className="divide-y divide-stone-100">
+                {activities.map((activity) => (
+                  <div
+                    key={activity.id}
+                    className="p-6 hover:bg-stone-50/50 transition-colors group"
+                  >
+                    <div className="flex items-start gap-4">
+                      {/* Icon */}
+                      <div className="flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center bg-[#EBF5FF] border border-[#D1E9FF] text-[#0066FF]">
+                        {getActivityIcon(activity.activity_type, activity.action)}
                       </div>
 
-                      {/* Hover effect line */}
-                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-slate-400 to-slate-600 rounded-l-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-1">
+                          <h3 className="font-bold text-stone-900 text-lg">
+                            {activity.title}
+                          </h3>
+                          <Badge
+                            className={cn(
+                              "text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider border-none",
+                              activity.status === 'success'
+                                ? "bg-[#DCFCE7] text-[#15803D] hover:bg-[#DCFCE7]"
+                                : "bg-[#FEE2E2] text-[#B91C1C] hover:bg-[#FEE2E2]"
+                            )}
+                          >
+                            {activity.status}
+                          </Badge>
+                        </div>
+                        <p className="text-stone-500 text-sm font-medium">
+                          {activity.description}
+                        </p>
+                      </div>
                     </div>
-                  ))}
+                  </div>
+                ))}
+              </div>
 
-                  {/* Pagination */}
-                  {totalPages > 1 && (
-                    <div className="flex items-center justify-center gap-2 mt-6 pt-6 border-t">
-                      <Button
-                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                        disabled={currentPage === 1}
-                        variant="outline"
-                        size="sm"
-                      >
-                        Previous
-                      </Button>
-                      <span className="text-sm text-slate-600 px-4">
-                        Page {currentPage} of {totalPages}
-                      </span>
-                      <Button
-                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                        disabled={currentPage === totalPages}
-                        variant="outline"
-                        size="sm"
-                      >
-                        Next
-                      </Button>
-                    </div>
-                  )}
-                </>
+              {/* Footer Button - See previous notification */}
+              {totalPages > 1 && (
+                <div className="p-4 bg-stone-50/50 border-t border-stone-100">
+                  <button
+                    onClick={() => {
+                      if (currentPage < totalPages) {
+                        setCurrentPage(p => p + 1)
+                      }
+                    }}
+                    className="w-full py-4 bg-[#A4163A]/60 hover:bg-[#A4163A]/70 text-white rounded-md font-bold uppercase tracking-widest text-sm transition-all shadow-sm hover:shadow-md active:scale-[0.99]"
+                  >
+                    See previous notification
+                  </button>
+                </div>
               )}
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+            </>
+          )}
+        </div>
+      </div>
 
       <style jsx>{`
         @keyframes fadeIn {
