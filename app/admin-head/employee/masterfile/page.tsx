@@ -67,8 +67,17 @@ export default function MasterfilePage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeDetails | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
-  const [view, setView] = useState<'list' | 'onboard'>('list')
+  const [view, setView] = useState<'list' | 'onboard' | 'checklist'>('list')
   const [activeTab, setActiveTab] = useState<'employed' | 'terminated'>('employed')
+  const [completedTasks, setCompletedTasks] = useState<string[]>([])
+  const [checklistData, setChecklistData] = useState<{
+    name: string,
+    position: string,
+    department: string,
+    date: string
+  } | null>(null)
+
+
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [additionalValues, setAdditionalValues] = useState<AdditionalFieldValue[]>([])
   const [positions, setPositions] = useState<Position[]>([])
@@ -215,6 +224,15 @@ export default function MasterfilePage() {
       const onboardData = await onboardResponse.json()
       if (onboardData.success) {
         toast.success('Employee created and onboarding started')
+        setChecklistData({
+          name: `${first_name} ${last_name}`,
+          position: position,
+          department: department,
+          date: new Date(onboarding_date).toLocaleDateString()
+        })
+        setCompletedTasks([])
+        setView('checklist')
+
         setOnboardFormData({
           first_name: '',
           last_name: '',
@@ -223,7 +241,6 @@ export default function MasterfilePage() {
           onboarding_date: '',
           department: '',
         })
-        setView('list')
         fetchEmployees()
       } else {
         toast.error('Error saving onboarding data: ' + onboardData.message)
@@ -474,8 +491,135 @@ export default function MasterfilePage() {
     )
   )
 
+  const onboardingTasks = [
+    "Signing of Job Offer",
+    "Signing of Employment Contract",
+    "Information Fill-Up for ID and Employee Record",
+    "Provide Link to Employee Handbook",
+    "Conduct Onboarding Presentation",
+    "Introduce to Departments and Key Team Members",
+    "Distribute Polo Shirt, ID Lace & keys",
+    "Add Employee to Biometrics",
+    "Create Company Accounts (Email and Telegram - Required)",
+    "Create Optional Accounts (Viber, WhatsApp, WeChat - Sales/Marketing only)",
+    "Set Up Email Signature",
+    "Add New Employee to Official Group Chats",
+    "Add New Employee to Masterfile Google Sheet",
+    "Add New Employee to Tardiness & Leave Monitoring Google Sheet",
+    "Prepare Requirement Checklist (Medical Certificate, Diploma, TOR, Birth Certificate, PhilHealth, Pag-IBIG, SSS)",
+    "Collect and Verify Employee Requirements"
+  ]
+
+  const toggleTask = (task: string) => {
+    setCompletedTasks(prev => 
+      prev.includes(task) ? prev.filter(t => t !== task) : [...prev, task]
+    )
+  }
+
   return (
     <div className="min-h-screen p-8 bg-slate-50">
+      {view === 'checklist' && checklistData ? (
+        <div className="max-w-5xl mx-auto py-4">
+          <div className="bg-[#D1D5DB] border-2 border-slate-400 overflow-hidden shadow-xl">
+            {/* Main Header */}
+            <div className="bg-[#D1D5DB] py-3 text-center border-b-2 border-slate-400">
+              <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-tight">
+                Employee Onboarding Process Checklist
+              </h1>
+            </div>
+
+            {/* Info Grid */}
+            <div className="grid grid-cols-2 border-b-2 border-slate-400 text-sm">
+              <div className="grid grid-cols-[140px_1fr] border-r-2 border-slate-400">
+                <div className="bg-[#D1D5DB] p-2 font-bold border-r-2 border-slate-400">Employee Name:</div>
+                <div className="bg-white p-2">{checklistData.name}</div>
+              </div>
+              <div className="grid grid-cols-[100px_1fr]">
+                <div className="bg-[#D1D5DB] p-2 font-bold border-r-2 border-slate-400">Start Date:</div>
+                <div className="bg-white p-2">{checklistData.date}</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 border-b-2 border-slate-400 text-sm">
+              <div className="grid grid-cols-[140px_1fr] border-r-2 border-slate-400">
+                <div className="bg-[#D1D5DB] p-2 font-bold border-r-2 border-slate-400">Position:</div>
+                <div className="bg-white p-2">{checklistData.position}</div>
+              </div>
+              <div className="grid grid-cols-[100px_1fr]">
+                <div className="bg-[#D1D5DB] p-2 font-bold border-r-2 border-slate-400">Department:</div>
+                <div className="bg-white p-2">{checklistData.department}</div>
+              </div>
+            </div>
+
+            {/* Progress Section */}
+            <div className="bg-white border-b-2 border-slate-400 p-4">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-bold text-slate-600 uppercase">Onboarding Progress</span>
+                <span className="text-xs font-bold text-[#630C22]">{completedTasks.length} / {onboardingTasks.length} Tasks Completed</span>
+              </div>
+              <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden border border-slate-200 shadow-inner">
+                <div 
+                  className="bg-[#630C22] h-full transition-all duration-500 ease-out shadow-[0_0_10px_rgba(99,12,34,0.3)]"
+                  style={{ width: `${(completedTasks.length / onboardingTasks.length) * 100}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Table Header Labels */}
+            <div className="grid grid-cols-[120px_1fr] text-center font-bold bg-[#D1D5DB] text-sm uppercase">
+              <div className="py-2 border-r-2 border-b-2 border-slate-400">Status</div>
+              <div className="py-2 border-b-2 border-slate-400">Tasks</div>
+            </div>
+
+            {/* Task List */}
+            <div className="bg-white">
+              {onboardingTasks.map((task, index) => (
+                <div 
+                  key={index} 
+                  className="grid grid-cols-[120px_1fr] border-b-2 border-slate-400 group cursor-pointer hover:bg-emerald-50/30 transition-colors"
+                  onClick={() => toggleTask(task)}
+                >
+                  <div className="py-2 flex items-center justify-center border-r-2 border-slate-400 font-bold transition-all">
+                    <div className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-all ${
+                      completedTasks.includes(task) 
+                        ? 'bg-emerald-500 border-emerald-500 text-white' 
+                        : 'border-slate-300 bg-white'
+                    }`}>
+                      {completedTasks.includes(task) && (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      )}
+                    </div>
+                  </div>
+                  <div className={`py-2 px-4 flex items-center text-sm font-medium transition-all ${
+                    completedTasks.includes(task) ? 'text-slate-400 line-through' : 'text-slate-800'
+                  }`}>
+                    {task}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+
+            {/* Action Buttons Row */}
+            <div className="grid grid-cols-[1fr_200px_150px] bg-white">
+              <div className="border-r-2 border-slate-400"></div>
+              <button 
+                onClick={() => setView('list')}
+                className="py-1 px-4 border-r-2 border-slate-400 bg-[#D1D5DB] hover:bg-slate-300 font-bold text-slate-800 text-sm transition-colors"
+              >
+                ADD TO MASTERFILE
+              </button>
+              <button 
+                onClick={() => toast.success('Checklist progress saved successfully')}
+                className="py-1 px-4 bg-[#D1D5DB] hover:bg-slate-300 font-bold text-slate-800 text-sm transition-colors"
+              >
+                SAVE
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+    <div className="min-h-screen p-8 bg-slate-50">
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-extrabold text-[#4A081A] tracking-tight">Employee Records</h1>
@@ -1075,6 +1219,8 @@ export default function MasterfilePage() {
       )}
 
       {/* Employee Registration Modal */}
+    </div>
+      )}
     </div>
   )
 }
