@@ -916,23 +916,23 @@ export default function EmployeeDashboardPage() {
                         className="flex h-12 w-full rounded-lg border-2 border-slate-300 bg-white px-4 py-2 text-base focus-visible:ring-2 focus-visible:ring-maroon-500 transition-all"
                       >
                         <option value="">Select Position...</option>
-                        <option value="Executive Assistant">Executive Assistant</option>
+                        <option value="Accounting Assistant">Accounting Assistant</option>
+                        <option value="Accounting Supervisor">Accounting Supervisor</option>
                         <option value="Admin Assistant">Admin Assistant</option>
                         <option value="Admin Head">Admin Head</option>
-                        <option value="Accounting Supervisor">Accounting Supervisor</option>
-                        <option value="Accounting Assistant">Accounting Assistant</option>
-                        <option value="Property Specialist">Property Specialist</option>
-                        <option value="Senior Property Specialist">Senior Property Specialist</option>
-                        <option value="Junior Web Developer">Junior Web Developer</option>
-                        <option value="Senior Web Developer">Senior Web Developer</option>
-                        <option value="IT Supervisor">IT Supervisor</option>
-                        <option value="Sales Supervisor">Sales Supervisor</option>
-                        <option value="Junior IT Manager">Junior IT Manager</option>
-                        <option value="Senior IT Manager">Senior IT Manager</option>
-                        <option value="Marketing Staff">Marketing Staff</option>
                         <option value="Assistant Studio Manager">Assistant Studio Manager</option>
-                        <option value="Studio Manager">Studio Manager</option>
+                        <option value="Executive Assistant">Executive Assistant</option>
+                        <option value="IT Supervisor">IT Supervisor</option>
+                        <option value="Junior IT Manager">Junior IT Manager</option>
+                        <option value="Junior Web Developer">Junior Web Developer</option>
+                        <option value="Marketing Staff">Marketing Staff</option>
                         <option value="Multimedia Manager">Multimedia Manager</option>
+                        <option value="Property Specialist">Property Specialist</option>
+                        <option value="Sales Supervisor">Sales Supervisor</option>
+                        <option value="Senior IT Manager">Senior IT Manager</option>
+                        <option value="Senior Property Specialist">Senior Property Specialist</option>
+                        <option value="Senior Web Developer">Senior Web Developer</option>
+                        <option value="Studio Manager">Studio Manager</option>
                       </select>
                     </div>
 
