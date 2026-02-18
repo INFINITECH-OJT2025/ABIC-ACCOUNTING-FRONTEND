@@ -69,12 +69,13 @@ export default function MasterfilePage() {
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [view, setView] = useState<'list' | 'onboard' | 'checklist'>('list')
   const [activeTab, setActiveTab] = useState<'employed' | 'terminated'>('employed')
-  const [completedTasks, setCompletedTasks] = useState<string[]>([])
+  const [completedTasks, setCompletedTasks] = useState<{[key: string]: string}>({})
   const [checklistData, setChecklistData] = useState<{
     name: string,
     position: string,
     department: string,
-    date: string
+    date: string,
+    raw_date: string
   } | null>(null)
 
 
@@ -228,9 +229,10 @@ export default function MasterfilePage() {
           name: `${first_name} ${last_name}`,
           position: position,
           department: department,
-          date: new Date(onboarding_date).toLocaleDateString()
+          date: new Date(onboarding_date).toLocaleDateString(),
+          raw_date: onboarding_date
         })
-        setCompletedTasks([])
+        setCompletedTasks({})
         setView('checklist')
 
         setOnboardFormData({
@@ -511,9 +513,57 @@ export default function MasterfilePage() {
   ]
 
   const toggleTask = (task: string) => {
-    setCompletedTasks(prev => 
-      prev.includes(task) ? prev.filter(t => t !== task) : [...prev, task]
-    )
+    setCompletedTasks(prev => {
+      const newTasks = { ...prev }
+      if (newTasks[task]) {
+        delete newTasks[task]
+      } else {
+        newTasks[task] = new Date().toLocaleString()
+      }
+      return newTasks
+    })
+  }
+
+  const handleSaveChecklist = async () => {
+    if (!checklistData) return
+
+    setIsSaving(true)
+    try {
+      // Prepare all tasks for saving
+      const allTasks = onboardingTasks.map(taskName => ({
+        task: taskName,
+        completed: !!completedTasks[taskName],
+        completed_at: completedTasks[taskName] || null
+      }))
+
+      const response = await fetch(`${getApiUrl()}/api/onboarding-checklists`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          employee_name: checklistData.name,
+          position: checklistData.position,
+          department: checklistData.department,
+          start_date: checklistData.raw_date,
+          status: `${Object.keys(completedTasks).length}/${onboardingTasks.length} Completed`,
+          tasks: allTasks
+        }),
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        toast.success('Checklist progress saved successfully to database')
+      } else {
+        toast.error(data.message || 'Error saving checklist')
+      }
+    } catch (error) {
+      console.error('Error saving checklist:', error)
+      toast.error('Failed to save checklist')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -554,18 +604,19 @@ export default function MasterfilePage() {
             <div className="bg-white border-b-2 border-slate-400 p-4">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-xs font-bold text-slate-600 uppercase">Onboarding Progress</span>
-                <span className="text-xs font-bold text-[#630C22]">{completedTasks.length} / {onboardingTasks.length} Tasks Completed</span>
+                <span className="text-xs font-bold text-[#630C22]">{Object.keys(completedTasks).length} / {onboardingTasks.length} Tasks Completed</span>
               </div>
               <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden border border-slate-200 shadow-inner">
                 <div 
                   className="bg-[#630C22] h-full transition-all duration-500 ease-out shadow-[0_0_10px_rgba(99,12,34,0.3)]"
-                  style={{ width: `${(completedTasks.length / onboardingTasks.length) * 100}%` }}
+                  style={{ width: `${(Object.keys(completedTasks).length / onboardingTasks.length) * 100}%` }}
                 />
               </div>
             </div>
 
             {/* Table Header Labels */}
-            <div className="grid grid-cols-[120px_1fr] text-center font-bold bg-[#D1D5DB] text-sm uppercase">
+            <div className="grid grid-cols-[200px_120px_1fr] text-center font-bold bg-[#D1D5DB] text-sm uppercase">
+              <div className="py-2 border-r-2 border-b-2 border-slate-400">Completed Date</div>
               <div className="py-2 border-r-2 border-b-2 border-slate-400">Status</div>
               <div className="py-2 border-b-2 border-slate-400">Tasks</div>
             </div>
@@ -575,22 +626,25 @@ export default function MasterfilePage() {
               {onboardingTasks.map((task, index) => (
                 <div 
                   key={index} 
-                  className="grid grid-cols-[120px_1fr] border-b-2 border-slate-400 group cursor-pointer hover:bg-emerald-50/30 transition-colors"
+                  className="grid grid-cols-[200px_120px_1fr] border-b-2 border-slate-400 group cursor-pointer hover:bg-emerald-50/30 transition-colors"
                   onClick={() => toggleTask(task)}
                 >
+                  <div className="py-2 px-4 flex items-center justify-center text-[10px] font-mono text-slate-500 bg-slate-50/50 border-r-2 border-slate-400">
+                    {completedTasks[task] || '-'}
+                  </div>
                   <div className="py-2 flex items-center justify-center border-r-2 border-slate-400 font-bold transition-all">
                     <div className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-all ${
-                      completedTasks.includes(task) 
+                      completedTasks[task] 
                         ? 'bg-emerald-500 border-emerald-500 text-white' 
                         : 'border-slate-300 bg-white'
                     }`}>
-                      {completedTasks.includes(task) && (
+                      {completedTasks[task] && (
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                       )}
                     </div>
                   </div>
                   <div className={`py-2 px-4 flex items-center text-sm font-medium transition-all ${
-                    completedTasks.includes(task) ? 'text-slate-400 line-through' : 'text-slate-800'
+                    completedTasks[task] ? 'text-slate-400 line-through' : 'text-slate-800'
                   }`}>
                     {task}
                   </div>
@@ -609,10 +663,11 @@ export default function MasterfilePage() {
                 ADD TO MASTERFILE
               </button>
               <button 
-                onClick={() => toast.success('Checklist progress saved successfully')}
-                className="py-1 px-4 bg-[#D1D5DB] hover:bg-slate-300 font-bold text-slate-800 text-sm transition-colors"
+                onClick={handleSaveChecklist}
+                disabled={isSaving}
+                className="py-1 px-4 bg-[#D1D5DB] hover:bg-slate-300 font-bold text-slate-800 text-sm transition-colors disabled:opacity-50"
               >
-                SAVE
+                {isSaving ? 'SAVING...' : 'SAVE'}
               </button>
             </div>
           </div>

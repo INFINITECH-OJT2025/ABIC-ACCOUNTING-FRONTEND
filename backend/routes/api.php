@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\EmployeeAdditionalFieldController;
 use App\Http\Controllers\Api\PositionController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\ActivityLogController;
+use App\Http\Controllers\Api\OnboardingChecklistController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -30,6 +31,7 @@ Route::get('/employees-profile', [EmployeeController::class, 'getProfile']);
 
 // Onboarding routes
 Route::post('/employees/{id}/onboard', [EmployeeController::class, 'onboard']);
+Route::post('/onboarding-checklists', [OnboardingChecklistController::class, 'store']);
 
 // Termination routes
 Route::post('/employees/{id}/terminate', [EmployeeController::class, 'terminate']);
