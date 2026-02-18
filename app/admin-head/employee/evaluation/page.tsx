@@ -9,7 +9,7 @@ export default function EvaluationPage() {
   return (
     <div className="min-h-screen">
       {/* Maroon Gradient Header */}
-      <div className="bg-gradient-to-br from-[#800020] via-[#A0153E] to-[#C9184A] text-white rounded-lg shadow-lg p-8 mb-8">
+      <div className="bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#7B0F2B] text-white shadow-lg p-8 mb-8">
         <h1 className="text-4xl font-bold mb-3">Employee Evaluation</h1>
         <p className="text-rose-100 text-lg">Manage employee evaluations and performance reviews</p>
       </div>

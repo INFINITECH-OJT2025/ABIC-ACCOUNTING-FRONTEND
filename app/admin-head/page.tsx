@@ -161,61 +161,25 @@ export default function AdminHeadPage() {
   return (
     <div className="p-8 space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">Activity Logs</h1>
-          <p className="text-slate-600 text-lg">
-            Monitor all system activities and recent changes in real-time
-          </p>
+      <header className="bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#7B0F2B] text-white shadow-lg p-8 mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold text-slate-900 mb-2">Activity Logs</h1>
+            <p className="text-slate-600 text-lg">
+              Monitor all system activities and recent changes in real-time
+            </p>
+          </div>
+          <Button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            variant="outline"
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
         </div>
-        <Button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          variant="outline"
-          className="gap-2"
-        >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
-      </div>
-
-      {/* Stats Cards */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="border-l-4 border-l-emerald-500 hover:shadow-lg transition-shadow duration-300">
-            <CardHeader className="pb-3">
-              <CardDescription>Total Activities</CardDescription>
-              <CardTitle className="text-3xl font-bold text-emerald-600">
-                {stats.total_activities}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card className="border-l-4 border-l-blue-500 hover:shadow-lg transition-shadow duration-300">
-            <CardHeader className="pb-3">
-              <CardDescription>Employee Actions</CardDescription>
-              <CardTitle className="text-3xl font-bold text-blue-600">
-                {stats.by_type.employee}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card className="border-l-4 border-l-amber-500 hover:shadow-lg transition-shadow duration-300">
-            <CardHeader className="pb-3">
-              <CardDescription>Pending Items</CardDescription>
-              <CardTitle className="text-3xl font-bold text-amber-600">
-                {stats.pending_items}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card className="border-l-4 border-l-purple-500 hover:shadow-lg transition-shadow duration-300">
-            <CardHeader className="pb-3">
-              <CardDescription>Today&apos;s Activities</CardDescription>
-              <CardTitle className="text-3xl font-bold text-purple-600">
-                {stats.today_activities}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-        </div>
-      )}
+      </header>
 
       {/* Activity Feed */}
       <Card className="shadow-xl">

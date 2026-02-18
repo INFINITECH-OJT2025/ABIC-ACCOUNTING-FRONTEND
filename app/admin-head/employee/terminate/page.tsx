@@ -227,7 +227,7 @@ export default function TerminatePage() {
   return (
     <div className="min-h-screen pb-12">
       {/* Maroon Gradient Header */}
-      <div className="bg-gradient-to-br from-[#800020] via-[#A0153E] to-[#C9184A] text-white rounded-lg shadow-lg p-8 mb-8">
+      <div className="bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#7B0F2B] text-white shadow-lg p-8 mb-8">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-4xl font-bold mb-3">
@@ -270,8 +270,8 @@ export default function TerminatePage() {
           <div className="p-20 text-center bg-slate-50/50">
             <AlertCircle className="h-12 w-12 text-slate-300 mx-auto mb-3" />
             <p className="text-slate-500 text-lg">
-              {employees.length === 0 
-                ? "No active employees available for termination." 
+              {employees.length === 0
+                ? "No active employees available for termination."
                 : "No employees match your search query."}
             </p>
           </div>
@@ -451,8 +451,8 @@ export default function TerminatePage() {
                           </div>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="sm"
                             className="text-[#800020] hover:text-[#A0153E] hover:bg-rose-100 font-semibold"
                             onClick={() => {
@@ -463,8 +463,8 @@ export default function TerminatePage() {
                           >
                             View details
                           </Button>
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             size="sm"
                             className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200 ml-2"
                             onClick={() => handleRehire(record.employee_id)}
@@ -482,7 +482,7 @@ export default function TerminatePage() {
           </div>
 
           <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
-            <Button 
+            <Button
               onClick={() => setShowTerminatedModal(false)}
               className="bg-[#800020] hover:bg-[#A0153E] text-white px-8"
             >
@@ -493,8 +493,8 @@ export default function TerminatePage() {
       </Dialog>
 
       {/* Termination Detail View Modal */}
-      <Dialog 
-        open={showDetailDialog} 
+      <Dialog
+        open={showDetailDialog}
         onOpenChange={(open) => {
           setShowDetailDialog(open)
           if (!open) {
@@ -549,7 +549,7 @@ export default function TerminatePage() {
           </div>
 
           <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
-            <Button 
+            <Button
               onClick={() => {
                 setShowDetailDialog(false)
                 // The onOpenChange will handle re-opening history
@@ -558,7 +558,7 @@ export default function TerminatePage() {
             >
               Back to History
             </Button>
-            <Button 
+            <Button
               onClick={() => {
                 if (selectedTermination) {
                   handleRehire(selectedTermination.employee_id)

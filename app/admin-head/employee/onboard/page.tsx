@@ -55,12 +55,12 @@ export default function OnboardPage() {
   const [onboardingDate, setOnboardingDate] = useState('')
   const [department, setDepartment] = useState('')
   const [position, setPosition] = useState('')
-  
+
   // Modal states
   const [showRegistrationModal, setShowRegistrationModal] = useState(false)
   const [managementModalType, setManagementModalType] = useState<'position' | 'department' | null>(null)
   const [newItemName, setNewItemName] = useState('')
-  
+
   const [isSaving, setIsSaving] = useState(false)
   const [isActionLoading, setIsActionLoading] = useState(false)
 
@@ -77,7 +77,7 @@ export default function OnboardPage() {
     try {
       const response = await fetch(`${getApiUrl()}/api/employees`)
       const data = await response.json()
-      
+
       if (data.success) {
         const approved = data.data.filter((emp: any) => emp.status === 'approved' || emp.status === 'pending')
         setEmployees(approved)
@@ -252,7 +252,7 @@ export default function OnboardPage() {
   return (
     <div className="min-h-screen">
       {/* Maroon Gradient Header */}
-      <div className="bg-gradient-to-br from-[#800020] via-[#A0153E] to-[#C9184A] text-white rounded-lg shadow-lg p-8 mb-8">
+      <div className="bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#7B0F2B] text-white shadow-lg p-8 mb-8">
         <div>
           <h1 className="text-4xl font-bold mb-3">Onboard Employee</h1>
           <p className="text-rose-100 text-lg">Select approved employees to onboard into the system</p>
@@ -285,7 +285,7 @@ export default function OnboardPage() {
               </Button>
             </div>
           </div>
-          
+
           {loading ? (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#A0153E] mx-auto mb-4"></div>
@@ -435,19 +435,19 @@ export default function OnboardPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="p-6">
-            <EmployeeRegistrationForm 
+            <EmployeeRegistrationForm
               onSuccess={() => {
                 setShowRegistrationModal(false)
                 fetchApprovedEmployees()
-              }} 
+              }}
             />
           </div>
         </DialogContent>
       </Dialog>
 
       {/* Management Modal (Positions/Departments) */}
-      <Dialog 
-        open={managementModalType !== null} 
+      <Dialog
+        open={managementModalType !== null}
         onOpenChange={(open) => !open && setManagementModalType(null)}
       >
         <DialogContent className="sm:max-w-[500px] border-2 border-[#C9184A] p-0 overflow-hidden">
@@ -458,7 +458,7 @@ export default function OnboardPage() {
               </DialogTitle>
             </div>
           </DialogHeader>
-          
+
           <div className="p-6">
             {/* Add New Input */}
             <div className="flex gap-2 mb-6">
@@ -469,7 +469,7 @@ export default function OnboardPage() {
                 onKeyDown={(e) => e.key === 'Enter' && handleAddItem()}
                 className="focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A]"
               />
-              <Button 
+              <Button
                 onClick={handleAddItem}
                 disabled={isActionLoading || !newItemName.trim()}
                 className="bg-[#800020] hover:bg-[#A0153E] text-white"

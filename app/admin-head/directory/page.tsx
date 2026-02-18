@@ -87,54 +87,17 @@ export default function GovernmentContributionsPage() {
 
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-12 font-sans">
-      {/* HEADER SECTION - Matches Onboarding/Clearance Style */}
-      <header className="bg-[#a0153e] text-white p-10 rounded-b-[3rem] shadow-lg relative overflow-hidden">
-        <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-          <div className="space-y-4">
+    <div className="min-h-screen w-full bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-2">
+      {/* HEADER SECTION - */}
+      <header className="bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#7B0F2B] text-white shadow-lg p-8 mb-8">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
+          <div>
             <h1 className="text-4xl font-extrabold tracking-tight italic">Government Contributions</h1>
+            <p className="text-white/80 text-lg flex items-center gap-2">
+              Step-by-step para sumaccess
+            </p>
 
 
-            {/* Page Navigation / Sub-Header */}
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex bg-black/20 p-1 rounded-xl backdrop-blur-md">
-                {(["Adding", "Removing"] as ProcessType[]).map((proc) => (
-                  <Button
-                    key={proc}
-                    onClick={() => setActiveProcess(proc)}
-                    variant="ghost"
-                    className={cn(
-                      "h-9 rounded-lg px-6 text-xs font-bold transition-all",
-                      activeProcess === proc ? "bg-white text-[#a0153e] shadow-md" : "text-white/70 hover:text-white"
-                    )}
-                  >
-                    {proc.toUpperCase()}
-                  </Button>
-                ))}
-              </div>
-
-
-              <span className="text-rose-200/50 mx-2">|</span>
-
-
-
-
-              <div className="flex bg-black/20 p-1 rounded-xl backdrop-blur-md">
-                {(["Philhealth", "SSS", "PAG-IBIG", "TIN"] as GovAgency[]).map((agency) => (
-                  <Button
-                    key={agency}
-                    onClick={() => setActiveAgency(agency)}
-                    variant="ghost"
-                    className={cn(
-                      "h-9 rounded-lg px-4 text-xs font-bold transition-all",
-                      activeAgency === agency ? "bg-white text-[#a0153e] shadow-md" : "text-white/70 hover:text-white"
-                    )}
-                  >
-                    {agency}
-                  </Button>
-                ))}
-              </div>
-            </div>
           </div>
 
 
@@ -145,6 +108,47 @@ export default function GovernmentContributionsPage() {
           </Button>
         </div>
       </header>
+
+      {/* Page Navigation / Sub-Header */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex bg-black/20 p-1 rounded-xl backdrop-blur-md">
+          {(["Adding", "Removing"] as ProcessType[]).map((proc) => (
+            <Button
+              key={proc}
+              onClick={() => setActiveProcess(proc)}
+              variant="ghost"
+              className={cn(
+                "h-9 rounded-lg px-6 text-xs font-bold transition-all",
+                activeProcess === proc ? "bg-white text-[#a0153e] shadow-md" : "text-white/70 hover:text-white"
+              )}
+            >
+              {proc.toUpperCase()}
+            </Button>
+          ))}
+        </div>
+
+
+        <span className="text-rose-200/50 mx-2">|</span>
+
+
+
+
+        <div className="flex bg-black/20 p-1 rounded-xl backdrop-blur-md">
+          {(["Philhealth", "SSS", "PAG-IBIG", "TIN"] as GovAgency[]).map((agency) => (
+            <Button
+              key={agency}
+              onClick={() => setActiveAgency(agency)}
+              variant="ghost"
+              className={cn(
+                "h-9 rounded-lg px-4 text-xs font-bold transition-all",
+                activeAgency === agency ? "bg-white text-[#a0153e] shadow-md" : "text-white/70 hover:text-white"
+              )}
+            >
+              {agency}
+            </Button>
+          ))}
+        </div>
+      </div>
 
 
 
@@ -242,7 +246,7 @@ export default function GovernmentContributionsPage() {
           </Card>
         </div>
       </main>
-    </div>
+    </div >
   )
 }
 
