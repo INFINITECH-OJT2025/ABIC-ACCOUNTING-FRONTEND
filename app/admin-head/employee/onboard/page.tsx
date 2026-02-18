@@ -158,7 +158,7 @@ export default function OnboardPage() {
           department: department,
         }
         sessionStorage.setItem('onboardingData', JSON.stringify(onboardingData))
-        router.push('/admin-head/forms/onboarding')
+        router.push('/admin-head/forms/onboarding-checklist')
       } else {
         alert('Error saving onboarding data: ' + data.message)
       }

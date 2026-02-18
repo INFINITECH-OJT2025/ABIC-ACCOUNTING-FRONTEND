@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\ClearanceChecklistController;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\Termination;
@@ -307,10 +308,33 @@ class EmployeeController extends Controller
 
             $employee->update($validated);
 
+            // Prepare checklist data
+            $checklistData = [
+                'employee_name' => $employee->first_name . ' ' . $employee->last_name,
+                'position' => $employee->position ?? $validated['position'],
+                'department' => $employee->department ?? $validated['department'],
+                'start_date' => $validated['onboarding_date'],
+                'tasks' => json_encode([
+                    ['task' => 'Submit documents', 'completed' => false],
+                    ['task' => 'Attend orientation', 'completed' => false],
+                    ['task' => 'Receive equipment', 'completed' => false],
+                    ['task' => 'Setup email', 'completed' => false],
+                ]),
+                'status' => 'pending',
+            ];
+
+            // Create onboarding checklist
+            $checklist = app(\App\Http\Controllers\Api\OnboardingChecklistController::class)->generateChecklist(
+                new \Illuminate\Http\Request($checklistData)
+            );
+
+            $checklistResponse = $checklist->getData(true);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Employee onboarded successfully',
-                'data' => $employee
+                'data' => $employee,
+                'checklist' => $checklistResponse['data'] ?? null
             ]);
         } catch (ValidationException $e) {
             return response()->json([

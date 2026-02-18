@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\OnboardingChecklistController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\PositionController;
 use App\Http\Controllers\Api\DepartmentController;
@@ -12,6 +13,9 @@ Route::get('/user', function (Request $request) {
 
 // Employee API Routes
 Route::apiResource('employees', EmployeeController::class);
+
+// Onboarding Checklist API Routes
+Route::apiResource('onboarding-checklist', OnboardingChecklistController::class);
 
 // Positions API Routes
 Route::apiResource('positions', PositionController::class);
