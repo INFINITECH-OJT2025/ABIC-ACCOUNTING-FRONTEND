@@ -842,22 +842,12 @@ export default function MasterfilePage() {
              <div className="bg-slate-50 px-8 py-6 border-t border-slate-200 flex justify-end gap-3">
                 {selectedEmployee?.status === 'pending' ? (
                    <>
-                    {(!checkCompleteness(selectedEmployee).isComplete || !selectedEmployee.onboarding_tasks?.isComplete) && (
+                    {selectedEmployee.onboarding_tasks?.isComplete && !checkCompleteness(selectedEmployee).isComplete && (
                       <Button
-                        onClick={() =>
-                          router.push(
-                            selectedEmployee.onboarding_tasks?.isComplete
-                              ? `/admin-head/employee/onboard?id=${selectedEmployee.id}`
-                              : `/admin-head/employee/onboard?id=${selectedEmployee.id}&view=checklist`
-                          )
-                        }
-                        className={`h-12 px-8 font-bold rounded-xl text-white transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 ${
-                          selectedEmployee.onboarding_tasks?.isComplete
-                            ? 'bg-[#630C22] hover:bg-[#4A081A]'
-                            : 'bg-blue-600 hover:bg-blue-700'
-                        }`}
+                        onClick={() => router.push(`/admin-head/employee/onboard?id=${selectedEmployee.id}`)}
+                        className="h-12 px-8 font-bold rounded-xl text-white transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 bg-[#630C22] hover:bg-[#4A081A]"
                       >
-                        {selectedEmployee.onboarding_tasks?.isComplete ? 'Update Profile' : 'Continue Onboarding'}
+                        Update Profile
                       </Button>
                     )}
                     <Button
