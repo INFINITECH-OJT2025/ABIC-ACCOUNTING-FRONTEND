@@ -127,6 +127,7 @@ export default function ClearanceChecklistPage() {
   const [error, setError] = useState<string | null>(null)
   const [recordStatusFilter, setRecordStatusFilter] = useState<RecordStatusFilter>('ALL')
   const [recordSort, setRecordSort] = useState<RecordSort>('UPDATED_DESC')
+  const isRecordSwitchLocked = saving
 
   useEffect(() => {
     const fetchChecklists = async () => {
@@ -242,8 +243,17 @@ export default function ClearanceChecklistPage() {
     () => filteredAndSortedRecords.filter(({ record }) => !isRecordDone(record)),
     [filteredAndSortedRecords]
   )
+  const activeFilterChips = useMemo(() => {
+    const statusLabel = recordStatusFilter === 'ALL' ? 'All' : recordStatusFilter === 'DONE' ? 'Done' : 'Pending'
+    let sortLabel = 'Latest'
+    if (recordSort === 'UPDATED_ASC') sortLabel = 'Oldest'
+    if (recordSort === 'NAME_ASC') sortLabel = 'A - Z'
+    if (recordSort === 'NAME_DESC') sortLabel = 'Z - A'
+    return [statusLabel, sortLabel]
+  }, [recordSort, recordStatusFilter])
 
   const selectRecordByIndex = (index: number) => {
+    if (isRecordSwitchLocked) return
     const selected = records[index]
     if (!selected) return
 
@@ -320,6 +330,16 @@ export default function ClearanceChecklistPage() {
 
   const handleSave = async () => {
     if (!employeeInfo) return
+    if (employeeInfo.resignationDate && employeeInfo.lastDay) {
+      const resignationDate = new Date(employeeInfo.resignationDate)
+      const lastDay = new Date(employeeInfo.lastDay)
+      if (!Number.isNaN(resignationDate.getTime()) && !Number.isNaN(lastDay.getTime()) && lastDay < resignationDate) {
+        toast.error('Invalid Separation Dates', {
+          description: 'Last day cannot be earlier than resignation date.',
+        })
+        return
+      }
+    }
 
     try {
       setSaving(true)
@@ -393,15 +413,20 @@ export default function ClearanceChecklistPage() {
           <div className="space-y-4">
             <h1 className="text-4xl font-extrabold tracking-tight italic">Clearance Checklist</h1>
 
-            <div className="flex flex-wrap items-center gap-3 text-rose-100/80 text-lg">
+            <div className="flex flex-wrap items-center gap-3 text-rose-100/80 text-sm md:text-base font-medium">
               <span className="opacity-80">Exit processing for</span>
               <Popover open={open} onOpenChange={setOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="ghost" className="h-auto p-0 text-white font-bold text-lg hover:bg-transparent underline underline-offset-4 decoration-rose-400">
-                    {employeeInfo?.name || 'No records yet'}
+                  <Button
+                    variant="ghost"
+                    disabled={isRecordSwitchLocked}
+                    className="h-auto max-w-[360px] md:max-w-[560px] p-0 text-white font-bold text-base md:text-lg hover:bg-transparent underline underline-offset-4 decoration-rose-400"
+                    title={employeeInfo?.name || 'No records yet'}
+                  >
+                    <span className="truncate">{employeeInfo?.name || 'No records yet'}</span>
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[300px] p-0 rounded-xl border-none shadow-2xl">
+                <PopoverContent className="w-[360px] p-0 rounded-xl border-none shadow-2xl">
                   <Command>
                     <CommandInput placeholder="Search records..." />
                     <CommandList>
@@ -409,7 +434,7 @@ export default function ClearanceChecklistPage() {
                       {doneRecords.length > 0 && (
                         <CommandGroup heading="DONE">
                           {doneRecords.map(({ record: emp, index }) => (
-                            <CommandItem key={emp.id} onSelect={() => { selectRecordByIndex(index); setOpen(false); }}>
+                            <CommandItem key={emp.id} disabled={isRecordSwitchLocked} onSelect={() => { selectRecordByIndex(index); setOpen(false); }}>
                               <Check className={cn("mr-2 h-4 w-4", currentIndex === index ? "opacity-100" : "opacity-0")} />
                               {emp.name} ({getRecordCompletionPercentage(emp)}%)
                             </CommandItem>
@@ -419,7 +444,7 @@ export default function ClearanceChecklistPage() {
                       {pendingRecords.length > 0 && (
                         <CommandGroup heading="PENDING">
                           {pendingRecords.map(({ record: emp, index }) => (
-                            <CommandItem key={emp.id} onSelect={() => { selectRecordByIndex(index); setOpen(false); }}>
+                            <CommandItem key={emp.id} disabled={isRecordSwitchLocked} onSelect={() => { selectRecordByIndex(index); setOpen(false); }}>
                               <Check className={cn("mr-2 h-4 w-4", currentIndex === index ? "opacity-100" : "opacity-0")} />
                               {emp.name} ({getRecordCompletionPercentage(emp)}%)
                             </CommandItem>
@@ -431,37 +456,43 @@ export default function ClearanceChecklistPage() {
                 </PopoverContent>
               </Popover>
 
-              <div className="flex items-center gap-2">
-                <Select value={recordStatusFilter} onValueChange={(value) => setRecordStatusFilter(value as RecordStatusFilter)}>
-                  <SelectTrigger className="h-9 w-[130px] rounded-full border border-white/25 bg-white/10 text-white text-xs font-black uppercase tracking-widest">
-                    <div className="flex items-center gap-2">
-                      <Filter className="h-3.5 w-3.5 text-rose-200" />
-                      <SelectValue />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">All</SelectItem>
-                    <SelectItem value="DONE">Done</SelectItem>
-                    <SelectItem value="PENDING">Pending</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={recordSort} onValueChange={(value) => setRecordSort(value as RecordSort)}>
-                  <SelectTrigger className="h-9 w-[130px] rounded-full border border-white/25 bg-white/10 text-white text-xs font-black uppercase tracking-widest">
-                    <div className="flex items-center gap-2">
-                      <ArrowUpDown className="h-3.5 w-3.5 text-rose-200" />
-                      <SelectValue />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="UPDATED_DESC">Latest</SelectItem>
-                    <SelectItem value="UPDATED_ASC">Oldest</SelectItem>
-                    <SelectItem value="NAME_ASC">A - Z</SelectItem>
-                    <SelectItem value="NAME_DESC">Z - A</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="flex items-end gap-2">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-rose-100/80">Status</p>
+                  <Select value={recordStatusFilter} onValueChange={(value) => setRecordStatusFilter(value as RecordStatusFilter)}>
+                    <SelectTrigger className="h-9 w-[130px] rounded-full border border-white/25 bg-white/10 text-white text-xs font-black uppercase tracking-widest">
+                      <div className="flex items-center gap-2">
+                        <Filter className="h-3.5 w-3.5 text-rose-200" />
+                        <SelectValue />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">All</SelectItem>
+                      <SelectItem value="DONE">Done</SelectItem>
+                      <SelectItem value="PENDING">Pending</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-rose-100/80">Sort</p>
+                  <Select value={recordSort} onValueChange={(value) => setRecordSort(value as RecordSort)}>
+                    <SelectTrigger className="h-9 w-[130px] rounded-full border border-white/25 bg-white/10 text-white text-xs font-black uppercase tracking-widest">
+                      <div className="flex items-center gap-2">
+                        <ArrowUpDown className="h-3.5 w-3.5 text-rose-200" />
+                        <SelectValue />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="UPDATED_DESC">Latest</SelectItem>
+                      <SelectItem value="UPDATED_ASC">Oldest</SelectItem>
+                      <SelectItem value="NAME_ASC">A - Z</SelectItem>
+                      <SelectItem value="NAME_DESC">Z - A</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2 ml-2 px-4 py-1.5 bg-white/10 rounded-full border border-white/20 backdrop-blur-sm">
+              <div className="flex flex-wrap items-center gap-2 ml-2 px-4 py-1.5 bg-white/10 rounded-full border border-white/20 backdrop-blur-sm">
                 <Target className="w-4 h-4 text-rose-300" />
                 <span className="text-xs font-black uppercase tracking-widest text-rose-100">Status:</span>
                 <span className="text-sm font-black text-white">{completionPercentage}% Completed</span>
@@ -473,11 +504,22 @@ export default function ClearanceChecklistPage() {
                   </>
                 )}
               </div>
+              <div className="flex items-center gap-2">
+                {activeFilterChips.map((chip) => (
+                  <span key={chip} className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-rose-100">
+                    {chip}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
 
           <div className="flex gap-3">
-            <Button onClick={() => router.push('/admin-head/forms/clearance-checklist/add-clearance-checklist')} className="rounded-full bg-white text-[#a0153e] hover:bg-rose-50 h-12 px-8 font-bold">
+            <Button
+              onClick={() => router.push('/admin-head/forms/clearance-checklist/add-clearance-checklist')}
+              variant="outline"
+              className="rounded-full bg-white/10 border-white/35 text-white hover:bg-white/20 h-11 px-7 font-semibold"
+            >
               <UserPlus className="mr-2 h-4 w-4" /> Add Record
             </Button>
           </div>
@@ -486,12 +528,12 @@ export default function ClearanceChecklistPage() {
 
       <main className="max-w-[1600px] mx-auto p-8 relative">
         <div className="absolute left-0 top-[25%] -translate-x-1/2 z-10">
-          <Button onClick={handlePrev} disabled={records.length === 0 || currentIndex === 0} size="icon" className="rounded-full h-12 w-12 bg-white shadow-xl text-[#a0153e] border-none hover:bg-rose-50 transition-colors">
+          <Button onClick={handlePrev} disabled={isRecordSwitchLocked || records.length === 0 || currentIndex === 0} size="icon" className="rounded-full h-12 w-12 bg-white shadow-xl text-[#a0153e] border-none hover:bg-rose-50 transition-colors">
             <ChevronLeft className="h-6 w-6" />
           </Button>
         </div>
         <div className="absolute right-0 top-[25%] translate-x-1/2 z-10">
-          <Button onClick={handleNext} disabled={records.length === 0 || currentIndex >= records.length - 1} size="icon" className="rounded-full h-12 w-12 bg-white shadow-xl text-[#a0153e] border-none hover:bg-rose-50 transition-colors">
+          <Button onClick={handleNext} disabled={isRecordSwitchLocked || records.length === 0 || currentIndex >= records.length - 1} size="icon" className="rounded-full h-12 w-12 bg-white shadow-xl text-[#a0153e] border-none hover:bg-rose-50 transition-colors">
             <ChevronRight className="h-6 w-6" />
           </Button>
         </div>
@@ -542,18 +584,23 @@ export default function ClearanceChecklistPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100 border-t border-slate-100">
-            <div className="p-8">
+          <div className="border-t border-slate-100 bg-slate-50/40 px-8 py-7">
+            <div className="mb-4">
+              <p className="text-[11px] font-black text-[#a0153e] uppercase tracking-[0.2em]">Separation Details</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100 rounded-2xl border border-slate-200 bg-white">
+              <div className="p-6">
               <p className="text-lg font-bold text-[#a0153e] uppercase tracking-wide mb-3">Resignation Date</p>
               {editMode && employeeInfo ? (
                 <Input type="date" value={employeeInfo.resignationDate} onChange={(e) => setEmployeeInfo({ ...employeeInfo, resignationDate: e.target.value })} className="rounded-xl border-slate-200 h-11" />
-              ) : (<p className="text-2xl md:text-3xl font-extrabold text-slate-700">{employeeInfo?.resignationDate ? new Date(employeeInfo.resignationDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' }) : '-'}</p>)}
-            </div>
-            <div className="p-8">
+              ) : (<p className="text-2xl md:text-3xl font-extrabold text-slate-700">{employeeInfo?.resignationDate ? new Date(employeeInfo.resignationDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}</p>)}
+              </div>
+              <div className="p-6">
               <p className="text-lg font-bold text-[#a0153e] uppercase tracking-wide mb-3">Last Day</p>
               {editMode && employeeInfo ? (
                 <Input type="date" value={employeeInfo.lastDay} onChange={(e) => setEmployeeInfo({ ...employeeInfo, lastDay: e.target.value })} className="rounded-xl border-slate-200 h-11" />
-              ) : (<p className="text-2xl md:text-3xl font-extrabold text-slate-700">{employeeInfo?.lastDay ? new Date(employeeInfo.lastDay).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' }) : '-'}</p>)}
+              ) : (<p className="text-2xl md:text-3xl font-extrabold text-slate-700">{employeeInfo?.lastDay ? new Date(employeeInfo.lastDay).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}</p>)}
+              </div>
             </div>
           </div>
         </Card>

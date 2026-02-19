@@ -75,6 +75,7 @@ export default function AddClearanceChecklistPage() {
     })
     const [taskMode, setTaskMode] = useState<'default' | 'custom'>('default')
     const [tasks, setTasks] = useState<ChecklistTask[]>(() => buildTaskRows(DEFAULT_CLEARANCE_TASK_LABELS))
+    const [showValidation, setShowValidation] = useState(false)
 
     useEffect(() => {
         const fetchOptions = async () => {
@@ -170,11 +171,22 @@ export default function AddClearanceChecklistPage() {
     }
 
     const handleCreateRecord = async () => {
+        setShowValidation(true)
         if (!newRecord.name.trim() || !newRecord.startDate || !newRecord.resignationDate || !newRecord.lastDay) {
             toast.warning('Incomplete Form', {
                 description: 'Name, start date, resignation date, and last day are required.',
             })
             return
+        }
+        if (newRecord.lastDay && newRecord.resignationDate) {
+            const resignationDate = new Date(newRecord.resignationDate)
+            const lastDay = new Date(newRecord.lastDay)
+            if (!Number.isNaN(resignationDate.getTime()) && !Number.isNaN(lastDay.getTime()) && lastDay < resignationDate) {
+                toast.error('Invalid Separation Dates', {
+                    description: 'Last day cannot be earlier than resignation date.',
+                })
+                return
+            }
         }
 
         const cleanedTasks = tasks
@@ -248,6 +260,7 @@ export default function AddClearanceChecklistPage() {
                     <div>
                         <h1 className="text-4xl font-extrabold tracking-tight italic">Add Clearance Record</h1>
                         <p className="text-rose-100 mt-2">Create a new clearance checklist record.</p>
+                        <p className="text-rose-100/85 mt-1 text-sm">1. Select employee, 2. Confirm details, 3. Create record.</p>
                     </div>
                     <Button variant="outline" onClick={() => router.push('/admin-head/forms/clearance-checklist')} className="rounded-full bg-transparent border-white/30 text-white hover:bg-white/20 h-12 px-8">
                         <ArrowLeft className="mr-2 h-4 w-4" /> Back to Checklist
@@ -258,7 +271,7 @@ export default function AddClearanceChecklistPage() {
             <main className="max-w-[1000px] mx-auto p-8">
                 <Card className="rounded-[2rem] border-none shadow-2xl bg-white p-8 space-y-6">
                     <div>
-                        <p className="text-[11px] font-bold text-[#a0153e] uppercase tracking-[0.2em] mb-2">Employee Name</p>
+                        <p className="text-[11px] font-bold text-[#a0153e] uppercase tracking-[0.2em] mb-2">Employee Name <span className="text-rose-600">*</span></p>
                         <Popover open={employeePickerOpen} onOpenChange={setEmployeePickerOpen}>
                             <PopoverTrigger asChild>
                                 <Button variant="outline" className="w-full justify-start rounded-xl border-slate-200 h-11 font-normal">
@@ -294,6 +307,9 @@ export default function AddClearanceChecklistPage() {
                                 </Command>
                             </PopoverContent>
                         </Popover>
+                        {showValidation && !newRecord.name.trim() && (
+                            <p className="mt-2 text-xs font-semibold text-rose-600">Employee name is required.</p>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -327,16 +343,28 @@ export default function AddClearanceChecklistPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                            <p className="text-[11px] font-bold text-[#a0153e] uppercase tracking-[0.2em] mb-2">Start Date</p>
+                            <p className="text-[11px] font-bold text-[#a0153e] uppercase tracking-[0.2em] mb-2">Start Date <span className="text-rose-600">*</span></p>
                             <Input type="date" value={newRecord.startDate} onChange={(e) => setNewRecord(prev => ({ ...prev, startDate: e.target.value }))} className="rounded-xl border-slate-200 h-11" />
+                            {showValidation && !newRecord.startDate && (
+                                <p className="mt-2 text-xs font-semibold text-rose-600">Start date is required.</p>
+                            )}
                         </div>
                         <div>
-                            <p className="text-[11px] font-bold text-[#a0153e] uppercase tracking-[0.2em] mb-2">Resignation Date</p>
+                            <p className="text-[11px] font-bold text-[#a0153e] uppercase tracking-[0.2em] mb-2">Resignation Date <span className="text-rose-600">*</span></p>
                             <Input type="date" value={newRecord.resignationDate} onChange={(e) => setNewRecord(prev => ({ ...prev, resignationDate: e.target.value }))} className="rounded-xl border-slate-200 h-11" />
+                            {showValidation && !newRecord.resignationDate && (
+                                <p className="mt-2 text-xs font-semibold text-rose-600">Resignation date is required.</p>
+                            )}
                         </div>
                         <div>
-                            <p className="text-[11px] font-bold text-[#a0153e] uppercase tracking-[0.2em] mb-2">Last Day</p>
+                            <p className="text-[11px] font-bold text-[#a0153e] uppercase tracking-[0.2em] mb-2">Last Day <span className="text-rose-600">*</span></p>
                             <Input type="date" value={newRecord.lastDay} onChange={(e) => setNewRecord(prev => ({ ...prev, lastDay: e.target.value }))} className="rounded-xl border-slate-200 h-11" />
+                            {showValidation && !newRecord.lastDay && (
+                                <p className="mt-2 text-xs font-semibold text-rose-600">Last day is required.</p>
+                            )}
+                            {showValidation && newRecord.resignationDate && newRecord.lastDay && new Date(newRecord.lastDay) < new Date(newRecord.resignationDate) && (
+                                <p className="mt-2 text-xs font-semibold text-rose-600">Last day cannot be earlier than resignation date.</p>
+                            )}
                         </div>
                     </div>
 
@@ -414,12 +442,20 @@ export default function AddClearanceChecklistPage() {
                         )}
                     </div>
 
-                    <div className="flex justify-end gap-3 pt-2">
+                    <div className="hidden md:flex justify-end gap-3 pt-2">
                         <Button variant="outline" onClick={() => router.push('/admin-head/forms/clearance-checklist')} className="rounded-full">
                             Cancel
                         </Button>
                         <Button onClick={handleCreateRecord} disabled={creatingRecord} className="rounded-full bg-[#a0153e] hover:bg-[#801030] text-white">
                             <Plus className="mr-2 h-4 w-4" /> {creatingRecord ? 'Creating...' : 'Create Record'}
+                        </Button>
+                    </div>
+                    <div className="md:hidden sticky bottom-0 -mx-8 px-6 py-4 bg-white/95 backdrop-blur border-t border-slate-200 flex items-center justify-between gap-3">
+                        <Button variant="outline" onClick={() => router.push('/admin-head/forms/clearance-checklist')} className="rounded-full flex-1">
+                            Cancel
+                        </Button>
+                        <Button onClick={handleCreateRecord} disabled={creatingRecord} className="rounded-full bg-[#a0153e] hover:bg-[#801030] text-white flex-1">
+                            {creatingRecord ? 'Creating...' : 'Create Record'}
                         </Button>
                     </div>
                 </Card>

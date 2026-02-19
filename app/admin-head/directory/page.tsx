@@ -121,6 +121,13 @@ const OFFICIAL_PORTALS: PortalLink[] = [
 ]
 
 const normalizeCode = (value: string): string => String(value || '').trim().toLowerCase()
+const getDomainOnly = (url: string): string => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return url
+  }
+}
 
 const getAgencyIcon = (code: string) => {
   switch (normalizeCode(code)) {
@@ -700,7 +707,10 @@ export default function GovernmentDirectoryPage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           <div className="lg:col-span-1 space-y-6">
             <Card className="rounded-[2rem] border-none shadow-2xl bg-white p-6">
-              <p className="text-[11px] font-black text-[#a0153e] uppercase tracking-[0.2em] mb-4">Agencies</p>
+              <div className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
+                <Building2 className="h-4 w-4 text-[#a0153e]" />
+                <p className="text-[11px] font-black text-[#a0153e] uppercase tracking-[0.2em]">Agencies</p>
+              </div>
               <div className="space-y-3">
                 {mergedAgencies.map((item) => {
                   const Icon = item.icon
@@ -732,7 +742,10 @@ export default function GovernmentDirectoryPage() {
             </Card>
 
             <Card className="rounded-[2rem] border-none shadow-2xl bg-white p-6">
-              <p className="text-[11px] font-black text-[#a0153e] uppercase tracking-[0.2em] mb-2">Agency Snapshot</p>
+              <div className="mb-3 flex items-center gap-2 border-b border-slate-100 pb-3">
+                <Fingerprint className="h-4 w-4 text-[#a0153e]" />
+                <p className="text-[11px] font-black text-[#a0153e] uppercase tracking-[0.2em]">Agency Snapshot</p>
+              </div>
               <p className="text-sm font-semibold text-slate-700 mb-4">{agency.shortName}</p>
               <div className="space-y-3 text-sm">
                 <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
@@ -755,7 +768,10 @@ export default function GovernmentDirectoryPage() {
             </Card>
 
             <Card className="rounded-[2rem] border-none shadow-2xl bg-white p-6">
-              <p className="text-[11px] font-black text-[#a0153e] uppercase tracking-[0.2em] mb-4">Official Online Portals</p>
+              <div className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
+                <Globe className="h-4 w-4 text-[#a0153e]" />
+                <p className="text-[11px] font-black text-[#a0153e] uppercase tracking-[0.2em]">Official Online Portals</p>
+              </div>
               <div className="space-y-3">
                 {OFFICIAL_PORTALS.map((portal) => {
                   const isActivePortal = normalizeCode(portal.code) === normalizeCode(activeAgency)
@@ -773,7 +789,7 @@ export default function GovernmentDirectoryPage() {
                       )}
                     >
                       <p className="text-[11px] font-black uppercase tracking-[0.15em] text-[#a0153e]">{portal.label}</p>
-                      <p className="text-xs text-slate-600 mt-1 break-all">{portal.url}</p>
+                      <p className="text-xs text-slate-600 mt-1 break-all" title={portal.url}>{getDomainOnly(portal.url)}</p>
                     </a>
                   )
                 })}
@@ -863,7 +879,7 @@ export default function GovernmentDirectoryPage() {
                       value={draft.name}
                       onChange={(e) => setDraft({ ...draft, name: e.target.value })}
                       className={cn(
-                        "h-10 bg-white/95 text-slate-900 border-none",
+                        "h-10 bg-amber-50/95 text-slate-900 border border-amber-200",
                         showValidation && draft.name.trim().length === 0 && "ring-2 ring-rose-400"
                       )}
                       placeholder="Agency short name"
@@ -874,7 +890,7 @@ export default function GovernmentDirectoryPage() {
                     <Input
                       value={draft.full_name}
                       onChange={(e) => setDraft({ ...draft, full_name: e.target.value })}
-                      className="h-9 bg-white/95 text-slate-900 border-none"
+                      className="h-9 bg-amber-50/95 text-slate-900 border border-amber-200"
                       placeholder="Agency full name"
                     />
                   </div>
@@ -888,11 +904,17 @@ export default function GovernmentDirectoryPage() {
             </div>
 
             <div className="p-8">
+              {editMode && (
+                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1">
+                  <Edit3 className="h-3.5 w-3.5 text-amber-700" />
+                  <span className="text-[11px] font-black uppercase tracking-widest text-amber-800">Edit Mode Active</span>
+                </div>
+              )}
               {editMode && draft ? (
                 <Textarea
                   value={draft.summary}
                   onChange={(e) => setDraft({ ...draft, summary: e.target.value })}
-                  className="mb-6 min-h-[80px]"
+                  className="mb-6 min-h-[80px] border-amber-200 bg-amber-50/40"
                   placeholder="Agency summary"
                 />
               ) : (
@@ -936,7 +958,7 @@ export default function GovernmentDirectoryPage() {
                                   onChange={(e) => updateContactAt(row.index, 'type', e.target.value)}
                                   placeholder="Type (email, hotline, address)"
                                   className={cn(
-                                    "h-8 text-xs",
+                                    "h-8 text-xs border-amber-200 bg-amber-50/40",
                                     showValidation && row.editable.type.trim().length === 0 && "border-rose-400 focus-visible:ring-rose-300"
                                   )}
                                 />
@@ -944,14 +966,14 @@ export default function GovernmentDirectoryPage() {
                                   value={row.editable.label}
                                   onChange={(e) => updateContactAt(row.index, 'label', e.target.value)}
                                   placeholder="Label"
-                                  className="h-8 text-xs"
+                                  className="h-8 text-xs border-amber-200 bg-amber-50/40"
                                 />
                                 <Input
                                   value={row.editable.value}
                                   onChange={(e) => updateContactAt(row.index, 'value', e.target.value)}
                                   placeholder="Value"
                                   className={cn(
-                                    "h-8 text-xs",
+                                    "h-8 text-xs border-amber-200 bg-amber-50/40",
                                     showValidation && row.editable.value.trim().length === 0 && "border-rose-400 focus-visible:ring-rose-300"
                                   )}
                                 />
@@ -994,7 +1016,12 @@ export default function GovernmentDirectoryPage() {
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
                 <div>
                   <p className="text-[11px] font-black text-[#a0153e] uppercase tracking-[0.2em] mb-2">Goverment Contribution</p>
-                  <h3 className="text-2xl font-black text-slate-900">Process Steps</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-2xl font-black text-slate-900">Process Steps</h3>
+                    <Badge className="rounded-full border-none bg-slate-900 text-white px-2.5 py-1 text-[10px] tracking-wider">
+                      {(editMode ? currentProcessDraftRows.length : currentSteps.length)} Steps
+                    </Badge>
+                  </div>
                 </div>
 
                 <div className="flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm w-fit">
@@ -1032,7 +1059,7 @@ export default function GovernmentDirectoryPage() {
                   </TableHeader>
                   <TableBody>
                     {editMode && currentProcessDraftRows.map((step, index) => (
-                      <TableRow key={`${activeAgency}-${activeProcess}-${step.id ?? index}`} className="hover:bg-slate-50/60">
+                      <TableRow key={`${activeAgency}-${activeProcess}-${step.id ?? index}`} className="hover:bg-slate-50/60 cursor-pointer transition-colors">
                         <TableCell className="text-center">
                           <div className="h-8 w-8 rounded-lg bg-slate-100 text-slate-700 font-black text-sm flex items-center justify-center mx-auto">
                             {index + 1}
@@ -1044,7 +1071,7 @@ export default function GovernmentDirectoryPage() {
                               value={step.process}
                               onChange={(e) => updateProcessTextAt(index, e.target.value)}
                               className={cn(
-                                "h-9",
+                                "h-9 border-amber-200 bg-amber-50/40",
                                 showValidation && step.process.trim().length === 0 && "border-rose-400 focus-visible:ring-rose-300"
                               )}
                             />
@@ -1062,7 +1089,7 @@ export default function GovernmentDirectoryPage() {
                       </TableRow>
                     ))}
                     {!editMode && currentSteps.map((step, index) => (
-                      <TableRow key={`${activeAgency}-${activeProcess}-${index}`} className="hover:bg-slate-50/60">
+                      <TableRow key={`${activeAgency}-${activeProcess}-${index}`} className="hover:bg-slate-50/60 cursor-pointer transition-colors">
                         <TableCell className="text-center">
                           <div className="h-8 w-8 rounded-lg bg-slate-100 text-slate-700 font-black text-sm flex items-center justify-center mx-auto">
                             {index + 1}

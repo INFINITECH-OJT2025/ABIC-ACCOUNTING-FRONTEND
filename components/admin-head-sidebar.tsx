@@ -58,7 +58,7 @@ export default function AdminHeadSidebar() {
 
 
   return (
-    <div className={`${isCollapsed ? 'w-20' : 'w-64'} bg-gradient-to-r from-[#7B0F2B] to-[#A4163A] text-white min-h-screen p-4 flex flex-col transition-all duration-300 ease-in-out relative`}>
+    <div className={`${isCollapsed ? 'w-20' : 'w-64'} bg-gradient-to-r from-[#7B0F2B] to-[#A4163A] text-white min-h-screen p-4 flex flex-col transition-all duration-300 ease-in-out relative z-40 shrink-0`}>
 
       <button
         onClick={toggleSidebar}
