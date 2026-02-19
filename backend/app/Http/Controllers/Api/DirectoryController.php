@@ -97,7 +97,8 @@ class DirectoryController extends Controller
         $maxResults = $request->query('max_results', 30);
 
         try {
-            $response = Http::withBasicAuth($apiKey, $apiSecret)
+            $response = Http::withoutVerifying()
+                ->withBasicAuth($apiKey, $apiSecret)
                 ->get("https://api.cloudinary.com/v1_1/{$cloudName}/resources/image", [
                     'type' => 'upload',
                     'prefix' => $prefix,
