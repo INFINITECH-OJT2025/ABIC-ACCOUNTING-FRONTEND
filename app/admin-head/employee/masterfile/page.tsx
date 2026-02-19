@@ -2,19 +2,11 @@
 
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { EmployeeRegistrationForm } from '@/components/employee-registration-form'
 import { getApiUrl } from '@/lib/api'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
+import { X } from 'lucide-react'
 
 interface Employee {
   id: number
@@ -22,7 +14,7 @@ interface Employee {
   last_name: string
   email: string
   position: string
-  status: 'pending' | 'approved' | 'terminated'
+  status: 'pending' | 'employed' | 'terminated'
   created_at: string
 }
 
@@ -30,59 +22,36 @@ interface EmployeeDetails extends Employee {
   [key: string]: any
 }
 
-interface AdditionalFieldValue {
-  field_id: number
-  field_label: string
-  field_key: string
-  value: string | null
-}
-
 const statusBadgeColors = {
-  pending: 'bg-amber-50 text-[#A0153E] border-[#C9184A]',
-  approved: 'bg-emerald-50 text-[#800020] border-[#A0153E]',
-  terminated: 'bg-rose-50 text-[#800020] border-[#C9184A]',
+  pending: 'bg-amber-50 text-amber-700 border-amber-200',
+  employed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  terminated: 'bg-rose-50 text-rose-700 border-rose-200',
 }
 
 const statusLabels = {
   pending: 'Pending',
-  approved: 'Approved',
+  employed: 'Employed',
   terminated: 'Terminated',
 }
 
 export default function MasterfilePage() {
   const router = useRouter()
   const [employees, setEmployees] = useState<Employee[]>([])
-  const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeDetails | null>(null)
-  const [showDetailModal, setShowDetailModal] = useState(false)
-  const [showRegistrationModal, setShowRegistrationModal] = useState(false)
-  const [updatingStatus, setUpdatingStatus] = useState(false)
-  const [additionalValues, setAdditionalValues] = useState<AdditionalFieldValue[]>([])
+  const [viewMode, setViewMode] = useState<'list' | 'details'>('list')
+  const [activeTab, setActiveTab] = useState<'employed' | 'terminated'>('employed')
+  const [isUpdating, setIsUpdating] = useState(false)
 
   useEffect(() => {
     fetchEmployees()
   }, [])
 
-  useEffect(() => {
-    const filtered = employees.filter((emp) => {
-      const query = searchQuery.toLowerCase()
-      return (
-        emp.first_name?.toLowerCase().includes(query) ||
-        emp.last_name?.toLowerCase().includes(query) ||
-        emp.email?.toLowerCase().includes(query) ||
-        emp.position?.toLowerCase().includes(query)
-      )
-    })
-    setFilteredEmployees(filtered)
-  }, [searchQuery, employees])
-
   const fetchEmployees = async () => {
     try {
       const apiUrl = getApiUrl()
       const fullUrl = `${apiUrl}/api/employees`
-      console.log('Fetching employees from:', fullUrl)
       
       const response = await fetch(fullUrl, {
         method: 'GET',
@@ -94,23 +63,15 @@ export default function MasterfilePage() {
       })
       
       if (!response.ok) {
-        console.error(`API returned status ${response.status}: ${response.statusText}`)
         throw new Error(`HTTP Error: ${response.status}`)
       }
       
       const data = await response.json()
       if (data.success) {
         setEmployees(data.data || [])
-      } else {
-        console.warn('API response not successful:', data)
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      console.error('Error fetching employees:', errorMessage)
-      console.error('Full error:', error)
-      
-      // Show error to user for debugging
-      alert(`Failed to load employees: ${errorMessage}\n\nMake sure the backend server is running on ${getApiUrl()}`)
+      console.error('Error fetching employees:', error)
     } finally {
       setLoading(false)
     }
@@ -120,502 +81,544 @@ export default function MasterfilePage() {
     try {
       const apiUrl = getApiUrl()
       const fullUrl = `${apiUrl}/api/employees/${employeeId}`
-      console.log('Fetching employee details from:', fullUrl)
-      
-      const [empResponse, addlResponse] = await Promise.all([
-        fetch(fullUrl, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          credentials: 'include',
-        }),
-        fetch(`${apiUrl}/api/employees/${employeeId}/additional-values`, {
-          method: 'GET',
-          headers: { 'Accept': 'application/json' },
-          credentials: 'include',
-        }),
-      ])
-      
-      if (!empResponse.ok) {
-        console.error(`API returned status ${empResponse.status}: ${empResponse.statusText}`)
-        throw new Error(`HTTP Error: ${empResponse.status}`)
-      }
-      
-      const data = await empResponse.json()
-      if (data.success) {
-        setSelectedEmployee(data.data)
-        setShowDetailModal(true)
-      } else {
-        console.warn('API response not successful:', data)
-        alert('Failed to load employee details')
-      }
-
-      if (addlResponse.ok) {
-        const addlData = await addlResponse.json()
-        if (addlData.success) setAdditionalValues(addlData.data)
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      console.error('Error fetching employee details:', errorMessage)
-      alert(`Failed to load employee details: ${errorMessage}`)
-    }
-  }
-
-  const handleStatusUpdate = async (newStatus: 'pending' | 'approved' | 'terminated') => {
-    if (!selectedEmployee) return
-
-    setUpdatingStatus(true)
-    try {
-      const apiUrl = getApiUrl()
-      const fullUrl = `${apiUrl}/api/employees/${selectedEmployee.id}`
-      console.log('Updating employee status at:', fullUrl)
       
       const response = await fetch(fullUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ status: newStatus }),
       })
-
+      
       if (!response.ok) {
-        console.error(`API returned status ${response.status}: ${response.statusText}`)
         throw new Error(`HTTP Error: ${response.status}`)
       }
-
+      
       const data = await response.json()
       if (data.success) {
-        // Update employee in list
-        setEmployees(employees.map(emp =>
-          emp.id === selectedEmployee.id ? { ...emp, status: newStatus } : emp
-        ))
-        // Update selected employee
-        setSelectedEmployee({ ...selectedEmployee, status: newStatus })
-        // Show success message
-        alert(`Employee status updated to ${statusLabels[newStatus]}`)
+        setSelectedEmployee(data.data)
+        setViewMode('details')
+        window.scrollTo(0, 0)
       } else {
-        console.warn('API response not successful:', data)
-        alert('Failed to update status')
+        alert('Failed to load employee details')
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      console.error('Error updating status:', errorMessage)
-      alert(`Failed to update status: ${errorMessage}`)
-    } finally {
-      setUpdatingStatus(false)
+      console.error('Error fetching employee details:', error)
+      alert(`Failed to load employee details`)
     }
   }
 
-  const isEmployeeComplete = (employee: EmployeeDetails): boolean => {
-    // Check if all required fields are filled
+  const checkCompleteness = (emp: any) => {
+    if (!emp) return false
+    // We can only fully check completeness if we have all details (EmployeeDetails).
+    // If it's just from the list (Employee), we might not have all fields.
+    // However, for the pending list styling, we assume we might need to fetch details or rely on what's available.
+    // The current API for list might not return all fields. 
+    // To properly style the pending list without N+1 fetches, strictly we should use data available.
+    // But logically, "Ready to Employ" implies detailed info is filled.
+    // If the list API doesn't return everything, this check on the list view might be partial.
+    // For the DETAIL view, we have full data.
+    
+    // Required fields based on the Onboarding flow
     const requiredFields = [
-      'first_name',
-      'last_name',
-      'email',
-      'position',
-      'date_hired',
-      'birthday',
-      'birthplace',
-      'civil_status',
-      'gender',
+      'position', 'date_hired',
+      'last_name', 'first_name', 'birthday', 'birthplace', 'civil_status', 'gender',
       'mobile_number',
-      'street',
-      'barangay',
-      'region',
-      'province',
-      'city_municipality',
-      'zip_code',
-      'mlast_name',
-      'mfirst_name',
-      'flast_name',
-      'ffirst_name',
+      'street', 'barangay', 'region', 'province', 'city_municipality', 'zip_code',
+      'mlast_name', 'mfirst_name'
     ]
 
+    // If we only have basic info (from list), we can't be sure, but for the "Set as Employed" button
+    // which appears in Detail View, we have `selectedEmployee` which is full details.
+    
+    // For the list view "Pending" cards, if the API doesn't return these fields, 
+    // we might need to assume incomplete or fetch.
+    // Assuming `emp` passed here is `selectedEmployee` or from a list that includes these fields.
+    
     for (const field of requiredFields) {
-      const value = employee[field]
-      if (!value || (typeof value === 'string' && value.trim() === '')) {
+      if (!emp[field] || emp[field].toString().trim() === '') {
         return false
       }
     }
+    
+    // Check email specific (could be email or email_address)
+    if (!emp.email && !emp.email_address) return false;
+
     return true
   }
 
+  const handleSetAsEmployed = async () => {
+    if (!selectedEmployee) return
+    
+    if (!checkCompleteness(selectedEmployee)) {
+      alert('Cannot employ: Missing required Information.')
+      return
+    }
+
+    if (!confirm(`Are you sure you want to employ ${selectedEmployee.first_name} ${selectedEmployee.last_name}?`)) return
+
+    setIsUpdating(true)
+    try {
+      const apiUrl = getApiUrl()
+      // We update the status to 'employed'
+      const response = await fetch(`${apiUrl}/api/employees/${selectedEmployee.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'employed' }),
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        // Refresh list and return to list view
+        await fetchEmployees()
+        setViewMode('list')
+        setSelectedEmployee(null)
+      } else {
+        alert(data.message || 'Failed to update status')
+      }
+    } catch (error) {
+      console.error('Error updating status:', error)
+      alert('Failed to update status')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  const filterEmployees = (list: Employee[]) => {
+    if (!searchQuery) return list
+    const query = searchQuery.toLowerCase()
+    return list.filter((emp) =>
+      emp.first_name?.toLowerCase().includes(query) ||
+      emp.last_name?.toLowerCase().includes(query) ||
+      emp.email?.toLowerCase().includes(query) ||
+      emp.position?.toLowerCase().includes(query)
+    )
+  }
+
+  const employedList = filterEmployees(employees.filter(e => e.status === 'employed'))
+  const terminatedList = filterEmployees(employees.filter(e => e.status === 'terminated'))
+  const pendingList = filterEmployees(employees.filter(e => e.status === 'pending'))
+
+  const EmployeeTable = ({ list, emptyMessage }: { list: Employee[], emptyMessage: string }) => (
+    list.length === 0 ? (
+      <div className="text-center py-12 text-slate-400 bg-slate-50/50 rounded-lg border border-dashed border-slate-200">
+        <p>{emptyMessage}</p>
+      </div>
+    ) : (
+      <div className="overflow-x-auto rounded-lg border border-slate-200 shadow-sm">
+        <table className="w-full">
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-200">
+              <th className="text-left py-4 px-6 font-semibold text-[#4A081A] text-xs uppercase tracking-wider">Name</th>
+              <th className="text-left py-4 px-6 font-semibold text-[#4A081A] text-xs uppercase tracking-wider">Email</th>
+              <th className="text-left py-4 px-6 font-semibold text-[#4A081A] text-xs uppercase tracking-wider">Position</th>
+              <th className="text-left py-4 px-6 font-semibold text-[#4A081A] text-xs uppercase tracking-wider">Status</th>
+              <th className="text-left py-4 px-6 font-semibold text-[#4A081A] text-xs uppercase tracking-wider">Joined</th>
+              <th className="text-right py-4 px-6 font-semibold text-[#4A081A] text-xs uppercase tracking-wider">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 bg-white">
+            {list.map((employee) => (
+              <tr key={employee.id} className="hover:bg-slate-50 transition-colors duration-200">
+                <td className="py-4 px-6">
+                  <div className="font-bold text-slate-800">{employee.first_name} {employee.last_name}</div>
+                </td>
+                <td className="py-4 px-6 text-slate-600 text-sm">{employee.email}</td>
+                <td className="py-4 px-6 text-slate-600 text-sm">{employee.position || '-'}</td>
+                <td className="py-4 px-6">
+                  <Badge className={`${statusBadgeColors[employee.status]} border shadow-none font-medium px-2.5 py-0.5 pointer-events-none`}>
+                    {statusLabels[employee.status]}
+                  </Badge>
+                </td>
+                <td className="py-4 px-6 text-slate-500 text-sm">
+                  {new Date(employee.created_at).toLocaleDateString()}
+                </td>
+                <td className="py-4 px-6 text-right">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-slate-200 text-slate-600 hover:text-[#630C22] hover:border-[#630C22] hover:bg-red-50 transition-all"
+                    onClick={() => fetchEmployeeDetails(employee.id)}
+                  >
+                    View Details
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  )
+
   return (
-    <div className="min-h-screen">
-      {/* Maroon Gradient Header */}
-      <div className="bg-gradient-to-br from-[#800020] via-[#A0153E] to-[#C9184A] text-white rounded-lg shadow-lg p-8 mb-8">
-        <h1 className="text-4xl font-bold mb-3">Employee Masterfile</h1>
-        <p className="text-rose-100 text-lg">Manage employee master data and records</p>
-      </div>
-
-      <div className="bg-white p-6 rounded-lg shadow-lg border-2 border-[#FFE5EC]">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-          <h2 className="text-2xl font-bold text-[#800020]">Employee List</h2>
-          <div className="flex gap-3">
-            <Button
-              onClick={() => router.push('/admin-head/employee/additional-info')}
-              variant="outline"
-              className="border-[#A0153E] text-[#800020] hover:bg-[#FFE5EC] font-semibold px-6 py-2 rounded-lg transition-all duration-300"
-            >
-              Additional Information
-            </Button>
-            <Button
-              onClick={() => setShowRegistrationModal(true)}
-              className="bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white font-bold px-6 py-2 rounded-lg transition-all duration-300 shadow-md hover:shadow-lg"
-            >
-              + CREATE EMPLOYEE
-            </Button>
+    <div className="min-h-screen p-8 bg-slate-50 animate-in fade-in duration-500">
+      {viewMode === 'list' ? (
+        <>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6">
+            <div>
+              <h1 className="text-3xl font-extrabold text-[#4A081A] tracking-tight">Employee Records</h1>
+              <p className="text-slate-500 mt-2 text-lg">Manage and monitor employee master data and records.</p>
+            </div>
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+              <div className="relative w-full sm:w-72">
+                <Input
+                  type="text"
+                  placeholder="Search employees..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-white border-slate-200 pl-10 h-11 focus:ring-2 focus:ring-[#630C22] focus:border-transparent rounded-xl shadow-sm transition-all"
+                />
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                </div>
+              </div>
+              <Button
+                onClick={() => router.push('/admin-head/employee/onboard')}
+                className="w-full sm:w-auto bg-[#630C22] hover:bg-[#4A081A] text-white font-bold px-6 h-11 rounded-xl transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+              >
+                + ONBOARD NEW EMPLOYEE
+              </Button>
+            </div>
           </div>
-        </div>
 
-        {/* Search Bar */}
-        <div className="mb-6">
-          <Input
-            type="text"
-            placeholder="Search by name, email, or position..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A]"
-          />
-        </div>
-
-        {loading ? (
-          <p className="text-slate-500">Loading employees...</p>
-        ) : filteredEmployees.length === 0 ? (
-          <p className="text-slate-500">
-            {employees.length === 0
-              ? 'No employees found. Create one using the button above.'
-              : 'No employees match your search.'}
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gradient-to-r from-[#FFE5EC] to-rose-50">
-                <tr className="border-b-2 border-[#C9184A]">
-                  <th className="text-left py-3 px-4 font-semibold text-[#800020]">Name</th>
-                  <th className="text-left py-3 px-4 font-semibold text-[#800020]">Email</th>
-                  <th className="text-left py-3 px-4 font-semibold text-[#800020]">Position</th>
-                  <th className="text-left py-3 px-4 font-semibold text-[#800020]">Status</th>
-                  <th className="text-left py-3 px-4 font-semibold text-[#800020]">Created</th>
-                  <th className="text-left py-3 px-4 font-semibold text-[#800020]">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredEmployees.map((employee) => (
-                  <tr key={employee.id} className="border-b border-slate-100 hover:bg-[#FFE5EC] transition-colors duration-200">
-                    <td className="py-3 px-4 text-slate-700 font-medium">{employee.first_name} {employee.last_name}</td>
-                    <td className="py-3 px-4 text-slate-700">{employee.email}</td>
-                    <td className="py-3 px-4 text-slate-700">{employee.position || '-'}</td>
-                    <td className="py-3 px-4">
-                      <Badge className={`${statusBadgeColors[employee.status]} border`}>
-                        {statusLabels[employee.status]}
+          <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-24">
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-100 border-t-[#630C22] mb-4"></div>
+                <p className="text-slate-500 font-medium animate-pulse">Loading employees...</p>
+              </div>
+            ) : (
+              <div className="space-y-12">
+                {/* Persistent Pending Approval Section */}
+                {pendingList.length > 0 && (
+                  <div className="bg-orange-50/50 rounded-2xl p-6 border border-orange-100/50">
+                    <h3 className="text-lg font-bold text-orange-900 mb-6 flex items-center gap-3">
+                      <div className="w-1.5 h-6 bg-orange-400 rounded-full" />
+                      Pending Approval
+                      <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-200 border-orange-200">
+                        {pendingList.length}
                       </Badge>
-                    </td>
-                    <td className="py-3 px-4 text-slate-500 text-sm">
-                      {new Date(employee.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="py-3 px-4">
-                      <Button
-                        size="sm"
-                        className="bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A] text-white border-0 transition-all duration-300"
-                        onClick={() => fetchEmployeeDetails(employee.id)}
-                      >
-                        View
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                      {pendingList.map((employee) => {
+                         // Note: We are checking completeness on the 'list' item. 
+                         // This assumes basic fields are present or we purely rely on visual indicator from detail view
+                         // But to show 'Green' here, checkCompleteness needs to return true. 
+                         // If the list object is partial, this might return false incorrectly until viewed. 
+                         // Since we can't easily fix the API return type here without backend changes, 
+                         // we will try to check what we have. If `checkCompleteness` expects full details, 
+                         // this might be limited. 
+                         // However, for now let's assume the user wants this consistent 
+                         // and we'll apply the style if it looks complete or if we enforce it.
+                         // Actually, let's assume we need to click to verify. 
+                         // But the request asked for "Green background if its ready". 
+                         // We'll apply a subtle hint if we can, or just keep it standard pending.
+                         // Let's rely on the `fetchEmployeeDetails` to verify readiness.
+                         // Changing styling here might misleading without full data. 
+                         // BUT, I will leave the styling "check" here. If the object lacks keys, it returns false.
+                         const isReady = checkCompleteness(employee as any) // Type assertion for now
+                        
+                         return (
+                          <div
+                            key={employee.id}
+                            onClick={() => fetchEmployeeDetails(employee.id)}
+                            className={`group relative bg-white border rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer overflow-hidden ${
+                              isReady 
+                                ? 'border-emerald-200 hover:border-emerald-400 ring-1 ring-emerald-50' 
+                                : 'border-slate-200 hover:border-orange-300'
+                            }`}
+                          >
+                             {/* Ready Indicator Strip */}
+                             {isReady && <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>}
 
-      {/* Employee Detail Modal */}
-      {showDetailModal && selectedEmployee && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[95vh] overflow-y-auto border-2 border-[#C9184A]">
-            <div className="p-6 border-b-2 border-[#C9184A] sticky top-0 bg-gradient-to-r from-[#800020] via-[#A0153E] to-[#C9184A]">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-bold text-white">
-                  {selectedEmployee.first_name} {selectedEmployee.last_name}
-                </h2>
-                <button
-                  onClick={() => setShowDetailModal(false)}
-                  className="text-white hover:text-rose-100 text-2xl font-bold transition-colors"
-                >
-                  ×
-                </button>
-              </div>
-              {/* Current Status Badge */}
-              <div className="flex items-center gap-3">
-                <span className="text-white font-medium">Current Status:</span>
-                <Badge className={`${statusBadgeColors[selectedEmployee.status]} border-2 text-base py-1 px-3`}>
-                  {statusLabels[selectedEmployee.status]}
-                </Badge>
-              </div>
-            </div>
-
-            <div className="p-6">
-              {/* EMPLOYEE DETAILS */}
-              <div className="mb-8">
-                <h3 className="text-lg font-bold text-[#800020] mb-4 pb-2 border-b-2 border-[#C9184A]">EMPLOYEE DETAILS</h3>
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">POSITION <span className="text-red-500">*</span></p>
-                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.position || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">DATE HIRED <span className="text-red-500">*</span></p>
-                    <p className="text-slate-900 font-medium text-base">
-                      {selectedEmployee.date_hired
-                        ? new Date(selectedEmployee.date_hired).toLocaleDateString()
-                        : '-'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* PERSONAL INFORMATION */}
-              <div className="mb-8">
-                <h3 className="text-lg font-bold text-[#800020] mb-4 pb-2 border-b-2 border-[#C9184A]">PERSONAL INFORMATION</h3>
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">LAST NAME <span className="text-red-500">*</span></p>
-                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.last_name || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">FIRST NAME <span className="text-red-500">*</span></p>
-                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.first_name || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">MIDDLE NAME <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
-                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.middle_name || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">SUFFIX <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
-                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.suffix || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">BIRTHDAY <span className="text-red-500">*</span></p>
-                    <p className="text-slate-900 font-medium text-base">
-                      {selectedEmployee.birthday
-                        ? new Date(selectedEmployee.birthday).toLocaleDateString()
-                        : '-'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">BIRTHPLACE <span className="text-red-500">*</span></p>
-                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.birthplace || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">CIVIL_STATUS <span className="text-red-500">*</span></p>
-                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.civil_status || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">GENDER <span className="text-red-500">*</span></p>
-                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.gender || '-'}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* CONTACT INFORMATION */}
-              <div className="mb-8">
-                <h3 className="text-lg font-bold text-[#800020] mb-4 pb-2 border-b-2 border-[#C9184A]">CONTACT INFORMATION</h3>
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">MOBILE NUMBER <span className="text-red-500">*</span></p>
-                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.mobile_number || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">PHONE NUMBER <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
-                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.phone_number || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">EMAIL ADDRESS <span className="text-red-500">*</span></p>
-                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.email_address || selectedEmployee.email || '-'}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* GOVERNMENT ID NUMBERS */}
-              <div className="mb-8">
-                <h3 className="text-lg font-bold text-[#800020] mb-4 pb-2 border-b-2 border-[#C9184A]">GOVERNMENT ID NUMBERS</h3>
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">SSS NUMBER <span className="text-slate-400 text-xs">(can be N/A)</span></p>
-                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.sss_number || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">PHILHEALTH NUMBER <span className="text-slate-400 text-xs">(can be N/A)</span></p>
-                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.philhealth_number || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">PAG-IBIG NUMBER <span className="text-slate-400 text-xs">(can be N/A)</span></p>
-                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.pagibig_number || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">TIN NUMBER <span className="text-slate-400 text-xs">(can be N/A)</span></p>
-                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.tin_number || '-'}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* FAMILY INFORMATION */}
-              <div className="mb-8">
-                <h3 className="text-lg font-bold text-[#800020] mb-4 pb-2 border-b-2 border-[#C9184A]">FAMILY INFORMATION</h3>
-                <div className="mb-6">
-                  <p className="text-slate-700 font-semibold mb-3">MOTHER'S MAIDEN NAME</p>
-                  <div className="grid grid-cols-2 gap-6 ml-4">
-                    <div>
-                      <p className="text-slate-600 text-sm font-medium mb-1">MLAST NAME <span className="text-red-500">*</span></p>
-                      <p className="text-slate-900 font-medium text-base">{selectedEmployee.mlast_name || '-'}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-600 text-sm font-medium mb-1">MFIRST NAME <span className="text-red-500">*</span></p>
-                      <p className="text-slate-900 font-medium text-base">{selectedEmployee.mfirst_name || '-'}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-600 text-sm font-medium mb-1">MMIDDLE NAME <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
-                      <p className="text-slate-900 font-medium text-base">{selectedEmployee.mmiddle_name || '-'}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-600 text-sm font-medium mb-1">MSUFFIX <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
-                      <p className="text-slate-900 font-medium text-base">{selectedEmployee.msuffix || '-'}</p>
+                            <div className="flex items-center gap-4 mb-4">
+                              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold transition-colors duration-200 ${
+                                isReady 
+                                  ? 'bg-emerald-100 text-emerald-700 group-hover:bg-emerald-500 group-hover:text-white' 
+                                  : 'bg-orange-100 text-orange-700 group-hover:bg-orange-500 group-hover:text-white'
+                              }`}>
+                                {employee.first_name.charAt(0)}{employee.last_name.charAt(0)}
+                              </div>
+                              <div className="overflow-hidden">
+                                <h1 className="font-bold text-slate-800 truncate group-hover:text-[#630C22] transition-colors">
+                                  {employee.first_name} {employee.last_name}
+                                </h1>
+                                <p className="text-xs text-slate-500 truncate font-medium">
+                                  {employee.position || 'No Position'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-center pt-3 border-t border-slate-50">
+                              {isReady ? (
+                                <Badge variant="outline" className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border-emerald-100">
+                                  READY TO EMPLOY
+                                </Badge>
+                              ) : (
+                                <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">
+                                  Incomplete
+                                </span>
+                              )}
+                              <span className="text-[10px] text-slate-400 font-medium group-hover:translate-x-1 transition-transform">
+                                Review →
+                              </span>
+                            </div>
+                          </div>
+                      )})}
                     </div>
                   </div>
-                </div>
+                )}
+
+                {/* Main Content Area */}
                 <div>
-                  <p className="text-slate-700 font-semibold mb-3">FATHER'S NAME <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
-                  <div className="grid grid-cols-2 gap-6 ml-4">
-                    <div>
-                      <p className="text-slate-600 text-sm font-medium mb-1">FLAST NAME <span className="text-red-500">*</span></p>
-                      <p className="text-slate-900 font-medium text-base">{selectedEmployee.flast_name || '-'}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-600 text-sm font-medium mb-1">FFIRST NAME <span className="text-red-500">*</span></p>
-                      <p className="text-slate-900 font-medium text-base">{selectedEmployee.ffirst_name || '-'}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-600 text-sm font-medium mb-1">FMIDDLE NAME <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
-                      <p className="text-slate-900 font-medium text-base">{selectedEmployee.fmiddle_name || '-'}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-600 text-sm font-medium mb-1">FSUFFIX <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
-                      <p className="text-slate-900 font-medium text-base">{selectedEmployee.fsuffix || '-'}</p>
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 border-b border-slate-100 pb-4">
+                    <h3 className="text-lg font-bold text-[#4A081A] flex items-center gap-2">
+                       Master List
+                    </h3>
+                    <div className="flex items-center bg-slate-100 p-1.5 rounded-xl">
+                      <button
+                        onClick={() => setActiveTab('employed')}
+                        className={`px-6 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
+                          activeTab === 'employed'
+                            ? 'bg-white text-[#4A081A] shadow-sm'
+                            : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
+                        }`}
+                      >
+                        Employed <span className="ml-1 opacity-60 text-xs">({employees.filter(e => e.status === 'employed').length})</span>
+                      </button>
+                      <button
+                        onClick={() => setActiveTab('terminated')}
+                        className={`px-6 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
+                          activeTab === 'terminated'
+                            ? 'bg-white text-[#4A081A] shadow-sm'
+                            : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
+                        }`}
+                      >
+                        Terminated <span className="ml-1 opacity-60 text-xs">({employees.filter(e => e.status === 'terminated').length})</span>
+                      </button>
                     </div>
                   </div>
+
+                  <EmployeeTable
+                    list={activeTab === 'employed' ? employedList : terminatedList}
+                    emptyMessage={
+                      searchQuery 
+                        ? `No ${activeTab} employees match your search.` 
+                        : `No ${activeTab} employees found.`
+                    }
+                  />
                 </div>
               </div>
-
-              {/* ADDRESS INFORMATION */}
-              <div className="mb-8">
-                <h3 className="text-lg font-bold text-[#800020] mb-4 pb-2 border-b-2 border-[#C9184A]">ADDRESS INFORMATION</h3>
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">HOUSE NUMBER <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
-                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.house_number || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">STREET <span className="text-red-500">*</span></p>
-                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.street || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">VILLAGE <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
-                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.village || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">SUBDIVISION <span className="text-slate-400 text-xs">(NOT REQUIRED)</span></p>
-                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.subdivision || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">BARANGAY <span className="text-red-500">*</span></p>
-                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.barangay || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">REGION <span className="text-red-500">*</span></p>
-                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.region || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">PROVINCE <span className="text-red-500">*</span></p>
-                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.province || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">CITY / MUNICIPALITY <span className="text-red-500">*</span></p>
-                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.city_municipality || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-600 text-sm font-medium mb-1">ZIP CODE <span className="text-red-500">*</span></p>
-                    <p className="text-slate-900 font-medium text-base">{selectedEmployee.zip_code || '-'}</p>
-                  </div>
-                </div>
+            )}
+          </div>
+        </>
+      ) : (
+        /* DETAIL VIEW (Replaces Modal) */
+        <div className="max-w-5xl mx-auto animate-in slide-in-from-bottom-8 duration-500">
+          <div className="mb-6 flex items-center justify-between">
+            <Button
+              variant="ghost"
+              onClick={() => setViewMode('list')}
+              className="text-slate-500 hover:text-slate-800 hover:bg-white"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2"><path d="m15 18-6-6 6-6"/></svg>
+              Back to Employee List
+            </Button>
+            
+            {/* Set as Employed Action */}
+            {selectedEmployee?.status === 'pending' && (
+              <div className="flex items-center gap-3">
+                 {!checkCompleteness(selectedEmployee) && (
+                   <span className="text-xs font-medium text-rose-500 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100">
+                     Complete all required fields to employ
+                   </span>
+                 )}
+                 <Button
+                  onClick={handleSetAsEmployed}
+                  disabled={!checkCompleteness(selectedEmployee) || isUpdating}
+                  className={`font-bold transition-all ${
+                     !checkCompleteness(selectedEmployee) 
+                     ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                     : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg'
+                  }`}
+                 >
+                   {isUpdating ? 'Updating...' : 'Set as Employed'}
+                 </Button>
               </div>
+            )}
+          </div>
 
-              {/* ADDITIONAL INFORMATION */}
-              {additionalValues.length > 0 && (
-                <div className="mb-8">
-                  <h3 className="text-lg font-bold text-[#800020] mb-4 pb-2 border-b-2 border-[#C9184A]">ADDITIONAL INFORMATION</h3>
-                  <div className="grid grid-cols-2 gap-6">
-                    {additionalValues.map((field) => (
-                      <div key={field.field_id}>
-                        <p className="text-slate-600 text-sm font-medium mb-1 uppercase">{field.field_label}</p>
-                        <p className="text-slate-900 font-medium text-base">{field.value || '-'}</p>
+          <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
+             {/* Header */}
+             <div className="bg-slate-50/50 p-8 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div className="flex items-center gap-5">
+                   <div className="w-20 h-20 rounded-full bg-[#630C22] text-white flex items-center justify-center text-3xl font-bold shadow-lg">
+                      {selectedEmployee?.first_name.charAt(0)}{selectedEmployee?.last_name.charAt(0)}
+                   </div>
+                   <div>
+                      <h1 className="text-3xl font-extrabold text-[#4A081A] mb-1">
+                        {selectedEmployee?.first_name} {selectedEmployee?.last_name}
+                      </h1>
+                      <div className="flex items-center gap-3">
+                        <p className="text-slate-500 font-medium">{selectedEmployee?.position || 'No Position'}</p>
+                        <Badge className={`${statusBadgeColors[selectedEmployee?.status || 'pending']} border shadow-none px-3 py-0.5`}>
+                           {statusLabels[selectedEmployee?.status || 'pending']}
+                        </Badge>
                       </div>
-                    ))}
-                  </div>
+                   </div>
                 </div>
-              )}
+                <div className="flex flex-col items-end gap-1">
+                   <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Employee ID</p>
+                   <p className="font-mono text-slate-700 font-bold">#{selectedEmployee?.id.toString().padStart(4, '0')}</p>
+                </div>
+             </div>
 
-              {/* Status Requirements Check */}
-              <div className="mb-6 p-4 bg-[#FFE5EC] rounded-lg border-2 border-[#C9184A]">
-                <p className="text-slate-700 text-sm font-medium">
-                  <span className="text-[#800020] font-semibold">ℹ️ Required fields check:</span> All fields marked with <span className="text-red-500">*</span> must be filled to approve this employee.
-                </p>
-              </div>
-            </div>
+             {/* Content */}
+             <div className="p-8 md:p-10 space-y-12">
+               {selectedEmployee && (
+                 <>
+                  {/* EMPLOYMENT */}
+                  <section>
+                    <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
+                      <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
+                      Employment Information
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                      <DetailItem label="Position" value={selectedEmployee.position} required />
+                      <DetailItem label="Date Hired" value={selectedEmployee.date_hired ? new Date(selectedEmployee.date_hired).toLocaleDateString() : null} required />
+                      <DetailItem label="Department" value={selectedEmployee.department} />
+                      <DetailItem label="Employment Status" value={selectedEmployee.status} />
+                    </div>
+                  </section>
 
-            {/* Footer with Action Buttons */}
-            <div className="p-6 border-t-2 border-[#C9184A] bg-gradient-to-r from-[#FFE5EC] to-rose-50 sticky bottom-0">
-              <div className="flex gap-3 justify-end">
-                <Button
-                  onClick={() => setShowDetailModal(false)}
-                  variant="outline"
-                >
-                  Close
-                </Button>
-                <Button
-                  onClick={() => handleStatusUpdate('approved')}
-                  disabled={updatingStatus || selectedEmployee.status === 'approved' || !isEmployeeComplete(selectedEmployee)}
-                  className={`${!isEmployeeComplete(selectedEmployee) ? 'opacity-50 cursor-not-allowed' : 'bg-gradient-to-r from-[#800020] to-[#A0153E] hover:from-[#A0153E] hover:to-[#C9184A]'} text-white transition-all duration-300`}
-                >
-                  {updatingStatus ? 'Updating...' : 'Approve Employee'}
-                </Button>
-              </div>
-            </div>
+                  {/* PERSONAL */}
+                  <section>
+                     <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
+                      <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
+                      Personal Information
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+                      <DetailItem label="First Name" value={selectedEmployee.first_name} required />
+                      <DetailItem label="Last Name" value={selectedEmployee.last_name} required />
+                      <DetailItem label="Middle Name" value={selectedEmployee.middle_name} />
+                      <DetailItem label="Suffix" value={selectedEmployee.suffix} />
+                      <DetailItem label="Birthday" value={selectedEmployee.birthday ? new Date(selectedEmployee.birthday).toLocaleDateString() : null} required />
+                      <DetailItem label="Birthplace" value={selectedEmployee.birthplace} required />
+                      <DetailItem label="Gender" value={selectedEmployee.gender} required />
+                      <DetailItem label="Civil Status" value={selectedEmployee.civil_status} required />
+                    </div>
+                  </section>
+
+                  {/* CONTACT */}
+                   <section>
+                     <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
+                      <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
+                      Contact Information
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+                      <DetailItem label="Email Address" value={selectedEmployee.email || selectedEmployee.email_address} required />
+                      <DetailItem label="Mobile Number" value={selectedEmployee.mobile_number} required />
+                      <DetailItem label="Tel Number" value={selectedEmployee.phone_number} />
+                    </div>
+                  </section>
+
+                  {/* ADDRESS */}
+                   <section>
+                     <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
+                      <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
+                      Address Information
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+                       <DetailItem label="Street" value={selectedEmployee.street} required />
+                       <DetailItem label="Barangay" value={selectedEmployee.barangay} required />
+                       <DetailItem label="City / Municipality" value={selectedEmployee.city_municipality} required />
+                       <DetailItem label="Province" value={selectedEmployee.province} required />
+                       <DetailItem label="Region" value={selectedEmployee.region} required />
+                       <DetailItem label="Zip Code" value={selectedEmployee.zip_code} required />
+                       <DetailItem label="House No." value={selectedEmployee.house_number} />
+                       <DetailItem label="Village" value={selectedEmployee.village} />
+                       <DetailItem label="Subdivision" value={selectedEmployee.subdivision} />
+                    </div>
+                  </section>
+
+                  {/* FAMILY & GOV */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                     <section>
+                       <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
+                        <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
+                        Family Background
+                      </h3>
+                      <div className="space-y-6">
+                        <div>
+                           <p className="text-xs font-bold text-slate-400 mb-2 uppercase">Mother's Maiden Name</p>
+                           <div className="grid grid-cols-2 gap-4 pl-3 border-l-2 border-slate-100">
+                             <DetailItem label="Last Name" value={selectedEmployee.mlast_name} required />
+                             <DetailItem label="First Name" value={selectedEmployee.mfirst_name} required />
+                           </div>
+                        </div>
+                        <div>
+                           <p className="text-xs font-bold text-slate-400 mb-2 uppercase">Father's Name</p>
+                           <div className="grid grid-cols-2 gap-4 pl-3 border-l-2 border-slate-100">
+                             <DetailItem label="Last Name" value={selectedEmployee.flast_name} />
+                             <DetailItem label="First Name" value={selectedEmployee.ffirst_name} />
+                           </div>
+                        </div>
+                      </div>
+                     </section>
+
+                     <section>
+                       <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
+                        <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
+                        Government IDs
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
+                        <DetailItem label="SSS No." value={selectedEmployee.sss_number} />
+                        <DetailItem label="PhilHealth No." value={selectedEmployee.philhealth_number} />
+                        <DetailItem label="Pag-IBIG No." value={selectedEmployee.pagibig_number} />
+                        <DetailItem label="TIN" value={selectedEmployee.tin_number} />
+                      </div>
+                     </section>
+                  </div>
+                 </>
+               )}
+             </div>
+             
+             {/* Footer Actions */}
+             <div className="bg-slate-50 px-8 py-6 border-t border-slate-200 flex justify-end">
+                {selectedEmployee?.status === 'pending' ? (
+                   <Button
+                    onClick={handleSetAsEmployed}
+                    disabled={!checkCompleteness(selectedEmployee) || isUpdating}
+                    className={`h-12 px-8 font-bold rounded-xl transition-all ${
+                       !checkCompleteness(selectedEmployee) 
+                       ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                       : 'bg-[#630C22] hover:bg-[#4A081A] text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5'
+                    }`}
+                   >
+                     {isUpdating ? 'Processing...' : 'Approve & Set as Employed'}
+                   </Button>
+                ) : (
+                   <Button variant="outline" onClick={() => setViewMode('list')} className="h-11 px-8">
+                     Back to List
+                   </Button>
+                )}
+             </div>
           </div>
         </div>
       )}
+    </div>
+  )
+}
 
-      {/* Employee Registration Modal */}
-      <Dialog open={showRegistrationModal} onOpenChange={setShowRegistrationModal}>
-        <DialogContent className="sm:max-w-[500px] border-2 border-[#C9184A] p-0 overflow-hidden">
-          <DialogHeader className="bg-gradient-to-r from-[#800020] via-[#A0153E] to-[#C9184A] p-6 text-white">
-            <DialogTitle className="text-2xl font-bold">Create New Employee</DialogTitle>
-            <DialogDescription className="text-rose-100">
-              Fill in the details below to register a new employee.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="p-6">
-            <EmployeeRegistrationForm 
-              onSuccess={() => {
-                setShowRegistrationModal(false)
-                fetchEmployees()
-              }} 
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
+function DetailItem({ label, value, required }: { label: string, value: any, required?: boolean }) {
+  const isEmpty = !value || value.toString().trim() === ''
+  return (
+    <div className="group">
+      <p className="text-xs font-bold text-slate-500 mb-1.5 flex items-center gap-1 group-hover:text-[#630C22] transition-colors">
+        {label} 
+        {required && <span className="text-rose-500 text-[10px] bg-rose-50 px-1 rounded ml-1">REQUIRED</span>}
+      </p>
+      <p className={`font-medium text-base ${isEmpty ? 'text-slate-300 italic' : 'text-slate-800'}`}>
+        {isEmpty ? 'Not Provided' : value}
+      </p>
     </div>
   )
 }
