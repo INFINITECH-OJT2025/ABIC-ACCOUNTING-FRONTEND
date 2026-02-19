@@ -493,8 +493,22 @@ export default function GovernmentDirectoryPage() {
           </div>
         </header>
         <main className="max-w-[1600px] mx-auto p-8">
-          <Card className="rounded-[2rem] border-none shadow-2xl bg-white p-10 text-center text-slate-600">
-            Loading directory data...
+          <Card className="rounded-[2rem] border-none shadow-2xl bg-white p-10">
+            <div className="mx-auto max-w-3xl text-center">
+              <div className="mx-auto mb-5 h-14 w-14 rounded-full border-4 border-[#a0153e]/20 border-t-[#a0153e] animate-spin" />
+              <p className="text-2xl font-black text-slate-900">Loading Directory</p>
+              <p className="mt-2 text-slate-600">Fetching agencies, contacts, and process steps...</p>
+              <div className="mt-6 space-y-3">
+                <div className="h-4 rounded-full bg-slate-200/80 animate-pulse" />
+                <div className="h-4 w-11/12 mx-auto rounded-full bg-slate-200/70 animate-pulse [animation-delay:120ms]" />
+                <div className="h-4 w-9/12 mx-auto rounded-full bg-slate-200/60 animate-pulse [animation-delay:240ms]" />
+              </div>
+              <div className="mt-7 flex items-center justify-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#a0153e]/80 animate-bounce" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#a0153e]/70 animate-bounce [animation-delay:140ms]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#a0153e]/60 animate-bounce [animation-delay:280ms]" />
+              </div>
+            </div>
           </Card>
         </main>
       </div>

@@ -400,7 +400,25 @@ export default function OnboardingChecklistPage() {
   }
 
   if (loading) {
-    return <div className="p-8 text-slate-600">Loading onboarding checklist...</div>
+    return (
+      <div className="min-h-screen bg-slate-50/50 p-8 font-sans">
+        <Card className="mx-auto mt-16 max-w-3xl rounded-[2rem] border-none shadow-2xl bg-white p-10 text-center">
+          <div className="mx-auto mb-5 h-14 w-14 rounded-full border-4 border-[#a0153e]/20 border-t-[#a0153e] animate-spin" />
+          <p className="text-2xl font-black text-slate-900">Loading Onboarding Checklist</p>
+          <p className="mt-2 text-slate-600">Preparing employee record and onboarding tasks...</p>
+          <div className="mt-6 space-y-3">
+            <div className="h-4 rounded-full bg-slate-200/80 animate-pulse" />
+            <div className="h-4 w-11/12 mx-auto rounded-full bg-slate-200/70 animate-pulse [animation-delay:120ms]" />
+            <div className="h-4 w-9/12 mx-auto rounded-full bg-slate-200/60 animate-pulse [animation-delay:240ms]" />
+          </div>
+          <div className="mt-7 flex items-center justify-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-[#a0153e]/80 animate-bounce" />
+            <span className="h-2.5 w-2.5 rounded-full bg-[#a0153e]/70 animate-bounce [animation-delay:140ms]" />
+            <span className="h-2.5 w-2.5 rounded-full bg-[#a0153e]/60 animate-bounce [animation-delay:280ms]" />
+          </div>
+        </Card>
+      </div>
+    )
   }
 
   if (error) {
