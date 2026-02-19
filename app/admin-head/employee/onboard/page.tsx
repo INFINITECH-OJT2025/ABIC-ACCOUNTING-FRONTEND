@@ -460,6 +460,20 @@ export default function OnboardPage() {
     })
   }
 
+  const toggleAllTasks = () => {
+    const allCompleted = onboardingTasks.every(task => completedTasks[task])
+    if (allCompleted) {
+      setCompletedTasks({})
+    } else {
+      const newTasks: {[key: string]: string} = {}
+      const now = new Date().toLocaleString()
+      onboardingTasks.forEach(task => {
+        newTasks[task] = now
+      })
+      setCompletedTasks(newTasks)
+    }
+  }
+
   const handleProgressionChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setProgressionFormData((prev) => ({
@@ -801,7 +815,15 @@ export default function OnboardPage() {
             <div className="grid grid-cols-[200px_120px_1fr] text-center font-bold bg-[#D1D5DB] text-sm uppercase">
               <div className="py-2 border-r-2 border-b-2 border-slate-400">Completed Date</div>
               <div className="py-2 border-r-2 border-b-2 border-slate-400">Status</div>
-              <div className="py-2 border-b-2 border-slate-400">Tasks</div>
+              <div className="py-2 border-b-2 border-slate-400 flex items-center justify-between px-4">
+                <span>Tasks</span>
+                <button 
+                  onClick={toggleAllTasks}
+                  className="text-xs normal-case bg-slate-200 hover:bg-slate-300 px-2 py-0.5 rounded border border-slate-400 transition-colors"
+                >
+                  {onboardingTasks.every(task => completedTasks[task]) ? 'Uncheck All' : 'Check All'}
+                </button>
+              </div>
             </div>
 
             {/* Task List */}
