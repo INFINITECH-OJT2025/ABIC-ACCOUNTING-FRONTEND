@@ -202,7 +202,7 @@ export default function AdminHeadSidebar() {
           {/* Forms Dropdown Menu (hover OR click) */}
           <div className={`${isCollapsed ? 'fixed left-20 top-auto ml-1 w-48 z-50' : 'ml-9 mt-1'} space-y-1 bg-[#7B0F2B]/95 rounded-lg p-2 border border-white/10 backdrop-blur-md transition-all duration-200 ${isFormsOpen ? 'block' : 'hidden'} group-hover:block`}>
             <Link
-              href="/admin-head/forms/clearance"
+              href="/admin-head/forms/clearance-checklist"
               className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/10 transition-all duration-150 text-xs font-medium text-red-50 hover:text-white"
             >
               <ClipboardCheck size={14} />
