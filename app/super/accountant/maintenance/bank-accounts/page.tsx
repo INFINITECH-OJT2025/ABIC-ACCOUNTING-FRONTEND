@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useMemo, useState, useEffect } from "react";
-import { Search, Grid, List, X, Inbox, Plus, Eye, Banknote } from "lucide-react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Search, X, Inbox, Plus, Eye, Banknote, ChevronDown } from "lucide-react";
 import SuccessModal from "@/components/ui/SuccessModal";
 import LoadingModal from "@/components/ui/LoadingModal";
 import FailModal from "@/components/ui/FailModal";
@@ -74,69 +75,72 @@ const EyeIcon = (props: any) => (
 
 // Reusable Pagination Component
 const Pagination = ({
-  totalPages,
+  paginationMeta,
   currentPage,
   setCurrentPage,
-  totalItems,
-  startIndex,
-  endIndex,
   itemName = "items",
 }: {
-  totalPages: number;
+  paginationMeta: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number;
+    to: number;
+  } | null;
   currentPage: number;
   setCurrentPage: (page: number | ((p: number) => number)) => void;
-  totalItems: number;
-  startIndex: number;
-  endIndex: number;
   itemName?: string;
 }) => {
-  if (totalPages <= 1) return null;
+  if (!paginationMeta || paginationMeta.total === 0) return null;
 
   return (
     <div className="flex items-center justify-between py-3 border-b" style={{ borderColor: BORDER }}>
       <div className="text-sm text-neutral-600">
-        Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} {itemName}
+        Showing {paginationMeta.from} to {paginationMeta.to} of {paginationMeta.total} {itemName}
       </div>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-          disabled={currentPage === 1}
-          className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-          style={{ borderColor: BORDER }}
-        >
-          Previous
-        </button>
-        <div className="flex items-center gap-1">
-          {[...Array(totalPages)].map((_, i) => {
-            const page = i + 1;
-            if (page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)) {
-              return (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium ${
-                    currentPage === page ? "bg-[#7a0f1f] text-white" : "border hover:bg-gray-50"
-                  }`}
-                  style={currentPage !== page ? { borderColor: BORDER } : undefined}
-                >
-                  {page}
-                </button>
-              );
-            } else if (page === currentPage - 2 || page === currentPage + 2) {
-              return <span key={page} className="px-2 text-neutral-500">...</span>;
-            }
-            return null;
-          })}
+      {paginationMeta.last_page > 1 && (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={paginationMeta.current_page === 1}
+            className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            style={{ borderColor: BORDER }}
+          >
+            Previous
+          </button>
+          <div className="flex items-center gap-1">
+            {[...Array(paginationMeta.last_page)].map((_, i) => {
+              const page = i + 1;
+              if (page === 1 || page === paginationMeta.last_page || (page >= paginationMeta.current_page - 1 && page <= paginationMeta.current_page + 1)) {
+                return (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+                      paginationMeta.current_page === page ? "bg-[#7a0f1f] text-white" : "border hover:bg-gray-50"
+                    }`}
+                    style={paginationMeta.current_page !== page ? { borderColor: BORDER } : undefined}
+                  >
+                    {page}
+                  </button>
+                );
+              } else if (page === paginationMeta.current_page - 2 || page === paginationMeta.current_page + 2) {
+                return <span key={page} className="px-2 text-neutral-500">...</span>;
+              }
+              return null;
+            })}
+          </div>
+          <button
+            onClick={() => setCurrentPage((p) => Math.min(paginationMeta.last_page, p + 1))}
+            disabled={paginationMeta.current_page === paginationMeta.last_page}
+            className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            style={{ borderColor: BORDER }}
+          >
+            Next
+          </button>
         </div>
-        <button
-          onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-          disabled={currentPage === totalPages}
-          className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-          style={{ borderColor: BORDER }}
-        >
-          Next
-        </button>
-      </div>
+      )}
     </div>
   );
 };
@@ -225,13 +229,27 @@ const BankAccountDetailSkeleton = () => (
 );
 
 export default function BankAccountsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ACTIVE" | "INACTIVE" | "CLOSED">("ACTIVE");
-  const [accountTypeFilter, setAccountTypeFilter] = useState<AccountType | "ALL">("ALL");
-  const [viewMode, setViewMode] = useState<"cards" | "table">("table");
-  const [currentPage, setCurrentPage] = useState(1);
+  
+  // Get initial values from URL params or defaults
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
+  const [statusFilter, setStatusFilter] = useState<"ACTIVE" | "INACTIVE">((searchParams.get("status") as "ACTIVE" | "INACTIVE") || "ACTIVE");
+  const [accountTypeFilter, setAccountTypeFilter] = useState<AccountType | "ALL">((searchParams.get("account_type") as AccountType | "ALL") || "ALL");
+  const [currentPage, setCurrentPage] = useState(parseInt(searchParams.get("page") || "1", 10));
+  const [sortBy, setSortBy] = useState<"date" | "name">((searchParams.get("sort_by") as "date" | "name") || "date");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">((searchParams.get("sort_order") as "asc" | "desc") || "desc");
+  const [paginationMeta, setPaginationMeta] = useState<{
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number;
+    to: number;
+  } | null>(null);
   const [showCreatePanel, setShowCreatePanel] = useState(false);
   const [createPanelClosing, setCreatePanelClosing] = useState(false);
   const [showCreateSuccess, setShowCreateSuccess] = useState(false);
@@ -276,15 +294,32 @@ export default function BankAccountsPage() {
     status: "ACTIVE" as AccountStatus,
   });
 
+  // Sync URL params when state changes
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (searchQuery) params.set("search", searchQuery);
+    if (statusFilter) params.set("status", statusFilter);
+    if (accountTypeFilter && accountTypeFilter !== "ALL") params.set("account_type", accountTypeFilter);
+    if (currentPage > 1) params.set("page", currentPage.toString());
+    if (sortBy !== "date") params.set("sort_by", sortBy);
+    if (sortOrder !== "desc") params.set("sort_order", sortOrder);
+    
+    const newUrl = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname;
+    router.replace(newUrl, { scroll: false });
+  }, [searchQuery, statusFilter, accountTypeFilter, currentPage, sortBy, sortOrder, router]);
+
   useEffect(() => {
     fetchBankAccounts();
+  }, [searchQuery, statusFilter, accountTypeFilter, currentPage, sortBy, sortOrder]);
+
+  useEffect(() => {
     fetchOwners();
     fetchBanks();
-  }, [searchQuery]);
+  }, []);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, accountTypeFilter, searchQuery, viewMode]);
+  }, [statusFilter, accountTypeFilter, searchQuery, sortBy, sortOrder]);
 
   const fetchBankAccounts = async () => {
     setLoading(true);
@@ -293,16 +328,43 @@ export default function BankAccountsPage() {
       if (searchQuery.trim()) {
         url.searchParams.append("search", searchQuery.trim());
       }
+      if (statusFilter) {
+        url.searchParams.append("status", statusFilter);
+      }
+      if (accountTypeFilter && accountTypeFilter !== "ALL") {
+        url.searchParams.append("account_type", accountTypeFilter);
+      }
+      url.searchParams.append("page", currentPage.toString());
+      url.searchParams.append("per_page", "10");
+      url.searchParams.append("sort_by", sortBy);
+      url.searchParams.append("sort_order", sortOrder);
+      
       const res = await fetch(url.toString());
       const data = await res.json();
       if (res.ok && data.success) {
         const accountsList = data.data?.data || data.data || [];
         setBankAccounts(Array.isArray(accountsList) ? accountsList : []);
+        
+        // Extract pagination metadata
+        if (data.data?.current_page !== undefined) {
+          setPaginationMeta({
+            current_page: data.data.current_page,
+            last_page: data.data.last_page,
+            per_page: data.data.per_page,
+            total: data.data.total,
+            from: data.data.from,
+            to: data.data.to,
+          });
+        } else {
+          setPaginationMeta(null);
+        }
       } else {
         setBankAccounts([]);
+        setPaginationMeta(null);
       }
     } catch {
       setBankAccounts([]);
+      setPaginationMeta(null);
     } finally {
       setLoading(false);
     }
@@ -329,11 +391,12 @@ export default function BankAccountsPage() {
   const fetchBanks = async () => {
     setLoadingBanks(true);
     try {
-      const res = await fetch("/api/accountant/maintenance/banks");
+      const res = await fetch("/api/accountant/maintenance/banks?per_page=all&status=ACTIVE");
       const data = await res.json();
       if (res.ok && data.success) {
-        const banksList = Array.isArray(data.data) ? data.data : [];
-        setBanks(banksList.filter((bank: Bank) => bank.status === "ACTIVE"));
+        // When per_page=all, backend returns data.data as array directly
+        const banksList = data.data?.data || data.data || [];
+        setBanks(Array.isArray(banksList) ? banksList : []);
       } else {
         setBanks([]);
       }
@@ -370,33 +433,6 @@ export default function BankAccountsPage() {
     );
   }, [banks, bankSearchQuery]);
 
-  const filteredBankAccounts = useMemo(() => {
-    let filtered = bankAccounts;
-    if (statusFilter) {
-      filtered = filtered.filter((account) => account.status === statusFilter);
-    }
-    if (accountTypeFilter && accountTypeFilter !== "ALL") {
-      filtered = filtered.filter((account) => account.account_type === accountTypeFilter);
-    }
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (account) =>
-          account.account_name?.toLowerCase().includes(q) ||
-          account.account_number?.toLowerCase().includes(q) ||
-          account.account_holder?.toLowerCase().includes(q) ||
-          account.owner?.name?.toLowerCase().includes(q) ||
-          account.bank?.name?.toLowerCase().includes(q)
-      );
-    }
-    return filtered;
-  }, [bankAccounts, searchQuery, statusFilter, accountTypeFilter]);
-
-  const itemsPerPage = viewMode === "table" ? 10 : 30;
-  const totalPages = Math.ceil(filteredBankAccounts.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedAccounts = filteredBankAccounts.slice(startIndex, endIndex);
 
   const openDetailDrawer = async (accountId: number) => {
     setDetailDrawerOpen(true);
@@ -739,17 +775,6 @@ export default function BankAccountsPage() {
               >
                 Inactive
               </button>
-              <button
-                onClick={() => setStatusFilter("CLOSED")}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  statusFilter === "CLOSED"
-                    ? "bg-[#7a0f1f] text-white"
-                    : "bg-white border text-gray-600 hover:bg-gray-50"
-                }`}
-                style={statusFilter !== "CLOSED" ? { borderColor: BORDER } : undefined}
-              >
-                Closed
-              </button>
               <span className="text-sm font-medium text-gray-700 ml-2">Type:</span>
               <button
                 onClick={() => setAccountTypeFilter("ALL")}
@@ -830,120 +855,48 @@ export default function BankAccountsPage() {
                   style={{ borderColor: BORDER, height: 40, color: "#111" }}
                 />
               </div>
-              <div className="flex rounded-md border" style={{ borderColor: BORDER }}>
-                <button
-                  onClick={() => setViewMode("cards")}
-                  className={`p-2 rounded-l-md ${viewMode === "cards" ? "bg-[#7a0f1f] text-white" : "text-gray-500 hover:text-gray-700"}`}
-                  title="Card View"
+
+              {/* Sort Dropdown */}
+              <div className="relative">
+                <select
+                  value={`${sortBy}-${sortOrder}`}
+                  onChange={(e) => {
+                    const [newSortBy, newSortOrder] = e.target.value.split('-') as [typeof sortBy, typeof sortOrder];
+                    setSortBy(newSortBy);
+                    setSortOrder(newSortOrder);
+                  }}
+                  className="appearance-none rounded-md border bg-white px-4 py-2 pr-8 text-sm outline-none cursor-pointer hover:bg-gray-50"
+                  style={{ borderColor: BORDER, height: 40, color: "#111" }}
                 >
-                  <Grid className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setViewMode("table")}
-                  className={`p-2 rounded-r-md ${viewMode === "table" ? "bg-[#7a0f1f] text-white" : "text-gray-500 hover:text-gray-700"}`}
-                  title="Table View"
-                >
-                  <List className="w-4 h-4" />
-                </button>
+                  <option value="date-desc">Date Promoted (Newest First)</option>
+                  <option value="date-asc">Date Promoted (Oldest First)</option>
+                  <option value="name-asc">Name (A-Z)</option>
+                  <option value="name-desc">Name (Z-A)</option>
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500 pointer-events-none" />
               </div>
             </div>
           </div>
 
           {/* Pagination at the top */}
-          {totalPages > 1 && (
+          {paginationMeta && (
             <Pagination
-              totalPages={totalPages}
+              paginationMeta={paginationMeta}
               currentPage={currentPage}
               setCurrentPage={setCurrentPage}
-              totalItems={filteredBankAccounts.length}
-              startIndex={startIndex}
-              endIndex={endIndex}
               itemName="accounts"
             />
           )}
 
           <div className="mt-4">
             {loading ? (
-              viewMode === "cards" ? (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" style={{ gridAutoRows: "min-content" }}>
-                  {[...Array(6)].map((_, i) => (
-                    <BankAccountCardSkeleton key={i} />
-                  ))}
-                </div>
-              ) : (
-                <BankAccountTableSkeleton />
-              )
-            ) : filteredBankAccounts.length === 0 ? (
+              <BankAccountTableSkeleton />
+            ) : bankAccounts.length === 0 ? (
               <div className="px-4 py-10 flex flex-col items-center justify-center text-center">
                 <Inbox className="w-16 h-16 text-gray-300 mx-auto mb-4" aria-hidden />
                 <div className="text-3xl font-bold text-[#5f0c18]">No data</div>
                 <div className="mt-2 text-xs text-neutral-800">Create a bank account or adjust your search.</div>
               </div>
-            ) : viewMode === "cards" ? (
-              <>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" style={{ gridAutoRows: "min-content" }}>
-                  {paginatedAccounts.map((account) => (
-                    <div
-                      key={account.id}
-                      className="rounded-md bg-white border shadow-sm p-4 hover:shadow-md transition-shadow"
-                      style={{ borderColor: BORDER }}
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-[#7a0f1f]/10 rounded-md flex items-center justify-center">
-                            <Banknote className="w-5 h-5 text-[#7a0f1f]" />
-                          </div>
-                          <div>
-                            <h3 className="font-semibold text-neutral-900">{account.account_name}</h3>
-                            <p className="text-sm text-neutral-600 mt-0.5">{account.owner?.name || "—"}</p>
-                            {account.bank && <p className="text-xs text-neutral-500 mt-0.5">{account.bank.name}</p>}
-                          </div>
-                        </div>
-                        <div
-                          className={`px-2 py-1 text-[11px] font-semibold rounded ${
-                            account.status === "ACTIVE" ? "bg-green-100 text-green-700" : 
-                            account.status === "CLOSED" ? "bg-red-100 text-red-700" : 
-                            "bg-gray-100 text-gray-700"
-                          }`}
-                        >
-                          {account.status}
-                        </div>
-                      </div>
-                      <div className="space-y-1 mb-3">
-                        <div className="flex justify-between text-xs">
-                          <span className="text-neutral-500">Type:</span>
-                          <span className="text-neutral-700 font-medium">{account.account_type}</span>
-                        </div>
-                        {account.account_number && (
-                          <div className="flex justify-between text-xs">
-                            <span className="text-neutral-500">Account #:</span>
-                            <span className="text-neutral-700">{account.account_number}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between text-sm">
-                          <span className="text-neutral-600">Opening Balance:</span>
-                          <span className="font-semibold text-neutral-900">{formatCurrency(account.opening_balance, account.currency)}</span>
-                        </div>
-                        <div className="flex justify-between text-xs">
-                          <span className="text-neutral-500">Opening Date:</span>
-                          <span className="text-neutral-700">{formatDate(account.opening_date)}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-end">
-                        <button
-                          onClick={() => openDetailDrawer(account.id)}
-                          className="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold text-white hover:opacity-95"
-                          style={{ background: "#7a0f1f", height: 32 }}
-                          title="View"
-                        >
-                          <EyeIcon />
-                          View
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
             ) : (
               <div>
                 <div className="rounded-md border bg-neutral-50 px-4 py-0 mb-3" style={{ borderColor: BORDER }}>
@@ -966,7 +919,7 @@ export default function BankAccountsPage() {
                   </div>
                 </div>
                 <div className="space-y-3">
-                  {paginatedAccounts.map((account) => (
+                  {bankAccounts.map((account) => (
                     <div
                       key={account.id}
                       className="rounded-md bg-white border shadow-sm p-4 hover:shadow-md transition-shadow"
@@ -1025,53 +978,6 @@ export default function BankAccountsPage() {
                     </div>
                   ))}
                 </div>
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-6 pt-4 border-t" style={{ borderColor: BORDER }}>
-                    <div className="text-sm text-neutral-600">
-                      Showing {startIndex + 1} to {Math.min(endIndex, filteredBankAccounts.length)} of {filteredBankAccounts.length} accounts
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                        disabled={currentPage === 1}
-                        className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                        style={{ borderColor: BORDER }}
-                      >
-                        Previous
-                      </button>
-                      <div className="flex items-center gap-1">
-                        {[...Array(totalPages)].map((_, i) => {
-                          const page = i + 1;
-                          if (page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)) {
-                            return (
-                              <button
-                                key={page}
-                                onClick={() => setCurrentPage(page)}
-                                className={`px-3 py-1.5 rounded-md text-sm font-medium ${
-                                  currentPage === page ? "bg-[#7a0f1f] text-white" : "border hover:bg-gray-50"
-                                }`}
-                                style={currentPage !== page ? { borderColor: BORDER } : undefined}
-                              >
-                                {page}
-                              </button>
-                            );
-                          } else if (page === currentPage - 2 || page === currentPage + 2) {
-                            return <span key={page} className="px-2 text-neutral-500">...</span>;
-                          }
-                          return null;
-                        })}
-                      </div>
-                      <button
-                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                        disabled={currentPage === totalPages}
-                        className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                        style={{ borderColor: BORDER }}
-                      >
-                        Next
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
           </div>

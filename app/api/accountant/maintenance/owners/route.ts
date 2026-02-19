@@ -12,6 +12,8 @@ export async function GET(req: Request) {
     const ownerType = searchParams.get("owner_type");
     const page = searchParams.get("page");
     const perPage = searchParams.get("per_page");
+    const sortBy = searchParams.get("sort_by");
+    const sortOrder = searchParams.get("sort_order");
 
     const backendUrl =
       process.env.BACKEND_URL ?? "http://127.0.0.1:8000";
@@ -31,6 +33,12 @@ export async function GET(req: Request) {
     }
     if (perPage) {
       url.searchParams.append("per_page", perPage);
+    }
+    if (sortBy) {
+      url.searchParams.append("sort_by", sortBy);
+    }
+    if (sortOrder) {
+      url.searchParams.append("sort_order", sortOrder);
     }
 
     const backendRes = await fetch(url.toString(), {

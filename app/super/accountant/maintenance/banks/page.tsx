@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState, useEffect } from "react";
-import { Search, Grid, List, X, Inbox, Plus, Eye, Banknote, Edit2, User } from "lucide-react";
+import { Search, Grid, List, X, Inbox, Plus, Eye, Banknote, Edit2, User, ChevronDown } from "lucide-react";
 import SuccessModal from "@/components/ui/SuccessModal";
 import LoadingModal from "@/components/ui/LoadingModal";
 import FailModal from "@/components/ui/FailModal";
@@ -128,69 +128,72 @@ const EyeIcon = (props: any) => (
 
 // Reusable Pagination Component
 const Pagination = ({
-  totalPages,
+  paginationMeta,
   currentPage,
   setCurrentPage,
-  totalItems,
-  startIndex,
-  endIndex,
   itemName = "items",
 }: {
-  totalPages: number;
+  paginationMeta: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number;
+    to: number;
+  } | null;
   currentPage: number;
   setCurrentPage: (page: number | ((p: number) => number)) => void;
-  totalItems: number;
-  startIndex: number;
-  endIndex: number;
   itemName?: string;
 }) => {
-  if (totalPages <= 1) return null;
+  if (!paginationMeta || paginationMeta.total === 0) return null;
 
   return (
     <div className="flex items-center justify-between py-3 border-b" style={{ borderColor: BORDER }}>
       <div className="text-sm text-neutral-600">
-        Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} {itemName}
+        Showing {paginationMeta.from} to {paginationMeta.to} of {paginationMeta.total} {itemName}
       </div>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-          disabled={currentPage === 1}
-          className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-          style={{ borderColor: BORDER }}
-        >
-          Previous
-        </button>
-        <div className="flex items-center gap-1">
-          {[...Array(totalPages)].map((_, i) => {
-            const page = i + 1;
-            if (page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)) {
-              return (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium ${
-                    currentPage === page ? "bg-[#7a0f1f] text-white" : "border hover:bg-gray-50"
-                  }`}
-                  style={currentPage !== page ? { borderColor: BORDER } : undefined}
-                >
-                  {page}
-                </button>
-              );
-            } else if (page === currentPage - 2 || page === currentPage + 2) {
-              return <span key={page} className="px-2 text-neutral-500">...</span>;
-            }
-            return null;
-          })}
+      {paginationMeta.last_page > 1 && (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={paginationMeta.current_page === 1}
+            className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            style={{ borderColor: BORDER }}
+          >
+            Previous
+          </button>
+          <div className="flex items-center gap-1">
+            {[...Array(paginationMeta.last_page)].map((_, i) => {
+              const page = i + 1;
+              if (page === 1 || page === paginationMeta.last_page || (page >= paginationMeta.current_page - 1 && page <= paginationMeta.current_page + 1)) {
+                return (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+                      paginationMeta.current_page === page ? "bg-[#7a0f1f] text-white" : "border hover:bg-gray-50"
+                    }`}
+                    style={paginationMeta.current_page !== page ? { borderColor: BORDER } : undefined}
+                  >
+                    {page}
+                  </button>
+                );
+              } else if (page === paginationMeta.current_page - 2 || page === paginationMeta.current_page + 2) {
+                return <span key={page} className="px-2 text-neutral-500">...</span>;
+              }
+              return null;
+            })}
+          </div>
+          <button
+            onClick={() => setCurrentPage((p) => Math.min(paginationMeta.last_page, p + 1))}
+            disabled={paginationMeta.current_page === paginationMeta.last_page}
+            className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            style={{ borderColor: BORDER }}
+          >
+            Next
+          </button>
         </div>
-        <button
-          onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-          disabled={currentPage === totalPages}
-          className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-          style={{ borderColor: BORDER }}
-        >
-          Next
-        </button>
-      </div>
+      )}
     </div>
   );
 };
@@ -202,6 +205,16 @@ export default function BanksPage() {
   const [statusFilter, setStatusFilter] = useState<"ACTIVE" | "INACTIVE">("ACTIVE");
   const [viewMode, setViewMode] = useState<"cards" | "table">("table");
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState<"date" | "name">("date");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [paginationMeta, setPaginationMeta] = useState<{
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number;
+    to: number;
+  } | null>(null);
   const [showCreatePanel, setShowCreatePanel] = useState(false);
   const [createPanelClosing, setCreatePanelClosing] = useState(false);
   const [showCreateSuccess, setShowCreateSuccess] = useState(false);
@@ -249,7 +262,7 @@ export default function BanksPage() {
 
   useEffect(() => {
     fetchBanks();
-  }, []);
+  }, [searchQuery, statusFilter, currentPage, viewMode, sortBy, sortOrder]);
 
   // Debounce bank name checking
   useEffect(() => {
@@ -278,42 +291,52 @@ export default function BanksPage() {
     return () => clearTimeout(timeoutId);
   }, [detailFormData.name, detailEditing, detailBank?.id]);
 
-  const filteredBanks = useMemo(() => {
-    let filtered = banks.filter((bank) => bank.status === statusFilter);
-    const q = searchQuery.trim().toLowerCase();
-    if (q) {
-      filtered = filtered.filter(
-        (bank) =>
-          bank.name?.toLowerCase().includes(q) ||
-          bank.short_name?.toLowerCase().includes(q) ||
-          bank.country?.toLowerCase().includes(q)
-      );
-    }
-    return filtered;
-  }, [banks, searchQuery, statusFilter]);
-
-  const itemsPerPage = viewMode === "table" ? 10 : 30;
-  const totalPages = Math.ceil(filteredBanks.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedBanks = filteredBanks.slice(startIndex, endIndex);
-
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, searchQuery, viewMode]);
+  }, [statusFilter, searchQuery, viewMode, sortBy, sortOrder]);
 
   const fetchBanks = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/accountant/maintenance/banks");
+      const url = new URL("/api/accountant/maintenance/banks", window.location.origin);
+      if (searchQuery.trim()) {
+        url.searchParams.append("search", searchQuery.trim());
+      }
+      if (statusFilter) {
+        url.searchParams.append("status", statusFilter);
+      }
+      const itemsPerPage = viewMode === "table" ? 10 : 30;
+      url.searchParams.append("page", currentPage.toString());
+      url.searchParams.append("per_page", itemsPerPage.toString());
+      url.searchParams.append("sort_by", sortBy);
+      url.searchParams.append("sort_order", sortOrder);
+      
+      const res = await fetch(url.toString());
       const data = await res.json();
-      if (res.ok && data.success && Array.isArray(data.data)) {
-        setBanks(data.data);
+      if (res.ok && data.success) {
+        const banksList = data.data?.data || data.data || [];
+        setBanks(Array.isArray(banksList) ? banksList : []);
+        
+        // Extract pagination metadata
+        if (data.data?.current_page !== undefined) {
+          setPaginationMeta({
+            current_page: data.data.current_page,
+            last_page: data.data.last_page,
+            per_page: data.data.per_page,
+            total: data.data.total,
+            from: data.data.from,
+            to: data.data.to,
+          });
+        } else {
+          setPaginationMeta(null);
+        }
       } else {
         setBanks([]);
+        setPaginationMeta(null);
       }
     } catch {
       setBanks([]);
+      setPaginationMeta(null);
     } finally {
       setLoading(false);
     }
@@ -780,34 +803,35 @@ export default function BanksPage() {
                   style={{ borderColor: BORDER, height: 40, color: "#111" }}
                 />
               </div>
-              <div className="flex rounded-md border" style={{ borderColor: BORDER }}>
-                <button
-                  onClick={() => setViewMode("cards")}
-                  className={`p-2 rounded-l-md ${viewMode === "cards" ? "bg-[#7a0f1f] text-white" : "text-gray-500 hover:text-gray-700"}`}
-                  title="Card View"
+
+              {/* Sort Dropdown */}
+              <div className="relative">
+                <select
+                  value={`${sortBy}-${sortOrder}`}
+                  onChange={(e) => {
+                    const [newSortBy, newSortOrder] = e.target.value.split('-') as [typeof sortBy, typeof sortOrder];
+                    setSortBy(newSortBy);
+                    setSortOrder(newSortOrder);
+                  }}
+                  className="appearance-none rounded-md border bg-white px-4 py-2 pr-8 text-sm outline-none cursor-pointer hover:bg-gray-50"
+                  style={{ borderColor: BORDER, height: 40, color: "#111" }}
                 >
-                  <Grid className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setViewMode("table")}
-                  className={`p-2 rounded-r-md ${viewMode === "table" ? "bg-[#7a0f1f] text-white" : "text-gray-500 hover:text-gray-700"}`}
-                  title="Table View"
-                >
-                  <List className="w-4 h-4" />
-                </button>
+                  <option value="date-desc">Date Created (Newest First)</option>
+                  <option value="date-asc">Date Created (Oldest First)</option>
+                  <option value="name-asc">Name (A-Z)</option>
+                  <option value="name-desc">Name (Z-A)</option>
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500 pointer-events-none" />
               </div>
             </div>
           </div>
 
           {/* Pagination at the top */}
-          {totalPages > 1 && (
+          {paginationMeta && (
             <Pagination
-              totalPages={totalPages}
+              paginationMeta={paginationMeta}
               currentPage={currentPage}
               setCurrentPage={setCurrentPage}
-              totalItems={filteredBanks.length}
-              startIndex={startIndex}
-              endIndex={endIndex}
               itemName="banks"
             />
           )}
@@ -823,7 +847,7 @@ export default function BanksPage() {
               ) : (
                 <BankTableSkeleton />
               )
-            ) : filteredBanks.length === 0 ? (
+            ) : banks.length === 0 ? (
               <div className="px-4 py-10 flex flex-col items-center justify-center text-center">
                 <Inbox className="w-16 h-16 text-gray-300 mx-auto mb-4" aria-hidden />
                 <div className="text-3xl font-bold text-[#5f0c18]">No data</div>
@@ -832,7 +856,7 @@ export default function BanksPage() {
             ) : viewMode === "cards" ? (
               <>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" style={{ gridAutoRows: "min-content" }}>
-                  {paginatedBanks.map((bank) => (
+                  {banks.map((bank) => (
                     <div
                       key={bank.id}
                       className="rounded-md bg-white border shadow-sm p-4 hover:shadow-md transition-shadow"
@@ -892,7 +916,7 @@ export default function BanksPage() {
                   </div>
                 </div>
                 <div className="space-y-3">
-                  {paginatedBanks.map((bank) => (
+                  {banks.map((bank) => (
                     <div
                       key={bank.id}
                       className="rounded-md bg-white border shadow-sm p-4 hover:shadow-md transition-shadow"

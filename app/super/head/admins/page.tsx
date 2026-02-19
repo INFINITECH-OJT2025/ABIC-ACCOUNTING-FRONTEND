@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { Search, Grid, List, X, Eye, Inbox, ArrowUp, ArrowDown } from "lucide-react";
+import { Search, X, Eye, Inbox, ArrowUp, ArrowDown, ChevronDown } from "lucide-react";
 import SuccessModal from "@/components/ui/SuccessModal";
 import LoadingModal from "@/components/ui/LoadingModal";
 import FailModal from "@/components/ui/FailModal";
@@ -97,69 +97,72 @@ const Icons = {
 
 // Reusable Pagination Component
 const Pagination = ({
-  totalPages,
+  paginationMeta,
   currentPage,
   setCurrentPage,
-  totalItems,
-  startIndex,
-  endIndex,
   itemName = "items",
 }: {
-  totalPages: number;
+  paginationMeta: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number;
+    to: number;
+  } | null;
   currentPage: number;
   setCurrentPage: (page: number | ((p: number) => number)) => void;
-  totalItems: number;
-  startIndex: number;
-  endIndex: number;
   itemName?: string;
 }) => {
-  if (totalPages <= 1) return null;
+  if (!paginationMeta || paginationMeta.total === 0) return null;
 
   return (
     <div className="flex items-center justify-between py-3 border-b" style={{ borderColor: BORDER }}>
       <div className="text-sm text-neutral-600">
-        Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} {itemName}
+        Showing {paginationMeta.from} to {paginationMeta.to} of {paginationMeta.total} {itemName}
       </div>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-          disabled={currentPage === 1}
-          className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-          style={{ borderColor: BORDER }}
-        >
-          Previous
-        </button>
-        <div className="flex items-center gap-1">
-          {[...Array(totalPages)].map((_, i) => {
-            const page = i + 1;
-            if (page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)) {
-              return (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium ${
-                    currentPage === page ? "bg-[#7a0f1f] text-white" : "border hover:bg-gray-50"
-                  }`}
-                  style={currentPage !== page ? { borderColor: BORDER } : undefined}
-                >
-                  {page}
-                </button>
-              );
-            } else if (page === currentPage - 2 || page === currentPage + 2) {
-              return <span key={page} className="px-2 text-neutral-500">...</span>;
-            }
-            return null;
-          })}
+      {paginationMeta.last_page > 1 && (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={paginationMeta.current_page === 1}
+            className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            style={{ borderColor: BORDER }}
+          >
+            Previous
+          </button>
+          <div className="flex items-center gap-1">
+            {[...Array(paginationMeta.last_page)].map((_, i) => {
+              const page = i + 1;
+              if (page === 1 || page === paginationMeta.last_page || (page >= paginationMeta.current_page - 1 && page <= paginationMeta.current_page + 1)) {
+                return (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+                      paginationMeta.current_page === page ? "bg-[#7a0f1f] text-white" : "border hover:bg-gray-50"
+                    }`}
+                    style={paginationMeta.current_page !== page ? { borderColor: BORDER } : undefined}
+                  >
+                    {page}
+                  </button>
+                );
+              } else if (page === paginationMeta.current_page - 2 || page === paginationMeta.current_page + 2) {
+                return <span key={page} className="px-2 text-neutral-500">...</span>;
+              }
+              return null;
+            })}
+          </div>
+          <button
+            onClick={() => setCurrentPage((p) => Math.min(paginationMeta.last_page, p + 1))}
+            disabled={paginationMeta.current_page === paginationMeta.last_page}
+            className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            style={{ borderColor: BORDER }}
+          >
+            Next
+          </button>
         </div>
-        <button
-          onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-          disabled={currentPage === totalPages}
-          className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-          style={{ borderColor: BORDER }}
-        >
-          Next
-        </button>
-      </div>
+      )}
     </div>
   );
 };
@@ -174,8 +177,17 @@ export default function ManagementPage() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [showCreateSuccess, setShowCreateSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState("accounts");
-  const [viewMode, setViewMode] = useState<"cards" | "table">("table");
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState<"date" | "name">("date");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [paginationMeta, setPaginationMeta] = useState<{
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number;
+    to: number;
+  } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [showEditSuccess, setShowEditSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -185,12 +197,21 @@ export default function ManagementPage() {
   // Fetch admin accounts
   React.useEffect(() => {
     fetchAdminAccounts();
-  }, []);
+  }, [query, currentPage, sortBy, sortOrder]);
 
   async function fetchAdminAccounts() {
     setIsLoading(true);
     try {
-      const response = await fetch('/api/admin/accounts', {
+      const url = new URL('/api/admin/accounts', window.location.origin);
+      if (query.trim()) {
+        url.searchParams.append('search', query.trim());
+      }
+      url.searchParams.append('page', currentPage.toString());
+      url.searchParams.append('per_page', '10');
+      url.searchParams.append('sort_by', sortBy);
+      url.searchParams.append('sort_order', sortOrder);
+
+      const response = await fetch(url.toString(), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -204,6 +225,20 @@ export default function ManagementPage() {
       const data = await response.json();
       if (data.success && data.data?.data) {
         setAccounts(data.data.data);
+        
+        // Store pagination metadata
+        if (data.data?.current_page !== undefined) {
+          setPaginationMeta({
+            current_page: data.data.current_page || 1,
+            last_page: data.data.last_page || 1,
+            per_page: data.data.per_page || 10,
+            total: data.data.total || 0,
+            from: data.data.from || 0,
+            to: data.data.to || 0,
+          });
+        } else {
+          setPaginationMeta(null);
+        }
       }
     } catch (error) {
       console.error('Error fetching admin accounts:', error);
@@ -343,42 +378,9 @@ export default function ManagementPage() {
     }
   };
 
-  React.useEffect(() => {
-    const fetchAccounts = async () => {
-      try {
-        const res = await fetch("/api/admin/accounts");
-        const data = await res.json();
-        if (res.ok && data.success) setAccounts(data.data?.data || []);
-      } catch {
-        setError("Network error");
-      }
-    };
-    fetchAccounts();
-  }, []);
-
-  const filtered = useMemo(() => {
-    let filtered = accounts;
-    const q = query.trim().toLowerCase();
-    if (q) {
-      filtered = filtered.filter(
-        (a) =>
-          a.name.toLowerCase().includes(q) ||
-          a.email.toLowerCase().includes(q) ||
-          a.status.toLowerCase().includes(q)
-      );
-    }
-    return filtered;
-  }, [accounts, query]);
-
-  const itemsPerPage = viewMode === "table" ? 10 : 30;
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedAdmins = filtered.slice(startIndex, endIndex);
-
   useEffect(() => {
     setCurrentPage(1);
-  }, [query, viewMode]);
+  }, [query, sortBy, sortOrder]);
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -802,81 +804,101 @@ export default function ManagementPage() {
                       />
                     </div>
 
-                    <div className="flex rounded-md border" style={{ borderColor: BORDER }}>
-                      <button
-                        onClick={() => setViewMode("cards")}
-                        className={`p-2 rounded-l-md ${viewMode === "cards" ? "bg-[#7a0f1f] text-white" : "text-gray-500 hover:text-gray-700"}`}
-                        title="Card View"
+                    {/* Sort Dropdown */}
+                    <div className="relative">
+                      <select
+                        value={`${sortBy}-${sortOrder}`}
+                        onChange={(e) => {
+                          const [newSortBy, newSortOrder] = e.target.value.split('-') as [typeof sortBy, typeof sortOrder];
+                          setSortBy(newSortBy);
+                          setSortOrder(newSortOrder);
+                        }}
+                        className="appearance-none rounded-md border bg-white px-4 py-2 pr-8 text-sm outline-none cursor-pointer hover:bg-gray-50"
+                        style={{ borderColor: BORDER, height: 40, color: "#111" }}
                       >
-                        <Grid className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setViewMode("table")}
-                        className={`p-2 rounded-r-md ${viewMode === "table" ? "bg-[#7a0f1f] text-white" : "text-gray-500 hover:text-gray-700"}`}
-                        title="Table View"
-                      >
-                        <List className="w-4 h-4" />
-                      </button>
+                        <option value="date-desc">Date Promoted (Newest First)</option>
+                        <option value="date-asc">Date Promoted (Oldest First)</option>
+                        <option value="name-asc">Alphabetical (A-Z)</option>
+                        <option value="name-desc">Alphabetical (Z-A)</option>
+                      </select>
+                      <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500 pointer-events-none" />
                     </div>
                   </div>
                 </div>
 
                 {/* Pagination at the top */}
-                {totalPages > 1 && (
+                {paginationMeta && (
                   <Pagination
-                    totalPages={totalPages}
+                    paginationMeta={paginationMeta}
                     currentPage={currentPage}
                     setCurrentPage={setCurrentPage}
-                    totalItems={filtered.length}
-                    startIndex={startIndex}
-                    endIndex={endIndex}
                     itemName="admins"
                   />
                 )}
 
                 <div className="mt-4">
                   {isLoading ? (
-                    viewMode === "cards" ? (
-                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" style={{ gridAutoRows: 'min-content' }}>
-                            {[...Array(6)].map((_, index) => (
-                              <AdminCardSkeleton key={index} />
-                            ))}
+                    <AdminTableSkeleton />
+                  ) : accounts.length === 0 ? (
+                    <div className="px-4 py-10 flex flex-col items-center justify-center text-center">
+                      <Inbox className="w-16 h-16 text-gray-300 mx-auto mb-4" aria-hidden />
+                      <div className="text-3xl font-bold text-[#5f0c18]">No data</div>
+                      <div className="mt-2 text-xs text-neutral-800">Create a record or adjust your search.</div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="rounded-md border bg-neutral-50 px-4 py-0 mb-3" style={{ borderColor: BORDER }}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4 flex-1 min-w-0">
+                            <div className="w-12 h-12 shrink-0"></div>
+                            <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-2 gap-2 text-sm font-bold text-neutral-900">
+                              <div>Account Name</div>
+                              <div>Email</div>
+                            </div>
                           </div>
-                        ) : (
-                          <AdminTableSkeleton />
-                        )
-                      ) : filtered.length === 0 ? (
-                        <div className="px-4 py-10 flex flex-col items-center justify-center text-center">
-                          <Inbox className="w-16 h-16 text-gray-300 mx-auto mb-4" aria-hidden />
-                          <div className="text-3xl font-bold text-[#5f0c18]">No data</div>
-                          <div className="mt-2 text-xs text-neutral-800">Create a record or adjust your search.</div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="text-right text-sm font-bold text-neutral-900 w-20">Promoted</div>
+                            <div className="text-sm font-bold text-neutral-900 w-20">Status</div>
+                            <div className="w-20"></div>
+                          </div>
                         </div>
-                    ) : viewMode === "cards" ? (
-                      <>
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" style={{ gridAutoRows: 'min-content' }}>
-                          {paginatedAdmins.map((a) => (
-                            <div
-                              key={a.id}
-                              className="rounded-md bg-white border shadow-sm p-4 hover:shadow-md transition-shadow"
-                              style={{ borderColor: BORDER }}
-                            >
-                              <div className="flex items-start justify-between mb-3">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 rounded-md bg-[#7a0f1f]/10 flex items-center justify-center">
-                                    <span className="text-sm font-semibold text-[#7a0f1f]">
-                                      {a.name.charAt(0).toUpperCase()}
-                                    </span>
+                      </div>
+                      <div className="space-y-3">
+                        {accounts.map((a) => (
+                          <div
+                            key={a.id}
+                            className="rounded-md bg-white border shadow-sm p-4 hover:shadow-md transition-shadow"
+                            style={{ borderColor: BORDER }}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-4 flex-1 min-w-0">
+                                <div className="w-12 h-12 rounded-md bg-[#7a0f1f]/10 flex items-center justify-center shrink-0">
+                                  <span className="text-base font-semibold text-[#7a0f1f]">{a.name.charAt(0).toUpperCase()}</span>
+                                </div>
+                                <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-2 gap-2">
+                                  <div className="min-w-0">
+                                    <div className="font-semibold text-neutral-900 truncate">{a.name}</div>
+                                    <div className="text-xs text-neutral-500 mt-0.5">Account Name</div>
                                   </div>
-                                  <div>
-                                    <h3 className="font-semibold text-neutral-900">{a.name}</h3>
-                                    <p className="text-sm text-neutral-600">{a.email}</p>
+                                  <div className="min-w-0">
+                                    <div className="text-sm text-neutral-900 truncate">{a.email}</div>
+                                    <div className="text-xs text-neutral-500 mt-0.5">Email</div>
                                   </div>
                                 </div>
                               </div>
-                              
-                              <div className="flex items-center justify-between">
-                                <div className="text-[11px] text-neutral-500">
-                                  Promoted on: {a.promoted_at ? formatDate(a.promoted_at) : '—'}
+                              <div className="flex items-center gap-3 shrink-0">
+                                <div className="text-right">
+                                  <div className="text-xs text-neutral-500 mb-1">Promoted</div>
+                                  <div className="text-xs text-neutral-700">{a.promoted_at ? formatDate(a.promoted_at) : "—"}</div>
+                                </div>
+                                <div
+                                  className={`px-3 py-1.5 rounded-md text-xs font-semibold ${
+                                    a.status === "Active" ? "bg-green-100 text-green-700" :
+                                    a.status === "Suspended" ? "bg-red-100 text-red-700" :
+                                    "bg-gray-100 text-gray-700"
+                                  }`}
+                                >
+                                  {a.status}
                                 </div>
                                 <button
                                   onClick={() => openEditPanel(a)}
@@ -890,81 +912,11 @@ export default function ManagementPage() {
                                 </button>
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      </>
-                      ) : (
-                        <div>
-                          <div className="rounded-md border bg-neutral-50 px-4 py-0 mb-3" style={{ borderColor: BORDER }}>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-4 flex-1 min-w-0">
-                                <div className="w-12 h-12 shrink-0"></div>
-                                <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-2 gap-2 text-sm font-bold text-neutral-900">
-                                  <div>Account Name</div>
-                                  <div>Email</div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-3 shrink-0">
-                                <div className="text-right text-sm font-bold text-neutral-900 w-20">Promoted</div>
-                                <div className="text-sm font-bold text-neutral-900 w-20">Status</div>
-                                <div className="w-20"></div>
-                              </div>
-                            </div>
                           </div>
-                          <div className="space-y-3">
-                            {paginatedAdmins.map((a) => (
-                            <div
-                              key={a.id}
-                              className="rounded-md bg-white border shadow-sm p-4 hover:shadow-md transition-shadow"
-                              style={{ borderColor: BORDER }}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-4 flex-1 min-w-0">
-                                  <div className="w-12 h-12 rounded-md bg-[#7a0f1f]/10 flex items-center justify-center shrink-0">
-                                    <span className="text-base font-semibold text-[#7a0f1f]">{a.name.charAt(0).toUpperCase()}</span>
-                                  </div>
-                                  <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-2 gap-2">
-                                    <div className="min-w-0">
-                                      <div className="font-semibold text-neutral-900 truncate">{a.name}</div>
-                                      <div className="text-xs text-neutral-500 mt-0.5">Account Name</div>
-                                    </div>
-                                    <div className="min-w-0">
-                                      <div className="text-sm text-neutral-900 truncate">{a.email}</div>
-                                      <div className="text-xs text-neutral-500 mt-0.5">Email</div>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-3 shrink-0">
-                                  <div className="text-right">
-                                    <div className="text-xs text-neutral-500 mb-1">Promoted</div>
-                                    <div className="text-xs text-neutral-700">{a.promoted_at ? formatDate(a.promoted_at) : "—"}</div>
-                                  </div>
-                                  <div
-                                    className={`px-3 py-1.5 rounded-md text-xs font-semibold ${
-                                      a.status === "Active" ? "bg-green-100 text-green-700" :
-                                      a.status === "Suspended" ? "bg-red-100 text-red-700" :
-                                      "bg-gray-100 text-gray-700"
-                                    }`}
-                                  >
-                                    {a.status}
-                                  </div>
-                                  <button
-                                    onClick={() => openEditPanel(a)}
-                                    className="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold text-white hover:opacity-95"
-                                    style={{ background: "#7a0f1f", height: 32 }}
-                                    title="View"
-                                    aria-label="View"
-                                  >
-                                    <Icons.Eye />
-                                    View
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                          </div>
-                        </div>
-                      )}
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </section>
             )}

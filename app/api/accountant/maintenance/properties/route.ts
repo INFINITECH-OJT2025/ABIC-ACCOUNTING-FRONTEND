@@ -14,14 +14,34 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search");
+    const status = searchParams.get("status");
+    const propertyType = searchParams.get("property_type");
+    const page = searchParams.get("page");
     const perPage = searchParams.get("per_page");
+    const sortBy = searchParams.get("sort_by");
+    const sortOrder = searchParams.get("sort_order");
 
     const url = new URL(`${backendUrl}/api/accountant/maintenance/properties`);
     if (search) {
       url.searchParams.append("search", search);
     }
+    if (status) {
+      url.searchParams.append("status", status);
+    }
+    if (propertyType) {
+      url.searchParams.append("property_type", propertyType);
+    }
+    if (page) {
+      url.searchParams.append("page", page);
+    }
     if (perPage) {
       url.searchParams.append("per_page", perPage);
+    }
+    if (sortBy) {
+      url.searchParams.append("sort_by", sortBy);
+    }
+    if (sortOrder) {
+      url.searchParams.append("sort_order", sortOrder);
     }
 
     const res = await fetch(url.toString(), {

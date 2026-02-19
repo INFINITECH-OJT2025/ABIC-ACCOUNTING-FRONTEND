@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useMemo, useState, useEffect } from "react";
-import { Search, Grid, List, X, Inbox, Plus, Eye, User, Edit2, Building2 } from "lucide-react";
+import { Search, Grid, List, X, Inbox, Plus, Eye, User, Edit2, Building2, ChevronDown } from "lucide-react";
 import SuccessModal from "@/components/ui/SuccessModal";
 import LoadingModal from "@/components/ui/LoadingModal";
 import FailModal from "@/components/ui/FailModal";
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
 
-type OwnerType = "COMPANY" | "CLIENT" | "EMPLOYEE" | "INDIVIDUAL" | "PARTNER" | "PROPERTY" | "PROJECT";
+type OwnerType = "COMPANY" | "CLIENT" | "EMPLOYEE" | "INDIVIDUAL" | "MAIN" | "PARTNER" | "PROPERTY" | "PROJECT";
 type OwnerStatus = "active" | "inactive" | "archived";
 
 type Owner = {
@@ -120,53 +120,55 @@ const Pagination = ({
   setCurrentPage: (page: number | ((p: number) => number)) => void;
   itemName?: string;
 }) => {
-  if (!paginationMeta || paginationMeta.last_page <= 1) return null;
+  if (!paginationMeta || paginationMeta.total === 0) return null;
 
   return (
     <div className="flex items-center justify-between py-3 border-b" style={{ borderColor: BORDER }}>
       <div className="text-sm text-neutral-600">
         Showing {paginationMeta.from} to {paginationMeta.to} of {paginationMeta.total} {itemName}
       </div>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-          disabled={paginationMeta.current_page === 1}
-          className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-          style={{ borderColor: BORDER }}
-        >
-          Previous
-        </button>
-        <div className="flex items-center gap-1">
-          {[...Array(paginationMeta.last_page)].map((_, i) => {
-            const page = i + 1;
-            if (page === 1 || page === paginationMeta.last_page || (page >= paginationMeta.current_page - 1 && page <= paginationMeta.current_page + 1)) {
-              return (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium ${
-                    paginationMeta.current_page === page ? "bg-[#7a0f1f] text-white" : "border hover:bg-gray-50"
-                  }`}
-                  style={paginationMeta.current_page !== page ? { borderColor: BORDER } : undefined}
-                >
-                  {page}
-                </button>
-              );
-            } else if (page === paginationMeta.current_page - 2 || page === paginationMeta.current_page + 2) {
-              return <span key={page} className="px-2 text-neutral-500">...</span>;
-            }
-            return null;
-          })}
+      {paginationMeta.last_page > 1 && (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={paginationMeta.current_page === 1}
+            className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            style={{ borderColor: BORDER }}
+          >
+            Previous
+          </button>
+          <div className="flex items-center gap-1">
+            {[...Array(paginationMeta.last_page)].map((_, i) => {
+              const page = i + 1;
+              if (page === 1 || page === paginationMeta.last_page || (page >= paginationMeta.current_page - 1 && page <= paginationMeta.current_page + 1)) {
+                return (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+                      paginationMeta.current_page === page ? "bg-[#7a0f1f] text-white" : "border hover:bg-gray-50"
+                    }`}
+                    style={paginationMeta.current_page !== page ? { borderColor: BORDER } : undefined}
+                  >
+                    {page}
+                  </button>
+                );
+              } else if (page === paginationMeta.current_page - 2 || page === paginationMeta.current_page + 2) {
+                return <span key={page} className="px-2 text-neutral-500">...</span>;
+              }
+              return null;
+            })}
+          </div>
+          <button
+            onClick={() => setCurrentPage((p) => Math.min(paginationMeta.last_page, p + 1))}
+            disabled={paginationMeta.current_page === paginationMeta.last_page}
+            className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            style={{ borderColor: BORDER }}
+          >
+            Next
+          </button>
         </div>
-        <button
-          onClick={() => setCurrentPage((p) => Math.min(paginationMeta.last_page, p + 1))}
-          disabled={paginationMeta.current_page === paginationMeta.last_page}
-          className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-          style={{ borderColor: BORDER }}
-        >
-          Next
-        </button>
-      </div>
+      )}
     </div>
   );
 };
@@ -237,6 +239,8 @@ export default function OwnersPage() {
   const [ownerTypeFilter, setOwnerTypeFilter] = useState<OwnerType | "ALL">("ALL");
   const [viewMode, setViewMode] = useState<"cards" | "table">("table");
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState<"date" | "name">("date");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [paginationMeta, setPaginationMeta] = useState<{
     current_page: number;
     last_page: number;
@@ -299,7 +303,7 @@ export default function OwnersPage() {
 
   useEffect(() => {
     fetchOwners();
-  }, [searchQuery, statusFilter, ownerTypeFilter, currentPage]);
+  }, [searchQuery, statusFilter, ownerTypeFilter, currentPage, sortBy, sortOrder]);
 
   useEffect(() => {
     fetchProperties();
@@ -365,7 +369,7 @@ export default function OwnersPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, ownerTypeFilter, searchQuery]);
+  }, [statusFilter, ownerTypeFilter, searchQuery, sortBy, sortOrder]);
 
   const fetchOwners = async () => {
     setLoading(true);
@@ -382,6 +386,8 @@ export default function OwnersPage() {
       }
       url.searchParams.append("page", currentPage.toString());
       url.searchParams.append("per_page", viewMode === "table" ? "10" : "30");
+      url.searchParams.append("sort_by", sortBy);
+      url.searchParams.append("sort_order", sortOrder);
 
       const res = await fetch(url.toString());
       const data = await res.json();
@@ -890,17 +896,6 @@ export default function OwnersPage() {
                 All
               </button>
               <button
-                onClick={() => setOwnerTypeFilter("INDIVIDUAL")}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  ownerTypeFilter === "INDIVIDUAL"
-                    ? "bg-[#7a0f1f] text-white"
-                    : "bg-white border text-gray-600 hover:bg-gray-50"
-                }`}
-                style={ownerTypeFilter !== "INDIVIDUAL" ? { borderColor: BORDER } : undefined}
-              >
-                Individual
-              </button>
-              <button
                 onClick={() => setOwnerTypeFilter("COMPANY")}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   ownerTypeFilter === "COMPANY"
@@ -910,17 +905,6 @@ export default function OwnersPage() {
                 style={ownerTypeFilter !== "COMPANY" ? { borderColor: BORDER } : undefined}
               >
                 Company
-              </button>
-              <button
-                onClick={() => setOwnerTypeFilter("CLIENT")}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  ownerTypeFilter === "CLIENT"
-                    ? "bg-[#7a0f1f] text-white"
-                    : "bg-white border text-gray-600 hover:bg-gray-50"
-                }`}
-                style={ownerTypeFilter !== "CLIENT" ? { borderColor: BORDER } : undefined}
-              >
-                Client
               </button>
               <button
                 onClick={() => setOwnerTypeFilter("EMPLOYEE")}
@@ -934,15 +918,26 @@ export default function OwnersPage() {
                 Employee
               </button>
               <button
-                onClick={() => setOwnerTypeFilter("PARTNER")}
+                onClick={() => setOwnerTypeFilter("INDIVIDUAL")}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  ownerTypeFilter === "PARTNER"
+                  ownerTypeFilter === "INDIVIDUAL"
                     ? "bg-[#7a0f1f] text-white"
                     : "bg-white border text-gray-600 hover:bg-gray-50"
                 }`}
-                style={ownerTypeFilter !== "PARTNER" ? { borderColor: BORDER } : undefined}
+                style={ownerTypeFilter !== "INDIVIDUAL" ? { borderColor: BORDER } : undefined}
               >
-                Partner
+                Individual
+              </button>
+              <button
+                onClick={() => setOwnerTypeFilter("MAIN")}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  ownerTypeFilter === "MAIN"
+                    ? "bg-[#7a0f1f] text-white"
+                    : "bg-white border text-gray-600 hover:bg-gray-50"
+                }`}
+                style={ownerTypeFilter !== "MAIN" ? { borderColor: BORDER } : undefined}
+              >
+                Main
               </button>
               <button
                 onClick={() => setOwnerTypeFilter("PROPERTY")}
@@ -990,27 +985,31 @@ export default function OwnersPage() {
                   style={{ borderColor: BORDER, height: 40, color: "#111" }}
                 />
               </div>
-              <div className="flex rounded-md border" style={{ borderColor: BORDER }}>
-                <button
-                  onClick={() => setViewMode("cards")}
-                  className={`p-2 rounded-l-md ${viewMode === "cards" ? "bg-[#7a0f1f] text-white" : "text-gray-500 hover:text-gray-700"}`}
-                  title="Card View"
+
+              {/* Sort Dropdown */}
+              <div className="relative">
+                <select
+                  value={`${sortBy}-${sortOrder}`}
+                  onChange={(e) => {
+                    const [newSortBy, newSortOrder] = e.target.value.split('-') as [typeof sortBy, typeof sortOrder];
+                    setSortBy(newSortBy);
+                    setSortOrder(newSortOrder);
+                  }}
+                  className="appearance-none rounded-md border bg-white px-4 py-2 pr-8 text-sm outline-none cursor-pointer hover:bg-gray-50"
+                  style={{ borderColor: BORDER, height: 40, color: "#111" }}
                 >
-                  <Grid className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setViewMode("table")}
-                  className={`p-2 rounded-r-md ${viewMode === "table" ? "bg-[#7a0f1f] text-white" : "text-gray-500 hover:text-gray-700"}`}
-                  title="Table View"
-                >
-                  <List className="w-4 h-4" />
-                </button>
+                  <option value="date-desc">Date Created (Newest First)</option>
+                  <option value="date-asc">Date Created (Oldest First)</option>
+                  <option value="name-asc">Name (A-Z)</option>
+                  <option value="name-desc">Name (Z-A)</option>
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500 pointer-events-none" />
               </div>
             </div>
           </div>
 
           {/* Pagination at the top */}
-          {paginationMeta && paginationMeta.last_page > 1 && (
+          {paginationMeta && (
             <Pagination
               paginationMeta={paginationMeta}
               currentPage={currentPage}
@@ -1195,10 +1194,9 @@ export default function OwnersPage() {
                       style={{ borderColor: BORDER }}
                     >
                       <option value="COMPANY">Company</option>
-                      <option value="CLIENT">Client</option>
                       <option value="EMPLOYEE">Employee</option>
                       <option value="INDIVIDUAL">Individual</option>
-                      <option value="PARTNER">Partner</option>
+                      <option value="MAIN">Main</option>
                       <option value="PROPERTY">Property</option>
                       <option value="PROJECT">Project</option>
                     </select>
@@ -1356,10 +1354,9 @@ export default function OwnersPage() {
                             style={{ borderColor: BORDER }}
                           >
                             <option value="COMPANY">Company</option>
-                            <option value="CLIENT">Client</option>
                             <option value="EMPLOYEE">Employee</option>
                             <option value="INDIVIDUAL">Individual</option>
-                            <option value="PARTNER">Partner</option>
+                            <option value="MAIN">Main</option>
                             <option value="PROPERTY">Property</option>
                             <option value="PROJECT">Project</option>
                           </select>
