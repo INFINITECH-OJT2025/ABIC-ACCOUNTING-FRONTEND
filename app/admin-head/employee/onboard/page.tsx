@@ -1,10 +1,15 @@
 "use client"
 
-import React, { useEffect, useState, Suspense } from 'react'
+import React, { useEffect, useState, Suspense, useMemo } from 'react'
+import { cn } from '@/lib/utils'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { getApiUrl } from '@/lib/api'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow
+} from "@/components/ui/table"
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
@@ -23,7 +28,11 @@ import {
   ChevronDown,
   ChevronUp,
   PlusCircle,
-  AlertCircle
+  AlertCircle,
+  ClipboardList,
+  Save,
+  Check,
+  Loader2
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmationModal } from '@/components/ConfirmationModal'
@@ -78,6 +87,7 @@ function OnboardPageContent() {
     raw_date: string
   } | null>(null)
   const [completedTasks, setCompletedTasks] = useState<{ [key: string]: string }>({})
+
 
   // Dropdown Data
   const [positions, setPositions] = useState<Position[]>([])
@@ -139,6 +149,17 @@ function OnboardPageContent() {
     "Prepare Requirement Checklist (Medical Certificate, Diploma, TOR, Birth Certificate, PhilHealth, Pag-IBIG, SSS)",
     "Collect and Verify Employee Requirements"
   ]
+
+  const completionPercentage = useMemo(() => {
+    if (!onboardingTasks.length) return 0
+    return Math.round((Object.keys(completedTasks).length / onboardingTasks.length) * 100)
+  }, [completedTasks, onboardingTasks])
+
+  const completionDateText = useMemo(() => {
+    const dates = Object.values(completedTasks)
+    if (dates.length === 0) return ''
+    return dates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0]
+  }, [completedTasks])
 
   // Persistence Logic
   useEffect(() => {
@@ -498,29 +519,31 @@ function OnboardPageContent() {
     try {
       const allTasks = onboardingTasks.map(taskName => ({
         task: taskName,
-        completed: !!completedTasks[taskName],
-        completed_at: completedTasks[taskName] || null
+        status: completedTasks[taskName] ? 'DONE' : 'PENDING',
+        date: completedTasks[taskName] || null
       }))
 
-      const response = await fetch(`${getApiUrl()}/api/onboarding-checklists`, {
+      const response = await fetch(`${getApiUrl()}/api/onboarding-checklist`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
         body: JSON.stringify({
-          employee_name: checklistData.name,
+          name: checklistData.name,
           position: checklistData.position,
           department: checklistData.department,
-          start_date: checklistData.raw_date,
-          status: `${Object.keys(completedTasks).length}/${onboardingTasks.length} Completed`,
+          startDate: checklistData.raw_date,
+          status: completionPercentage === 100 ? 'DONE' : 'PENDING',
           tasks: allTasks
         }),
       })
 
       const data = await response.json()
       if (data.success) {
-        toast.success('Checklist progress saved successfully to database')
+        toast.success('Checklist progress saved successfully')
+        clearStorage()
+        router.push(`/admin-head/forms/onboarding?name=${encodeURIComponent(checklistData.name)}`)
       } else {
         toast.error(data.message || 'Error saving checklist')
       }
@@ -538,7 +561,14 @@ function OnboardPageContent() {
       if (newTasks[task]) {
         delete newTasks[task]
       } else {
-        newTasks[task] = new Date().toLocaleString()
+        newTasks[task] = new Date().toLocaleString('en-US', { 
+          month: 'short', 
+          day: '2-digit', 
+          year: 'numeric', 
+          hour: '2-digit', 
+          minute: '2-digit', 
+          hour12: true 
+        })
       }
       return newTasks
     })
@@ -550,7 +580,14 @@ function OnboardPageContent() {
       setCompletedTasks({})
     } else {
       const newTasks: {[key: string]: string} = {}
-      const now = new Date().toLocaleString()
+      const now = new Date().toLocaleString('en-US', { 
+        month: 'short', 
+        day: '2-digit', 
+        year: 'numeric', 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        hour12: true 
+      })
       onboardingTasks.forEach(task => {
         newTasks[task] = now
       })
@@ -705,7 +742,7 @@ function OnboardPageContent() {
   }
 
   return (
-    <div className="min-h-screen p-8 bg-slate-50">
+    <div className="min-h-screen w-full bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-12">
       {view === 'onboard' && (
         <div className="max-w-3xl mx-auto py-4">
           <div className="flex items-center justify-between mb-8">
@@ -883,114 +920,158 @@ function OnboardPageContent() {
       )}
 
       {view === 'checklist' && checklistData && (
-        <div className="max-w-5xl mx-auto py-4">
-          <div className="bg-[#D1D5DB] border-2 border-slate-400 overflow-hidden shadow-xl">
-            {/* Main Header */}
-            <div className="bg-[#D1D5DB] py-3 text-center border-b-2 border-slate-400">
-              <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-tight">
-                Employee Onboarding Process Checklist
-              </h1>
-            </div>
+        <div className="max-w-[1600px] mx-auto py-4 px-6 md:px-8">
+          {/* ----- INTEGRATED PREMIUM HEADER ----- */}
+          <header className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md p-4 md:p-6 mb-8 relative overflow-hidden">
+            <div className="max-w-[1600px] mx-auto flex flex-wrap items-center gap-6 lg:gap-8 relative z-10">
+              {/* Title Section */}
+              <div className="flex flex-col">
+                <h1 className="text-xl md:text-2xl font-bold tracking-tight leading-none mb-1">Onboarding Process</h1>
+                <div className="flex items-center gap-1.5 text-white/60">
+                  <ClipboardList className="w-3.5 h-3.5" />
+                  <p className="text-[10px] md:text-xs font-bold uppercase tracking-widest">ABIC REALTY & CONSULTANCY</p>
+                </div>
+              </div>
 
-            {/* Info Grid */}
-            <div className="grid grid-cols-2 border-b-2 border-slate-400 text-sm">
-              <div className="grid grid-cols-[140px_1fr] border-r-2 border-slate-400">
-                <div className="bg-[#D1D5DB] p-2 font-bold border-r-2 border-slate-400">Employee Name:</div>
-                <div className="bg-white p-2">{checklistData.name}</div>
-              </div>
-              <div className="grid grid-cols-[100px_1fr]">
-                <div className="bg-[#D1D5DB] p-2 font-bold border-r-2 border-slate-400">Start Date:</div>
-                <div className="bg-white p-2">{checklistData.date}</div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 border-b-2 border-slate-400 text-sm">
-              <div className="grid grid-cols-[140px_1fr] border-r-2 border-slate-400">
-                <div className="bg-[#D1D5DB] p-2 font-bold border-r-2 border-slate-400">Position:</div>
-                <div className="bg-white p-2">{checklistData.position}</div>
-              </div>
-              <div className="grid grid-cols-[100px_1fr]">
-                <div className="bg-[#D1D5DB] p-2 font-bold border-r-2 border-slate-400">Department:</div>
-                <div className="bg-white p-2">{checklistData.department}</div>
-              </div>
-            </div>
+              <div className="h-8 w-px bg-white/10 hidden lg:block" />
 
-            {/* Progress Section */}
-            <div className="bg-white border-b-2 border-slate-400 p-4">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-xs font-bold text-slate-600 uppercase">Onboarding Progress</span>
-                <span className="text-xs font-bold text-[#630C22]">{Object.keys(completedTasks).length} / {onboardingTasks.length} Tasks Completed</span>
+              {/* Employee Info Cards (Integrated) */}
+              <div className="flex flex-wrap items-center gap-6 flex-1">
+                <div className="flex flex-col">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Employee</span>
+                  <span className="text-sm font-bold text-white leading-none">{checklistData.name}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Position</span>
+                  <span className="text-sm font-bold text-white leading-none">{checklistData.position}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Department</span>
+                  <span className="text-sm font-bold text-white leading-none">{checklistData.department}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Start Date</span>
+                  <span className="text-sm font-bold text-white leading-none">{checklistData.date}</span>
+                </div>
+
+                {/* Progress Stats */}
+                <div className="ml-auto hidden xl:flex items-center gap-4 bg-white/5 px-6 py-2 rounded-xl border border-white/10 backdrop-blur-sm">
+                  <div className="flex flex-col items-end">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Overall Progress</span>
+                    <span className="text-base font-black text-white">{completionPercentage}%</span>
+                  </div>
+                  <div className="h-6 w-px bg-white/10" />
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Last Updated</span>
+                    <span className="text-base font-black text-white tracking-tight">{completionDateText || '—'}</span>
+                  </div>
+                </div>
               </div>
-              <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden border border-slate-200 shadow-inner">
+            </div>
+            {/* Aesthetic Background Pattern */}
+            <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+              <ClipboardList className="w-32 h-32" />
+            </div>
+          </header>
+
+          {/* Task List Section */}
+          <Card className="rounded-2xl border-2 border-[#FFE5EC] shadow-2xl bg-white overflow-hidden mb-12">
+            {/* Progress Banner */}
+            <div className="bg-[#FFE5EC]/20 p-4 md:px-8 border-b border-[#FFE5EC]">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-[11px] font-black text-[#800020] uppercase tracking-widest">Process Onboarding Progress</h3>
+                <span className="text-sm font-black text-[#A4163A] bg-white px-3 py-0.5 rounded-full shadow-sm border border-[#FFE5EC]">
+                  {Object.keys(completedTasks).length} / {onboardingTasks.length} Completed
+                </span>
+              </div>
+              <div className="w-full bg-white h-2.5 rounded-full overflow-hidden border border-[#FFE5EC] shadow-inner p-0.5">
                 <div
-                  className="bg-[#630C22] h-full transition-all duration-500 ease-out shadow-[0_0_10px_rgba(99,12,34,0.3)]"
+                  className="bg-gradient-to-r from-[#A4163A] to-[#630C22] h-full rounded-full transition-all duration-1000 ease-out shadow-sm"
                   style={{ width: `${(Object.keys(completedTasks).length / onboardingTasks.length) * 100}%` }}
                 />
               </div>
             </div>
 
-            {/* Table Header Labels */}
-            <div className="grid grid-cols-[200px_120px_1fr] text-center font-bold bg-[#D1D5DB] text-sm uppercase">
-              <div className="py-2 border-r-2 border-b-2 border-slate-400">Completed Date</div>
-              <div className="py-2 border-r-2 border-b-2 border-slate-400">Status</div>
-              <div className="py-2 border-b-2 border-slate-400 flex items-center justify-between px-4">
-                <span>Tasks</span>
-                <button 
-                  onClick={toggleAllTasks}
-                  className="text-xs normal-case bg-slate-200 hover:bg-slate-300 px-2 py-0.5 rounded border border-slate-400 transition-colors"
+            <Table>
+              <TableHeader className="bg-[#FFE5EC]/40">
+                <TableRow className="border-b border-[#FFE5EC] hover:bg-transparent">
+                  <TableHead className="w-[200px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">Completed Date</TableHead>
+                  <TableHead className="w-[100px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">Status</TableHead>
+                  <TableHead className="font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">
+                    <div className="flex items-center justify-between">
+                      <span>Tasks</span>
+                      <button 
+                        onClick={toggleAllTasks}
+                        className="text-[8px] normal-case bg-white/50 hover:bg-rose-50 text-[#800020] px-2 py-1 rounded-md border border-[#FFE5EC] transition-all font-black shadow-sm"
+                      >
+                        {onboardingTasks.every(task => completedTasks[task]) ? 'UNCHECK ALL' : 'CHECK ALL'}
+                      </button>
+                    </div>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {onboardingTasks.map((task, index) => (
+                  <TableRow 
+                    key={index} 
+                    className="border-b border-rose-50/30 last:border-0 hover:bg-[#FFE5EC]/5 transition-colors group cursor-pointer"
+                    onClick={() => toggleTask(task)}
+                  >
+                    <TableCell className="text-center py-2.5 font-mono text-[10px] font-bold text-slate-400">
+                      {completedTasks[task] || '-'}
+                    </TableCell>
+                    <TableCell className="py-2.5">
+                      <div className="flex justify-center">
+                        <div className={cn(
+                          "w-5 h-5 rounded flex items-center justify-center transition-all border-2",
+                          completedTasks[task]
+                            ? "bg-emerald-500 border-emerald-500 text-white shadow-sm" 
+                            : "border-slate-200 bg-white hover:border-[#A4163A]"
+                        )}>
+                          {completedTasks[task] && <Check className="h-3.5 w-3.5" />}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-2.5">
+                      <span className={cn(
+                        "text-sm font-bold transition-all duration-300",
+                        completedTasks[task] ? "text-slate-300 line-through" : "text-slate-700"
+                      )}>
+                        {task}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+
+            {/* Table Footer */}
+            <div className="p-4 md:px-8 bg-slate-50/50 border-t border-[#FFE5EC] flex flex-col md:flex-row justify-between items-center gap-4">
+              <div className="flex items-center gap-3">
+                <p className="text-[8px] font-black text-slate-300 uppercase tracking-[0.2em] italic">
+                  ADMINISTRATION FRAMEWORK • ABIC HR
+                </p>
+              </div>
+              
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => setView('update-info')}
+                  disabled={Object.keys(completedTasks).length < onboardingTasks.length}
+                  className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg active:scale-95 transition-all rounded-xl disabled:opacity-50"
                 >
-                  {onboardingTasks.every(task => completedTasks[task]) ? 'Uncheck All' : 'Check All'}
-                </button>
+                  PROCEED TO DATA ENTRY
+                </Button>
+                <Button 
+                  onClick={handleSaveChecklist} 
+                  disabled={isSaving}
+                  className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-[#A4163A] hover:bg-[#800020] text-white shadow-lg active:scale-95 transition-all rounded-xl"
+                >
+                  {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <Save className="w-3.5 h-3.5 mr-2" />}
+                  {isSaving ? 'SAVING...' : 'SAVE PROGRESS'}
+                </Button>
               </div>
             </div>
-
-            {/* Task List */}
-            <div className="bg-white">
-              {onboardingTasks.map((task, index) => (
-                <div
-                  key={index}
-                  className="grid grid-cols-[200px_120px_1fr] border-b-2 border-slate-400 group cursor-pointer hover:bg-emerald-50/30 transition-colors"
-                  onClick={() => toggleTask(task)}
-                >
-                  <div className="py-2 px-4 flex items-center justify-center text-[10px] font-mono text-slate-500 bg-slate-50/50 border-r-2 border-slate-400">
-                    {completedTasks[task] || '-'}
-                  </div>
-                  <div className="py-2 flex items-center justify-center border-r-2 border-slate-400 font-bold transition-all">
-                    <div className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-all ${completedTasks[task]
-                      ? 'bg-emerald-500 border-emerald-500 text-white'
-                      : 'border-slate-300 bg-white'
-                      }`}>
-                      {completedTasks[task] && (
-                        <CheckCircle2 className="h-4 w-4" />
-                      )}
-                    </div>
-                  </div>
-                  <div className={`py-2 px-4 flex items-center text-sm font-medium transition-all ${completedTasks[task] ? 'text-slate-400 line-through' : 'text-slate-800'
-                    }`}>
-                    {task}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Action Buttons Row */}
-            <div className="grid grid-cols-[1fr_200px_150px] bg-white">
-              <div className="border-r-2 border-slate-400"></div>
-              <button
-                onClick={() => setView('update-info')}
-                disabled={Object.keys(completedTasks).length < onboardingTasks.length}
-                className="py-1 px-4 border-r-2 border-slate-400 bg-[#D1D5DB] hover:bg-slate-300 font-bold text-slate-800 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:text-slate-500"
-              >
-                PROCEED TO DATA ENTRY
-              </button>
-              <button
-                onClick={handleSaveChecklist}
-                disabled={isSaving}
-                className="py-1 px-4 bg-[#D1D5DB] hover:bg-slate-300 font-bold text-slate-800 text-sm transition-colors disabled:opacity-50"
-              >
-                {isSaving ? 'SAVING...' : 'SAVE'}
-              </button>
-            </div>
-          </div>
+          </Card>
         </div>
       )}
 

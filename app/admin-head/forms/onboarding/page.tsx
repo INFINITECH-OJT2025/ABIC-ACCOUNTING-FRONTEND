@@ -1,6 +1,7 @@
 "use client"
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table"
@@ -112,6 +113,16 @@ const isRecordDone = (record: OnboardingRecord) =>
   String(record.status).toUpperCase() === 'DONE' || getRecordCompletionPercentage(record) === 100
 
 export default function OnboardingChecklistPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen p-8 bg-slate-50"><Loader2 className="animate-spin h-8 w-8 text-[#630C22]" /></div>}>
+      <OnboardingChecklistPageContent />
+    </Suspense>
+  )
+}
+
+function OnboardingChecklistPageContent() {
+  const searchParams = useSearchParams()
+  const targetName = searchParams.get('name')
   const editMode = true
   const [saving, setSaving] = useState(false)
   const [creatingRecord, setCreatingRecord] = useState(false)
@@ -151,9 +162,19 @@ export default function OnboardingChecklistPage() {
         setRecords(data)
 
         if (data.length > 0) {
-          setCurrentIndex(0)
-          setEmployeeInfo(data[0])
-          setTasks(data[0].tasks)
+          let indexToSelect = 0
+          
+          // Auto-select based on search param
+          if (targetName) {
+            const matchingIndex = data.findIndex((r: OnboardingRecord) => r.name.toLowerCase() === targetName.toLowerCase())
+            if (matchingIndex !== -1) {
+              indexToSelect = matchingIndex
+            }
+          }
+          
+          setCurrentIndex(indexToSelect)
+          setEmployeeInfo(data[indexToSelect])
+          setTasks(data[indexToSelect].tasks)
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to load checklists'
