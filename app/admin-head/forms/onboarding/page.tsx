@@ -467,27 +467,28 @@ export default function OnboardingChecklistPage() {
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-12">
-      {/* ----- MAROON GRADIENT HEADER ----- */}
+      {/* ----- INTEGRATED HEADER & TOOLBAR ----- */}
       <header className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md p-4 md:p-6 mb-8 relative overflow-hidden">
-        <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="space-y-1">
-            <h1 className="text-2xl md:text-4xl font-bold tracking-tight">Onboarding Checklist</h1>
-            <div className="flex items-center gap-2 text-white/80">
-              <ClipboardList className="w-4 h-4" />
-              <p className="text-base font-medium">ABIC REALTY & CONSULTANCY</p>
+        <div className="max-w-[1600px] mx-auto flex flex-wrap items-center gap-6 lg:gap-8">
+          {/* Title Section */}
+          <div className="flex flex-col">
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight leading-none mb-1">Onboarding Checklist</h1>
+            <div className="flex items-center gap-1.5 text-white/60">
+              <ClipboardList className="w-3.5 h-3.5" />
+              <p className="text-[10px] md:text-xs font-bold uppercase tracking-widest">ABIC REALTY & CONSULTANCY</p>
             </div>
           </div>
-        </div>
 
-        {/* ----- SECONDARY TOOLBAR ----- */}
-        <div className="max-w-[1600px] mx-auto mt-8 pt-6 border-t border-white/10 flex flex-wrap items-center gap-6">
-          <div className="flex items-center gap-4">
+          <div className="h-8 w-px bg-white/10 hidden lg:block" />
+
+          {/* Controls Area */}
+          <div className="flex flex-wrap items-center gap-5 flex-1">
             <div className="flex items-center gap-3">
-              <span className="text-sm font-bold text-white/70 uppercase tracking-widest flex items-center gap-2">
-                <Filter className="w-4 h-4" /> Filter Status
+              <span className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] flex items-center gap-2">
+                <Filter className="w-3.5 h-3.5" /> Filter Status
               </span>
               <Select value={recordStatusFilter} onValueChange={(value) => setRecordStatusFilter(value as RecordStatusFilter)}>
-                <SelectTrigger className="h-10 w-[140px] rounded-lg border-2 border-white/20 bg-white/10 text-white text-sm font-bold hover:bg-white/20 transition-all">
+                <SelectTrigger className="h-9 w-[130px] rounded-lg border-2 border-white/20 bg-white/10 text-white text-xs font-bold hover:bg-white/20 transition-all">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="rounded-lg">
@@ -500,9 +501,9 @@ export default function OnboardingChecklistPage() {
 
             <Popover open={open} onOpenChange={setOpen}>
               <PopoverTrigger asChild>
-                <div className="h-10 px-4 rounded-lg border-2 border-white/20 bg-white/10 text-white text-sm font-bold hover:bg-white/20 transition-all inline-flex items-center justify-center whitespace-nowrap cursor-pointer group min-w-[220px]">
-                  <Users className="w-4 h-4 mr-2 opacity-70" />
-                  <span className="truncate max-w-[150px]">{employeeInfo?.name || 'Select Record'}</span>
+                <div className="h-9 px-4 rounded-lg border-2 border-white/20 bg-white/10 text-white text-xs font-bold hover:bg-white/20 transition-all inline-flex items-center justify-center whitespace-nowrap cursor-pointer group min-w-[200px]">
+                  <Users className="w-3.5 h-3.5 mr-2 opacity-70" />
+                  <span className="truncate max-w-[140px]">{employeeInfo?.name || 'Select Record'}</span>
                   <ChevronDown className="w-4 h-4 ml-2 opacity-50 group-hover:opacity-100 transition-opacity" />
                 </div>
               </PopoverTrigger>
@@ -537,34 +538,34 @@ export default function OnboardingChecklistPage() {
                 </Command>
               </PopoverContent>
             </Popover>
-          </div>
 
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-bold text-white/70 uppercase tracking-widest flex items-center gap-2">
-              <ArrowUpDown className="w-4 h-4" /> Sort By
-            </span>
-            <Select value={recordSort} onValueChange={(value) => setRecordSort(value as RecordSort)}>
-              <SelectTrigger className="h-10 w-[160px] rounded-lg border-2 border-white/20 bg-white/10 text-white text-sm font-bold hover:bg-white/20 transition-all">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="rounded-lg">
-                <SelectItem value="UPDATED_DESC">Latest First</SelectItem>
-                <SelectItem value="UPDATED_ASC">Oldest First</SelectItem>
-                <SelectItem value="NAME_ASC">Name (A-Z)</SelectItem>
-                <SelectItem value="NAME_DESC">Name (Z-A)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="ml-auto hidden md:flex items-center gap-4 bg-white/10 px-6 py-2 rounded-full border border-white/20 backdrop-blur-sm">
-            <div className="flex flex-col items-end">
-              <span className="text-[10px] font-black uppercase tracking-widest text-white/60 leading-none">Overall Progress</span>
-              <span className="text-lg font-black text-white">{completionPercentage}%</span>
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] flex items-center gap-2">
+                <ArrowUpDown className="w-3.5 h-3.5" /> Sort By
+              </span>
+              <Select value={recordSort} onValueChange={(value) => setRecordSort(value as RecordSort)}>
+                <SelectTrigger className="h-9 w-[150px] rounded-lg border-2 border-white/20 bg-white/10 text-white text-xs font-bold hover:bg-white/20 transition-all">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-lg">
+                  <SelectItem value="UPDATED_DESC">Latest First</SelectItem>
+                  <SelectItem value="UPDATED_ASC">Oldest First</SelectItem>
+                  <SelectItem value="NAME_ASC">Name (A-Z)</SelectItem>
+                  <SelectItem value="NAME_DESC">Name (Z-A)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <div className="h-8 w-px bg-white/20" />
-            <div className="flex flex-col">
-              <span className="text-[10px] font-black uppercase tracking-widest text-white/60 leading-none">Last Updated</span>
-              <span className="text-lg font-black text-white tracking-tight">{completionDateText || '—'}</span>
+
+            <div className="ml-auto hidden xl:flex items-center gap-4 bg-white/5 px-6 py-2 rounded-xl border border-white/10 backdrop-blur-sm">
+              <div className="flex flex-col items-end">
+                <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Overall Progress</span>
+                <span className="text-base font-black text-white">{completionPercentage}%</span>
+              </div>
+              <div className="h-6 w-px bg-white/10" />
+              <div className="flex flex-col">
+                <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Last Updated</span>
+                <span className="text-base font-black text-white tracking-tight">{completionDateText || '—'}</span>
+              </div>
             </div>
           </div>
         </div>
