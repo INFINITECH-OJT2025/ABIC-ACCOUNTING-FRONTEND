@@ -23,13 +23,15 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
-  Save, Lock, ChevronLeft, ChevronRight, Check, Trash2, Plus, Target, UserPlus, ClipboardList, TriangleAlert, FolderPlus
+  Save, Lock, ChevronLeft, ChevronRight, Check, Trash2, Plus, Target, UserPlus, ClipboardList, TriangleAlert, FolderPlus, Filter, ArrowUpDown
 } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { getApiUrl } from '@/lib/api'
 import { toast } from 'sonner'
 
 type TaskStatus = 'DONE' | 'PENDING'
+type RecordStatusFilter = 'ALL' | TaskStatus
+type RecordSort = 'NAME_ASC' | 'NAME_DESC' | 'UPDATED_DESC' | 'UPDATED_ASC'
 
 interface ChecklistTask {
   id: number
@@ -123,6 +125,8 @@ export default function ClearanceChecklistPage() {
   const [departmentOptions, setDepartmentOptions] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [recordStatusFilter, setRecordStatusFilter] = useState<RecordStatusFilter>('ALL')
+  const [recordSort, setRecordSort] = useState<RecordSort>('UPDATED_DESC')
 
   useEffect(() => {
     const fetchChecklists = async () => {
@@ -211,13 +215,32 @@ export default function ClearanceChecklistPage() {
     return [...new Set([...(current ? [current] : []), ...departmentOptions])]
   }, [employeeInfo?.department, departmentOptions])
 
+  const filteredAndSortedRecords = useMemo(() => {
+    const rows = records.map((record, index) => ({ record, index }))
+    const filtered = recordStatusFilter === 'ALL'
+      ? rows
+      : rows.filter(({ record }) => (recordStatusFilter === 'DONE' ? isRecordDone(record) : !isRecordDone(record)))
+
+    const withTime = (value: string) => {
+      const timestamp = new Date(value).getTime()
+      return Number.isNaN(timestamp) ? 0 : timestamp
+    }
+
+    return [...filtered].sort((a, b) => {
+      if (recordSort === 'NAME_ASC') return a.record.name.localeCompare(b.record.name)
+      if (recordSort === 'NAME_DESC') return b.record.name.localeCompare(a.record.name)
+      if (recordSort === 'UPDATED_ASC') return withTime(a.record.updatedAt) - withTime(b.record.updatedAt)
+      return withTime(b.record.updatedAt) - withTime(a.record.updatedAt)
+    })
+  }, [records, recordSort, recordStatusFilter])
+
   const doneRecords = useMemo(
-    () => records.map((record, index) => ({ record, index })).filter(({ record }) => isRecordDone(record)),
-    [records]
+    () => filteredAndSortedRecords.filter(({ record }) => isRecordDone(record)),
+    [filteredAndSortedRecords]
   )
   const pendingRecords = useMemo(
-    () => records.map((record, index) => ({ record, index })).filter(({ record }) => !isRecordDone(record)),
-    [records]
+    () => filteredAndSortedRecords.filter(({ record }) => !isRecordDone(record)),
+    [filteredAndSortedRecords]
   )
 
   const selectRecordByIndex = (index: number) => {
@@ -407,6 +430,36 @@ export default function ClearanceChecklistPage() {
                   </Command>
                 </PopoverContent>
               </Popover>
+
+              <div className="flex items-center gap-2">
+                <Select value={recordStatusFilter} onValueChange={(value) => setRecordStatusFilter(value as RecordStatusFilter)}>
+                  <SelectTrigger className="h-9 w-[130px] rounded-full border border-white/25 bg-white/10 text-white text-xs font-black uppercase tracking-widest">
+                    <div className="flex items-center gap-2">
+                      <Filter className="h-3.5 w-3.5 text-rose-200" />
+                      <SelectValue />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All</SelectItem>
+                    <SelectItem value="DONE">Done</SelectItem>
+                    <SelectItem value="PENDING">Pending</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={recordSort} onValueChange={(value) => setRecordSort(value as RecordSort)}>
+                  <SelectTrigger className="h-9 w-[130px] rounded-full border border-white/25 bg-white/10 text-white text-xs font-black uppercase tracking-widest">
+                    <div className="flex items-center gap-2">
+                      <ArrowUpDown className="h-3.5 w-3.5 text-rose-200" />
+                      <SelectValue />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="UPDATED_DESC">Latest</SelectItem>
+                    <SelectItem value="UPDATED_ASC">Oldest</SelectItem>
+                    <SelectItem value="NAME_ASC">A - Z</SelectItem>
+                    <SelectItem value="NAME_DESC">Z - A</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
               <div className="flex items-center gap-2 ml-2 px-4 py-1.5 bg-white/10 rounded-full border border-white/20 backdrop-blur-sm">
                 <Target className="w-4 h-4 text-rose-300" />
