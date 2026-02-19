@@ -43,7 +43,7 @@ interface Department {
 export default function OnboardPage() {
   const router = useRouter()
   const [view, setView] = useState<'onboard' | 'checklist' | 'update-info'>('onboard')
-  
+
   // Form States
   const [onboardFormData, setOnboardFormData] = useState({
     first_name: '',
@@ -56,7 +56,7 @@ export default function OnboardPage() {
   const [currentBatch, setCurrentBatch] = useState(1)
   const [onboardingEmployeeId, setOnboardingEmployeeId] = useState<number | null>(null)
   const [progressionFormData, setProgressionFormData] = useState<Partial<EmployeeDetails>>({})
-  
+
   // Checklist States
   const [checklistData, setChecklistData] = useState<{
     name: string,
@@ -65,7 +65,7 @@ export default function OnboardPage() {
     date: string,
     raw_date: string
   } | null>(null)
-  const [completedTasks, setCompletedTasks] = useState<{[key: string]: string}>({})
+  const [completedTasks, setCompletedTasks] = useState<{ [key: string]: string }>({})
 
   // Dropdown Data
   const [positions, setPositions] = useState<Position[]>([])
@@ -504,7 +504,7 @@ export default function OnboardPage() {
         return !!data.position && !!data.date_hired
       case 2:
         return !!data.last_name && !!data.first_name && !!data.birthday &&
-               !!data.birthplace && !!data.gender && !!data.civil_status
+          !!data.birthplace && !!data.gender && !!data.civil_status
       case 3:
         return !!data.mobile_number && !!data.street
       case 4:
@@ -513,7 +513,7 @@ export default function OnboardPage() {
         return !!data.mlast_name && !!data.mfirst_name
       case 6:
         return !!data.region && !!data.province && !!data.city_municipality &&
-               !!data.barangay && !!data.zip_code && !!data.email_address
+          !!data.barangay && !!data.zip_code && !!data.email_address
       default:
         return true
     }
@@ -591,12 +591,12 @@ export default function OnboardPage() {
               <h2 className="text-2xl font-bold text-[#4A081A]">Onboard New Employee</h2>
             </div>
           </div>
-          
+
           <div className="bg-white border border-slate-100 rounded-2xl p-8 shadow-sm space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">First Name <span className="text-red-500">*</span></label>
-                <Input 
+                <Input
                   value={onboardFormData.first_name}
                   onChange={(e) => setOnboardFormData(prev => ({ ...prev, first_name: e.target.value }))}
                   placeholder="John"
@@ -604,7 +604,7 @@ export default function OnboardPage() {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Last Name <span className="text-red-500">*</span></label>
-                <Input 
+                <Input
                   value={onboardFormData.last_name}
                   onChange={(e) => setOnboardFormData(prev => ({ ...prev, last_name: e.target.value }))}
                   placeholder="Doe"
@@ -612,18 +612,18 @@ export default function OnboardPage() {
               </div>
               <div className="md:col-span-2">
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Email Address <span className="text-red-500">*</span></label>
-                <Input 
+                <Input
                   type="email"
                   value={onboardFormData.email}
                   onChange={(e) => setOnboardFormData(prev => ({ ...prev, email: e.target.value }))}
                   placeholder="john@example.com"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <label className="block text-sm font-semibold text-slate-700">Position <span className="text-red-500">*</span></label>
-                  <button 
+                  <button
                     onClick={() => setInlineManagerType(inlineManagerType === 'position' ? null : 'position')}
                     className={`text-xs flex items-center gap-1 font-bold transition-colors ${inlineManagerType === 'position' ? 'text-[#630C22]' : 'text-slate-400 hover:text-slate-600'}`}
                   >
@@ -641,12 +641,12 @@ export default function OnboardPage() {
                     <option key={pos.id} value={pos.name}>{pos.name}</option>
                   ))}
                 </select>
-                
+
                 {inlineManagerType === 'position' && (
                   <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mt-2 shadow-inner">
                     <div className="flex gap-2 mb-3">
-                      <Input 
-                        placeholder="Add new position..." 
+                      <Input
+                        placeholder="Add new position..."
                         value={newItemName}
                         onChange={(e) => setNewItemName(e.target.value)}
                         className="h-9 text-xs"
@@ -673,7 +673,7 @@ export default function OnboardPage() {
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <label className="block text-sm font-semibold text-slate-700">Department <span className="text-red-500">*</span></label>
-                  <button 
+                  <button
                     onClick={() => setInlineManagerType(inlineManagerType === 'department' ? null : 'department')}
                     className={`text-xs flex items-center gap-1 font-bold transition-colors ${inlineManagerType === 'department' ? 'text-[#630C22]' : 'text-slate-400 hover:text-slate-600'}`}
                   >
@@ -695,8 +695,8 @@ export default function OnboardPage() {
                 {inlineManagerType === 'department' && (
                   <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mt-2 shadow-inner">
                     <div className="flex gap-2 mb-3">
-                      <Input 
-                        placeholder="Add new department..." 
+                      <Input
+                        placeholder="Add new department..."
                         value={newItemName}
                         onChange={(e) => setNewItemName(e.target.value)}
                         className="h-9 text-xs"
@@ -722,7 +722,7 @@ export default function OnboardPage() {
 
               <div className="md:col-span-2">
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Onboarding Date <span className="text-red-500">*</span></label>
-                <Input 
+                <Input
                   type="date"
                   value={onboardFormData.onboarding_date}
                   onChange={(e) => setOnboardFormData(prev => ({ ...prev, onboarding_date: e.target.value }))}
@@ -790,7 +790,7 @@ export default function OnboardPage() {
                 <span className="text-xs font-bold text-[#630C22]">{Object.keys(completedTasks).length} / {onboardingTasks.length} Tasks Completed</span>
               </div>
               <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden border border-slate-200 shadow-inner">
-                <div 
+                <div
                   className="bg-[#630C22] h-full transition-all duration-500 ease-out shadow-[0_0_10px_rgba(99,12,34,0.3)]"
                   style={{ width: `${(Object.keys(completedTasks).length / onboardingTasks.length) * 100}%` }}
                 />
@@ -807,8 +807,8 @@ export default function OnboardPage() {
             {/* Task List */}
             <div className="bg-white">
               {onboardingTasks.map((task, index) => (
-                <div 
-                  key={index} 
+                <div
+                  key={index}
                   className="grid grid-cols-[200px_120px_1fr] border-b-2 border-slate-400 group cursor-pointer hover:bg-emerald-50/30 transition-colors"
                   onClick={() => toggleTask(task)}
                 >
@@ -816,19 +816,17 @@ export default function OnboardPage() {
                     {completedTasks[task] || '-'}
                   </div>
                   <div className="py-2 flex items-center justify-center border-r-2 border-slate-400 font-bold transition-all">
-                    <div className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-all ${
-                      completedTasks[task] 
-                        ? 'bg-emerald-500 border-emerald-500 text-white' 
-                        : 'border-slate-300 bg-white'
-                    }`}>
+                    <div className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-all ${completedTasks[task]
+                      ? 'bg-emerald-500 border-emerald-500 text-white'
+                      : 'border-slate-300 bg-white'
+                      }`}>
                       {completedTasks[task] && (
                         <CheckCircle2 className="h-4 w-4" />
                       )}
                     </div>
                   </div>
-                  <div className={`py-2 px-4 flex items-center text-sm font-medium transition-all ${
-                    completedTasks[task] ? 'text-slate-400 line-through' : 'text-slate-800'
-                  }`}>
+                  <div className={`py-2 px-4 flex items-center text-sm font-medium transition-all ${completedTasks[task] ? 'text-slate-400 line-through' : 'text-slate-800'
+                    }`}>
                     {task}
                   </div>
                 </div>
@@ -838,14 +836,14 @@ export default function OnboardPage() {
             {/* Action Buttons Row */}
             <div className="grid grid-cols-[1fr_200px_150px] bg-white">
               <div className="border-r-2 border-slate-400"></div>
-              <button 
+              <button
                 onClick={() => setView('update-info')}
                 disabled={Object.keys(completedTasks).length < onboardingTasks.length}
                 className="py-1 px-4 border-r-2 border-slate-400 bg-[#D1D5DB] hover:bg-slate-300 font-bold text-slate-800 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:text-slate-500"
               >
                 PROCEED TO DATA ENTRY
               </button>
-              <button 
+              <button
                 onClick={handleSaveChecklist}
                 disabled={isSaving}
                 className="py-1 px-4 bg-[#D1D5DB] hover:bg-slate-300 font-bold text-slate-800 text-sm transition-colors disabled:opacity-50"
@@ -859,7 +857,7 @@ export default function OnboardPage() {
 
       {view === 'update-info' && (
         <div className="max-w-7xl mx-auto py-8">
-           <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+          <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
             {/* Horizontal Stepper Progress Card */}
             <Card className="border-none shadow-lg overflow-hidden">
               <div className="bg-gradient-to-br from-[#6B1C23] via-[#7B2431] to-[#8B2C3F] px-6 py-6">
@@ -939,11 +937,11 @@ export default function OnboardPage() {
               <CardHeader className="bg-gradient-to-br from-[#6B1C23] via-[#7B2431] to-[#8B2C3F] text-white rounded-t-xl py-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
-                    {React.createElement(batches[currentBatch-1].icon, { className: "h-5 w-5" })}
+                    {React.createElement(batches[currentBatch - 1].icon, { className: "h-5 w-5" })}
                   </div>
                   <div>
-                    <CardTitle className="text-xl text-white font-bold">Batch {currentBatch}: {batches[currentBatch-1].title}</CardTitle>
-                    <CardDescription className="text-white/80 text-xs font-medium">{batches[currentBatch-1].description}</CardDescription>
+                    <CardTitle className="text-xl text-white font-bold">Batch {currentBatch}: {batches[currentBatch - 1].title}</CardTitle>
+                    <CardDescription className="text-white/80 text-xs font-medium">{batches[currentBatch - 1].description}</CardDescription>
                   </div>
                 </div>
               </CardHeader>

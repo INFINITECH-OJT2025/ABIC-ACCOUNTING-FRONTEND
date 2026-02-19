@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table"
@@ -19,13 +20,10 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover"
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog'
-import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
-  Save, Lock, ChevronLeft, ChevronRight, Check, Trash2, Plus, LayoutDashboard, ClipboardList, TriangleAlert, FolderPlus, Filter, ArrowUpDown, ListFilter, CheckCircle2, CircleDashed, Clock3, History, ArrowUpAZ, ArrowDownAZ
+  Save, Lock, ChevronLeft, ChevronRight, Check, Trash2, Plus, Target, UserPlus, ClipboardList, TriangleAlert, FolderPlus, Filter, ArrowUpDown
 } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { getApiUrl } from '@/lib/api'
@@ -42,12 +40,14 @@ interface ChecklistTask {
   date: string
 }
 
-interface OnboardingRecord {
+interface ClearanceRecord {
   id: string
   name: string
   startDate: string
   position: string
   department: string
+  resignationDate: string
+  lastDay: string
   status: string
   updatedAt: string
   tasks: ChecklistTask[]
@@ -89,45 +89,40 @@ const normalizeTasks = (input: unknown): ChecklistTask[] => {
   })
 }
 
-const normalizeRecord = (record: any): OnboardingRecord => ({
+const normalizeRecord = (record: any): ClearanceRecord => ({
   id: String(record?.id ?? ''),
   name: String(record?.name ?? ''),
   startDate: String(record?.startDate ?? ''),
   position: String(record?.position ?? ''),
   department: String(record?.department ?? ''),
+  resignationDate: String(record?.resignationDate ?? ''),
+  lastDay: String(record?.lastDay ?? ''),
   status: String(record?.status ?? ''),
   updatedAt: String(record?.updated_at ?? record?.updatedAt ?? ''),
   tasks: normalizeTasks(record?.tasks),
 })
 
-const getRecordCompletionPercentage = (record: OnboardingRecord) => {
+const getRecordCompletionPercentage = (record: ClearanceRecord) => {
   if (!record.tasks.length) return 0
   const doneCount = record.tasks.filter((task) => task.status === 'DONE').length
   return Math.round((doneCount / record.tasks.length) * 100)
 }
 
-const isRecordDone = (record: OnboardingRecord) =>
+const isRecordDone = (record: ClearanceRecord) =>
   String(record.status).toUpperCase() === 'DONE' || getRecordCompletionPercentage(record) === 100
 
-export default function OnboardingChecklistPage() {
+export default function ClearanceChecklistPage() {
+  const router = useRouter()
   const editMode = true
   const [saving, setSaving] = useState(false)
-  const [creatingRecord, setCreatingRecord] = useState(false)
-  const [addRecordOpen, setAddRecordOpen] = useState(false)
   const [tasks, setTasks] = useState<ChecklistTask[]>([])
   const [taskIdToDelete, setTaskIdToDelete] = useState<number | null>(null)
   const [open, setOpen] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [records, setRecords] = useState<OnboardingRecord[]>([])
-  const [employeeInfo, setEmployeeInfo] = useState<OnboardingRecord | null>(null)
+  const [records, setRecords] = useState<ClearanceRecord[]>([])
+  const [employeeInfo, setEmployeeInfo] = useState<ClearanceRecord | null>(null)
   const [positionOptions, setPositionOptions] = useState<string[]>([])
   const [departmentOptions, setDepartmentOptions] = useState<string[]>([])
-  const [newRecord, setNewRecord] = useState({
-    name: '',
-    position: '',
-    department: '',
-    startDate: '',
-  })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [recordStatusFilter, setRecordStatusFilter] = useState<RecordStatusFilter>('ALL')
@@ -138,7 +133,7 @@ export default function OnboardingChecklistPage() {
       try {
         setLoading(true)
         setError(null)
-        const response = await fetch(`${getApiUrl()}/api/onboarding-checklist`, {
+        const response = await fetch(`${getApiUrl()}/api/clearance-checklist`, {
           headers: { Accept: 'application/json' },
         })
 
@@ -269,15 +264,6 @@ export default function OnboardingChecklistPage() {
     }
   }
 
-  const resetNewRecord = () => {
-    setNewRecord({
-      name: '',
-      position: '',
-      department: '',
-      startDate: '',
-    })
-  }
-
   const addTask = () => {
     setTasks([...tasks, { id: Date.now() + Math.floor(Math.random() * 1000), task: '', status: 'PENDING', date: '' }]);
   };
@@ -294,7 +280,7 @@ export default function OnboardingChecklistPage() {
     if (!employeeInfo) return
 
     try {
-      const response = await fetch(`${getApiUrl()}/api/onboarding-checklist/${employeeInfo.id}`, {
+      const response = await fetch(`${getApiUrl()}/api/clearance-checklist/${employeeInfo.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -342,11 +328,13 @@ export default function OnboardingChecklistPage() {
         position: employeeInfo.position,
         department: employeeInfo.department,
         startDate: employeeInfo.startDate,
+        resignationDate: employeeInfo.resignationDate,
+        lastDay: employeeInfo.lastDay,
         tasks,
         status: completionPercentage === 100 ? 'DONE' : 'PENDING',
       }
 
-      const response = await fetch(`${getApiUrl()}/api/onboarding-checklist/${employeeInfo.id}`, {
+      const response = await fetch(`${getApiUrl()}/api/clearance-checklist/${employeeInfo.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -372,63 +360,13 @@ export default function OnboardingChecklistPage() {
     }
   }
 
-  const handleCreateRecord = async () => {
-    if (!newRecord.name.trim() || !newRecord.startDate) {
-      toast.warning('Incomplete Form', {
-        description: 'Name and start date are required.',
-      })
-      return
-    }
-
-    try {
-      setCreatingRecord(true)
-      const payload = {
-        name: newRecord.name.trim(),
-        position: newRecord.position.trim(),
-        department: newRecord.department.trim(),
-        startDate: newRecord.startDate,
-        tasks: [],
-      }
-
-      const response = await fetch(`${getApiUrl()}/api/onboarding-checklist`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      })
-
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
-
-      const result = await response.json()
-      const created = normalizeRecord(result?.data)
-      setRecords(prev => {
-        const next = [...prev, created]
-        setCurrentIndex(next.length - 1)
-        return next
-      })
-      setEmployeeInfo(created)
-      setTasks(created.tasks)
-      setAddRecordOpen(false)
-      resetNewRecord()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to create onboarding record'
-      toast.error('Create Record Failed', {
-        description: message,
-      })
-    } finally {
-      setCreatingRecord(false)
-    }
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50/50 p-8 font-sans">
         <Card className="mx-auto mt-16 max-w-3xl rounded-[2rem] border-none shadow-2xl bg-white p-10 text-center">
           <div className="mx-auto mb-5 h-14 w-14 rounded-full border-4 border-[#a0153e]/20 border-t-[#a0153e] animate-spin" />
-          <p className="text-2xl font-black text-slate-900">Loading Onboarding Checklist</p>
-          <p className="mt-2 text-slate-600">Preparing employee record and onboarding tasks...</p>
+          <p className="text-2xl font-black text-slate-900">Loading Clearance Checklist</p>
+          <p className="mt-2 text-slate-600">Preparing employee record and clearance tasks...</p>
           <div className="mt-6 space-y-3">
             <div className="h-4 rounded-full bg-slate-200/80 animate-pulse" />
             <div className="h-4 w-11/12 mx-auto rounded-full bg-slate-200/70 animate-pulse [animation-delay:120ms]" />
@@ -445,7 +383,7 @@ export default function OnboardingChecklistPage() {
   }
 
   if (error) {
-    return <div className="p-8 text-rose-600">Failed to load onboarding checklist: {error}</div>
+    return <div className="p-8 text-rose-600">Failed to load clearance checklist: {error}</div>
   }
 
   return (
@@ -453,10 +391,10 @@ export default function OnboardingChecklistPage() {
       <header className="-mx-8 -mt-8 mb-8 bg-[#a0153e] text-white px-10 py-10 shadow-lg relative overflow-hidden">
         <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <div className="space-y-4">
-            <h1 className="text-4xl font-extrabold tracking-tight italic">Onboarding Checklist</h1>
+            <h1 className="text-4xl font-extrabold tracking-tight italic">Clearance Checklist</h1>
 
             <div className="flex flex-wrap items-center gap-3 text-rose-100/80 text-lg">
-              <span className="opacity-80">Onboarding for</span>
+              <span className="opacity-80">Exit processing for</span>
               <Popover open={open} onOpenChange={setOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="ghost" className="h-auto p-0 text-white font-bold text-lg hover:bg-transparent underline underline-offset-4 decoration-rose-400">
@@ -502,9 +440,9 @@ export default function OnboardingChecklistPage() {
                     </div>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ALL"><span className="flex items-center gap-2"><ListFilter className="h-3.5 w-3.5" /> All</span></SelectItem>
-                    <SelectItem value="DONE"><span className="flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Done</span></SelectItem>
-                    <SelectItem value="PENDING"><span className="flex items-center gap-2"><CircleDashed className="h-3.5 w-3.5 text-amber-600" /> Pending</span></SelectItem>
+                    <SelectItem value="ALL">All</SelectItem>
+                    <SelectItem value="DONE">Done</SelectItem>
+                    <SelectItem value="PENDING">Pending</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={recordSort} onValueChange={(value) => setRecordSort(value as RecordSort)}>
@@ -515,17 +453,17 @@ export default function OnboardingChecklistPage() {
                     </div>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="UPDATED_DESC"><span className="flex items-center gap-2"><Clock3 className="h-3.5 w-3.5" /> Latest</span></SelectItem>
-                    <SelectItem value="UPDATED_ASC"><span className="flex items-center gap-2"><History className="h-3.5 w-3.5" /> Oldest</span></SelectItem>
-                    <SelectItem value="NAME_ASC"><span className="flex items-center gap-2"><ArrowUpAZ className="h-3.5 w-3.5" /> A - Z</span></SelectItem>
-                    <SelectItem value="NAME_DESC"><span className="flex items-center gap-2"><ArrowDownAZ className="h-3.5 w-3.5" /> Z - A</span></SelectItem>
+                    <SelectItem value="UPDATED_DESC">Latest</SelectItem>
+                    <SelectItem value="UPDATED_ASC">Oldest</SelectItem>
+                    <SelectItem value="NAME_ASC">A - Z</SelectItem>
+                    <SelectItem value="NAME_DESC">Z - A</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="flex items-center gap-2 ml-2 px-4 py-1.5 bg-white/10 rounded-full border border-white/20 backdrop-blur-sm">
-                <LayoutDashboard className="w-4 h-4 text-rose-300" />
-                <span className="text-xs font-black uppercase tracking-widest text-rose-100">Progress:</span>
+                <Target className="w-4 h-4 text-rose-300" />
+                <span className="text-xs font-black uppercase tracking-widest text-rose-100">Status:</span>
                 <span className="text-sm font-black text-white">{completionPercentage}% Completed</span>
                 {completionDateText && (
                   <>
@@ -538,17 +476,22 @@ export default function OnboardingChecklistPage() {
             </div>
           </div>
 
+          <div className="flex gap-3">
+            <Button onClick={() => router.push('/admin-head/forms/clearance-checklist/add-clearance-checklist')} className="rounded-full bg-white text-[#a0153e] hover:bg-rose-50 h-12 px-8 font-bold">
+              <UserPlus className="mr-2 h-4 w-4" /> Add Record
+            </Button>
+          </div>
         </div>
       </header>
 
       <main className="max-w-[1600px] mx-auto p-8 relative">
         <div className="absolute left-0 top-[25%] -translate-x-1/2 z-10">
-          <Button onClick={handlePrev} disabled={records.length === 0 || currentIndex === 0} size="icon" className="rounded-full h-12 w-12 bg-white shadow-xl text-[#a0153e] border-none hover:bg-rose-50">
+          <Button onClick={handlePrev} disabled={records.length === 0 || currentIndex === 0} size="icon" className="rounded-full h-12 w-12 bg-white shadow-xl text-[#a0153e] border-none hover:bg-rose-50 transition-colors">
             <ChevronLeft className="h-6 w-6" />
           </Button>
         </div>
         <div className="absolute right-0 top-[25%] translate-x-1/2 z-10">
-          <Button onClick={handleNext} disabled={records.length === 0 || currentIndex >= records.length - 1} size="icon" className="rounded-full h-12 w-12 bg-white shadow-xl text-[#a0153e] border-none hover:bg-rose-50">
+          <Button onClick={handleNext} disabled={records.length === 0 || currentIndex >= records.length - 1} size="icon" className="rounded-full h-12 w-12 bg-white shadow-xl text-[#a0153e] border-none hover:bg-rose-50 transition-colors">
             <ChevronRight className="h-6 w-6" />
           </Button>
         </div>
@@ -598,6 +541,21 @@ export default function OnboardingChecklistPage() {
               ) : (<p className="text-2xl md:text-3xl font-extrabold text-slate-700">{employeeInfo?.department || '-'}</p>)}
             </div>
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100 border-t border-slate-100">
+            <div className="p-8">
+              <p className="text-lg font-bold text-[#a0153e] uppercase tracking-wide mb-3">Resignation Date</p>
+              {editMode && employeeInfo ? (
+                <Input type="date" value={employeeInfo.resignationDate} onChange={(e) => setEmployeeInfo({ ...employeeInfo, resignationDate: e.target.value })} className="rounded-xl border-slate-200 h-11" />
+              ) : (<p className="text-2xl md:text-3xl font-extrabold text-slate-700">{employeeInfo?.resignationDate ? new Date(employeeInfo.resignationDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' }) : '-'}</p>)}
+            </div>
+            <div className="p-8">
+              <p className="text-lg font-bold text-[#a0153e] uppercase tracking-wide mb-3">Last Day</p>
+              {editMode && employeeInfo ? (
+                <Input type="date" value={employeeInfo.lastDay} onChange={(e) => setEmployeeInfo({ ...employeeInfo, lastDay: e.target.value })} className="rounded-xl border-slate-200 h-11" />
+              ) : (<p className="text-2xl md:text-3xl font-extrabold text-slate-700">{employeeInfo?.lastDay ? new Date(employeeInfo.lastDay).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' }) : '-'}</p>)}
+            </div>
+          </div>
         </Card>
 
         <Card className="rounded-[2rem] border-none shadow-2xl bg-white overflow-hidden">
@@ -606,7 +564,7 @@ export default function OnboardingChecklistPage() {
               <TableRow className="border-b border-slate-100">
                 <TableHead className="w-[220px] text-center font-black text-[#a0153e] uppercase tracking-widest text-[11px] py-8">Date</TableHead>
                 <TableHead className="w-[180px] text-center font-black text-[#a0153e] uppercase tracking-widest text-[11px] py-8">Status</TableHead>
-                <TableHead className="font-black text-[#a0153e] uppercase tracking-widest text-[11px] py-8">Onboarding Tasks</TableHead>
+                <TableHead className="font-black text-[#a0153e] uppercase tracking-widest text-[11px] py-8">Clearance Tasks</TableHead>
                 {editMode && <TableHead className="w-[100px] text-center font-black text-[#a0153e] uppercase tracking-widest text-[11px] py-8">Action</TableHead>}
               </TableRow>
             </TableHeader>
@@ -660,7 +618,7 @@ export default function OnboardingChecklistPage() {
                       </div>
                       <p className="text-base font-bold text-slate-700">No tasks to display</p>
                       <p className="text-sm text-slate-500">
-                        {records.length === 0 ? 'No onboarding records found yet. Add a record to begin.' : 'This record has no tasks yet.'}
+                        {records.length === 0 ? 'No clearance records found yet. Add a record to begin.' : 'This record has no tasks yet.'}
                       </p>
                     </div>
                   </TableCell>
@@ -671,7 +629,7 @@ export default function OnboardingChecklistPage() {
 
           <div className="bg-slate-50/50 px-10 py-8 flex justify-between items-center border-t border-slate-100">
             <div className="flex items-center gap-4">
-              <p className="text-[10px] text-slate-400 font-bold tracking-[0.2em] uppercase">ABIC Realty Onboarding System</p>
+              <p className="text-[10px] text-slate-400 font-bold tracking-[0.2em] uppercase">ABIC Realty Exit Clearance</p>
               {editMode && (
                 <Button onClick={addTask} size="sm" variant="ghost" className="rounded-full text-[#a0153e] font-bold bg-[#a0153e]/5 hover:bg-[#a0153e]/10 px-6">
                   <Plus className="mr-2 h-4 w-4" /> Add Task
@@ -680,7 +638,7 @@ export default function OnboardingChecklistPage() {
             </div>
             <div className="flex gap-4">
               <Button variant="outline" className="rounded-full px-8 h-12 shadow-sm border-slate-200 font-bold text-slate-600 hover:bg-slate-100 transition-colors">
-                <FolderPlus className="mr-2 h-4 w-4" /> Add to Masterfile
+                <FolderPlus className="mr-2 h-4 w-4" /> Update Masterfile
               </Button>
               <Button
                 onClick={handleSave}
@@ -693,67 +651,6 @@ export default function OnboardingChecklistPage() {
           </div>
         </Card>
       </main>
-
-      <Dialog open={addRecordOpen} onOpenChange={setAddRecordOpen}>
-        <DialogContent className="sm:max-w-[560px] border-2 border-[#C9184A] p-0 overflow-hidden">
-          <DialogHeader className="bg-gradient-to-r from-[#800020] via-[#A0153E] to-[#C9184A] p-6 text-white">
-            <DialogTitle className="text-2xl font-bold">Add Onboarding Record</DialogTitle>
-            <DialogDescription className="text-rose-100">
-              Create a new onboarding checklist record.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="p-6 space-y-4">
-            <div>
-              <p className="text-[11px] font-bold text-[#a0153e] uppercase tracking-[0.2em] mb-2">Employee Name</p>
-              <Input
-                value={newRecord.name}
-                onChange={(e) => setNewRecord(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Enter employee name"
-                className="rounded-xl border-slate-200 h-11"
-              />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-[11px] font-bold text-[#a0153e] uppercase tracking-[0.2em] mb-2">Position</p>
-                <Input
-                  value={newRecord.position}
-                  onChange={(e) => setNewRecord(prev => ({ ...prev, position: e.target.value }))}
-                  placeholder="Enter position"
-                  className="rounded-xl border-slate-200 h-11"
-                />
-              </div>
-              <div>
-                <p className="text-[11px] font-bold text-[#a0153e] uppercase tracking-[0.2em] mb-2">Department</p>
-                <Input
-                  value={newRecord.department}
-                  onChange={(e) => setNewRecord(prev => ({ ...prev, department: e.target.value }))}
-                  placeholder="Enter department"
-                  className="rounded-xl border-slate-200 h-11"
-                />
-              </div>
-            </div>
-            <div>
-              <p className="text-[11px] font-bold text-[#a0153e] uppercase tracking-[0.2em] mb-2">Start Date</p>
-              <Input
-                type="date"
-                value={newRecord.startDate}
-                onChange={(e) => setNewRecord(prev => ({ ...prev, startDate: e.target.value }))}
-                className="rounded-xl border-slate-200 h-11"
-              />
-            </div>
-          </div>
-
-          <DialogFooter className="px-6 pb-6 gap-2">
-            <Button variant="outline" onClick={() => { setAddRecordOpen(false); resetNewRecord(); }} className="rounded-full">
-              Cancel
-            </Button>
-            <Button onClick={handleCreateRecord} disabled={creatingRecord} className="rounded-full bg-[#a0153e] hover:bg-[#801030] text-white">
-              <Plus className="mr-2 h-4 w-4" /> {creatingRecord ? 'Creating...' : 'Create Record'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <AlertDialog open={taskIdToDelete !== null} onOpenChange={(open) => { if (!open) setTaskIdToDelete(null) }}>
         <AlertDialogContent className="border-2 border-rose-200">
@@ -780,6 +677,7 @@ export default function OnboardingChecklistPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
     </div>
   )
 }

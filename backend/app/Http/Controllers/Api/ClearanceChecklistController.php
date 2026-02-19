@@ -3,14 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\OnboardingChecklist;
+use App\Models\ClearanceChecklist;
 use Illuminate\Http\Request;
 
-class OnboardingChecklistController extends Controller
+class ClearanceChecklistController extends Controller
 {
     public function index()
     {
-        $checklists = OnboardingChecklist::orderBy('created_at', 'desc')->get();
+        $checklists = ClearanceChecklist::orderBy('created_at', 'desc')->get();
         $data = $checklists->map(function ($checklist) {
             return $this->transform($checklist);
         });
@@ -24,49 +24,44 @@ class OnboardingChecklistController extends Controller
             'position' => 'required|string|max:255',
             'department' => 'required|string|max:255',
             'startDate' => 'required|date',
+            'resignationDate' => 'required|date',
+            'lastDay' => 'required|date',
             'tasks' => 'nullable|array',
             'status' => 'nullable|string|max:255',
         ]);
 
         try {
-            // Map frontend keys to backend database columns if necessary
-            // The frontend sends camelCase (startDate), but model uses snake_case in migration?
-            // Let's check the migration for column names.
-            // Migration 2026_02_16_054833_create_onboarding_checklists_table.php defines:
-            // employee_name, position, department, start_date, tasks, status
-            
-            // The frontend sends 'name', 'position', 'department', 'startDate', 'tasks'.
-            
             $data = [
                 'employee_name' => $validated['name'],
                 'position' => $validated['position'],
                 'department' => $validated['department'],
                 'start_date' => $validated['startDate'],
+                'resignation_date' => $validated['resignationDate'],
+                'last_day' => $validated['lastDay'],
                 'tasks' => $validated['tasks'] ?? [],
                 'status' => $validated['status'] ?? 'PENDING',
             ];
 
-            $checklist = OnboardingChecklist::create($data);
+            $checklist = ClearanceChecklist::create($data);
             
-            // Transform back to frontend format
             $response = $this->transform($checklist);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Onboarding checklist saved successfully',
+                'message' => 'Clearance checklist saved successfully',
                 'data' => $response
             ], 201);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error saving checklist: ' . $e->getMessage()
+                'message' => 'Error saving clearance checklist: ' . $e->getMessage()
             ], 500);
         }
     }
 
     public function update(Request $request, $id)
     {
-        $checklist = OnboardingChecklist::find($id);
+        $checklist = ClearanceChecklist::find($id);
 
         if (!$checklist) {
             return response()->json(['message' => 'Checklist not found'], 404);
@@ -77,6 +72,8 @@ class OnboardingChecklistController extends Controller
             'position' => 'sometimes|string|max:255',
             'department' => 'sometimes|string|max:255',
             'startDate' => 'sometimes|date',
+            'resignationDate' => 'sometimes|date',
+            'lastDay' => 'sometimes|date',
             'tasks' => 'sometimes|array',
             'status' => 'sometimes|string|max:255',
         ]);
@@ -87,6 +84,8 @@ class OnboardingChecklistController extends Controller
             if (isset($validated['position'])) $data['position'] = $validated['position'];
             if (isset($validated['department'])) $data['department'] = $validated['department'];
             if (isset($validated['startDate'])) $data['start_date'] = $validated['startDate'];
+            if (isset($validated['resignationDate'])) $data['resignation_date'] = $validated['resignationDate'];
+            if (isset($validated['lastDay'])) $data['last_day'] = $validated['lastDay'];
             if (isset($validated['tasks'])) $data['tasks'] = $validated['tasks'];
             if (isset($validated['status'])) $data['status'] = $validated['status'];
 
@@ -96,13 +95,13 @@ class OnboardingChecklistController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Onboarding checklist updated successfully',
+                'message' => 'Clearance checklist updated successfully',
                 'data' => $response
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error updating checklist: ' . $e->getMessage()
+                'message' => 'Error updating clearance checklist: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -114,7 +113,9 @@ class OnboardingChecklistController extends Controller
             'name' => $checklist->employee_name,
             'position' => $checklist->position,
             'department' => $checklist->department,
-            'startDate' => $checklist->start_date,
+            'startDate' => $checklist->start_date ? $checklist->start_date->format('Y-m-d') : null,
+            'resignationDate' => $checklist->resignation_date ? $checklist->resignation_date->format('Y-m-d') : null,
+            'lastDay' => $checklist->last_day ? $checklist->last_day->format('Y-m-d') : null,
             'tasks' => $checklist->tasks,
             'status' => $checklist->status,
             'updated_at' => $checklist->updated_at,

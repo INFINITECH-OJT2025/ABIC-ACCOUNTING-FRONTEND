@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\OnboardingChecklistController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
@@ -26,7 +27,17 @@ Route::post('/departments/bulk', [DepartmentController::class, 'bulkCreate']);
 
 // Onboarding routes
 Route::post('/employees/{id}/onboard', [EmployeeController::class, 'onboard']);
-Route::post('/onboarding-checklists', [OnboardingChecklistController::class, 'store']);
+
+// CHECKLIST ROUTES
+Route::get('/onboarding-checklist', [OnboardingChecklistController::class, 'index']);
+Route::post('/onboarding-checklist', [OnboardingChecklistController::class, 'store']);
+Route::put('/onboarding-checklist/{id}', [OnboardingChecklistController::class, 'update']);
+
+// CLEARANCE ROUTES
+use App\Http\Controllers\Api\ClearanceChecklistController;
+Route::get('/clearance-checklist', [ClearanceChecklistController::class, 'index']);
+Route::post('/clearance-checklist', [ClearanceChecklistController::class, 'store']);
+Route::put('/clearance-checklist/{id}', [ClearanceChecklistController::class, 'update']);
 
 // Termination routes
 Route::post('/employees/{id}/terminate', [EmployeeController::class, 'terminate']);
@@ -44,3 +55,12 @@ Route::post('/employees/{id}/additional-values', [EmployeeAdditionalFieldControl
 Route::get('/activity-logs', [ActivityLogController::class, 'index']);
 Route::get('/activity-logs/stats', [ActivityLogController::class, 'stats']);
 Route::get('/activity-logs/{id}', [ActivityLogController::class, 'show']);
+
+// Directory API Routes
+use App\Http\Controllers\Api\DirectoryController;
+Route::get('/directory/agencies', [DirectoryController::class, 'index']);
+Route::put('/directory/agencies/{code}', [DirectoryController::class, 'update']);
+Route::put('/directory/agencies/{code}/image', [DirectoryController::class, 'updateImage']);
+Route::get('/directory/cloudinary-images', [DirectoryController::class, 'listCloudinaryImages']);
+
+

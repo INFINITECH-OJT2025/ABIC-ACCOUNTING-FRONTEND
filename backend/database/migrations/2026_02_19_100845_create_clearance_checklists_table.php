@@ -4,21 +4,24 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     /**
      * Run the migrations.
      */
     public function up(): void
     {
-        if (!Schema::hasTable('onboarding_checklists')) {
-            Schema::create('onboarding_checklists', function (Blueprint $table) {
+        if (!Schema::hasTable('clearance_checklists')) {
+            Schema::create('clearance_checklists', function (Blueprint $table) {
                 $table->id();
                 $table->string('employee_name');
                 $table->string('position');
                 $table->string('department');
                 $table->date('start_date');
-                $table->json('tasks');
-                $table->string('status');
+                $table->date('resignation_date');
+                $table->date('last_day');
+                $table->json('tasks')->nullable();
+                $table->string('status')->default('PENDING');
                 $table->timestamps();
             });
         }
@@ -29,6 +32,6 @@ return new class extends Migration {
      */
     public function down(): void
     {
-        Schema::dropIfExists('onboarding_checklists');
+        Schema::dropIfExists('clearance_checklists');
     }
 };
