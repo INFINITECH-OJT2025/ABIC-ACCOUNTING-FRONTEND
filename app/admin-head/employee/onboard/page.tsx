@@ -22,9 +22,11 @@ import {
   Trash2,
   ChevronDown,
   ChevronUp,
-  PlusCircle
+  PlusCircle,
+  AlertCircle
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { ConfirmationModal } from '@/components/ConfirmationModal'
 
 interface EmployeeDetails {
   [key: string]: any
@@ -84,6 +86,21 @@ export default function OnboardPage() {
   const [loadingProvinces, setLoadingProvinces] = useState(false)
   const [loadingCities, setLoadingCities] = useState(false)
   const [loadingBarangays, setLoadingBarangays] = useState(false)
+
+  // Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean
+    title: string
+    description: string
+    onConfirm: () => void
+    variant: "default" | "destructive" | "success" | "warning"
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    onConfirm: () => {},
+    variant: 'default'
+  })
 
   const batches = [
     { id: 1, title: 'Employee Details', icon: Briefcase, description: 'Basic employment information' },
@@ -307,35 +324,43 @@ export default function OnboardPage() {
 
   const handleDeleteItem = async (id: number) => {
     if (!inlineManagerType) return
-    if (!confirm(`Are you sure you want to delete this ${inlineManagerType}?`)) return
 
-    setIsActionLoading(true)
-    try {
-      const endpoint = inlineManagerType === 'position' ? 'positions' : 'departments'
-      const response = await fetch(`${getApiUrl()}/api/${endpoint}/${id}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-      })
+    setConfirmModal({
+      isOpen: true,
+      title: `Delete ${inlineManagerType === 'position' ? 'Position' : 'Department'}`,
+      description: `Are you sure you want to delete this ${inlineManagerType}? This action cannot be undone.`,
+      variant: 'destructive',
+      onConfirm: async () => {
+        setIsActionLoading(true)
+        try {
+          const endpoint = inlineManagerType === 'position' ? 'positions' : 'departments'
+          const response = await fetch(`${getApiUrl()}/api/${endpoint}/${id}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+          })
 
-      const data = await response.json()
-      if (data.success) {
-        if (inlineManagerType === 'position') {
-          await fetchPositions()
-          if (onboardFormData.position === data.name) setOnboardFormData(prev => ({ ...prev, position: '' }))
-        } else {
-          await fetchDepartments()
-          if (onboardFormData.department === data.name) setOnboardFormData(prev => ({ ...prev, department: '' }))
+          const data = await response.json()
+          if (data.success) {
+            if (inlineManagerType === 'position') {
+              await fetchPositions()
+              if (onboardFormData.position === data.name) setOnboardFormData(prev => ({ ...prev, position: '' }))
+            } else {
+              await fetchDepartments()
+              if (onboardFormData.department === data.name) setOnboardFormData(prev => ({ ...prev, department: '' }))
+            }
+            toast.success(`${inlineManagerType === 'position' ? 'Position' : 'Department'} deleted successfully`)
+          } else {
+            toast.error(data.message || 'Error deleting item')
+          }
+        } catch (error) {
+          console.error('Error deleting item:', error)
+          toast.error('Failed to delete item')
+        } finally {
+          setIsActionLoading(false)
+          setConfirmModal(prev => ({ ...prev, isOpen: false }))
         }
-        toast.success(`${inlineManagerType === 'position' ? 'Position' : 'Department'} deleted successfully`)
-      } else {
-        toast.error(data.message || 'Error deleting item')
       }
-    } catch (error) {
-      console.error('Error deleting item:', error)
-      toast.error('Failed to delete item')
-    } finally {
-      setIsActionLoading(false)
-    }
+    })
   }
 
   const handleStartOnboarding = async () => {
@@ -1215,6 +1240,16 @@ export default function OnboardPage() {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        description={confirmModal.description}
+        variant={confirmModal.variant}
+        isLoading={isActionLoading}
+      />
     </div>
   )
 }

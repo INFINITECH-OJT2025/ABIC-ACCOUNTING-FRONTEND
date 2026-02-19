@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { getApiUrl } from '@/lib/api'
+import { ConfirmationModal } from '@/components/ConfirmationModal'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -82,6 +83,23 @@ export default function TerminatePage() {
     notes: '',
   })
 
+  // Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean
+    title: string
+    description: string
+    onConfirm: () => void
+    variant: "default" | "destructive" | "success" | "warning"
+    confirmText?: string
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    onConfirm: () => {},
+    variant: 'default',
+    confirmText: 'Confirm'
+  })
+
   useEffect(() => {
     fetchData()
   }, [])
@@ -144,80 +162,91 @@ export default function TerminatePage() {
       return
     }
 
-    if (!confirm('Are you sure you want to proceed with this termination? This action can be reversed via re-hire.')) {
-        return
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Confirm Termination',
+      description: 'Are you sure you want to proceed with this termination? This action can be reversed via re-hire.',
+      variant: 'destructive',
+      confirmText: 'Yes, Terminate',
+      onConfirm: async () => {
+        try {
+          setSubmitting(true)
+          const response = await fetch(
+            `${getApiUrl()}/api/employees/${selectedEmployeeId}/terminate`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                termination_date: formData.termination_date,
+                reason: formData.reason,
+                notes: formData.notes,
+                status: 'completed',
+              }),
+            }
+          )
 
-    try {
-      setSubmitting(true)
-      const response = await fetch(
-        `${getApiUrl()}/api/employees/${selectedEmployeeId}/terminate`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            termination_date: formData.termination_date,
-            reason: formData.reason,
-            notes: formData.notes,
-            status: 'completed',
-          }),
+          const data = await response.json()
+
+          if (data.success) {
+            toast.success(data.message || 'Employee terminated successfully')
+            setSelectedEmployeeId('')
+            setFormData({
+                termination_date: new Date().toISOString().split('T')[0],
+                reason: '',
+                notes: '',
+            })
+            fetchData()
+          } else {
+            toast.error(data.message || 'Failed to terminate employee')
+          }
+        } catch (error) {
+          console.error('Error:', error)
+          toast.error('Failed to terminate employee')
+        } finally {
+          setSubmitting(false)
+          setConfirmModal(prev => ({ ...prev, isOpen: false }))
         }
-      )
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast.success(data.message || 'Employee terminated successfully')
-        setSelectedEmployeeId('')
-        setFormData({
-            termination_date: new Date().toISOString().split('T')[0],
-            reason: '',
-            notes: '',
-        })
-        // Refresh data
-        fetchData()
-      } else {
-        toast.error(data.message || 'Failed to terminate employee')
       }
-    } catch (error) {
-      console.error('Error:', error)
-      toast.error('Failed to terminate employee')
-    } finally {
-      setSubmitting(false)
-    }
+    })
   }
 
   const handleRehire = async (employeeId: number) => {
-    if (!confirm('Are you sure you want to re-hire this employee? This will restore their active status.')) {
-      return
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Confirm Re-hire',
+      description: 'Are you sure you want to re-hire this employee? This will restore their active status.',
+      variant: 'success',
+      confirmText: 'Yes, Re-hire',
+      onConfirm: async () => {
+        try {
+          setRehireLoading(employeeId)
+          const response = await fetch(`${getApiUrl()}/api/employees/${employeeId}/rehire`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          })
 
-    try {
-      setRehireLoading(employeeId)
-      const response = await fetch(`${getApiUrl()}/api/employees/${employeeId}/rehire`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
+          const data = await response.json()
 
-      const data = await response.json()
-
-      if (data.success) {
-        toast.success(data.message || 'Employee re-hired successfully')
-        fetchData()
-        setShowDetailDialog(false)
-      } else {
-        toast.error(data.message || 'Failed to re-hire employee')
+          if (data.success) {
+            toast.success(data.message || 'Employee re-hired successfully')
+            fetchData()
+            setShowDetailDialog(false)
+          } else {
+            toast.error(data.message || 'Failed to re-hire employee')
+          }
+        } catch (error) {
+          console.error('Error re-hiring:', error)
+          toast.error('Failed to re-hire employee')
+        } finally {
+          setRehireLoading(null)
+          setConfirmModal(prev => ({ ...prev, isOpen: false }))
+        }
       }
-    } catch (error) {
-      console.error('Error re-hiring:', error)
-      toast.error('Failed to re-hire employee')
-    } finally {
-      setRehireLoading(null)
-    }
+    })
   }
 
   return (
@@ -518,6 +547,17 @@ export default function TerminatePage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        description={confirmModal.description}
+        variant={confirmModal.variant}
+        confirmText={confirmModal.confirmText}
+        isLoading={submitting || rehireLoading !== null}
+      />
     </div>
   )
 }

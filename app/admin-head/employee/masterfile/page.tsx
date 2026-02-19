@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { X } from 'lucide-react'
+import { toast } from 'sonner'
+import { ConfirmationModal } from '@/components/ConfirmationModal'
 
 interface Employee {
   id: number
@@ -43,6 +45,25 @@ export default function MasterfilePage() {
   const [viewMode, setViewMode] = useState<'list' | 'details'>('list')
   const [activeTab, setActiveTab] = useState<'employed' | 'terminated'>('employed')
   const [isUpdating, setIsUpdating] = useState(false)
+
+  // Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean
+    title: string
+    description: string
+    onConfirm: () => void
+    variant: "default" | "destructive" | "success" | "warning"
+    confirmText?: string
+    hideCancel?: boolean
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    onConfirm: () => {},
+    variant: 'default',
+    confirmText: 'Confirm',
+    hideCancel: false
+  })
 
   useEffect(() => {
     fetchEmployees()
@@ -98,11 +119,11 @@ export default function MasterfilePage() {
         setViewMode('details')
         window.scrollTo(0, 0)
       } else {
-        alert('Failed to load employee details')
+        toast.error('Failed to load employee details')
       }
     } catch (error) {
       console.error('Error fetching employee details:', error)
-      alert(`Failed to load employee details`)
+      toast.error('Failed to load employee details')
     }
   }
 
@@ -149,37 +170,53 @@ export default function MasterfilePage() {
     if (!selectedEmployee) return
     
     if (!checkCompleteness(selectedEmployee)) {
-      alert('Cannot employ: Missing required Information.')
+      setConfirmModal({
+        isOpen: true,
+        title: 'Information Incomplete',
+        description: 'Cannot employ: Missing required Information. Please complete the employee profile first.',
+        variant: 'warning',
+        confirmText: 'Got it',
+        hideCancel: true,
+        onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      })
       return
     }
 
-    if (!confirm(`Are you sure you want to employ ${selectedEmployee.first_name} ${selectedEmployee.last_name}?`)) return
+    setConfirmModal({
+      isOpen: true,
+      title: 'Confirm Employment',
+      description: `Are you sure you want to employ ${selectedEmployee.first_name} ${selectedEmployee.last_name}?`,
+      variant: 'default',
+      confirmText: 'Yes, Employ',
+      hideCancel: false,
+      onConfirm: async () => {
+        setIsUpdating(true)
+        try {
+          const apiUrl = getApiUrl()
+          const response = await fetch(`${apiUrl}/api/employees/${selectedEmployee.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'employed' }),
+          })
 
-    setIsUpdating(true)
-    try {
-      const apiUrl = getApiUrl()
-      // We update the status to 'employed'
-      const response = await fetch(`${apiUrl}/api/employees/${selectedEmployee.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'employed' }),
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        // Refresh list and return to list view
-        await fetchEmployees()
-        setViewMode('list')
-        setSelectedEmployee(null)
-      } else {
-        alert(data.message || 'Failed to update status')
+          const data = await response.json()
+          if (data.success) {
+            toast.success(`${selectedEmployee.first_name} set as employed successfully`)
+            await fetchEmployees()
+            setViewMode('list')
+            setSelectedEmployee(null)
+          } else {
+            toast.error(data.message || 'Failed to update status')
+          }
+        } catch (error) {
+          console.error('Error updating status:', error)
+          toast.error('Failed to update status')
+        } finally {
+          setIsUpdating(false)
+          setConfirmModal(prev => ({ ...prev, isOpen: false }))
+        }
       }
-    } catch (error) {
-      console.error('Error updating status:', error)
-      alert('Failed to update status')
-    } finally {
-      setIsUpdating(false)
-    }
+    })
   }
 
   const filterEmployees = (list: Employee[]) => {
@@ -604,6 +641,18 @@ export default function MasterfilePage() {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        description={confirmModal.description}
+        variant={confirmModal.variant}
+        confirmText={confirmModal.confirmText}
+        hideCancel={confirmModal.hideCancel}
+        isLoading={isUpdating}
+      />
     </div>
   )
 }
