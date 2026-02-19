@@ -41,6 +41,7 @@ import {
   Trash2,
   Copy,
   Clock,
+  ArrowRight
 } from 'lucide-react'
 
 type ProcessType = 'Adding' | 'Removing'
@@ -191,8 +192,13 @@ export default function GovernmentDirectoryPage() {
 
         setAgenciesByCode(mapped)
         if (!activeAgency) {
-          const firstCode = Object.keys(mapped)[0] ?? ''
-          if (firstCode) setActiveAgency(firstCode)
+          // Default to PhilHealth if present, else first available
+          if (mapped['philhealth']) {
+            setActiveAgency('philhealth')
+          } else {
+            const firstCode = Object.keys(mapped)[0] ?? ''
+            if (firstCode) setActiveAgency(firstCode)
+          }
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to load directory data'
@@ -207,7 +213,16 @@ export default function GovernmentDirectoryPage() {
 
   const mergedAgencies = useMemo(() => {
     return Object.values(agenciesByCode)
-      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
+      .sort((a, b) => {
+        // Enforce order: BIR (tin), PAG IBIG, PHILHEALTH, SSS if possible
+        const order = ['tin', 'pagibig', 'philhealth', 'sss']
+        const indexA = order.indexOf(normalizeCode(a.code))
+        const indexB = order.indexOf(normalizeCode(b.code))
+        if (indexA !== -1 && indexB !== -1) return indexA - indexB
+        if (indexA !== -1) return -1
+        if (indexB !== -1) return 1
+        return String(a.name || '').localeCompare(String(b.name || ''))
+      })
       .map((backend) => {
         const code = normalizeCode(backend.code)
         const backendDetails = Array.isArray(backend?.contacts)
@@ -217,6 +232,7 @@ export default function GovernmentDirectoryPage() {
               icon: getDetailIcon(contact.type, contact.label ?? ''),
               label: contact.label?.trim() || contact.type,
               value: contact.value,
+              type: contact.type,
             }))
           : []
 
@@ -268,8 +284,11 @@ export default function GovernmentDirectoryPage() {
       ? updatedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
       : 'N/A'
 
-    return { contactsCount, addingStepsCount, removingStepsCount, updatedAtText }
-  }, [activeBackendAgency, editMode, draft])
+    // Find active portal link
+    const activeLink = OFFICIAL_PORTALS.find(p => normalizeCode(p.code) === activeAgency)?.url || 'N/A'
+
+    return { contactsCount, addingStepsCount, removingStepsCount, updatedAtText, activeLink }
+  }, [activeBackendAgency, editMode, draft, activeAgency])
 
   const currentProcessDraftRows = useMemo(() => {
     if (!editMode || !draft) return []
@@ -484,68 +503,6 @@ export default function GovernmentDirectoryPage() {
     }
   }
 
-  if (loadingDirectory && !agency) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-12">
-        <header className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md p-4 md:p-8 mb-4 md:mb-8">
-          <div className="w-full">
-            <h1 className="text-2xl md:text-4xl font-bold mb-2 md:mb-3 flex items-center gap-3">
-              <Building2 className="w-8 h-8 md:w-10 h-10" />
-              Government Directory
-            </h1>
-            <p className="text-white/80 text-sm md:text-lg flex items-center gap-2">
-              <Clock className="w-4 h-4 md:w-5 h-5" />
-              ABIC REALTY & CONSULTANCY • PROCESS REFERENCE
-            </p>
-          </div>
-        </header>
-        <main className="w-full p-4 md:p-8">
-          <Card className="rounded-[2rem] border-none shadow-2xl bg-white p-10">
-            <div className="mx-auto max-w-3xl text-center">
-              <div className="mx-auto mb-5 h-14 w-14 rounded-full border-4 border-[#A4163A]/20 border-t-[#A4163A] animate-spin" />
-              <p className="text-2xl font-black text-slate-900">Loading Directory</p>
-              <p className="mt-2 text-slate-600">Fetching agencies, contacts, and process steps...</p>
-              <div className="mt-6 space-y-3">
-                <div className="h-4 rounded-full bg-slate-200/80 animate-pulse" />
-                <div className="h-4 w-11/12 mx-auto rounded-full bg-slate-200/70 animate-pulse [animation-delay:120ms]" />
-                <div className="h-4 w-9/12 mx-auto rounded-full bg-slate-200/60 animate-pulse [animation-delay:240ms]" />
-              </div>
-              <div className="mt-7 flex items-center justify-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-[#A4163A]/80 animate-bounce" />
-                <span className="h-2.5 w-2.5 rounded-full bg-[#A4163A]/70 animate-bounce [animation-delay:140ms]" />
-                <span className="h-2.5 w-2.5 rounded-full bg-[#A4163A]/60 animate-bounce [animation-delay:280ms]" />
-              </div>
-            </div>
-          </Card>
-        </main>
-      </div>
-    )
-  }
-
-  if (!loadingDirectory && !agency) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-12">
-        <header className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md p-4 md:p-8 mb-4 md:mb-8">
-          <div className="w-full">
-            <h1 className="text-2xl md:text-4xl font-bold mb-2 md:mb-3 flex items-center gap-3">
-              <Building2 className="w-8 h-8 md:w-10 h-10" />
-              Government Directory
-            </h1>
-            <p className="text-white/80 text-sm md:text-lg flex items-center gap-2">
-              <Clock className="w-4 h-4 md:w-5 h-5" />
-              ABIC REALTY & CONSULTANCY • PROCESS REFERENCE
-            </p>
-          </div>
-        </header>
-        <main className="w-full p-4 md:p-8">
-          <Card className="rounded-[2rem] border-none shadow-2xl bg-white p-10 text-center text-slate-600">
-            No agencies found in the database yet.
-          </Card>
-        </main>
-      </div>
-    )
-  }
-
   const persistAgencyImage = async (params: {
     imageUrl: string
     publicId?: string | null
@@ -652,445 +609,456 @@ export default function GovernmentDirectoryPage() {
     }
   }
 
+  // --- RENDERING ---
+
+  if (loadingDirectory && !agency) {
+    return (
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-[#A4163A] mx-auto mb-4" />
+          <p className="text-xl font-bold text-slate-700">Loading Directory...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!loadingDirectory && !agency) {
+    return (
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
+        <div className="text-center max-w-md p-8 bg-white rounded-xl shadow-xl">
+          <Building2 className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">No Agencies Found</h2>
+          <p className="text-slate-600">The directory database is empty. Please verify the backend data.</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-12">
-      {/* ----- MAROON GRADIENT HEADER ----- */}
-      <header className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md p-4 md:p-8 mb-4 md:mb-8">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-          <div>
-            <h1 className="text-2xl md:text-4xl font-bold mb-2 md:mb-3 flex items-center gap-3">
-              <Building2 className="w-8 h-8 md:w-10 h-10" />
-              Government Directory
-            </h1>
-            <p className="text-white/80 text-sm md:text-lg flex items-center gap-2">
-              <Clock className="w-4 h-4 md:w-5 h-5" />
-              ABIC REALTY & CONSULTANCY • PROCESS REFERENCE
-            </p>
+    <div className="min-h-screen bg-[#F0F2F5] font-sans flex flex-col">
+      {/* ----- HEADER AREA ----- */}
+      <header className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-xl relative overflow-hidden">
+        {/* Top Pattern Effect (Optional) */}
+        <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-white to-transparent" />
+
+        <div className="w-full px-4 md:px-8 py-5 relative z-10">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-black tracking-tight flex items-center gap-3">
+                <Building2 className="w-8 h-8 opacity-80" />
+                Government Directory
+              </h1>
+              <p className="text-xs md:text-sm font-semibold tracking-wide opacity-70 mt-1 flex items-center gap-2">
+                <Clock className="w-3.5 h-3.5" />
+                ABIC REALTY & CONSULTANCY - PROCESS REFERENCE
+              </p>
+            </div>
+
+            {/* EDIT MODE TOGGLE */}
+            <div className="flex items-center gap-2">
+              {editMode ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    onClick={cancelEditMode}
+                    className="text-white hover:bg-white/20 hover:text-white"
+                  >
+                    CANCEL
+                  </Button>
+                  <Button
+                    onClick={saveDirectoryChanges}
+                    disabled={savingChanges || !draft}
+                    variant="secondary"
+                    className="font-bold text-[#A4163A] bg-white hover:bg-stone-100"
+                  >
+                    {savingChanges ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : (
+                      <Save className="w-4 h-4 mr-2" />
+                    )}
+                    SAVE SHANGES
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  onClick={startEditMode}
+                  variant="outline"
+                  className="border-white/30 text-white hover:bg-white/20 hover:text-white bg-transparent backdrop-blur-sm"
+                >
+                  <Edit3 className="w-4 h-4 mr-2" />
+                  UPDATE MODE
+                </Button>
+              )}
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            {editMode ? (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={cancelEditMode}
-                  className="bg-white/10 backdrop-blur-sm border-white/30 text-white hover:bg-white/20 transition-all duration-200 text-lg h-11 px-6 font-bold rounded-lg border"
+          {/* AGENCY NAVIGATION (Tabs style) */}
+          <div className="flex items-center gap-6 overflow-x-auto pb-2 scrollbar-hide text-sm md:text-base font-black tracking-widest uppercase">
+            {mergedAgencies.map((item) => {
+              const isActive = item.key === activeAgency
+              const Icon = item.icon
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => {
+                    if (editMode) {
+                      toast.warning('Save or cancel changes first.')
+                      return
+                    }
+                    setActiveAgency(item.key)
+                  }}
+                  className={cn(
+                    "relative py-2 px-1 transition-all duration-300 whitespace-nowrap group hover:text-white flex items-center gap-3",
+                    isActive ? "text-white" : "text-white/40"
+                  )}
                 >
-                  <X className="mr-2 h-5 w-5" />
-                  CANCEL
-                </Button>
-                <Button
-                  onClick={saveDirectoryChanges}
-                  disabled={savingChanges || !draft}
-                  className="bg-white/95 backdrop-blur-sm border-stone-200 text-[#A4163A] hover:bg-white hover:border-red-200 shadow-sm hover:shadow-md transition-all duration-200 text-lg h-11 px-6 font-bold rounded-lg border flex items-center gap-2"
-                >
-                  <Save className="h-5 w-5" />
-                  {savingChanges ? 'SAVING...' : 'SAVE CHANGES'}
-                </Button>
-              </>
-            ) : (
-              <Button
-                onClick={startEditMode}
-                className="bg-white/95 backdrop-blur-sm border-stone-200 text-[#A4163A] hover:bg-white hover:border-red-200 shadow-sm hover:shadow-md transition-all duration-200 text-lg h-11 px-6 font-bold rounded-lg border flex items-center gap-2"
-              >
-                <Edit3 className="h-5 w-5" />
-                <span>UPDATE MODE</span>
-              </Button>
-            )}
+                  <Icon className="w-5 h-5" />
+                  <span>{item.shortName}</span>
+                  {isActive && (
+                    <span className="absolute bottom-0 left-0 w-full h-1 bg-white rounded-none" />
+                  )}
+                </button>
+              )
+            })}
           </div>
         </div>
       </header>
 
-      <main className="w-full p-4 md:p-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          <div className="lg:col-span-1 space-y-6">
-            <Card className="rounded-[2rem] border-none shadow-2xl bg-white p-6">
-              <p className="text-[11px] font-black text-[#A4163A] uppercase tracking-[0.2em] mb-4">Agencies</p>
-              <div className="space-y-3">
-                {mergedAgencies.map((item) => {
-                  const Icon = item.icon
-                  const isActive = item.key === activeAgency
-                  return (
+      {/* ----- MAIN CONTENT ----- */}
+      <main className="w-full px-4 md:px-8 py-8 -mt-2 flex-grow">
+
+        {/* COMBINED HERO & PROCESS SECTION */}
+        <div className="flex flex-col shadow-xl border border-slate-200 rounded-sm overflow-hidden mb-8">
+
+          {/* 1. HERO BANNER */}
+          <div className="relative w-full h-[400px] bg-white group">
+            {!imageError[agency.key] ? (
+              <img
+                src={agency.image}
+                alt={agency.shortName}
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                onError={() => setImageError(p => ({ ...p, [agency.key]: true }))}
+              />
+            ) : (
+              <div className="w-full h-full bg-slate-200 flex items-center justify-center">
+                <agency.icon className="w-24 h-24 text-slate-400" />
+              </div>
+            )}
+
+            {/* Banner Overlays */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+
+            <div className="absolute top-6 right-6 flex flex-col gap-3">
+              {/* Upload Buttons */}
+              {uploadPreset ? (
+                <CldUploadWidget
+                  uploadPreset={uploadPreset}
+                  options={{
+                    multiple: false,
+                    maxFiles: 1,
+                    resourceType: 'image',
+                    sources: ['local'],
+                    folder: `directory/${activeAgency}`,
+                    maxFileSize: MAX_IMAGE_BYTES,
+                    clientAllowedFormats: [...ALLOWED_UPLOAD_FORMATS],
+                  }}
+                  onSuccess={(result) => void handleImageUpdate(result)}
+                >
+                  {({ open }) => (
                     <Button
-                      key={item.key}
-                      onClick={() => {
-                        if (editMode) {
-                          toast.warning('Finish edit mode first', { description: 'Save or cancel your current changes before switching agency.' })
-                          return
-                        }
-                        setActiveAgency(item.key)
-                      }}
-                      variant="ghost"
-                      className={cn(
-                        'w-full h-auto justify-start rounded-xl px-4 py-3 border transition-colors',
-                        isActive
-                          ? 'bg-[#A4163A]/10 border-[#A4163A]/30 text-[#A4163A]'
-                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                      )}
+                      onClick={() => open()}
+                      disabled={updatingImage}
+                      className="bg-[#A4163A] hover:bg-[#8a1230] text-white border-none rounded-sm px-6 shadow-lg shadow-red-900/20 font-bold"
                     >
-                      <Icon className="h-4 w-4 mr-2 shrink-0" />
-                      <span className="font-bold">{item.shortName}</span>
+                      {updatingImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImageUp className="mr-2 h-4 w-4" />}
+                      Update Picture
                     </Button>
-                  )
-                })}
-              </div>
-            </Card>
-
-            <Card className="rounded-[2rem] border-none shadow-2xl bg-white p-6">
-              <p className="text-[11px] font-black text-[#A4163A] uppercase tracking-[0.2em] mb-2">Agency Snapshot</p>
-              <p className="text-sm font-semibold text-slate-700 mb-4">{agency.shortName}</p>
-              <div className="space-y-3 text-sm">
-                <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                  <span className="text-slate-600"># Contacts</span>
-                  <span className="font-black text-slate-900">{snapshot.contactsCount}</span>
-                </div>
-                <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                  <span className="text-slate-600"># Adding steps</span>
-                  <span className="font-black text-slate-900">{snapshot.addingStepsCount}</span>
-                </div>
-                <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                  <span className="text-slate-600"># Removing steps</span>
-                  <span className="font-black text-slate-900">{snapshot.removingStepsCount}</span>
-                </div>
-                <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                  <span className="text-slate-600">Last updated</span>
-                  <span className="font-black text-slate-900">{snapshot.updatedAtText}</span>
-                </div>
-              </div>
-            </Card>
-
-            <Card className="rounded-[2rem] border-none shadow-2xl bg-white p-6">
-              <p className="text-[11px] font-black text-[#A4163A] uppercase tracking-[0.2em] mb-4">Official Online Portals</p>
-              <div className="space-y-3">
-                {OFFICIAL_PORTALS.map((portal) => {
-                  const isActivePortal = normalizeCode(portal.code) === normalizeCode(activeAgency)
-                  return (
-                    <a
-                      key={portal.code}
-                      href={portal.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={cn(
-                        "block rounded-xl border px-3 py-3 transition-colors",
-                        isActivePortal
-                          ? "border-[#A4163A]/30 bg-[#A4163A]/5"
-                          : "border-slate-200 bg-slate-50/50 hover:bg-slate-100"
-                      )}
-                    >
-                      <p className="text-[11px] font-black uppercase tracking-[0.15em] text-[#A4163A]">{portal.label}</p>
-                      <p className="text-xs text-slate-600 mt-1 break-all">{portal.url}</p>
-                    </a>
-                  )
-                })}
-              </div>
-            </Card>
-          </div>
-
-          <Card className="lg:col-span-3 rounded-[2rem] border-none shadow-2xl bg-white overflow-hidden">
-            <div className="relative h-64 bg-slate-100">
-              {!imageError[agency.key] ? (
-                <img
-                  src={agency.image}
-                  alt={agency.shortName}
-                  className="h-full w-full object-cover"
-                  onError={() =>
-                    setImageError((prev) => ({
-                      ...prev,
-                      [agency.key]: true,
-                    }))
-                  }
-                />
+                  )}
+                </CldUploadWidget>
               ) : (
-                <div className="h-full w-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center">
-                  <agency.icon className="h-16 w-16 text-slate-500" />
-                </div>
+                <Button disabled className="bg-slate-800 text-white rounded-sm">Config Error</Button>
               )}
 
-              <div className="absolute right-6 top-6 flex flex-col items-end gap-2">
-                {uploadPreset ? (
-                  <CldUploadWidget
-                    uploadPreset={uploadPreset}
-                    options={{
-                      multiple: false,
-                      maxFiles: 1,
-                      resourceType: 'image',
-                      sources: ['local'],
-                      folder: `directory/${activeAgency}`,
-                      maxFileSize: MAX_IMAGE_BYTES,
-                      clientAllowedFormats: [...ALLOWED_UPLOAD_FORMATS],
-                    }}
-                    onSuccess={(result) => {
-                      void handleImageUpdate(result)
-                    }}
-                  >
-                    {({ open }) => (
-                      <Button
-                        type="button"
-                        onClick={() => open()}
-                        disabled={updatingImage}
-                        className="rounded-full h-10 px-5 bg-white/95 text-[#A4163A] hover:bg-white"
-                      >
-                        {updatingImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImageUp className="mr-2 h-4 w-4" />}
-                        Update Picture
-                      </Button>
-                    )}
-                  </CldUploadWidget>
-                ) : (
-                  <Button
-                    type="button"
-                    disabled
-                    className="rounded-full h-10 px-5 bg-white/95 text-slate-500 hover:bg-white"
-                  >
-                    <ImageUp className="mr-2 h-4 w-4" /> Update Picture
-                  </Button>
-                )}
-                <Button
-                  type="button"
-                  onClick={() => { void loadCloudinaryImages() }}
-                  disabled={loadingCloudinaryImages || updatingImage}
-                  className="rounded-full h-10 px-5 bg-white/95 text-[#A4163A] hover:bg-white"
-                >
-                  {loadingCloudinaryImages ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Images className="mr-2 h-4 w-4" />}
-                  Select from image uploads
-                </Button>
-                <p className="text-[11px] font-bold text-white/90 bg-black/40 px-3 py-1 rounded-full">
-                  Max 20MB - JPG, JPEG, PNG, GIF, WebP, HEIC, HEIF
+              <Button
+                onClick={() => void loadCloudinaryImages()}
+                disabled={loadingCloudinaryImages || updatingImage}
+                className="bg-[#A4163A] hover:bg-[#8a1230] text-white border-none rounded-sm px-6 shadow-lg shadow-red-900/20 font-bold"
+              >
+                {loadingCloudinaryImages ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Images className="mr-2 h-4 w-4" />}
+                Select from Image uploads
+              </Button>
+              <p className="text-[10px] font-bold text-white/80 text-right mt-1 drop-shadow-md">
+                Max 20MB - JPG, JPEG, PNG, GIF, WebP, HEIC, HEIF
+              </p>
+            </div>
+
+            <div className="absolute bottom-0 left-0 p-10 w-full max-w-4xl">
+              <div className="flex items-center gap-3 mb-3">
+                <p className="text-xs md:text-sm font-black text-white/80 tracking-[0.3em] uppercase bg-white/10 backdrop-blur-md px-4 py-1.5 rounded-sm inline-block border border-white/20 shadow-sm">
+                  AGENCY DIRECTORY
                 </p>
               </div>
 
-              <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-black/70 to-transparent text-white">
-                <Badge className="mb-2 bg-white/20 text-white border-none rounded-full px-3 py-1 text-[10px] font-black tracking-widest">
-                  AGENCY DIRECTORY
-                </Badge>
-                {editMode && draft ? (
-                  <div className="space-y-2 max-w-2xl">
-                    <Input
-                      value={draft.name}
-                      onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                      className={cn(
-                        "h-10 bg-white/95 text-slate-900 border-none",
-                        showValidation && draft.name.trim().length === 0 && "ring-2 ring-rose-400"
-                      )}
-                      placeholder="Agency short name"
-                    />
-                    {showValidation && draft.name.trim().length === 0 && (
-                      <p className="text-xs font-semibold text-rose-100">Agency short name is required.</p>
-                    )}
-                    <Input
-                      value={draft.full_name}
-                      onChange={(e) => setDraft({ ...draft, full_name: e.target.value })}
-                      className="h-9 bg-white/95 text-slate-900 border-none"
-                      placeholder="Agency full name"
-                    />
-                  </div>
-                ) : (
-                  <>
-                    <h2 className="text-3xl font-black leading-tight">{agency.shortName}</h2>
-                    <p className="text-white/90">{agency.fullName}</p>
-                  </>
+              {editMode && draft ? (
+                <div className="space-y-3">
+                  <Input
+                    value={draft.name}
+                    onChange={e => setDraft({ ...draft, name: e.target.value })}
+                    className="text-4xl md:text-6xl font-black text-white bg-transparent border-b border-white/40 rounded-none px-0 h-auto focus-visible:ring-0 focus-visible:border-white placeholder:text-white/30"
+                    placeholder="SHORT NAME"
+                  />
+                  <Input
+                    value={draft.full_name}
+                    onChange={e => setDraft({ ...draft, full_name: e.target.value })}
+                    className="text-xl md:text-2xl font-medium text-white/90 bg-transparent border-b border-white/40 rounded-none px-0 h-auto focus-visible:ring-0 focus-visible:border-white placeholder:text-white/30"
+                    placeholder="Agency Full Business Name"
+                  />
+                </div>
+              ) : (
+                <>
+                  <h2 className="text-4xl md:text-6xl font-black text-white tracking-tight drop-shadow-sm mb-2">
+                    {agency.shortName}
+                  </h2>
+                  <p className="text-lg md:text-2xl font-medium text-white/90 leading-snug max-w-2xl drop-shadow-sm">
+                    {agency.fullName}
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* 2. PROCESS STEPS */}
+          <div className="bg-white p-8 md:p-10 relative overflow-hidden">
+            {/* Background decoration */}
+            <div className="absolute -top-24 -right-24 w-64 h-64 bg-red-50 rounded-full blur-3xl opacity-50 pointer-events-none" />
+
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-10 relative z-10">
+              <div>
+                <p className="text-lg font-black text-[#A4163A] uppercase tracking-[0.25em] mb-2">GOVERNMENT CONTRIBUTION</p>
+                <h3 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Process Steps</h3>
+                {editMode && draft && (
+                  <Textarea
+                    value={draft.summary}
+                    onChange={e => {
+                      setDraft({ ...draft, summary: e.target.value })
+                    }}
+                    className="mt-4 max-w-2xl rounded-sm"
+                    placeholder="Agency summary or additional notes..."
+                  />
                 )}
               </div>
-            </div>
 
-            <div className="p-8">
-              {editMode && draft ? (
-                <Textarea
-                  value={draft.summary}
-                  onChange={(e) => setDraft({ ...draft, summary: e.target.value })}
-                  className="mb-6 min-h-[80px]"
-                  placeholder="Agency summary"
-                />
-              ) : (
-                <p className="text-slate-600 font-medium mb-6">{agency.summary}</p>
-              )}
-
-              {editMode && (
-                <div className="mb-4">
-                  <Button onClick={addContact} size="sm" variant="ghost" className="rounded-full text-[#A4163A] font-bold bg-[#A4163A]/5 hover:bg-[#A4163A]/10 px-5">
-                    <Plus className="mr-2 h-4 w-4" /> Add Contact
-                  </Button>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {(editMode && draft
-                  ? draft.contacts.map((contact, index) => ({
-                    icon: getDetailIcon(contact.type, contact.label),
-                    label: contact.label || contact.type,
-                    value: contact.value,
-                    editable: contact,
-                    index,
-                  }))
-                  : agency.details.map((row, index) => ({
-                    ...row,
-                    editable: null as EditableContact | null,
-                    index,
-                  }))).map((row: any) => {
-                    const Icon = row.icon
+              <div className="flex items-center gap-3">
+                <div className="flex bg-slate-100 p-1.5 rounded-sm border border-slate-200">
+                  {(['Adding', 'Removing'] as ProcessType[]).map((type) => {
+                    const isActive = activeProcess === type
                     return (
-                      <div key={`${agency.key}-${row.index}`} className="rounded-xl border border-slate-200 bg-slate-50/40 p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="h-9 w-9 rounded-lg bg-[#A4163A]/10 text-[#A4163A] flex items-center justify-center shrink-0">
-                            <Icon className="h-4 w-4" />
-                          </div>
-                          <div className="flex-1">
-                            {editMode && row.editable ? (
-                              <div className="space-y-2 min-w-[260px]">
-                                <Input
-                                  value={row.editable.type}
-                                  onChange={(e) => updateContactAt(row.index, 'type', e.target.value)}
-                                  placeholder="Type (email, hotline, address)"
-                                  className={cn(
-                                    "h-8 text-xs",
-                                    showValidation && row.editable.type.trim().length === 0 && "border-rose-400 focus-visible:ring-rose-300"
-                                  )}
-                                />
-                                <Input
-                                  value={row.editable.label}
-                                  onChange={(e) => updateContactAt(row.index, 'label', e.target.value)}
-                                  placeholder="Label"
-                                  className="h-8 text-xs"
-                                />
-                                <Input
-                                  value={row.editable.value}
-                                  onChange={(e) => updateContactAt(row.index, 'value', e.target.value)}
-                                  placeholder="Value"
-                                  className={cn(
-                                    "h-8 text-xs",
-                                    showValidation && row.editable.value.trim().length === 0 && "border-rose-400 focus-visible:ring-rose-300"
-                                  )}
-                                />
-                                <Button
-                                  type="button"
-                                  onClick={() => removeContactAt(row.index)}
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 px-2 text-rose-600 hover:bg-rose-50"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
-                                </Button>
-                              </div>
-                            ) : (
-                              <>
-                                <div className="flex items-center justify-between gap-2">
-                                  <p className="text-[11px] font-black text-[#A4163A] uppercase tracking-[0.15em]">{row.label}</p>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => { void handleCopyText(String(row.label || 'Value'), String(row.value || '')) }}
-                                    className="h-7 px-2 text-slate-500 hover:text-[#A4163A] hover:bg-[#A4163A]/10"
-                                  >
-                                    <Copy className="h-3.5 w-3.5 mr-1" /> Copy
-                                  </Button>
-                                </div>
-                                <p className="text-sm font-semibold text-slate-700 mt-1 leading-relaxed">{row.value}</p>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+                      <button
+                        key={type}
+                        onClick={() => setActiveProcess(type)}
+                        className={cn(
+                          "px-6 py-2.5 rounded-sm text-sm font-black transition-all flex items-center gap-2",
+                          isActive ? "bg-[#A4163A] text-white shadow-md transform scale-105" : "text-slate-500 hover:text-slate-900 hover:bg-slate-200"
+                        )}
+                      >
+                        {type === 'Adding' ? <UserPlus className="w-4 h-4" /> : <UserMinus className="w-4 h-4" />}
+                        <span>{type}</span>
+                      </button>
                     )
                   })}
+                </div>
               </div>
             </div>
 
-            <div className="border-t border-slate-100 p-8 bg-slate-50/30">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-                <div>
-                  <p className="text-[11px] font-black text-[#A4163A] uppercase tracking-[0.2em] mb-2">Goverment Contribution</p>
-                  <h3 className="text-2xl font-black text-slate-900">Process Steps</h3>
-                </div>
-
-                <div className="flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm w-fit">
-                  {(['Adding', 'Removing'] as ProcessType[]).map((proc) => (
-                    <Button
-                      key={proc}
-                      onClick={() => setActiveProcess(proc)}
-                      variant="ghost"
-                      className={cn(
-                        'h-9 rounded-lg px-5 text-xs font-black transition-all',
-                        activeProcess === proc
-                          ? 'bg-[#A4163A] text-white'
-                          : 'text-slate-600 hover:text-slate-900'
-                      )}
-                    >
-                      {proc === 'Adding' ? <UserPlus className="mr-1.5 h-3.5 w-3.5" /> : <UserMinus className="mr-1.5 h-3.5 w-3.5" />}
-                      {proc}
-                    </Button>
-                  ))}
-                </div>
+            {/* TABLE / LIST */}
+            <div className="relative z-10">
+              <div className="border rounded-sm overflow-hidden border-slate-100 shadow-sm">
                 {editMode && (
-                  <Button onClick={addProcessStep} size="sm" variant="ghost" className="rounded-full text-[#A4163A] font-bold bg-[#A4163A]/5 hover:bg-[#A4163A]/10 px-5">
-                    <Plus className="mr-2 h-4 w-4" /> Add Step
-                  </Button>
+                  <div className="bg-slate-50 p-3 border-b border-slate-100 flex justify-end">
+                    <Button onClick={addProcessStep} size="sm" variant="outline" className="text-[#A4163A] border-[#A4163A]/20 bg-[#A4163A]/5 hover:bg-[#A4163A]/10 rounded-sm">
+                      <Plus className="mr-2 h-4 w-4" /> Add Step
+                    </Button>
+                  </div>
                 )}
-              </div>
 
-              <Card className="rounded-2xl border-slate-200 shadow-sm bg-white overflow-hidden">
                 <Table>
-                  <TableHeader className="bg-slate-50">
-                    <TableRow>
-                      <TableHead className="w-[100px] text-center font-black text-[#A4163A] uppercase tracking-widest text-[11px] py-5">Step</TableHead>
-                      <TableHead className="font-black text-[#A4163A] uppercase tracking-widest text-[11px] py-5">Process</TableHead>
+                  <TableHeader className="bg-slate-50/50">
+                    <TableRow className="hover:bg-slate-50/50 border-slate-100">
+                      <TableHead className="w-[80px] text-center font-black text-slate-400 uppercase text-[20px] tracking-widest py-4">Step</TableHead>
+                      <TableHead className="font-black text-slate-400 uppercase text-[20px] tracking-widest py-4">Process Description</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {editMode && currentProcessDraftRows.map((step, index) => (
-                      <TableRow key={`${activeAgency}-${activeProcess}-${step.id ?? index}`} className="hover:bg-slate-50/60">
-                        <TableCell className="text-center">
-                          <div className="h-8 w-8 rounded-lg bg-slate-100 text-slate-700 font-black text-sm flex items-center justify-center mx-auto">
-                            {index + 1}
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-semibold text-slate-700 py-4">
-                          <div className="flex items-center gap-2">
-                            <Input
-                              value={step.process}
-                              onChange={(e) => updateProcessTextAt(index, e.target.value)}
-                              className={cn(
-                                "h-9",
-                                showValidation && step.process.trim().length === 0 && "border-rose-400 focus-visible:ring-rose-300"
-                              )}
-                            />
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => removeProcessAt(index)}
-                              className="h-9 px-2 text-rose-600 hover:bg-rose-50"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {!editMode && currentSteps.map((step, index) => (
-                      <TableRow key={`${activeAgency}-${activeProcess}-${index}`} className="hover:bg-slate-50/60">
-                        <TableCell className="text-center">
-                          <div className="h-8 w-8 rounded-lg bg-slate-100 text-slate-700 font-black text-sm flex items-center justify-center mx-auto">
-                            {index + 1}
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-semibold text-slate-700 py-4">{step}</TableCell>
-                      </TableRow>
-                    ))}
-                    {(editMode ? currentProcessDraftRows.length === 0 : currentSteps.length === 0) && !loadingDirectory && (
-                      <TableRow>
-                        <TableCell colSpan={2} className="py-10 text-center text-slate-500">
-                          No process steps available for this agency yet.
-                        </TableCell>
-                      </TableRow>
+                    {editMode ? (
+                      currentProcessDraftRows.length > 0 ? (
+                        currentProcessDraftRows.map((step, index) => (
+                          <TableRow key={index} className="border-slate-100 hover:bg-slate-50/50">
+                            <TableCell className="text-center align-top py-6">
+                              <div className="h-8 w-8 rounded-sm bg-[#A4163A]/10 text-[#A4163A] font-black text-sm flex items-center justify-center mx-auto">
+                                {index + 1}
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-6 align-top">
+                              <div className="flex gap-2">
+                                <Textarea
+                                  value={step.process}
+                                  onChange={(e) => updateProcessTextAt(index, e.target.value)}
+                                  className="min-h-[60px] resize-y rounded-sm"
+                                />
+                                <Button size="icon" variant="ghost" onClick={() => removeProcessAt(index)} className="text-rose-500 hover:bg-rose-50 hover:text-rose-600 shrink-0 h-9 w-9 rounded-sm">
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={2} className="h-32 text-center text-slate-400 italic">No draft steps yet.</TableCell>
+                        </TableRow>
+                      )
+                    ) : (
+                      currentSteps.length > 0 ? (
+                        currentSteps.map((step, index) => (
+                          <TableRow key={index} className="border-slate-100 hover:bg-slate-50/30 transition-colors">
+                            <TableCell className="text-center align-top py-6">
+                              <div className="h-10 w-10 rounded-sm bg-slate-100 text-slate-600 font-black text-base flex items-center justify-center mx-auto shadow-sm">
+                                {index + 1}
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-6 align-top">
+                              <p className="text-xl font-medium text-slate-800 leading-relaxed pt-1.5">{step}</p>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={2} className="h-32 text-center text-slate-400 italic">No process steps found for this category.</TableCell>
+                        </TableRow>
+                      )
                     )}
                   </TableBody>
                 </Table>
-              </Card>
+              </div>
             </div>
-          </Card>
+          </div>
+        </div>
+        {/* 3. CONTACT GRIDS */}
+        <div>
+          <div className="mt-8 mb-4 border-b border-slate-200 pb-2">
+            <h3 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+              <Phone className="w-5 h-5 text-[#A4163A]" />
+              Contact Information
+            </h3>
+            <p className="text-slate-500 font-medium text-sm mt-1">
+              24/7 hotline, mobile support, callback service, and main office details.
+            </p>
+          </div>
+          {editMode && (
+            <div className="mb-4 flex justify-end">
+              <Button onClick={addContact} variant="outline" className="text-[#A4163A] border-[#A4163A]/20 bg-white shadow-sm rounded-sm">
+                <Plus className="mr-2 h-4 w-4" /> Add Contact Field
+              </Button>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {(editMode && draft
+              ? draft.contacts
+              : agency.details
+            ).filter(row => {
+              if (editMode) return true
+              // In view mode, only show if value exists
+              return row.value && row.value.trim().length > 0
+            })
+              .map((row, idx) => {
+                const isEditable = editMode && draft
+                const actualRow = isEditable ? row : row
+                // Note: agency.details already has icon, but draft doesn't.
+                const Icon = isEditable
+                  ? getDetailIcon(row.type, row.label)
+                  : (row as any).icon
+
+                return (
+                  <div key={idx} className="group bg-white rounded-sm p-3 border border-slate-200 hover:border-[#A4163A] transition-colors flex items-center justify-between gap-4 shadow-sm hover:shadow-md">
+                    {isEditable ? (
+                      <div className="flex-1 space-y-2 relative z-10 w-full">
+                        <div className="flex gap-2">
+                          <Input
+                            value={row.type}
+                            onChange={(e) => updateContactAt(idx, 'type', e.target.value)}
+                            placeholder="Type (e.g. Hotline)"
+                            className="font-bold text-xs uppercase rounded-sm h-8"
+                          />
+                          <Input
+                            value={row.label}
+                            onChange={(e) => updateContactAt(idx, 'label', e.target.value)}
+                            placeholder="Label"
+                            className="font-bold text-xs uppercase rounded-sm h-8"
+                          />
+                        </div>
+                        <Input
+                          value={row.value}
+                          onChange={(e) => updateContactAt(idx, 'value', e.target.value)}
+                          placeholder="Value"
+                          className="rounded-sm h-9"
+                        />
+                        <Button size="sm" variant="ghost" onClick={() => removeContactAt(idx)} className="text-rose-500 w-full hover:bg-rose-50 rounded-sm h-8">
+                          <Trash2 className="w-4 h-4 mr-2" /> Remove
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <div className="h-10 w-10 rounded-full bg-slate-50 text-[#A4163A] flex items-center justify-center shrink-0 border border-slate-100">
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-0.5">
+                              {row.label || row.type}
+                            </p>
+                            <p className="text-sm md:text-base font-bold text-slate-800 truncate leading-none pb-0.5">
+                              {row.value}
+                            </p>
+                          </div>
+                        </div>
+
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 px-3 text-slate-400 hover:text-[#A4163A] hover:bg-rose-50 rounded-sm font-bold text-xs tracking-wider"
+                          onClick={() => void handleCopyText(row.label || row.type, row.value)}
+                        >
+                          <Copy className="h-3.5 w-3.5 mr-2" />
+                          COPY
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                )
+              })}
+          </div>
         </div>
       </main>
 
+      {/* 4. FOOTER */}
+      <footer className="w-full bg-[#A4163A] text-white py-4 px-8 mt-auto sticky bottom-0 z-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+        <div className="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4 text-xs md:text-sm font-bold uppercase tracking-widest">
+          <div className="flex items-center gap-2">
+            <span className="opacity-70">OFFICIAL ONLINE PORTAL:</span>
+            <a href={snapshot.activeLink} target="_blank" rel="noreferrer" className="hover:underline hover:text-white text-white/90">
+              {snapshot.activeLink !== 'N/A' ? snapshot.activeLink : '(LINK)'}
+            </a>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="opacity-70">LAST UPDATED:</span>
+            <span className="text-white/90">{snapshot.updatedAtText}</span>
+          </div>
+        </div>
+      </footer>
+
+      {/* ----- MODALS ----- */}
       <Dialog open={cloudinaryPickerOpen} onOpenChange={setCloudinaryPickerOpen}>
         <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-hidden p-0">
           <DialogHeader className="px-6 pt-6">
@@ -1163,6 +1131,7 @@ export default function GovernmentDirectoryPage() {
           </div>
         </DialogContent>
       </Dialog>
+
       <AlertDialog open={deleteCandidate !== null} onOpenChange={(open) => { if (!open) setDeleteCandidate(null) }}>
         <AlertDialogContent className="border-2 border-rose-200">
           <AlertDialogHeader>
