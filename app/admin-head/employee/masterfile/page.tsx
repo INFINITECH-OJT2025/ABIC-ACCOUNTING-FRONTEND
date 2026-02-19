@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { X } from 'lucide-react'
+import { toast } from 'sonner'
+import { ConfirmationModal } from '@/components/ConfirmationModal'
 
 interface Employee {
   id: number
@@ -44,6 +46,25 @@ export default function MasterfilePage() {
   const [activeTab, setActiveTab] = useState<'employed' | 'terminated'>('employed')
   const [isUpdating, setIsUpdating] = useState(false)
 
+  // Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean
+    title: string
+    description: string
+    onConfirm: () => void
+    variant: "default" | "destructive" | "success" | "warning"
+    confirmText?: string
+    hideCancel?: boolean
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    onConfirm: () => {},
+    variant: 'default',
+    confirmText: 'Confirm',
+    hideCancel: false
+  })
+
   useEffect(() => {
     fetchEmployees()
   }, [])
@@ -69,9 +90,12 @@ export default function MasterfilePage() {
       const data = await response.json()
       if (data.success) {
         setEmployees(data.data || [])
+      } else {
+        toast.error(data.message || 'Failed to fetch employees')
       }
     } catch (error) {
       console.error('Error fetching employees:', error)
+      toast.error('Could not connect to the server. Please check your connection.')
     } finally {
       setLoading(false)
     }
@@ -98,88 +122,114 @@ export default function MasterfilePage() {
         setViewMode('details')
         window.scrollTo(0, 0)
       } else {
-        alert('Failed to load employee details')
+        toast.error(data.message || 'Failed to load employee details')
       }
     } catch (error) {
       console.error('Error fetching employee details:', error)
-      alert(`Failed to load employee details`)
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        toast.error('Network Error: Could not load employee details.')
+      } else {
+        toast.error('Failed to load employee details')
+      }
     }
   }
 
   const checkCompleteness = (emp: any) => {
-    if (!emp) return false
-    // We can only fully check completeness if we have all details (EmployeeDetails).
-    // If it's just from the list (Employee), we might not have all fields.
-    // However, for the pending list styling, we assume we might need to fetch details or rely on what's available.
-    // The current API for list might not return all fields. 
-    // To properly style the pending list without N+1 fetches, strictly we should use data available.
-    // But logically, "Ready to Employ" implies detailed info is filled.
-    // If the list API doesn't return everything, this check on the list view might be partial.
-    // For the DETAIL view, we have full data.
+    if (!emp) return { isComplete: false, status: 'Incomplete' }
     
-    // Required fields based on the Onboarding flow
-    const requiredFields = [
-      'position', 'date_hired',
-      'last_name', 'first_name', 'birthday', 'birthplace', 'civil_status', 'gender',
-      'mobile_number',
-      'street', 'barangay', 'region', 'province', 'city_municipality', 'zip_code',
-      'mlast_name', 'mfirst_name'
+    // Check basic info (Batch 1 & 2)
+    const basicFields = [
+      'position', 'date_hired', 'last_name', 'first_name', 'birthday', 'birthplace', 'civil_status', 'gender'
     ]
-
-    // If we only have basic info (from list), we can't be sure, but for the "Set as Employed" button
-    // which appears in Detail View, we have `selectedEmployee` which is full details.
-    
-    // For the list view "Pending" cards, if the API doesn't return these fields, 
-    // we might need to assume incomplete or fetch.
-    // Assuming `emp` passed here is `selectedEmployee` or from a list that includes these fields.
-    
-    for (const field of requiredFields) {
+    for (const field of basicFields) {
       if (!emp[field] || emp[field].toString().trim() === '') {
-        return false
+        return { isComplete: false, status: 'Pending: User Information' }
       }
     }
-    
-    // Check email specific (could be email or email_address)
-    if (!emp.email && !emp.email_address) return false;
 
-    return true
+    // Check contact info (Batch 3)
+    if (!emp.mobile_number || (!emp.email && !emp.email_address)) {
+      return { isComplete: false, status: 'Pending: Contact Information' }
+    }
+
+    // Check family background (Batch 5)
+    if (!emp.mlast_name || !emp.mfirst_name) {
+      return { isComplete: false, status: 'Pending: Family Information' }
+    }
+
+    // Check address (Batch 6)
+    const addressFields = ['street', 'barangay', 'region', 'province', 'city_municipality', 'zip_code']
+    for (const field of addressFields) {
+      if (!emp[field] || emp[field].toString().trim() === '') {
+        return { isComplete: false, status: 'Pending: Address Information' }
+      }
+    }
+
+    return { isComplete: true, status: 'READY TO EMPLOY' }
   }
 
   const handleSetAsEmployed = async () => {
     if (!selectedEmployee) return
     
-    if (!checkCompleteness(selectedEmployee)) {
-      alert('Cannot employ: Missing required Information.')
+    const { isComplete } = checkCompleteness(selectedEmployee)
+    if (!isComplete) {
+      setConfirmModal({
+        isOpen: true,
+        title: 'Information Incomplete',
+        description: 'Cannot employ: Missing required Information. Please complete the employee profile first.',
+        variant: 'warning',
+        confirmText: 'Got it',
+        hideCancel: true,
+        onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      })
       return
     }
 
-    if (!confirm(`Are you sure you want to employ ${selectedEmployee.first_name} ${selectedEmployee.last_name}?`)) return
+    setConfirmModal({
+      isOpen: true,
+      title: 'Confirm Employment',
+      description: `Are you sure you want to employ ${selectedEmployee.first_name} ${selectedEmployee.last_name}?`,
+      variant: 'default',
+      confirmText: 'Yes, Employ',
+      hideCancel: false,
+      onConfirm: async () => {
+        setIsUpdating(true)
+        try {
+          const apiUrl = getApiUrl()
+          const response = await fetch(`${apiUrl}/api/employees/${selectedEmployee.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'employed' }),
+          })
 
-    setIsUpdating(true)
-    try {
-      const apiUrl = getApiUrl()
-      // We update the status to 'employed'
-      const response = await fetch(`${apiUrl}/api/employees/${selectedEmployee.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'employed' }),
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        // Refresh list and return to list view
-        await fetchEmployees()
-        setViewMode('list')
-        setSelectedEmployee(null)
-      } else {
-        alert(data.message || 'Failed to update status')
+          const data = await response.json()
+          if (data.success) {
+            toast.success(`${selectedEmployee.first_name} set as employed successfully`)
+            await fetchEmployees()
+            setViewMode('list')
+            setSelectedEmployee(null)
+          } else {
+            // Parse validation errors if present
+            if (data.errors) {
+              const errorMessages = Object.values(data.errors).flat().join(' ')
+              toast.error(errorMessages || data.message)
+            } else {
+              toast.error(data.message || 'Failed to update status')
+            }
+          }
+        } catch (error) {
+          console.error('Error updating status:', error)
+          if (error instanceof TypeError && error.message === 'Failed to fetch') {
+            toast.error('Could not connect to server. Please ensure the backend is running.')
+          } else {
+            toast.error('Failed to update status')
+          }
+        } finally {
+          setIsUpdating(false)
+          setConfirmModal(prev => ({ ...prev, isOpen: false }))
+        }
       }
-    } catch (error) {
-      console.error('Error updating status:', error)
-      alert('Failed to update status')
-    } finally {
-      setIsUpdating(false)
-    }
+    })
   }
 
   const filterEmployees = (list: Employee[]) => {
@@ -300,69 +350,54 @@ export default function MasterfilePage() {
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                       {pendingList.map((employee) => {
-                         // Note: We are checking completeness on the 'list' item. 
-                         // This assumes basic fields are present or we purely rely on visual indicator from detail view
-                         // But to show 'Green' here, checkCompleteness needs to return true. 
-                         // If the list object is partial, this might return false incorrectly until viewed. 
-                         // Since we can't easily fix the API return type here without backend changes, 
-                         // we will try to check what we have. If `checkCompleteness` expects full details, 
-                         // this might be limited. 
-                         // However, for now let's assume the user wants this consistent 
-                         // and we'll apply the style if it looks complete or if we enforce it.
-                         // Actually, let's assume we need to click to verify. 
-                         // But the request asked for "Green background if its ready". 
-                         // We'll apply a subtle hint if we can, or just keep it standard pending.
-                         // Let's rely on the `fetchEmployeeDetails` to verify readiness.
-                         // Changing styling here might misleading without full data. 
-                         // BUT, I will leave the styling "check" here. If the object lacks keys, it returns false.
-                         const isReady = checkCompleteness(employee as any) // Type assertion for now
-                        
-                         return (
-                          <div
-                            key={employee.id}
-                            onClick={() => fetchEmployeeDetails(employee.id)}
-                            className={`group relative bg-white border rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer overflow-hidden ${
-                              isReady 
-                                ? 'border-emerald-200 hover:border-emerald-400 ring-1 ring-emerald-50' 
-                                : 'border-slate-200 hover:border-orange-300'
-                            }`}
-                          >
-                             {/* Ready Indicator Strip */}
-                             {isReady && <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>}
+                         const { isComplete, status } = checkCompleteness(employee as any)
+                         
+                          return (
+                           <div
+                             key={employee.id}
+                             onClick={() => fetchEmployeeDetails(employee.id)}
+                             className={`group relative bg-white border rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer overflow-hidden ${
+                               isComplete 
+                                 ? 'border-emerald-200 hover:border-emerald-400 ring-1 ring-emerald-50' 
+                                 : 'border-slate-200 hover:border-orange-300'
+                             }`}
+                           >
+                              {/* Ready Indicator Strip */}
+                              {isComplete && <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>}
 
-                            <div className="flex items-center gap-4 mb-4">
-                              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold transition-colors duration-200 ${
-                                isReady 
-                                  ? 'bg-emerald-100 text-emerald-700 group-hover:bg-emerald-500 group-hover:text-white' 
-                                  : 'bg-orange-100 text-orange-700 group-hover:bg-orange-500 group-hover:text-white'
-                              }`}>
-                                {employee.first_name.charAt(0)}{employee.last_name.charAt(0)}
-                              </div>
-                              <div className="overflow-hidden">
-                                <h1 className="font-bold text-slate-800 truncate group-hover:text-[#630C22] transition-colors">
-                                  {employee.first_name} {employee.last_name}
-                                </h1>
-                                <p className="text-xs text-slate-500 truncate font-medium">
-                                  {employee.position || 'No Position'}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex justify-between items-center pt-3 border-t border-slate-50">
-                              {isReady ? (
-                                <Badge variant="outline" className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border-emerald-100">
-                                  READY TO EMPLOY
-                                </Badge>
-                              ) : (
-                                <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">
-                                  Incomplete
-                                </span>
-                              )}
-                              <span className="text-[10px] text-slate-400 font-medium group-hover:translate-x-1 transition-transform">
-                                Review →
-                              </span>
-                            </div>
-                          </div>
-                      )})}
+                             <div className="flex items-center gap-4 mb-4">
+                               <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold transition-colors duration-200 ${
+                                 isComplete 
+                                   ? 'bg-emerald-100 text-emerald-700 group-hover:bg-emerald-500 group-hover:text-white' 
+                                   : 'bg-orange-100 text-orange-700 group-hover:bg-orange-500 group-hover:text-white'
+                               }`}>
+                                 {employee.first_name.charAt(0)}{employee.last_name.charAt(0)}
+                               </div>
+                               <div className="overflow-hidden">
+                                 <h1 className="font-bold text-slate-800 truncate group-hover:text-[#630C22] transition-colors">
+                                   {employee.first_name} {employee.last_name}
+                                 </h1>
+                                 <p className="text-xs text-slate-500 truncate font-medium">
+                                   {employee.position || 'No Position'}
+                                 </p>
+                               </div>
+                             </div>
+                             <div className="flex justify-between items-center pt-3 border-t border-slate-50">
+                               {isComplete ? (
+                                 <Badge variant="outline" className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border-emerald-100">
+                                   {status}
+                                 </Badge>
+                               ) : (
+                                 <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">
+                                   {status}
+                                 </span>
+                               )}
+                               <span className="text-[10px] text-slate-400 font-medium group-hover:translate-x-1 transition-transform">
+                                 Review →
+                               </span>
+                             </div>
+                           </div>
+                       )})}
                     </div>
                   </div>
                 )}
@@ -426,18 +461,26 @@ export default function MasterfilePage() {
             {/* Set as Employed Action */}
             {selectedEmployee?.status === 'pending' && (
               <div className="flex items-center gap-3">
-                 {!checkCompleteness(selectedEmployee) && (
-                   <span className="text-xs font-medium text-rose-500 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100">
-                     Complete all required fields to employ
-                   </span>
+                 {!checkCompleteness(selectedEmployee).isComplete && (
+                   <>
+                    <span className="text-xs font-medium text-rose-500 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100">
+                      Complete all required fields to employ
+                    </span>
+                    <Button
+                      onClick={() => router.push(`/admin-head/employee/onboard?id=${selectedEmployee.id}`)}
+                      className="h-10 px-6 font-bold rounded-xl bg-[#630C22] hover:bg-[#4A081A] text-white transition-all shadow-md hover:shadow-lg"
+                    >
+                      Update Profile
+                    </Button>
+                   </>
                  )}
                  <Button
                   onClick={handleSetAsEmployed}
-                  disabled={!checkCompleteness(selectedEmployee) || isUpdating}
-                  className={`font-bold transition-all ${
-                     !checkCompleteness(selectedEmployee) 
+                  disabled={!checkCompleteness(selectedEmployee).isComplete || isUpdating}
+                  className={`h-10 px-6 font-bold rounded-xl transition-all ${
+                     !checkCompleteness(selectedEmployee).isComplete 
                      ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                     : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg'
+                     : 'bg-[#630C22] hover:bg-[#4A081A] text-white shadow-md hover:shadow-lg'
                   }`}
                  >
                    {isUpdating ? 'Updating...' : 'Set as Employed'}
@@ -582,19 +625,29 @@ export default function MasterfilePage() {
              </div>
              
              {/* Footer Actions */}
-             <div className="bg-slate-50 px-8 py-6 border-t border-slate-200 flex justify-end">
+             <div className="bg-slate-50 px-8 py-6 border-t border-slate-200 flex justify-end gap-3">
                 {selectedEmployee?.status === 'pending' ? (
-                   <Button
-                    onClick={handleSetAsEmployed}
-                    disabled={!checkCompleteness(selectedEmployee) || isUpdating}
-                    className={`h-12 px-8 font-bold rounded-xl transition-all ${
-                       !checkCompleteness(selectedEmployee) 
-                       ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                       : 'bg-[#630C22] hover:bg-[#4A081A] text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5'
-                    }`}
-                   >
-                     {isUpdating ? 'Processing...' : 'Approve & Set as Employed'}
-                   </Button>
+                   <>
+                    {!checkCompleteness(selectedEmployee).isComplete && (
+                      <Button
+                        onClick={() => router.push(`/admin-head/employee/onboard?id=${selectedEmployee.id}`)}
+                        className="h-12 px-8 font-bold rounded-xl bg-[#630C22] hover:bg-[#4A081A] text-white transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                      >
+                        Update Profile
+                      </Button>
+                    )}
+                    <Button
+                      onClick={handleSetAsEmployed}
+                      disabled={!checkCompleteness(selectedEmployee).isComplete || isUpdating}
+                      className={`h-12 px-8 font-bold rounded-xl transition-all ${
+                        !checkCompleteness(selectedEmployee).isComplete 
+                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                        : 'bg-[#630C22] hover:bg-[#4A081A] text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5'
+                      }`}
+                    >
+                      {isUpdating ? 'Processing...' : 'Approve & Set as Employed'}
+                    </Button>
+                   </>
                 ) : (
                    <Button variant="outline" onClick={() => setViewMode('list')} className="h-11 px-8">
                      Back to List
@@ -604,6 +657,18 @@ export default function MasterfilePage() {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        description={confirmModal.description}
+        variant={confirmModal.variant}
+        confirmText={confirmModal.confirmText}
+        hideCancel={confirmModal.hideCancel}
+        isLoading={isUpdating}
+      />
     </div>
   )
 }

@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { Badge } from '@/components/ui'
 import { Button } from '@/components/ui'
 import {
@@ -80,6 +81,9 @@ export default function AdminHeadPage() {
       setTotalPages(response.pagination.last_page)
     } catch (err) {
       setError('Failed to load activity logs. Please try again.')
+      toast.error('Failed to load activity logs', {
+        description: 'Please check your connection and try again.'
+      })
       console.error('Error loading activities:', err)
     } finally {
       setLoading(false)

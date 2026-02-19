@@ -8,6 +8,7 @@ import { useState, useEffect, useRef } from 'react'
 import { ChevronDown, Clock, Plus, Search, Users, ChevronLeft, ChevronRight, FileDown, FileText, Check, AlertTriangle, Loader2, RotateCcw, X } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
+import { ConfirmationModal } from '@/components/ConfirmationModal'
 
 // shadcn/ui components
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -637,11 +638,21 @@ export default function AttendanceDashboard() {
           duration: 10000, // 10 seconds for undo
         })
       } else {
-        toast.error(data.message || 'Failed to add year')
+        // Parse validation errors if present
+        if (data.errors) {
+          const errorMessages = Object.values(data.errors).flat().join(' ')
+          toast.error(errorMessages || data.message)
+        } else {
+          toast.error(data.message || 'Failed to add year')
+        }
       }
     } catch (error) {
       console.error('Save error:', error)
-      toast.error('An error occurred while saving')
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        toast.error('Connection Error: Could not reach the server.')
+      } else {
+        toast.error('Could not add year. Please try again later.')
+      }
     } finally {
       setIsAddingYear(false)
     }
@@ -1120,39 +1131,16 @@ export default function AttendanceDashboard() {
 
 
 
-      {/* New Year Confirmation Dialog */}
-      <Dialog open={showNewYearConfirm} onOpenChange={setShowNewYearConfirm}>
-        <DialogContent className="bg-white border-2 border-[#FFE5EC] rounded-2xl max-w-sm">
-          <DialogHeader className="flex flex-col items-center gap-4 text-center">
-            <div className="p-4 bg-red-50 rounded-full">
-              <AlertTriangle className="w-8 h-8 text-[#4A081A]" />
-            </div>
-            <div className="space-y-2">
-              <DialogTitle className="text-2xl font-bold text-[#4A081A]">Confirm New Year</DialogTitle>
-              <DialogDescription className="text-stone-500 font-medium">
-                Are you sure you want to initialize year {Math.max(...yearsList) + 1}? This will add it to the selection menu.
-              </DialogDescription>
-            </div>
-          </DialogHeader>
-          <DialogFooter className="flex flex-col sm:flex-row gap-3 mt-6">
-            <Button
-              variant="outline"
-              onClick={() => setShowNewYearConfirm(false)}
-              disabled={isAddingYear}
-              className="flex-1 border-2 border-stone-100 text-stone-600 hover:bg-stone-50 font-bold h-12 rounded-xl"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={addNewYear}
-              disabled={isAddingYear}
-              className="flex-1 bg-gradient-to-r from-[#4A081A] to-[#800020] hover:from-[#630C22] hover:to-[#A0153E] text-white font-bold h-12 rounded-xl shadow-md transition-all active:scale-95"
-            >
-              {isAddingYear ? "Initializing..." : "Confirm"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmationModal
+        isOpen={showNewYearConfirm}
+        onClose={() => setShowNewYearConfirm(false)}
+        onConfirm={addNewYear}
+        title="Confirm New Year"
+        description={`Are you sure you want to initialize year ${Math.max(...yearsList) + 1}? This will add it to the selection menu.`}
+        variant="warning"
+        confirmText={isAddingYear ? "Initializing..." : "Confirm"}
+        isLoading={isAddingYear}
+      />
     </div>
   )
 }
