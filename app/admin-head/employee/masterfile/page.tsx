@@ -6,7 +6,7 @@ import { getApiUrl } from '@/lib/api'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { X } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmationModal } from '@/components/ConfirmationModal'
 
@@ -45,6 +45,13 @@ export default function MasterfilePage() {
   const [viewMode, setViewMode] = useState<'list' | 'details'>('list')
   const [activeTab, setActiveTab] = useState<'employed' | 'terminated'>('employed')
   const [isUpdating, setIsUpdating] = useState(false)
+
+  // Pagination States
+  const [pendingPage, setPendingPage] = useState(1)
+  const [employedPage, setEmployedPage] = useState(1)
+  const [terminatedPage, setTerminatedPage] = useState(1)
+  const ITEMS_PER_PAGE_CARDS = 6
+  const ITEMS_PER_PAGE_TABLE = 10
 
   // Modal State
   const [confirmModal, setConfirmModal] = useState<{
@@ -247,6 +254,106 @@ export default function MasterfilePage() {
   const terminatedList = filterEmployees(employees.filter(e => e.status === 'terminated'))
   const pendingList = filterEmployees(employees.filter(e => e.status === 'pending'))
 
+  const paginatedPending = pendingList.slice((pendingPage - 1) * ITEMS_PER_PAGE_CARDS, pendingPage * ITEMS_PER_PAGE_CARDS)
+  const paginatedEmployed = employedList.slice((employedPage - 1) * ITEMS_PER_PAGE_TABLE, employedPage * ITEMS_PER_PAGE_TABLE)
+  const paginatedTerminated = terminatedList.slice((terminatedPage - 1) * ITEMS_PER_PAGE_TABLE, terminatedPage * ITEMS_PER_PAGE_TABLE)
+
+  const PaginationControls = ({ 
+    currentPage, 
+    totalItems, 
+    itemsPerPage, 
+    onPageChange 
+  }: { 
+    currentPage: number, 
+    totalItems: number, 
+    itemsPerPage: number, 
+    onPageChange: (page: number) => void 
+  }) => {
+    const totalPages = Math.ceil(totalItems / itemsPerPage)
+    if (totalPages <= 1) return null
+
+    return (
+      <div className="flex items-center justify-between mt-6 px-2">
+        <p className="text-sm text-slate-500 font-medium">
+          Showing <span className="text-slate-800">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="text-slate-800">{Math.min(currentPage * itemsPerPage, totalItems)}</span> of <span className="text-slate-800">{totalItems}</span> results
+        </p>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => onPageChange(1)}
+            disabled={currentPage === 1}
+            className="h-9 w-9 border-slate-200 rounded-lg text-slate-500 hover:text-[#630C22] disabled:opacity-40"
+          >
+            <ChevronsLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="h-9 w-9 border-slate-200 rounded-lg text-slate-500 hover:text-[#630C22] disabled:opacity-40"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          
+          <div className="flex items-center gap-1 mx-2">
+            {[...Array(totalPages)].map((_, i) => {
+              const pageNum = i + 1
+              // Show only current, first, last, and pages around current
+              if (
+                pageNum === 1 || 
+                pageNum === totalPages || 
+                (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
+              ) {
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={currentPage === pageNum ? "default" : "outline"}
+                    onClick={() => onPageChange(pageNum)}
+                    className={`h-9 w-9 rounded-lg text-sm font-bold transition-all ${
+                      currentPage === pageNum 
+                        ? 'bg-[#630C22] hover:bg-[#4A081A] text-white shadow-sm' 
+                        : 'border-slate-200 text-slate-600 hover:border-[#630C22] hover:text-[#630C22]'
+                    }`}
+                  >
+                    {pageNum}
+                  </Button>
+                )
+              }
+              if (
+                (pageNum === 2 && currentPage > 3) || 
+                (pageNum === totalPages - 1 && currentPage < totalPages - 2)
+              ) {
+                return <span key={pageNum} className="text-slate-300 mx-1">...</span>
+              }
+              return null
+            })}
+          </div>
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className="h-9 w-9 border-slate-200 rounded-lg text-slate-500 hover:text-[#630C22] disabled:opacity-40"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => onPageChange(totalPages)}
+            disabled={currentPage === totalPages}
+            className="h-9 w-9 border-slate-200 rounded-lg text-slate-500 hover:text-[#630C22] disabled:opacity-40"
+          >
+            <ChevronsRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   const EmployeeTable = ({ list, emptyMessage }: { list: Employee[], emptyMessage: string }) => (
     list.length === 0 ? (
       <div className="text-center py-12 text-slate-400 bg-slate-50/50 rounded-lg border border-dashed border-slate-200">
@@ -348,8 +455,8 @@ export default function MasterfilePage() {
                         {pendingList.length}
                       </Badge>
                     </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                      {pendingList.map((employee) => {
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {paginatedPending.map((employee) => {
                          const { isComplete, status } = checkCompleteness(employee as any)
                          
                           return (
@@ -399,6 +506,12 @@ export default function MasterfilePage() {
                            </div>
                        )})}
                     </div>
+                    <PaginationControls 
+                      currentPage={pendingPage}
+                      totalItems={pendingList.length}
+                      itemsPerPage={ITEMS_PER_PAGE_CARDS}
+                      onPageChange={setPendingPage}
+                    />
                   </div>
                 )}
 
@@ -433,12 +546,18 @@ export default function MasterfilePage() {
                   </div>
 
                   <EmployeeTable
-                    list={activeTab === 'employed' ? employedList : terminatedList}
+                    list={activeTab === 'employed' ? paginatedEmployed : paginatedTerminated}
                     emptyMessage={
                       searchQuery 
                         ? `No ${activeTab} employees match your search.` 
                         : `No ${activeTab} employees found.`
                     }
+                  />
+                  <PaginationControls 
+                    currentPage={activeTab === 'employed' ? employedPage : terminatedPage}
+                    totalItems={activeTab === 'employed' ? employedList.length : terminatedList.length}
+                    itemsPerPage={ITEMS_PER_PAGE_TABLE}
+                    onPageChange={activeTab === 'employed' ? setEmployedPage : setTerminatedPage}
                   />
                 </div>
               </div>
