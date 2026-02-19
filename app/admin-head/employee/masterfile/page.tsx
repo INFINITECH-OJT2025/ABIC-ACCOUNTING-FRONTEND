@@ -59,7 +59,7 @@ export default function MasterfilePage() {
     isOpen: false,
     title: '',
     description: '',
-    onConfirm: () => {},
+    onConfirm: () => { },
     variant: 'default',
     confirmText: 'Confirm',
     hideCancel: false
@@ -73,7 +73,7 @@ export default function MasterfilePage() {
     try {
       const apiUrl = getApiUrl()
       const fullUrl = `${apiUrl}/api/employees`
-      
+
       const response = await fetch(fullUrl, {
         method: 'GET',
         headers: {
@@ -82,11 +82,11 @@ export default function MasterfilePage() {
         },
         credentials: 'include',
       })
-      
+
       if (!response.ok) {
         throw new Error(`HTTP Error: ${response.status}`)
       }
-      
+
       const data = await response.json()
       if (data.success) {
         setEmployees(data.data || [])
@@ -105,17 +105,17 @@ export default function MasterfilePage() {
     try {
       const apiUrl = getApiUrl()
       const fullUrl = `${apiUrl}/api/employees/${employeeId}`
-      
+
       const response = await fetch(fullUrl, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         credentials: 'include',
       })
-      
+
       if (!response.ok) {
         throw new Error(`HTTP Error: ${response.status}`)
       }
-      
+
       const data = await response.json()
       if (data.success) {
         setSelectedEmployee(data.data)
@@ -136,7 +136,7 @@ export default function MasterfilePage() {
 
   const checkCompleteness = (emp: any) => {
     if (!emp) return { isComplete: false, status: 'Incomplete' }
-    
+
     // Check basic info (Batch 1 & 2)
     const basicFields = [
       'position', 'date_hired', 'last_name', 'first_name', 'birthday', 'birthplace', 'civil_status', 'gender'
@@ -170,7 +170,7 @@ export default function MasterfilePage() {
 
   const handleSetAsEmployed = async () => {
     if (!selectedEmployee) return
-    
+
     const { isComplete } = checkCompleteness(selectedEmployee)
     if (!isComplete) {
       setConfirmModal({
@@ -300,35 +300,56 @@ export default function MasterfilePage() {
   )
 
   return (
-    <div className="min-h-screen p-8 bg-slate-50 animate-in fade-in duration-500">
-      {viewMode === 'list' ? (
-        <>
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6">
-            <div>
-              <h1 className="text-3xl font-extrabold text-[#4A081A] tracking-tight">Employee Records</h1>
-              <p className="text-slate-500 mt-2 text-lg">Manage and monitor employee master data and records.</p>
-            </div>
-            <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-              <div className="relative w-full sm:w-72">
-                <Input
-                  type="text"
-                  placeholder="Search employees..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-white border-slate-200 pl-10 h-11 focus:ring-2 focus:ring-[#630C22] focus:border-transparent rounded-xl shadow-sm transition-all"
-                />
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                </div>
-              </div>
-              <Button
-                onClick={() => router.push('/admin-head/employee/onboard')}
-                className="w-full sm:w-auto bg-[#630C22] hover:bg-[#4A081A] text-white font-bold px-6 h-11 rounded-xl transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-              >
-                + ONBOARD NEW EMPLOYEE
-              </Button>
-            </div>
+    <div className="min-h-screen w-full animate-in fade-in duration-500">
+
+      {/* ----- MAROON GRADIENT HEADER ----- */}
+      <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md p-4 md:p-8 mb-6 md:mb-8 ">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+
+          {/* LEFT SIDE */}
+          <div>
+            <h1 className="text-2xl md:text-4xl font-bold mb-2 md:mb-3">
+              Employee Records
+            </h1>
+            <p className="text-white/80 text-sm md:text-lg">
+              Manage and monitor employee master data and records.
+            </p>
           </div>
+
+          {/* RIGHT SIDE ACTIONS */}
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
+
+            {/* Search */}
+            <div className="relative w-full sm:w-72">
+              <Input
+                type="text"
+                placeholder="Search employees..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="bg-white/95 backdrop-blur-sm border border-white/30 text-slate-800 placeholder:text-slate-400 pl-10 h-11 rounded-lg shadow-sm focus:ring-2 focus:ring-white/40 focus:border-white transition-all"
+              />
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7B0F2B]">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.3-4.3" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Onboard Button */}
+            <Button
+              onClick={() => router.push('/admin-head/employee/onboard')}
+              className="bg-white/95 backdrop-blur-sm border border-white/30 text-[#7B0F2B] hover:bg-white hover:border-white shadow-sm hover:shadow-md transition-all duration-200 font-bold h-11 px-6 rounded-lg"
+            >
+              + ONBOARD NEW EMPLOYEE
+            </Button>
+
+          </div>
+        </div>
+      </div> {viewMode === 'list' ? (
+        <>
+
+
 
           <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
             {loading ? (
@@ -350,54 +371,53 @@ export default function MasterfilePage() {
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                       {pendingList.map((employee) => {
-                         const { isComplete, status } = checkCompleteness(employee as any)
-                         
-                          return (
-                           <div
-                             key={employee.id}
-                             onClick={() => fetchEmployeeDetails(employee.id)}
-                             className={`group relative bg-white border rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer overflow-hidden ${
-                               isComplete 
-                                 ? 'border-emerald-200 hover:border-emerald-400 ring-1 ring-emerald-50' 
-                                 : 'border-slate-200 hover:border-orange-300'
-                             }`}
-                           >
-                              {/* Ready Indicator Strip */}
-                              {isComplete && <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>}
+                        const { isComplete, status } = checkCompleteness(employee as any)
 
-                             <div className="flex items-center gap-4 mb-4">
-                               <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold transition-colors duration-200 ${
-                                 isComplete 
-                                   ? 'bg-emerald-100 text-emerald-700 group-hover:bg-emerald-500 group-hover:text-white' 
-                                   : 'bg-orange-100 text-orange-700 group-hover:bg-orange-500 group-hover:text-white'
-                               }`}>
-                                 {employee.first_name.charAt(0)}{employee.last_name.charAt(0)}
-                               </div>
-                               <div className="overflow-hidden">
-                                 <h1 className="font-bold text-slate-800 truncate group-hover:text-[#630C22] transition-colors">
-                                   {employee.first_name} {employee.last_name}
-                                 </h1>
-                                 <p className="text-xs text-slate-500 truncate font-medium">
-                                   {employee.position || 'No Position'}
-                                 </p>
-                               </div>
-                             </div>
-                             <div className="flex justify-between items-center pt-3 border-t border-slate-50">
-                               {isComplete ? (
-                                 <Badge variant="outline" className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border-emerald-100">
-                                   {status}
-                                 </Badge>
-                               ) : (
-                                 <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">
-                                   {status}
-                                 </span>
-                               )}
-                               <span className="text-[10px] text-slate-400 font-medium group-hover:translate-x-1 transition-transform">
-                                 Review →
-                               </span>
-                             </div>
-                           </div>
-                       )})}
+                        return (
+                          <div
+                            key={employee.id}
+                            onClick={() => fetchEmployeeDetails(employee.id)}
+                            className={`group relative bg-white border rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer overflow-hidden ${isComplete
+                              ? 'border-emerald-200 hover:border-emerald-400 ring-1 ring-emerald-50'
+                              : 'border-slate-200 hover:border-orange-300'
+                              }`}
+                          >
+                            {/* Ready Indicator Strip */}
+                            {isComplete && <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>}
+
+                            <div className="flex items-center gap-4 mb-4">
+                              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold transition-colors duration-200 ${isComplete
+                                ? 'bg-emerald-100 text-emerald-700 group-hover:bg-emerald-500 group-hover:text-white'
+                                : 'bg-orange-100 text-orange-700 group-hover:bg-orange-500 group-hover:text-white'
+                                }`}>
+                                {employee.first_name.charAt(0)}{employee.last_name.charAt(0)}
+                              </div>
+                              <div className="overflow-hidden">
+                                <h1 className="font-bold text-slate-800 truncate group-hover:text-[#630C22] transition-colors">
+                                  {employee.first_name} {employee.last_name}
+                                </h1>
+                                <p className="text-xs text-slate-500 truncate font-medium">
+                                  {employee.position || 'No Position'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-center pt-3 border-t border-slate-50">
+                              {isComplete ? (
+                                <Badge variant="outline" className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border-emerald-100">
+                                  {status}
+                                </Badge>
+                              ) : (
+                                <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">
+                                  {status}
+                                </span>
+                              )}
+                              <span className="text-[10px] text-slate-400 font-medium group-hover:translate-x-1 transition-transform">
+                                Review →
+                              </span>
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )}
@@ -406,26 +426,24 @@ export default function MasterfilePage() {
                 <div>
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 border-b border-slate-100 pb-4">
                     <h3 className="text-lg font-bold text-[#4A081A] flex items-center gap-2">
-                       Master List
+                      Master List
                     </h3>
                     <div className="flex items-center bg-slate-100 p-1.5 rounded-xl">
                       <button
                         onClick={() => setActiveTab('employed')}
-                        className={`px-6 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
-                          activeTab === 'employed'
-                            ? 'bg-white text-[#4A081A] shadow-sm'
-                            : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
-                        }`}
+                        className={`px-6 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${activeTab === 'employed'
+                          ? 'bg-white text-[#4A081A] shadow-sm'
+                          : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
+                          }`}
                       >
                         Employed <span className="ml-1 opacity-60 text-xs">({employees.filter(e => e.status === 'employed').length})</span>
                       </button>
                       <button
                         onClick={() => setActiveTab('terminated')}
-                        className={`px-6 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
-                          activeTab === 'terminated'
-                            ? 'bg-white text-[#4A081A] shadow-sm'
-                            : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
-                        }`}
+                        className={`px-6 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${activeTab === 'terminated'
+                          ? 'bg-white text-[#4A081A] shadow-sm'
+                          : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
+                          }`}
                       >
                         Terminated <span className="ml-1 opacity-60 text-xs">({employees.filter(e => e.status === 'terminated').length})</span>
                       </button>
@@ -435,8 +453,8 @@ export default function MasterfilePage() {
                   <EmployeeTable
                     list={activeTab === 'employed' ? employedList : terminatedList}
                     emptyMessage={
-                      searchQuery 
-                        ? `No ${activeTab} employees match your search.` 
+                      searchQuery
+                        ? `No ${activeTab} employees match your search.`
                         : `No ${activeTab} employees found.`
                     }
                   />
@@ -454,15 +472,15 @@ export default function MasterfilePage() {
               onClick={() => setViewMode('list')}
               className="text-slate-500 hover:text-slate-800 hover:bg-white"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2"><path d="m15 18-6-6 6-6"/></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2"><path d="m15 18-6-6 6-6" /></svg>
               Back to Employee List
             </Button>
-            
+
             {/* Set as Employed Action */}
             {selectedEmployee?.status === 'pending' && (
               <div className="flex items-center gap-3">
-                 {!checkCompleteness(selectedEmployee).isComplete && (
-                   <>
+                {!checkCompleteness(selectedEmployee).isComplete && (
+                  <>
                     <span className="text-xs font-medium text-rose-500 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100">
                       Complete all required fields to employ
                     </span>
@@ -472,52 +490,51 @@ export default function MasterfilePage() {
                     >
                       Update Profile
                     </Button>
-                   </>
-                 )}
-                 <Button
+                  </>
+                )}
+                <Button
                   onClick={handleSetAsEmployed}
                   disabled={!checkCompleteness(selectedEmployee).isComplete || isUpdating}
-                  className={`h-10 px-6 font-bold rounded-xl transition-all ${
-                     !checkCompleteness(selectedEmployee).isComplete 
-                     ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                     : 'bg-[#630C22] hover:bg-[#4A081A] text-white shadow-md hover:shadow-lg'
-                  }`}
-                 >
-                   {isUpdating ? 'Updating...' : 'Set as Employed'}
-                 </Button>
+                  className={`h-10 px-6 font-bold rounded-xl transition-all ${!checkCompleteness(selectedEmployee).isComplete
+                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    : 'bg-[#630C22] hover:bg-[#4A081A] text-white shadow-md hover:shadow-lg'
+                    }`}
+                >
+                  {isUpdating ? 'Updating...' : 'Set as Employed'}
+                </Button>
               </div>
             )}
           </div>
 
           <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
-             {/* Header */}
-             <div className="bg-slate-50/50 p-8 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                <div className="flex items-center gap-5">
-                   <div className="w-20 h-20 rounded-full bg-[#630C22] text-white flex items-center justify-center text-3xl font-bold shadow-lg">
-                      {selectedEmployee?.first_name.charAt(0)}{selectedEmployee?.last_name.charAt(0)}
-                   </div>
-                   <div>
-                      <h1 className="text-3xl font-extrabold text-[#4A081A] mb-1">
-                        {selectedEmployee?.first_name} {selectedEmployee?.last_name}
-                      </h1>
-                      <div className="flex items-center gap-3">
-                        <p className="text-slate-500 font-medium">{selectedEmployee?.position || 'No Position'}</p>
-                        <Badge className={`${statusBadgeColors[selectedEmployee?.status || 'pending']} border shadow-none px-3 py-0.5`}>
-                           {statusLabels[selectedEmployee?.status || 'pending']}
-                        </Badge>
-                      </div>
-                   </div>
+            {/* Header */}
+            <div className="bg-slate-50/50 p-8 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+              <div className="flex items-center gap-5">
+                <div className="w-20 h-20 rounded-full bg-[#630C22] text-white flex items-center justify-center text-3xl font-bold shadow-lg">
+                  {selectedEmployee?.first_name.charAt(0)}{selectedEmployee?.last_name.charAt(0)}
                 </div>
-                <div className="flex flex-col items-end gap-1">
-                   <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Employee ID</p>
-                   <p className="font-mono text-slate-700 font-bold">#{selectedEmployee?.id.toString().padStart(4, '0')}</p>
+                <div>
+                  <h1 className="text-3xl font-extrabold text-[#4A081A] mb-1">
+                    {selectedEmployee?.first_name} {selectedEmployee?.last_name}
+                  </h1>
+                  <div className="flex items-center gap-3">
+                    <p className="text-slate-500 font-medium">{selectedEmployee?.position || 'No Position'}</p>
+                    <Badge className={`${statusBadgeColors[selectedEmployee?.status || 'pending']} border shadow-none px-3 py-0.5`}>
+                      {statusLabels[selectedEmployee?.status || 'pending']}
+                    </Badge>
+                  </div>
                 </div>
-             </div>
+              </div>
+              <div className="flex flex-col items-end gap-1">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Employee ID</p>
+                <p className="font-mono text-slate-700 font-bold">#{selectedEmployee?.id.toString().padStart(4, '0')}</p>
+              </div>
+            </div>
 
-             {/* Content */}
-             <div className="p-8 md:p-10 space-y-12">
-               {selectedEmployee && (
-                 <>
+            {/* Content */}
+            <div className="p-8 md:p-10 space-y-12">
+              {selectedEmployee && (
+                <>
                   {/* EMPLOYMENT */}
                   <section>
                     <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
@@ -534,7 +551,7 @@ export default function MasterfilePage() {
 
                   {/* PERSONAL */}
                   <section>
-                     <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
+                    <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
                       <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
                       Personal Information
                     </h3>
@@ -551,8 +568,8 @@ export default function MasterfilePage() {
                   </section>
 
                   {/* CONTACT */}
-                   <section>
-                     <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
+                  <section>
+                    <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
                       <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
                       Contact Information
                     </h3>
@@ -564,51 +581,51 @@ export default function MasterfilePage() {
                   </section>
 
                   {/* ADDRESS */}
-                   <section>
-                     <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
+                  <section>
+                    <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
                       <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
                       Address Information
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
-                       <DetailItem label="Street" value={selectedEmployee.street} required />
-                       <DetailItem label="Barangay" value={selectedEmployee.barangay} required />
-                       <DetailItem label="City / Municipality" value={selectedEmployee.city_municipality} required />
-                       <DetailItem label="Province" value={selectedEmployee.province} required />
-                       <DetailItem label="Region" value={selectedEmployee.region} required />
-                       <DetailItem label="Zip Code" value={selectedEmployee.zip_code} required />
-                       <DetailItem label="House No." value={selectedEmployee.house_number} />
-                       <DetailItem label="Village" value={selectedEmployee.village} />
-                       <DetailItem label="Subdivision" value={selectedEmployee.subdivision} />
+                      <DetailItem label="Street" value={selectedEmployee.street} required />
+                      <DetailItem label="Barangay" value={selectedEmployee.barangay} required />
+                      <DetailItem label="City / Municipality" value={selectedEmployee.city_municipality} required />
+                      <DetailItem label="Province" value={selectedEmployee.province} required />
+                      <DetailItem label="Region" value={selectedEmployee.region} required />
+                      <DetailItem label="Zip Code" value={selectedEmployee.zip_code} required />
+                      <DetailItem label="House No." value={selectedEmployee.house_number} />
+                      <DetailItem label="Village" value={selectedEmployee.village} />
+                      <DetailItem label="Subdivision" value={selectedEmployee.subdivision} />
                     </div>
                   </section>
 
                   {/* FAMILY & GOV */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                     <section>
-                       <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
+                    <section>
+                      <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
                         <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
                         Family Background
                       </h3>
                       <div className="space-y-6">
                         <div>
-                           <p className="text-xs font-bold text-slate-400 mb-2 uppercase">Mother's Maiden Name</p>
-                           <div className="grid grid-cols-2 gap-4 pl-3 border-l-2 border-slate-100">
-                             <DetailItem label="Last Name" value={selectedEmployee.mlast_name} required />
-                             <DetailItem label="First Name" value={selectedEmployee.mfirst_name} required />
-                           </div>
+                          <p className="text-xs font-bold text-slate-400 mb-2 uppercase">Mother's Maiden Name</p>
+                          <div className="grid grid-cols-2 gap-4 pl-3 border-l-2 border-slate-100">
+                            <DetailItem label="Last Name" value={selectedEmployee.mlast_name} required />
+                            <DetailItem label="First Name" value={selectedEmployee.mfirst_name} required />
+                          </div>
                         </div>
                         <div>
-                           <p className="text-xs font-bold text-slate-400 mb-2 uppercase">Father's Name</p>
-                           <div className="grid grid-cols-2 gap-4 pl-3 border-l-2 border-slate-100">
-                             <DetailItem label="Last Name" value={selectedEmployee.flast_name} />
-                             <DetailItem label="First Name" value={selectedEmployee.ffirst_name} />
-                           </div>
+                          <p className="text-xs font-bold text-slate-400 mb-2 uppercase">Father's Name</p>
+                          <div className="grid grid-cols-2 gap-4 pl-3 border-l-2 border-slate-100">
+                            <DetailItem label="Last Name" value={selectedEmployee.flast_name} />
+                            <DetailItem label="First Name" value={selectedEmployee.ffirst_name} />
+                          </div>
                         </div>
                       </div>
-                     </section>
+                    </section>
 
-                     <section>
-                       <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
+                    <section>
+                      <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
                         <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
                         Government IDs
                       </h3>
@@ -618,42 +635,41 @@ export default function MasterfilePage() {
                         <DetailItem label="Pag-IBIG No." value={selectedEmployee.pagibig_number} />
                         <DetailItem label="TIN" value={selectedEmployee.tin_number} />
                       </div>
-                     </section>
+                    </section>
                   </div>
-                 </>
-               )}
-             </div>
-             
-             {/* Footer Actions */}
-             <div className="bg-slate-50 px-8 py-6 border-t border-slate-200 flex justify-end gap-3">
-                {selectedEmployee?.status === 'pending' ? (
-                   <>
-                    {!checkCompleteness(selectedEmployee).isComplete && (
-                      <Button
-                        onClick={() => router.push(`/admin-head/employee/onboard?id=${selectedEmployee.id}`)}
-                        className="h-12 px-8 font-bold rounded-xl bg-[#630C22] hover:bg-[#4A081A] text-white transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
-                      >
-                        Update Profile
-                      </Button>
-                    )}
+                </>
+              )}
+            </div>
+
+            {/* Footer Actions */}
+            <div className="bg-slate-50 px-8 py-6 border-t border-slate-200 flex justify-end gap-3">
+              {selectedEmployee?.status === 'pending' ? (
+                <>
+                  {!checkCompleteness(selectedEmployee).isComplete && (
                     <Button
-                      onClick={handleSetAsEmployed}
-                      disabled={!checkCompleteness(selectedEmployee).isComplete || isUpdating}
-                      className={`h-12 px-8 font-bold rounded-xl transition-all ${
-                        !checkCompleteness(selectedEmployee).isComplete 
-                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                        : 'bg-[#630C22] hover:bg-[#4A081A] text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5'
-                      }`}
+                      onClick={() => router.push(`/admin-head/employee/onboard?id=${selectedEmployee.id}`)}
+                      className="h-12 px-8 font-bold rounded-xl bg-[#630C22] hover:bg-[#4A081A] text-white transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
                     >
-                      {isUpdating ? 'Processing...' : 'Approve & Set as Employed'}
+                      Update Profile
                     </Button>
-                   </>
-                ) : (
-                   <Button variant="outline" onClick={() => setViewMode('list')} className="h-11 px-8">
-                     Back to List
-                   </Button>
-                )}
-             </div>
+                  )}
+                  <Button
+                    onClick={handleSetAsEmployed}
+                    disabled={!checkCompleteness(selectedEmployee).isComplete || isUpdating}
+                    className={`h-12 px-8 font-bold rounded-xl transition-all ${!checkCompleteness(selectedEmployee).isComplete
+                      ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                      : 'bg-[#630C22] hover:bg-[#4A081A] text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5'
+                      }`}
+                  >
+                    {isUpdating ? 'Processing...' : 'Approve & Set as Employed'}
+                  </Button>
+                </>
+              ) : (
+                <Button variant="outline" onClick={() => setViewMode('list')} className="h-11 px-8">
+                  Back to List
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -678,7 +694,7 @@ function DetailItem({ label, value, required }: { label: string, value: any, req
   return (
     <div className="group">
       <p className="text-xs font-bold text-slate-500 mb-1.5 flex items-center gap-1 group-hover:text-[#630C22] transition-colors">
-        {label} 
+        {label}
         {required && <span className="text-rose-500 text-[10px] bg-rose-50 px-1 rounded ml-1">REQUIRED</span>}
       </p>
       <p className={`font-medium text-base ${isEmpty ? 'text-slate-300 italic' : 'text-slate-800'}`}>

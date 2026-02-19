@@ -108,7 +108,7 @@ function OnboardPageContent() {
     isOpen: false,
     title: '',
     description: '',
-    onConfirm: () => {},
+    onConfirm: () => { },
     variant: 'default'
   })
 
@@ -172,7 +172,7 @@ function OnboardPageContent() {
       setIsActionLoading(true)
       const response = await fetch(`${getApiUrl()}/api/employees/${id}`)
       const data = await response.json()
-      
+
       if (data.success) {
         const emp = data.data
         setOnboardingEmployeeId(id)
@@ -549,7 +549,7 @@ function OnboardPageContent() {
     if (allCompleted) {
       setCompletedTasks({})
     } else {
-      const newTasks: {[key: string]: string} = {}
+      const newTasks: { [key: string]: string } = {}
       const now = new Date().toLocaleString()
       onboardingTasks.forEach(task => {
         newTasks[task] = now
@@ -934,7 +934,7 @@ function OnboardPageContent() {
               <div className="py-2 border-r-2 border-b-2 border-slate-400">Status</div>
               <div className="py-2 border-b-2 border-slate-400 flex items-center justify-between px-4">
                 <span>Tasks</span>
-                <button 
+                <button
                   onClick={toggleAllTasks}
                   className="text-xs normal-case bg-slate-200 hover:bg-slate-300 px-2 py-0.5 rounded border border-slate-400 transition-colors"
                 >

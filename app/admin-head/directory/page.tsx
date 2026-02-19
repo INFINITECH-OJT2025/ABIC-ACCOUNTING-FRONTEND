@@ -40,6 +40,7 @@ import {
   Plus,
   Trash2,
   Copy,
+  Clock,
 } from 'lucide-react'
 
 type ProcessType = 'Adding' | 'Removing'
@@ -485,17 +486,23 @@ export default function GovernmentDirectoryPage() {
 
   if (loadingDirectory && !agency) {
     return (
-      <div className="min-h-screen bg-slate-50/50 pb-12 font-sans">
-        <header className="-mx-8 -mt-10 mb-8 bg-[#a0153e] text-white px-10 pt-12 pb-10 shadow-lg relative overflow-hidden">
-          <div className="max-w-[1600px] mx-auto">
-            <h1 className="text-4xl font-extrabold tracking-tight italic">Directory</h1>
-            <p className="text-rose-100/90 text-lg mt-2">Reference of processes for adding and removing employees in government contributions.</p>
+      <div className="min-h-screen bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-12">
+        <header className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md p-4 md:p-8 mb-4 md:mb-8">
+          <div className="w-full">
+            <h1 className="text-2xl md:text-4xl font-bold mb-2 md:mb-3 flex items-center gap-3">
+              <Building2 className="w-8 h-8 md:w-10 h-10" />
+              Government Directory
+            </h1>
+            <p className="text-white/80 text-sm md:text-lg flex items-center gap-2">
+              <Clock className="w-4 h-4 md:w-5 h-5" />
+              ABIC REALTY & CONSULTANCY • PROCESS REFERENCE
+            </p>
           </div>
         </header>
-        <main className="max-w-[1600px] mx-auto p-8">
+        <main className="w-full p-4 md:p-8">
           <Card className="rounded-[2rem] border-none shadow-2xl bg-white p-10">
             <div className="mx-auto max-w-3xl text-center">
-              <div className="mx-auto mb-5 h-14 w-14 rounded-full border-4 border-[#a0153e]/20 border-t-[#a0153e] animate-spin" />
+              <div className="mx-auto mb-5 h-14 w-14 rounded-full border-4 border-[#A4163A]/20 border-t-[#A4163A] animate-spin" />
               <p className="text-2xl font-black text-slate-900">Loading Directory</p>
               <p className="mt-2 text-slate-600">Fetching agencies, contacts, and process steps...</p>
               <div className="mt-6 space-y-3">
@@ -504,9 +511,9 @@ export default function GovernmentDirectoryPage() {
                 <div className="h-4 w-9/12 mx-auto rounded-full bg-slate-200/60 animate-pulse [animation-delay:240ms]" />
               </div>
               <div className="mt-7 flex items-center justify-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-[#a0153e]/80 animate-bounce" />
-                <span className="h-2.5 w-2.5 rounded-full bg-[#a0153e]/70 animate-bounce [animation-delay:140ms]" />
-                <span className="h-2.5 w-2.5 rounded-full bg-[#a0153e]/60 animate-bounce [animation-delay:280ms]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#A4163A]/80 animate-bounce" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#A4163A]/70 animate-bounce [animation-delay:140ms]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#A4163A]/60 animate-bounce [animation-delay:280ms]" />
               </div>
             </div>
           </Card>
@@ -517,14 +524,20 @@ export default function GovernmentDirectoryPage() {
 
   if (!loadingDirectory && !agency) {
     return (
-      <div className="min-h-screen bg-slate-50/50 pb-12 font-sans">
-        <header className="-mx-8 -mt-10 mb-8 bg-[#a0153e] text-white px-10 pt-12 pb-10 shadow-lg relative overflow-hidden">
-          <div className="max-w-[1600px] mx-auto">
-            <h1 className="text-4xl font-extrabold tracking-tight italic">Directory</h1>
-            <p className="text-rose-100/90 text-lg mt-2">Reference of processes for adding and removing employees in government contributions.</p>
+      <div className="min-h-screen bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-12">
+        <header className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md p-4 md:p-8 mb-4 md:mb-8">
+          <div className="w-full">
+            <h1 className="text-2xl md:text-4xl font-bold mb-2 md:mb-3 flex items-center gap-3">
+              <Building2 className="w-8 h-8 md:w-10 h-10" />
+              Government Directory
+            </h1>
+            <p className="text-white/80 text-sm md:text-lg flex items-center gap-2">
+              <Clock className="w-4 h-4 md:w-5 h-5" />
+              ABIC REALTY & CONSULTANCY • PROCESS REFERENCE
+            </p>
           </div>
         </header>
-        <main className="max-w-[1600px] mx-auto p-8">
+        <main className="w-full p-4 md:p-8">
           <Card className="rounded-[2rem] border-none shadow-2xl bg-white p-10 text-center text-slate-600">
             No agencies found in the database yet.
           </Card>
@@ -640,49 +653,59 @@ export default function GovernmentDirectoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-12 font-sans">
-      <header className="-mx-8 -mt-10 mb-8 bg-[#a0153e] text-white px-10 pt-12 pb-10 shadow-lg relative overflow-hidden">
-        <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-          <div className="space-y-4">
-            <h1 className="text-4xl font-extrabold tracking-tight italic">Directory</h1>
-            <p className="text-rose-100/90 text-lg">Reference of processes for adding and removing employees in government contributions.</p>
+    <div className="min-h-screen bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-12">
+      {/* ----- MAROON GRADIENT HEADER ----- */}
+      <header className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md p-4 md:p-8 mb-4 md:mb-8">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div>
+            <h1 className="text-2xl md:text-4xl font-bold mb-2 md:mb-3 flex items-center gap-3">
+              <Building2 className="w-8 h-8 md:w-10 h-10" />
+              Government Directory
+            </h1>
+            <p className="text-white/80 text-sm md:text-lg flex items-center gap-2">
+              <Clock className="w-4 h-4 md:w-5 h-5" />
+              ABIC REALTY & CONSULTANCY • PROCESS REFERENCE
+            </p>
           </div>
-          <div className="flex gap-3">
+
+          <div className="flex items-center gap-3">
             {editMode ? (
               <>
                 <Button
                   variant="outline"
                   onClick={cancelEditMode}
-                  className="rounded-full bg-transparent border-white/30 text-white hover:bg-white/20 h-11 px-6"
+                  className="bg-white/10 backdrop-blur-sm border-white/30 text-white hover:bg-white/20 transition-all duration-200 text-lg h-11 px-6 font-bold rounded-lg border"
                 >
-                  Cancel
+                  <X className="mr-2 h-5 w-5" />
+                  CANCEL
                 </Button>
                 <Button
                   onClick={saveDirectoryChanges}
                   disabled={savingChanges || !draft}
-                  className="rounded-full bg-white text-[#a0153e] hover:bg-rose-50 h-11 px-6 font-bold"
+                  className="bg-white/95 backdrop-blur-sm border-stone-200 text-[#A4163A] hover:bg-white hover:border-red-200 shadow-sm hover:shadow-md transition-all duration-200 text-lg h-11 px-6 font-bold rounded-lg border flex items-center gap-2"
                 >
-                  <Save className="mr-2 h-4 w-4" />
-                  {savingChanges ? 'Saving...' : 'Save Changes'}
+                  <Save className="h-5 w-5" />
+                  {savingChanges ? 'SAVING...' : 'SAVE CHANGES'}
                 </Button>
               </>
             ) : (
               <Button
                 onClick={startEditMode}
-                className="rounded-full bg-white text-[#a0153e] hover:bg-rose-50 h-11 px-6 font-bold"
+                className="bg-white/95 backdrop-blur-sm border-stone-200 text-[#A4163A] hover:bg-white hover:border-red-200 shadow-sm hover:shadow-md transition-all duration-200 text-lg h-11 px-6 font-bold rounded-lg border flex items-center gap-2"
               >
-                <Edit3 className="mr-2 h-4 w-4" /> Update Mode
+                <Edit3 className="h-5 w-5" />
+                <span>UPDATE MODE</span>
               </Button>
             )}
           </div>
         </div>
       </header>
 
-      <main className="max-w-[1600px] mx-auto p-8">
+      <main className="w-full p-4 md:p-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           <div className="lg:col-span-1 space-y-6">
             <Card className="rounded-[2rem] border-none shadow-2xl bg-white p-6">
-              <p className="text-[11px] font-black text-[#a0153e] uppercase tracking-[0.2em] mb-4">Agencies</p>
+              <p className="text-[11px] font-black text-[#A4163A] uppercase tracking-[0.2em] mb-4">Agencies</p>
               <div className="space-y-3">
                 {mergedAgencies.map((item) => {
                   const Icon = item.icon
@@ -701,7 +724,7 @@ export default function GovernmentDirectoryPage() {
                       className={cn(
                         'w-full h-auto justify-start rounded-xl px-4 py-3 border transition-colors',
                         isActive
-                          ? 'bg-[#a0153e]/10 border-[#a0153e]/30 text-[#a0153e]'
+                          ? 'bg-[#A4163A]/10 border-[#A4163A]/30 text-[#A4163A]'
                           : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                       )}
                     >
@@ -714,7 +737,7 @@ export default function GovernmentDirectoryPage() {
             </Card>
 
             <Card className="rounded-[2rem] border-none shadow-2xl bg-white p-6">
-              <p className="text-[11px] font-black text-[#a0153e] uppercase tracking-[0.2em] mb-2">Agency Snapshot</p>
+              <p className="text-[11px] font-black text-[#A4163A] uppercase tracking-[0.2em] mb-2">Agency Snapshot</p>
               <p className="text-sm font-semibold text-slate-700 mb-4">{agency.shortName}</p>
               <div className="space-y-3 text-sm">
                 <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
@@ -737,7 +760,7 @@ export default function GovernmentDirectoryPage() {
             </Card>
 
             <Card className="rounded-[2rem] border-none shadow-2xl bg-white p-6">
-              <p className="text-[11px] font-black text-[#a0153e] uppercase tracking-[0.2em] mb-4">Official Online Portals</p>
+              <p className="text-[11px] font-black text-[#A4163A] uppercase tracking-[0.2em] mb-4">Official Online Portals</p>
               <div className="space-y-3">
                 {OFFICIAL_PORTALS.map((portal) => {
                   const isActivePortal = normalizeCode(portal.code) === normalizeCode(activeAgency)
@@ -750,11 +773,11 @@ export default function GovernmentDirectoryPage() {
                       className={cn(
                         "block rounded-xl border px-3 py-3 transition-colors",
                         isActivePortal
-                          ? "border-[#a0153e]/30 bg-[#a0153e]/5"
+                          ? "border-[#A4163A]/30 bg-[#A4163A]/5"
                           : "border-slate-200 bg-slate-50/50 hover:bg-slate-100"
                       )}
                     >
-                      <p className="text-[11px] font-black uppercase tracking-[0.15em] text-[#a0153e]">{portal.label}</p>
+                      <p className="text-[11px] font-black uppercase tracking-[0.15em] text-[#A4163A]">{portal.label}</p>
                       <p className="text-xs text-slate-600 mt-1 break-all">{portal.url}</p>
                     </a>
                   )
@@ -805,7 +828,7 @@ export default function GovernmentDirectoryPage() {
                         type="button"
                         onClick={() => open()}
                         disabled={updatingImage}
-                        className="rounded-full h-10 px-5 bg-white/95 text-[#a0153e] hover:bg-white"
+                        className="rounded-full h-10 px-5 bg-white/95 text-[#A4163A] hover:bg-white"
                       >
                         {updatingImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImageUp className="mr-2 h-4 w-4" />}
                         Update Picture
@@ -825,7 +848,7 @@ export default function GovernmentDirectoryPage() {
                   type="button"
                   onClick={() => { void loadCloudinaryImages() }}
                   disabled={loadingCloudinaryImages || updatingImage}
-                  className="rounded-full h-10 px-5 bg-white/95 text-[#a0153e] hover:bg-white"
+                  className="rounded-full h-10 px-5 bg-white/95 text-[#A4163A] hover:bg-white"
                 >
                   {loadingCloudinaryImages ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Images className="mr-2 h-4 w-4" />}
                   Select from image uploads
@@ -883,7 +906,7 @@ export default function GovernmentDirectoryPage() {
 
               {editMode && (
                 <div className="mb-4">
-                  <Button onClick={addContact} size="sm" variant="ghost" className="rounded-full text-[#a0153e] font-bold bg-[#a0153e]/5 hover:bg-[#a0153e]/10 px-5">
+                  <Button onClick={addContact} size="sm" variant="ghost" className="rounded-full text-[#A4163A] font-bold bg-[#A4163A]/5 hover:bg-[#A4163A]/10 px-5">
                     <Plus className="mr-2 h-4 w-4" /> Add Contact
                   </Button>
                 </div>
@@ -907,7 +930,7 @@ export default function GovernmentDirectoryPage() {
                     return (
                       <div key={`${agency.key}-${row.index}`} className="rounded-xl border border-slate-200 bg-slate-50/40 p-4">
                         <div className="flex items-start gap-3">
-                          <div className="h-9 w-9 rounded-lg bg-[#a0153e]/10 text-[#a0153e] flex items-center justify-center shrink-0">
+                          <div className="h-9 w-9 rounded-lg bg-[#A4163A]/10 text-[#A4163A] flex items-center justify-center shrink-0">
                             <Icon className="h-4 w-4" />
                           </div>
                           <div className="flex-1">
@@ -950,13 +973,13 @@ export default function GovernmentDirectoryPage() {
                             ) : (
                               <>
                                 <div className="flex items-center justify-between gap-2">
-                                  <p className="text-[11px] font-black text-[#a0153e] uppercase tracking-[0.15em]">{row.label}</p>
+                                  <p className="text-[11px] font-black text-[#A4163A] uppercase tracking-[0.15em]">{row.label}</p>
                                   <Button
                                     type="button"
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => { void handleCopyText(String(row.label || 'Value'), String(row.value || '')) }}
-                                    className="h-7 px-2 text-slate-500 hover:text-[#a0153e] hover:bg-[#a0153e]/10"
+                                    className="h-7 px-2 text-slate-500 hover:text-[#A4163A] hover:bg-[#A4163A]/10"
                                   >
                                     <Copy className="h-3.5 w-3.5 mr-1" /> Copy
                                   </Button>
@@ -975,7 +998,7 @@ export default function GovernmentDirectoryPage() {
             <div className="border-t border-slate-100 p-8 bg-slate-50/30">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
                 <div>
-                  <p className="text-[11px] font-black text-[#a0153e] uppercase tracking-[0.2em] mb-2">Goverment Contribution</p>
+                  <p className="text-[11px] font-black text-[#A4163A] uppercase tracking-[0.2em] mb-2">Goverment Contribution</p>
                   <h3 className="text-2xl font-black text-slate-900">Process Steps</h3>
                 </div>
 
@@ -988,7 +1011,7 @@ export default function GovernmentDirectoryPage() {
                       className={cn(
                         'h-9 rounded-lg px-5 text-xs font-black transition-all',
                         activeProcess === proc
-                          ? 'bg-[#a0153e] text-white'
+                          ? 'bg-[#A4163A] text-white'
                           : 'text-slate-600 hover:text-slate-900'
                       )}
                     >
@@ -998,7 +1021,7 @@ export default function GovernmentDirectoryPage() {
                   ))}
                 </div>
                 {editMode && (
-                  <Button onClick={addProcessStep} size="sm" variant="ghost" className="rounded-full text-[#a0153e] font-bold bg-[#a0153e]/5 hover:bg-[#a0153e]/10 px-5">
+                  <Button onClick={addProcessStep} size="sm" variant="ghost" className="rounded-full text-[#A4163A] font-bold bg-[#A4163A]/5 hover:bg-[#A4163A]/10 px-5">
                     <Plus className="mr-2 h-4 w-4" /> Add Step
                   </Button>
                 )}
@@ -1008,8 +1031,8 @@ export default function GovernmentDirectoryPage() {
                 <Table>
                   <TableHeader className="bg-slate-50">
                     <TableRow>
-                      <TableHead className="w-[100px] text-center font-black text-[#a0153e] uppercase tracking-widest text-[11px] py-5">Step</TableHead>
-                      <TableHead className="font-black text-[#a0153e] uppercase tracking-widest text-[11px] py-5">Process</TableHead>
+                      <TableHead className="w-[100px] text-center font-black text-[#A4163A] uppercase tracking-widest text-[11px] py-5">Step</TableHead>
+                      <TableHead className="font-black text-[#A4163A] uppercase tracking-widest text-[11px] py-5">Process</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1085,7 +1108,7 @@ export default function GovernmentDirectoryPage() {
                   <button
                     key={asset.public_id}
                     type="button"
-                    className="group relative rounded-xl border border-slate-200 bg-white overflow-hidden text-left hover:border-[#a0153e]/50"
+                    className="group relative rounded-xl border border-slate-200 bg-white overflow-hidden text-left hover:border-[#A4163A]/50"
                     onClick={async () => {
                       try {
                         setUpdatingImage(true)
