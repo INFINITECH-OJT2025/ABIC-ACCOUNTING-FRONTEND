@@ -125,10 +125,12 @@ export default function TerminatePage() {
 
       if (termData.success && Array.isArray(termData.data)) {
         setTerminations(termData.data)
+      } else {
+        toast.error('Failed to load termination history')
       }
     } catch (error) {
       console.error('Error fetching data:', error)
-      toast.error('Failed to fetch data')
+      toast.error('Failed to connect to server. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -188,7 +190,7 @@ export default function TerminatePage() {
           )
 
           const data = await response.json()
-
+ 
           if (data.success) {
             toast.success(data.message || 'Employee terminated successfully')
             setSelectedEmployeeId('')
@@ -199,11 +201,21 @@ export default function TerminatePage() {
             })
             fetchData()
           } else {
-            toast.error(data.message || 'Failed to terminate employee')
+            // Parse validation errors if present
+            if (data.errors) {
+              const errorMessages = Object.values(data.errors).flat().join(' ')
+              toast.error(errorMessages || data.message)
+            } else {
+              toast.error(data.message || 'Failed to terminate employee')
+            }
           }
         } catch (error) {
           console.error('Error:', error)
-          toast.error('Failed to terminate employee')
+          if (error instanceof TypeError && error.message === 'Failed to fetch') {
+            toast.error('Could not connect to server. Please check your connection.')
+          } else {
+            toast.error('Failed to terminate employee')
+          }
         } finally {
           setSubmitting(false)
           setConfirmModal(prev => ({ ...prev, isOpen: false }))
@@ -230,17 +242,27 @@ export default function TerminatePage() {
           })
 
           const data = await response.json()
-
+ 
           if (data.success) {
             toast.success(data.message || 'Employee re-hired successfully')
             fetchData()
             setShowDetailDialog(false)
           } else {
-            toast.error(data.message || 'Failed to re-hire employee')
+            // Parse validation errors if present
+            if (data.errors) {
+              const errorMessages = Object.values(data.errors).flat().join(' ')
+              toast.error(errorMessages || data.message)
+            } else {
+              toast.error(data.message || 'Failed to re-hire employee')
+            }
           }
         } catch (error) {
           console.error('Error re-hiring:', error)
-          toast.error('Failed to re-hire employee')
+          if (error instanceof TypeError && error.message === 'Failed to fetch') {
+            toast.error('Could not connect to server.')
+          } else {
+            toast.error('Failed to re-hire employee')
+          }
         } finally {
           setRehireLoading(null)
           setConfirmModal(prev => ({ ...prev, isOpen: false }))

@@ -638,11 +638,21 @@ export default function AttendanceDashboard() {
           duration: 10000, // 10 seconds for undo
         })
       } else {
-        toast.error(data.message || 'Failed to add year')
+        // Parse validation errors if present
+        if (data.errors) {
+          const errorMessages = Object.values(data.errors).flat().join(' ')
+          toast.error(errorMessages || data.message)
+        } else {
+          toast.error(data.message || 'Failed to add year')
+        }
       }
     } catch (error) {
       console.error('Save error:', error)
-      toast.error('An error occurred while saving')
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        toast.error('Connection Error: Could not reach the server.')
+      } else {
+        toast.error('Could not add year. Please try again later.')
+      }
     } finally {
       setIsAddingYear(false)
     }

@@ -88,15 +88,18 @@ export default function MasterfilePage() {
       }
       
       const data = await response.json()
-      if (data.success) {
-        setEmployees(data.data || [])
-      }
-    } catch (error) {
-      console.error('Error fetching employees:', error)
-    } finally {
-      setLoading(false)
+    if (data.success) {
+      setEmployees(data.data || [])
+    } else {
+      toast.error(data.message || 'Failed to fetch employees')
     }
+  } catch (error) {
+    console.error('Error fetching employees:', error)
+    toast.error('Could not connect to the server. Please check your connection.')
+  } finally {
+    setLoading(false)
   }
+}
 
   const fetchEmployeeDetails = async (employeeId: number) => {
     try {
@@ -119,11 +122,15 @@ export default function MasterfilePage() {
         setViewMode('details')
         window.scrollTo(0, 0)
       } else {
-        toast.error('Failed to load employee details')
+        toast.error(data.message || 'Failed to load employee details')
       }
     } catch (error) {
       console.error('Error fetching employee details:', error)
-      toast.error('Failed to load employee details')
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        toast.error('Network Error: Could not load employee details.')
+      } else {
+        toast.error('Failed to load employee details')
+      }
     }
   }
 
@@ -131,8 +138,6 @@ export default function MasterfilePage() {
     if (!emp) return false
     // We can only fully check completeness if we have all details (EmployeeDetails).
     // If it's just from the list (Employee), we might not have all fields.
-    // However, for the pending list styling, we assume we might need to fetch details or rely on what's available.
-    // The current API for list might not return all fields. 
     // To properly style the pending list without N+1 fetches, strictly we should use data available.
     // But logically, "Ready to Employ" implies detailed info is filled.
     // If the list API doesn't return everything, this check on the list view might be partial.
@@ -200,24 +205,34 @@ export default function MasterfilePage() {
           })
 
           const data = await response.json()
-          if (data.success) {
-            toast.success(`${selectedEmployee.first_name} set as employed successfully`)
-            await fetchEmployees()
-            setViewMode('list')
-            setSelectedEmployee(null)
+        if (data.success) {
+          toast.success(`${selectedEmployee.first_name} set as employed successfully`)
+          await fetchEmployees()
+          setViewMode('list')
+          setSelectedEmployee(null)
+        } else {
+          // Parse validation errors if present
+          if (data.errors) {
+            const errorMessages = Object.values(data.errors).flat().join(' ')
+            toast.error(errorMessages || data.message)
           } else {
             toast.error(data.message || 'Failed to update status')
           }
-        } catch (error) {
-          console.error('Error updating status:', error)
-          toast.error('Failed to update status')
-        } finally {
-          setIsUpdating(false)
-          setConfirmModal(prev => ({ ...prev, isOpen: false }))
         }
+      } catch (error) {
+        console.error('Error updating status:', error)
+        if (error instanceof TypeError && error.message === 'Failed to fetch') {
+          toast.error('Could not connect to server. Please ensure the backend is running.')
+        } else {
+          toast.error('Failed to update status')
+        }
+      } finally {
+        setIsUpdating(false)
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
       }
-    })
-  }
+    }
+  })
+}
 
   const filterEmployees = (list: Employee[]) => {
     if (!searchQuery) return list

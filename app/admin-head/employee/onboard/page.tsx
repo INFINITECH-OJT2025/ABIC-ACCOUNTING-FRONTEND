@@ -381,6 +381,11 @@ export default function OnboardPage() {
 
       const empData = await empResponse.json()
       if (!empResponse.ok || !empData.success) {
+        // Parse validation errors if present
+        if (empData.errors) {
+          const errorMessages = Object.values(empData.errors).flat().join(' ')
+          throw new Error(errorMessages || empData.message)
+        }
         throw new Error(empData.message || 'Failed to create employee')
       }
 
@@ -422,11 +427,21 @@ export default function OnboardPage() {
           department: '',
         })
       } else {
-        toast.error('Error saving onboarding data: ' + onboardData.message)
+        // Parse validation errors if present
+        if (onboardData.errors) {
+          const errorMessages = Object.values(onboardData.errors).flat().join(' ')
+          toast.error(errorMessages || onboardData.message)
+        } else {
+          toast.error(onboardData.message || 'Error saving onboarding data')
+        }
       }
     } catch (error) {
       console.error('Error:', error)
-      toast.error(error instanceof Error ? error.message : 'Failed to complete onboarding')
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        toast.error('Could not connect to server. Please ensure the backend is running.')
+      } else {
+        toast.error(error instanceof Error ? error.message : 'Failed to complete onboarding')
+      }
     } finally {
       setIsSaving(false)
     }
