@@ -51,6 +51,40 @@ interface Department {
   name: string
 }
 
+const toPlainString = (value: unknown): string => {
+  if (typeof value === 'string') return value.trim()
+  if (value && typeof value === 'object') {
+    const maybeName = (value as any).name
+    if (typeof maybeName === 'string') return maybeName.trim()
+  }
+  if (value === null || value === undefined) return ''
+  return String(value).trim()
+}
+
+const toIsoDate = (value: unknown): string => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return ''
+    const datePart = trimmed.includes('T') ? trimmed.split('T')[0] : trimmed
+    if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return datePart
+    const parsed = new Date(trimmed)
+    if (!Number.isNaN(parsed.getTime())) {
+      const year = parsed.getFullYear()
+      const month = String(parsed.getMonth() + 1).padStart(2, '0')
+      const day = String(parsed.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    }
+    return ''
+  }
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const year = value.getFullYear()
+    const month = String(value.getMonth() + 1).padStart(2, '0')
+    const day = String(value.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+  return ''
+}
+
 export default function OnboardPage() {
   return (
     <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
@@ -63,6 +97,7 @@ function OnboardPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const employeeIdParam = searchParams.get('id')
+  const requestedViewParam = searchParams.get('view')
   const [view, setView] = useState<'onboard' | 'checklist' | 'update-info'>('onboard')
 
   // Form States
@@ -86,6 +121,7 @@ function OnboardPageContent() {
     date: string,
     raw_date: string
   } | null>(null)
+  const [checklistRecordId, setChecklistRecordId] = useState<number | null>(null)
   const [completedTasks, setCompletedTasks] = useState<{ [key: string]: string }>({})
 
 
@@ -167,12 +203,19 @@ function OnboardPageContent() {
     if (savedState) {
       try {
         const parsed = JSON.parse(savedState)
-        if (parsed.view) setView(parsed.view)
-        if (parsed.currentBatch) setCurrentBatch(parsed.currentBatch)
-        if (parsed.progressionFormData) setProgressionFormData(parsed.progressionFormData)
-        if (parsed.onboardingEmployeeId) setOnboardingEmployeeId(parsed.onboardingEmployeeId)
-        if (parsed.checklistData) setChecklistData(parsed.checklistData)
-        if (parsed.completedTasks) setCompletedTasks(parsed.completedTasks)
+        const sameEmployee = employeeIdParam
+          ? String(parsed.onboardingEmployeeId ?? '') === employeeIdParam
+          : true
+
+        if (sameEmployee) {
+          if (parsed.view) setView(parsed.view)
+          if (parsed.currentBatch) setCurrentBatch(parsed.currentBatch)
+          if (parsed.progressionFormData) setProgressionFormData(parsed.progressionFormData)
+          if (parsed.onboardingEmployeeId) setOnboardingEmployeeId(parsed.onboardingEmployeeId)
+          if (parsed.checklistData) setChecklistData(parsed.checklistData)
+          if (parsed.checklistRecordId) setChecklistRecordId(parsed.checklistRecordId)
+          if (parsed.completedTasks) setCompletedTasks(parsed.completedTasks)
+        }
       } catch (e) {
         console.error('Failed to restore state', e)
         localStorage.removeItem('employee_onboarding_state')
@@ -184,11 +227,96 @@ function OnboardPageContent() {
 
     // Load employee if ID is provided in URL
     if (employeeIdParam) {
-      loadExistingEmployee(parseInt(employeeIdParam))
+      const requestedView = requestedViewParam === 'checklist' ? 'checklist' : 'update-info'
+      loadExistingEmployee(parseInt(employeeIdParam), requestedView)
     }
-  }, [employeeIdParam])
+  }, [employeeIdParam, requestedViewParam])
 
-  const loadExistingEmployee = async (id: number) => {
+  const fetchChecklistProgress = async (employeeName: string) => {
+    try {
+      const response = await fetch(`${getApiUrl()}/api/onboarding-checklist`, {
+        headers: { Accept: 'application/json' },
+        credentials: 'include',
+      })
+      const data = await response.json()
+      const list = Array.isArray(data?.data) ? data.data : []
+      const normalizeName = (value: unknown) =>
+        toPlainString(value)
+          .toLowerCase()
+          .replace(/\s+/g, ' ')
+          .trim()
+      const normalizedName = normalizeName(employeeName)
+      const nameParts = normalizedName.split(' ').filter(Boolean)
+      const firstName = nameParts[0] || ''
+      const lastName = nameParts[nameParts.length - 1] || ''
+      const sortedByLatest = [...list].sort((a: any, b: any) => {
+        const aTime = new Date(a?.updated_at ?? a?.created_at ?? 0).getTime()
+        const bTime = new Date(b?.updated_at ?? b?.created_at ?? 0).getTime()
+        return bTime - aTime
+      })
+
+      let matched = sortedByLatest.find((item: any) => normalizeName(item?.name) === normalizedName)
+      if (!matched && firstName && lastName) {
+        matched = sortedByLatest.find((item: any) => {
+          const candidate = normalizeName(item?.name)
+          return candidate.includes(firstName) && candidate.includes(lastName)
+        })
+      }
+
+      if (!matched) {
+        setChecklistRecordId(null)
+        setCompletedTasks({})
+        return
+      }
+
+      const matchedId = Number(matched.id)
+      setChecklistRecordId(Number.isFinite(matchedId) ? matchedId : null)
+
+      const matchedStartDateRaw = toIsoDate(matched?.startDate ?? matched?.start_date)
+      const matchedStartDateFormatted =
+        matchedStartDateRaw && !Number.isNaN(new Date(matchedStartDateRaw).getTime())
+          ? new Date(matchedStartDateRaw).toLocaleDateString()
+          : null
+
+      setChecklistData((prev) => ({
+        name: toPlainString(matched?.name) || toPlainString(prev?.name) || employeeName,
+        position: toPlainString(matched?.position) || toPlainString(prev?.position),
+        department: toPlainString(matched?.department) || toPlainString(prev?.department),
+        date: matchedStartDateFormatted ?? prev?.date ?? '',
+        raw_date: matchedStartDateRaw || prev?.raw_date || ''
+      }))
+
+      const fallbackDateRaw = matched?.updated_at ?? matched?.created_at
+      const fallbackDate = !Number.isNaN(new Date(fallbackDateRaw).getTime())
+        ? new Date(fallbackDateRaw).toLocaleString('en-US', {
+            month: 'short',
+            day: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+          })
+        : 'Completed'
+
+      const tasks = Array.isArray(matched?.tasks) ? matched.tasks : []
+      const restoredTasks = tasks.reduce((acc: { [key: string]: string }, task: any) => {
+        const taskName = String(task?.task ?? '').trim()
+        const taskStatus = String(task?.status ?? '').toUpperCase()
+        if (!taskName || taskStatus !== 'DONE') return acc
+        const taskDate = String(task?.date ?? '').trim()
+        acc[taskName] = taskDate || fallbackDate
+        return acc
+      }, {})
+
+      setCompletedTasks(restoredTasks)
+    } catch (error) {
+      console.error('Error fetching checklist progress:', error)
+      setChecklistRecordId(null)
+      setCompletedTasks({})
+    }
+  }
+
+  const loadExistingEmployee = async (id: number, targetView: 'checklist' | 'update-info' = 'update-info') => {
     try {
       setIsActionLoading(true)
       const response = await fetch(`${getApiUrl()}/api/employees/${id}`)
@@ -200,12 +328,15 @@ function OnboardPageContent() {
         setProgressionFormData(emp)
         setChecklistData({
           name: `${emp.first_name} ${emp.last_name}`,
-          position: emp.position || '',
-          department: emp.department || '',
-          date: emp.date_hired ? new Date(emp.date_hired).toLocaleDateString() : '',
-          raw_date: emp.date_hired || ''
+          position: toPlainString(emp.position),
+          department: toPlainString(emp.department),
+          date: toIsoDate(emp.onboarding_date || emp.date_hired)
+            ? new Date(toIsoDate(emp.onboarding_date || emp.date_hired)).toLocaleDateString()
+            : '',
+          raw_date: toIsoDate(emp.onboarding_date || emp.date_hired)
         })
-        setView('update-info')
+        await fetchChecklistProgress(`${emp.first_name} ${emp.last_name}`)
+        setView(targetView)
       } else {
         toast.error('Employee not found')
       }
@@ -225,10 +356,11 @@ function OnboardPageContent() {
         progressionFormData,
         onboardingEmployeeId,
         checklistData,
+        checklistRecordId,
         completedTasks
       }))
     }
-  }, [view, currentBatch, progressionFormData, onboardingEmployeeId, checklistData, completedTasks, onboardFormData])
+  }, [view, currentBatch, progressionFormData, onboardingEmployeeId, checklistData, checklistRecordId, completedTasks, onboardFormData])
 
   const clearStorage = () => {
     localStorage.removeItem('employee_onboarding_state')
@@ -481,6 +613,7 @@ function OnboardPageContent() {
           date: new Date(onboarding_date).toLocaleDateString(),
           raw_date: onboarding_date
         })
+        setChecklistRecordId(null)
         setCompletedTasks({})
         setView('checklist')
         setOnboardFormData({
@@ -523,29 +656,54 @@ function OnboardPageContent() {
         date: completedTasks[taskName] || null
       }))
 
-      const response = await fetch(`${getApiUrl()}/api/onboarding-checklist`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          name: checklistData.name,
-          position: checklistData.position,
-          department: checklistData.department,
-          startDate: checklistData.raw_date,
-          status: completionPercentage === 100 ? 'DONE' : 'PENDING',
-          tasks: allTasks
-        }),
-      })
+      const normalizedDepartment =
+        toPlainString(checklistData.department) || toPlainString(progressionFormData.department)
+      const normalizedStartDate =
+        toIsoDate(checklistData.raw_date) ||
+        toIsoDate(progressionFormData.onboarding_date) ||
+        toIsoDate(progressionFormData.date_hired)
+
+      const isUpdate = checklistRecordId !== null
+      if (!normalizedDepartment || !normalizedStartDate) {
+        toast.error('Department and Start Date are required before saving checklist')
+        return
+      }
+
+      const response = await fetch(
+        `${getApiUrl()}/api/onboarding-checklist${isUpdate ? `/${checklistRecordId}` : ''}`,
+        {
+          method: isUpdate ? 'PUT' : 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({
+            name: toPlainString(checklistData.name),
+            position: toPlainString(checklistData.position),
+            department: normalizedDepartment,
+            startDate: normalizedStartDate,
+            status: completionPercentage === 100 ? 'DONE' : 'PENDING',
+            tasks: allTasks
+          }),
+        }
+      )
 
       const data = await response.json()
       if (data.success) {
+        const savedId = Number(data?.data?.id)
+        if (Number.isFinite(savedId)) {
+          setChecklistRecordId(savedId)
+        }
         toast.success('Checklist progress saved successfully')
         clearStorage()
         router.push('/admin-head/employee/masterfile')
       } else {
-        toast.error(data.message || 'Error saving checklist')
+        if (data?.errors) {
+          const errorMessages = Object.values(data.errors).flat().join(' ')
+          toast.error(errorMessages || data.message || 'Error saving checklist')
+        } else {
+          toast.error(data.message || 'Error saving checklist')
+        }
       }
     } catch (error) {
       console.error('Error saving checklist:', error)

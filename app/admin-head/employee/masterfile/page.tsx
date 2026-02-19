@@ -14,6 +14,14 @@ import {
 } from "@/components/ui/select"
 import { ArrowUpDown, ListFilter, ArrowUpAZ, ArrowDownAZ, Clock3, History } from 'lucide-react'
 
+interface OnboardingChecklist {
+  id: number
+  name: string
+  tasks: any[]
+  status: string
+  updated_at: string
+}
+
 interface Employee {
   id: number
   first_name: string
@@ -22,6 +30,11 @@ interface Employee {
   position: string
   status: 'pending' | 'employed' | 'terminated'
   created_at: string
+  onboarding_tasks?: {
+    done: number
+    total: number
+    isComplete: boolean
+  }
 }
 
 interface EmployeeDetails extends Employee {
@@ -49,6 +62,7 @@ export default function MasterfilePage() {
   const [viewMode, setViewMode] = useState<'list' | 'details'>('list')
   const [activeTab, setActiveTab] = useState<'employed' | 'terminated'>('employed')
   const [isUpdating, setIsUpdating] = useState(false)
+  const [checklists, setChecklists] = useState<OnboardingChecklist[]>([])
 
   // Pagination States
   const [pendingPage, setPendingPage] = useState(1)
@@ -84,26 +98,40 @@ export default function MasterfilePage() {
   const fetchEmployees = async () => {
     try {
       const apiUrl = getApiUrl()
-      const fullUrl = `${apiUrl}/api/employees`
+      const employeesUrl = `${apiUrl}/api/employees`
+      const checklistsUrl = `${apiUrl}/api/onboarding-checklist`
       
-      const response = await fetch(fullUrl, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        credentials: 'include',
-      })
+      const [empRes, checkRes] = await Promise.all([
+        fetch(employeesUrl, { headers: { Accept: 'application/json' }, credentials: 'include' }),
+        fetch(checklistsUrl, { headers: { Accept: 'application/json' }, credentials: 'include' })
+      ])
       
-      if (!response.ok) {
-        throw new Error(`HTTP Error: ${response.status}`)
-      }
+      const empData = await empRes.json()
+      const checkData = await checkRes.json()
       
-      const data = await response.json()
-      if (data.success) {
-        setEmployees(data.data || [])
+      if (empData.success) {
+        const checklistsList = Array.isArray(checkData.data) ? checkData.data : []
+        setChecklists(checklistsList)
+
+        const enhancedEmployees = empData.data.map((emp: Employee) => {
+          const checklist = checklistsList.find((c: any) => c.name === `${emp.first_name} ${emp.last_name}`)
+          if (checklist) {
+            const tasks = Array.isArray(checklist.tasks) ? checklist.tasks : []
+            const doneCount = tasks.filter((t: any) => t.status === 'DONE').length
+            return {
+              ...emp,
+              onboarding_tasks: {
+                done: doneCount,
+                total: tasks.length,
+                isComplete: doneCount === tasks.length && tasks.length > 0
+              }
+            }
+          }
+          return emp
+        })
+        setEmployees(enhancedEmployees || [])
       } else {
-        toast.error(data.message || 'Failed to fetch employees')
+        toast.error(empData.message || 'Failed to fetch employees')
       }
     } catch (error) {
       console.error('Error fetching employees:', error)
@@ -559,14 +587,46 @@ export default function MasterfilePage() {
                                  <Badge variant="outline" className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border-emerald-100">
                                    {status}
                                  </Badge>
-                               ) : (
-                                 <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">
-                                   {status}
-                                 </span>
+                              ) : (
+                                 <div className="flex flex-col gap-1 items-start">
+                                   <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">
+                                     {status}
+                                   </span>
+                                   {employee.onboarding_tasks && (
+                                     <span className="text-[9px] font-medium text-slate-400">
+                                       Tasks: {employee.onboarding_tasks.done}/{employee.onboarding_tasks.total}
+                                     </span>
+                                   )}
+                                 </div>
                                )}
-                               <span className="text-[10px] text-slate-400 font-medium group-hover:translate-x-1 transition-transform">
-                                 Review →
-                               </span>
+                               <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                 {employee.status === 'pending' && (!isComplete || !employee.onboarding_tasks?.isComplete) && (
+                                   <Button
+                                     variant="ghost"
+                                     size="sm"
+                                     onClick={() =>
+                                       router.push(
+                                         employee.onboarding_tasks?.isComplete
+                                           ? `/admin-head/employee/onboard?id=${employee.id}`
+                                           : `/admin-head/employee/onboard?id=${employee.id}&view=checklist`
+                                       )
+                                     }
+                                     className={`h-7 px-2 text-[10px] font-bold border rounded-lg transition-all ${
+                                       employee.onboarding_tasks?.isComplete
+                                         ? 'text-[#630C22] bg-rose-50 hover:bg-rose-100 border-rose-100'
+                                         : 'text-blue-600 bg-blue-50 hover:bg-blue-100 border-blue-100 animate-pulse hover:animate-none'
+                                     }`}
+                                   >
+                                     {employee.onboarding_tasks?.isComplete ? 'Update Profile' : 'Continue Onboarding'}
+                                   </Button>
+                                 )}
+                                 <button 
+                                   onClick={() => fetchEmployeeDetails(employee.id)}
+                                   className="text-[10px] text-slate-400 font-medium group-hover:text-[#630C22] group-hover:translate-x-1 transition-all flex items-center gap-1 py-1"
+                                 >
+                                   Review <span className="text-xs">→</span>
+                                 </button>
+                               </div>
                              </div>
                            </div>
                        )})}
@@ -641,36 +701,6 @@ export default function MasterfilePage() {
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2"><path d="m15 18-6-6 6-6"/></svg>
               Back to Employee List
             </Button>
-            
-            {/* Set as Employed Action */}
-            {selectedEmployee?.status === 'pending' && (
-              <div className="flex items-center gap-3">
-                 {!checkCompleteness(selectedEmployee).isComplete && (
-                   <>
-                    <span className="text-xs font-medium text-rose-500 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100">
-                      Complete all required fields to employ
-                    </span>
-                    <Button
-                      onClick={() => router.push(`/admin-head/employee/onboard?id=${selectedEmployee.id}`)}
-                      className="h-10 px-6 font-bold rounded-xl bg-[#630C22] hover:bg-[#4A081A] text-white transition-all shadow-md hover:shadow-lg"
-                    >
-                      Update Profile
-                    </Button>
-                   </>
-                 )}
-                 <Button
-                  onClick={handleSetAsEmployed}
-                  disabled={!checkCompleteness(selectedEmployee).isComplete || isUpdating}
-                  className={`h-10 px-6 font-bold rounded-xl transition-all ${
-                     !checkCompleteness(selectedEmployee).isComplete 
-                     ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                     : 'bg-[#630C22] hover:bg-[#4A081A] text-white shadow-md hover:shadow-lg'
-                  }`}
-                 >
-                   {isUpdating ? 'Updating...' : 'Set as Employed'}
-                 </Button>
-              </div>
-            )}
           </div>
 
           <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
@@ -812,19 +842,29 @@ export default function MasterfilePage() {
              <div className="bg-slate-50 px-8 py-6 border-t border-slate-200 flex justify-end gap-3">
                 {selectedEmployee?.status === 'pending' ? (
                    <>
-                    {!checkCompleteness(selectedEmployee).isComplete && (
+                    {(!checkCompleteness(selectedEmployee).isComplete || !selectedEmployee.onboarding_tasks?.isComplete) && (
                       <Button
-                        onClick={() => router.push(`/admin-head/employee/onboard?id=${selectedEmployee.id}`)}
-                        className="h-12 px-8 font-bold rounded-xl bg-[#630C22] hover:bg-[#4A081A] text-white transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                        onClick={() =>
+                          router.push(
+                            selectedEmployee.onboarding_tasks?.isComplete
+                              ? `/admin-head/employee/onboard?id=${selectedEmployee.id}`
+                              : `/admin-head/employee/onboard?id=${selectedEmployee.id}&view=checklist`
+                          )
+                        }
+                        className={`h-12 px-8 font-bold rounded-xl text-white transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 ${
+                          selectedEmployee.onboarding_tasks?.isComplete
+                            ? 'bg-[#630C22] hover:bg-[#4A081A]'
+                            : 'bg-blue-600 hover:bg-blue-700'
+                        }`}
                       >
-                        Update Profile
+                        {selectedEmployee.onboarding_tasks?.isComplete ? 'Update Profile' : 'Continue Onboarding'}
                       </Button>
                     )}
                     <Button
                       onClick={handleSetAsEmployed}
-                      disabled={!checkCompleteness(selectedEmployee).isComplete || isUpdating}
+                      disabled={!checkCompleteness(selectedEmployee).isComplete || !selectedEmployee.onboarding_tasks?.isComplete || isUpdating}
                       className={`h-12 px-8 font-bold rounded-xl transition-all ${
-                        !checkCompleteness(selectedEmployee).isComplete 
+                        (!checkCompleteness(selectedEmployee).isComplete || !selectedEmployee.onboarding_tasks?.isComplete)
                         ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                         : 'bg-[#630C22] hover:bg-[#4A081A] text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5'
                       }`}
