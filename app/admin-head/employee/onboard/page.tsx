@@ -1,7 +1,7 @@
 "use client"
 
-import React, { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import React, { useEffect, useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { getApiUrl } from '@/lib/api'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -43,7 +43,17 @@ interface Department {
 }
 
 export default function OnboardPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+      <OnboardPageContent />
+    </Suspense>
+  )
+}
+
+function OnboardPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const employeeIdParam = searchParams.get('id')
   const [view, setView] = useState<'onboard' | 'checklist' | 'update-info'>('onboard')
   
   // Form States
@@ -150,7 +160,41 @@ export default function OnboardPage() {
     fetchPositions()
     fetchDepartments()
     fetchRegions()
-  }, [])
+
+    // Load employee if ID is provided in URL
+    if (employeeIdParam) {
+      loadExistingEmployee(parseInt(employeeIdParam))
+    }
+  }, [employeeIdParam])
+
+  const loadExistingEmployee = async (id: number) => {
+    try {
+      setIsActionLoading(true)
+      const response = await fetch(`${getApiUrl()}/api/employees/${id}`)
+      const data = await response.json()
+      
+      if (data.success) {
+        const emp = data.data
+        setOnboardingEmployeeId(id)
+        setProgressionFormData(emp)
+        setChecklistData({
+          name: `${emp.first_name} ${emp.last_name}`,
+          position: emp.position || '',
+          department: emp.department || '',
+          date: emp.date_hired ? new Date(emp.date_hired).toLocaleDateString() : '',
+          raw_date: emp.date_hired || ''
+        })
+        setView('update-info')
+      } else {
+        toast.error('Employee not found')
+      }
+    } catch (error) {
+      console.error('Error loading employee:', error)
+      toast.error('Failed to load employee details')
+    } finally {
+      setIsActionLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (view !== 'onboard' || Object.values(onboardFormData).some(v => v)) {
@@ -612,6 +656,39 @@ export default function OnboardPage() {
       setIsSaving(false)
     }
   }
+
+  const handlePartialSave = async () => {
+    if (!onboardingEmployeeId) return
+    setIsSaving(true)
+    try {
+      const cleanedData = Object.entries(progressionFormData).reduce((acc, [key, value]) => {
+        acc[key] = value === '' ? null : value
+        return acc
+      }, {} as any)
+
+      const response = await fetch(`${getApiUrl()}/api/employees/${onboardingEmployeeId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cleanedData),
+      })
+
+      const data = await response.json()
+      if (response.ok && data.success) {
+        toast.success('Progress saved successfully')
+        clearStorage()
+        router.push('/admin-head/employee/masterfile')
+      } else {
+        toast.error(data.message || 'Failed to save progress')
+      }
+    } catch (error) {
+      console.error('Error in partial save:', error)
+      toast.error('Failed to save progress.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+
 
   const handleCancelOnboarding = () => {
     clearStorage()
@@ -1231,23 +1308,45 @@ export default function OnboardPage() {
                   </div>
 
                   {currentBatch === 6 ? (
-                    <Button
-                      onClick={handleProgressionSave}
-                      disabled={isSaving || !isCurrentBatchValid()}
-                      className="bg-green-600 hover:bg-green-700 text-white h-11 px-8 font-bold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isSaving ? 'Saving...' : 'Complete & Finish'}
-                      <LucideSave className="h-4 w-4 ml-2" />
-                    </Button>
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={handlePartialSave}
+                        disabled={isSaving}
+                        variant="outline"
+                        className="h-11 px-6 font-bold border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                      >
+                        {isSaving ? 'Saving...' : 'Save Progress'}
+                        <LucideSave className="h-4 w-4 ml-2" />
+                      </Button>
+                      <Button
+                        onClick={handleProgressionSave}
+                        disabled={isSaving || !isCurrentBatchValid()}
+                        className="bg-green-600 hover:bg-green-700 text-white h-11 px-8 font-bold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isSaving ? 'Saving...' : 'Complete & Finish'}
+                        <LucideSave className="h-4 w-4 ml-2" />
+                      </Button>
+                    </div>
                   ) : (
-                    <Button
-                      onClick={nextBatch}
-                      disabled={!isCurrentBatchValid()}
-                      className="bg-maroon-600 hover:bg-maroon-700 text-white h-11 px-8 font-bold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Next Step
-                      <ChevronRight className="h-4 w-4 ml-2" />
-                    </Button>
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={handlePartialSave}
+                        disabled={isSaving}
+                        variant="outline"
+                        className="h-11 px-6 font-bold border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                      >
+                        {isSaving ? 'Saving...' : 'Save Progress'}
+                        <LucideSave className="h-4 w-4 ml-2" />
+                      </Button>
+                      <Button
+                        onClick={nextBatch}
+                        disabled={!isCurrentBatchValid()}
+                        className="bg-maroon-600 hover:bg-maroon-700 text-white h-11 px-8 font-bold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Next Step
+                        <ChevronRight className="h-4 w-4 ml-2" />
+                      </Button>
+                    </div>
                   )}
                 </div>
               </CardContent>
