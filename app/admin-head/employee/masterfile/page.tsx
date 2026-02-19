@@ -9,6 +9,10 @@ import { Badge } from '@/components/ui/badge'
 import { X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmationModal } from '@/components/ConfirmationModal'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+} from "@/components/ui/select"
+import { ArrowUpDown, ListFilter, ArrowUpAZ, ArrowDownAZ, Clock3, History } from 'lucide-react'
 
 interface Employee {
   id: number
@@ -52,6 +56,7 @@ export default function MasterfilePage() {
   const [terminatedPage, setTerminatedPage] = useState(1)
   const ITEMS_PER_PAGE_CARDS = 6
   const ITEMS_PER_PAGE_TABLE = 10
+  const [sortOrder, setSortOrder] = useState<'recent' | 'oldest' | 'az' | 'za'>('recent')
 
   // Modal State
   const [confirmModal, setConfirmModal] = useState<{
@@ -240,14 +245,36 @@ export default function MasterfilePage() {
   }
 
   const filterEmployees = (list: Employee[]) => {
-    if (!searchQuery) return list
-    const query = searchQuery.toLowerCase()
-    return list.filter((emp) =>
-      emp.first_name?.toLowerCase().includes(query) ||
-      emp.last_name?.toLowerCase().includes(query) ||
-      emp.email?.toLowerCase().includes(query) ||
-      emp.position?.toLowerCase().includes(query)
-    )
+    let result = [...list]
+    
+    // Search Filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      result = result.filter((emp) =>
+        emp.first_name?.toLowerCase().includes(query) ||
+        emp.last_name?.toLowerCase().includes(query) ||
+        emp.email?.toLowerCase().includes(query) ||
+        emp.position?.toLowerCase().includes(query)
+      )
+    }
+
+    // Sort Logic
+    result.sort((a, b) => {
+      switch (sortOrder) {
+        case 'recent':
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        case 'oldest':
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        case 'az':
+          return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`)
+        case 'za':
+          return `${b.first_name} ${b.last_name}`.localeCompare(`${a.first_name} ${a.last_name}`)
+        default:
+          return 0
+      }
+    })
+
+    return result
   }
 
   const employedList = filterEmployees(employees.filter(e => e.status === 'employed'))
@@ -428,6 +455,44 @@ export default function MasterfilePage() {
                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                 </div>
               </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Select value={sortOrder} onValueChange={(value: any) => setSortOrder(value)}>
+                  <SelectTrigger className="w-full sm:w-[180px] bg-white border-slate-200 h-11 rounded-xl shadow-sm focus:ring-[#630C22]">
+                    <div className="flex items-center gap-2 text-slate-600 font-bold text-xs uppercase tracking-wider">
+                      <ArrowUpDown className="h-4 w-4 text-slate-400" />
+                      <SelectValue placeholder="Sort by" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-slate-200 shadow-xl overflow-hidden">
+                    <SelectItem value="recent" className="focus:bg-red-50 focus:text-[#630C22] font-bold text-xs py-3 uppercase tracking-wider cursor-pointer border-b border-slate-50 last:border-0 translate-x-1">
+                      <div className="flex items-center gap-3">
+                        <History className="h-4 w-4" />
+                        <span>Recent First</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="oldest" className="focus:bg-red-50 focus:text-[#630C22] font-bold text-xs py-3 uppercase tracking-wider cursor-pointer border-b border-slate-50 last:border-0 translate-x-1">
+                      <div className="flex items-center gap-3">
+                        <Clock3 className="h-4 w-4" />
+                        <span>Oldest First</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="az" className="focus:bg-red-50 focus:text-[#630C22] font-bold text-xs py-3 uppercase tracking-wider cursor-pointer border-b border-slate-50 last:border-0 translate-x-1">
+                      <div className="flex items-center gap-3">
+                        <ArrowUpAZ className="h-4 w-4" />
+                        <span>Alphabet (A-Z)</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="za" className="focus:bg-red-50 focus:text-[#630C22] font-bold text-xs py-3 uppercase tracking-wider cursor-pointer border-b border-slate-50 last:border-0 translate-x-1">
+                      <div className="flex items-center gap-3">
+                        <ArrowDownAZ className="h-4 w-4" />
+                        <span>Alphabet (Z-A)</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <Button
                 onClick={() => router.push('/admin-head/employee/onboard')}
                 className="w-full sm:w-auto bg-[#630C22] hover:bg-[#4A081A] text-white font-bold px-6 h-11 rounded-xl transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5"

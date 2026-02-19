@@ -543,7 +543,7 @@ function OnboardPageContent() {
       if (data.success) {
         toast.success('Checklist progress saved successfully')
         clearStorage()
-        router.push(`/admin-head/forms/onboarding?name=${encodeURIComponent(checklistData.name)}`)
+        router.push('/admin-head/employee/masterfile')
       } else {
         toast.error(data.message || 'Error saving checklist')
       }
