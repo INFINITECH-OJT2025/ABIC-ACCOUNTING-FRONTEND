@@ -561,7 +561,25 @@ export default function GovernmentDirectoryPage() {
     const updated = result?.data as BackendAgency | undefined
     const code = normalizeCode(updated?.code ?? '')
     if (updated && code) {
-      setAgenciesByCode((prev) => ({ ...prev, [code]: updated }))
+      setAgenciesByCode((prev) => {
+        const existing = prev[code]
+        const mergedContacts = Array.isArray(updated.contacts) && (updated.contacts.length > 0 || !(existing?.contacts?.length))
+          ? updated.contacts
+          : (existing?.contacts ?? [])
+        const mergedProcesses = Array.isArray(updated.processes) && (updated.processes.length > 0 || !(existing?.processes?.length))
+          ? updated.processes
+          : (existing?.processes ?? [])
+
+        return {
+          ...prev,
+          [code]: {
+            ...(existing ?? ({} as BackendAgency)),
+            ...updated,
+            contacts: mergedContacts,
+            processes: mergedProcesses,
+          },
+        }
+      })
       setImageError((prev) => ({ ...prev, [code]: false }))
     }
   }
