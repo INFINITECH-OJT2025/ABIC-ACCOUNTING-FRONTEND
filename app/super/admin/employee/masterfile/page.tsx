@@ -369,7 +369,7 @@ export default function MasterfilePage() {
               </button>
               <div className="relative w-full md:w-80">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
-                <input
+                <input  
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search by name, email, or position..."
@@ -718,7 +718,7 @@ export default function MasterfilePage() {
           />
         )}
 
-        {showSaveLoading && (
+        {showSaveLoading && ( 
           <LoadingModal
             isOpen={showSaveLoading}
             title={saveLoadingAction === 'approve' ? 'Approving Employee' : 'Updating Employee'}

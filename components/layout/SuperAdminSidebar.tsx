@@ -36,6 +36,7 @@ import {
   Calendar as CalendarIcon,
   UsersRound,
   Sliders,
+  Building2,
 } from "lucide-react";
 import { NavSearchModal } from "./NavSearchModal";
 import { cn } from "@/lib/utils";
@@ -245,10 +246,10 @@ export default function SuperAdminSidebar({ user, onLogout }: SuperAdminSidebarP
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
-  const [employeeExpanded, setEmployeeExpanded] = useState(isActive(pathname, "/super/employee"));
-  const [formsExpanded, setFormsExpanded] = useState(isActive(pathname, "/super/forms"));
-  const [directoryExpanded, setDirectoryExpanded] = useState(isActive(pathname, "/super/directory"));
-  const [attendanceExpanded, setAttendanceExpanded] = useState(isActive(pathname, "/super/attendance"));
+  const [employeeExpanded, setEmployeeExpanded] = useState(isActive(pathname, "/super/admin/employee"));
+  const [formsExpanded, setFormsExpanded] = useState(isActive(pathname, "/super/admin/forms"));
+  const [directoryExpanded, setDirectoryExpanded] = useState(isActive(pathname, "/super/admin/directory"));
+  const [attendanceExpanded, setAttendanceExpanded] = useState(isActive(pathname, "/super/admin/attendance"));
   const [headExpanded, setHeadExpanded] = useState(isActive(pathname, "/super/head"));
   const [accountantTransactionsExpanded, setAccountantTransactionsExpanded] = useState(isActive(pathname, "/super/accountant/transactions"));
   const [accountantLedgerExpanded, setAccountantLedgerExpanded] = useState(isActive(pathname, "/super/accountant/ledger"));
@@ -420,10 +421,10 @@ export default function SuperAdminSidebar({ user, onLogout }: SuperAdminSidebarP
                 </button>
                 {employeeExpanded && (
                   <div className="ml-4 mt-1 space-y-0.5 border-l border-white/20 pl-3">
-                    {navItem("/super/employee/masterfile", "Masterfile", <User className="w-4 h-4" />)}
-                    {navItem("/super/employee/onboard", "Onboard Employee", <User className="w-4 h-4" />)}
-                    {navItem("/super/employee/terminate", "Terminate Employee", <User className="w-4 h-4" />)}
-                    {navItem("/super/employee/evaluation", "Evaluation", <FileText className="w-4 h-4" />)}
+                    {navItem("/super/admin/employee/masterfile", "Masterfile", <User className="w-4 h-4" />)}
+                    {navItem("/super/admin/employee/onboard", "Onboard Employee", <User className="w-4 h-4" />)}
+                    {navItem("/super/admin/employee/terminate", "Terminate Employee", <User className="w-4 h-4" />)}
+                    {navItem("/super/admin/employee/evaluation", "Evaluation", <FileText className="w-4 h-4" />)}
                   </div>
                 )}
               </div>
@@ -444,8 +445,8 @@ export default function SuperAdminSidebar({ user, onLogout }: SuperAdminSidebarP
                 </button>
                 {formsExpanded && (
                   <div className="ml-4 mt-1 space-y-0.5 border-l border-white/20 pl-3">
-                    {navItem("/super/forms/onboarding-checklist", "Onboarding Checklist", <FileText className="w-4 h-4" />)}
-                    {navItem("/super/forms/clearance-checklist", "Clearance Checklist", <FileText className="w-4 h-4" />)}
+                    {navItem("/super/admin/forms/onboarding-checklist", "Onboarding Checklist", <FileText className="w-4 h-4" />)}
+                    {navItem("/super/admin/forms/clearance-checklist", "Clearance Checklist", <FileText className="w-4 h-4" />)}
                   </div>
                 )}
               </div>
@@ -466,8 +467,8 @@ export default function SuperAdminSidebar({ user, onLogout }: SuperAdminSidebarP
                 </button>
                 {directoryExpanded && (
                   <div className="ml-4 mt-1 space-y-0.5 border-l border-white/20 pl-3">
-                    {navItem("/super/directory/process", "Process", <FileText className="w-4 h-4" />)}
-                    {navItem("/super/directory/contacts", "Contacts", <User className="w-4 h-4" />)}
+                    {navItem("/super/admin/directory/process", "Process", <FileText className="w-4 h-4" />)}
+                    {navItem("/super/admin/directory/contacts", "Contacts", <User className="w-4 h-4" />)}
                   </div>
                 )}
               </div>
@@ -488,9 +489,9 @@ export default function SuperAdminSidebar({ user, onLogout }: SuperAdminSidebarP
                 </button>
                 {attendanceExpanded && (
                   <div className="ml-4 mt-1 space-y-0.5 border-l border-white/20 pl-3">
-                    {navItem("/super/attendance/tardiness", "Tardiness", <Clock className="w-4 h-4" />)}
-                    {navItem("/super/attendance/leave", "Leave", <Calendar className="w-4 h-4" />)}
-                    {navItem("/super/attendance/leave-credits", "Leave Credits", <Calendar className="w-4 h-4" />)}
+                    {navItem("/super/admin/attendance/tardiness", "Tardiness", <Clock className="w-4 h-4" />)}
+                    {navItem("/super/admin/attendance/leave", "Leave", <Calendar className="w-4 h-4" />)}
+                    {navItem("/super/admin/attendance/leave-credits", "Leave Credits", <Calendar className="w-4 h-4" />)}
                   </div>
                 )}
               </div>
@@ -505,18 +506,18 @@ export default function SuperAdminSidebar({ user, onLogout }: SuperAdminSidebarP
               <CollapsedSubmenuPopover
                 label="Employee"
                 items={[
-                  { href: "/super/employee/masterfile", label: "Masterfile", icon: <User className="w-4 h-4" /> },
-                  { href: "/super/employee/onboard", label: "Onboard Employee", icon: <User className="w-4 h-4" /> },
-                  { href: "/super/employee/terminate", label: "Terminate Employee", icon: <User className="w-4 h-4" /> },
-                  { href: "/super/employee/evaluation", label: "Evaluation", icon: <FileText className="w-4 h-4" /> },
+                  { href: "/super/admin/employee/masterfile", label: "Masterfile", icon: <User className="w-4 h-4" /> },
+                  { href: "/super/admin/employee/onboard", label: "Onboard Employee", icon: <User className="w-4 h-4" /> },
+                  { href: "/super/admin/employee/terminate", label: "Terminate Employee", icon: <User className="w-4 h-4" /> },
+                  { href: "/super/admin/employee/evaluation", label: "Evaluation", icon: <FileText className="w-4 h-4" /> },
                 ]}
                 pathname={pathname}
               >
                 <button
-                  onClick={() => router.push("/super/employee/masterfile")}
+                  onClick={() => router.push("/super/admin/employee/masterfile")}
                   className={cn(
                     "w-full flex items-center justify-center p-2.5 rounded-lg",
-                    isActive(pathname, "/super/employee")
+                    isActive(pathname, "/super/admin/employee")
                       ? "bg-white/20 text-white"
                       : "text-white/70 hover:bg-white/10"
                   )}
@@ -531,16 +532,16 @@ export default function SuperAdminSidebar({ user, onLogout }: SuperAdminSidebarP
               <CollapsedSubmenuPopover
                 label="Forms"
                 items={[
-                  { href: "/super/forms/onboarding-checklist", label: "Onboarding Checklist", icon: <FileText className="w-4 h-4" /> },
-                  { href: "/super/forms/clearance-checklist", label: "Clearance Checklist", icon: <FileText className="w-4 h-4" /> },
+                  { href: "/super/admin/forms/onboarding-checklist", label: "Onboarding Checklist", icon: <FileText className="w-4 h-4" /> },
+                  { href: "/super/admin/forms/clearance-checklist", label: "Clearance Checklist", icon: <FileText className="w-4 h-4" /> },
                 ]}
                 pathname={pathname}
               >
                 <button
-                  onClick={() => router.push("/super/forms/onboarding-checklist")}
+                  onClick={() => router.push("/super/admin/forms/onboarding-checklist")}
                   className={cn(
                     "w-full flex items-center justify-center p-2.5 rounded-lg",
-                    isActive(pathname, "/super/forms")
+                    isActive(pathname, "/super/admin/forms")
                       ? "bg-white/20 text-white"
                       : "text-white/70 hover:bg-white/10"
                   )}
@@ -555,16 +556,16 @@ export default function SuperAdminSidebar({ user, onLogout }: SuperAdminSidebarP
               <CollapsedSubmenuPopover
                 label="Directory"
                 items={[
-                  { href: "/super/directory/process", label: "Process", icon: <FileText className="w-4 h-4" /> },
-                  { href: "/super/directory/contacts", label: "Contacts", icon: <User className="w-4 h-4" /> },
+                  { href: "/super/admin/directory/process", label: "Process", icon: <FileText className="w-4 h-4" /> },
+                  { href: "/super/admin/directory/contacts", label: "Contacts", icon: <User className="w-4 h-4" /> },
                 ]}
                 pathname={pathname}
               >
                 <button
-                  onClick={() => router.push("/super/directory/process")}
+                  onClick={() => router.push("/super/admin/directory/process")}
                   className={cn(
                     "w-full flex items-center justify-center p-2.5 rounded-lg",
-                    isActive(pathname, "/super/directory")
+                    isActive(pathname, "/super/admin/directory")
                       ? "bg-white/20 text-white"
                       : "text-white/70 hover:bg-white/10"
                   )}
@@ -579,17 +580,17 @@ export default function SuperAdminSidebar({ user, onLogout }: SuperAdminSidebarP
               <CollapsedSubmenuPopover
                 label="Attendance"
                 items={[
-                  { href: "/super/attendance/tardiness", label: "Tardiness", icon: <Clock className="w-4 h-4" /> },
-                  { href: "/super/attendance/leave", label: "Leave", icon: <Calendar className="w-4 h-4" /> },
-                  { href: "/super/attendance/leave-credits", label: "Leave Credits", icon: <Calendar className="w-4 h-4" /> },
+                  { href: "/super/admin/attendance/tardiness", label: "Tardiness", icon: <Clock className="w-4 h-4" /> },
+                  { href: "/super/admin/attendance/leave", label: "Leave", icon: <Calendar className="w-4 h-4" /> },
+                  { href: "/super/admin/attendance/leave-credits", label: "Leave Credits", icon: <Calendar className="w-4 h-4" /> },
                 ]}
                 pathname={pathname}
               >
                 <button
-                  onClick={() => router.push("/super/attendance/tardiness")}
+                  onClick={() => router.push("/super/admin/attendance/tardiness")}
                   className={cn(
                     "w-full flex items-center justify-center p-2.5 rounded-lg",
-                    isActive(pathname, "/super/attendance")
+                    isActive(pathname, "/super/admin/attendance")
                       ? "bg-white/20 text-white"
                       : "text-white/70 hover:bg-white/10"
                   )}
@@ -625,10 +626,10 @@ export default function SuperAdminSidebar({ user, onLogout }: SuperAdminSidebarP
                 </button>
                 {accountantTransactionsExpanded && (
                   <div className="ml-4 mt-1 space-y-0.5 border-l border-white/20 pl-3">
-                    {navItem("/super/accountant/transactions/deposit", "New Deposit", <Plus className="w-4 h-4" />)}
-                    {navItem("/super/accountant/transactions/withdrawal", "New Withdrawal", <Minus className="w-4 h-4" />)}
-                    {navItem("/super/accountant/transactions/transfer", "Bank Transfer", <ArrowRightLeft className="w-4 h-4" />)}
-                    {navItem("/super/accountant/transactions/journal-entry", "Journal Entry", <Receipt className="w-4 h-4" />)}
+                    {navItem("/super/accountant/transactions/deposit", "New Deposit", <Plus className="w-3.5 h-3.5" />)}
+                    {navItem("/super/accountant/transactions/withdrawal", "New Withdrawal", <Minus className="w-3.5 h-3.5" />)}
+                    {navItem("/super/accountant/transactions/transfer", "Bank Transfer", <ArrowRightLeft className="w-3.5 h-3.5" />)}
+                    {navItem("/super/accountant/transactions/journal-entry", "Journal Entry", <Receipt className="w-3.5 h-3.5" />)}
                   </div>
                 )}
               </div>
@@ -736,12 +737,12 @@ export default function SuperAdminSidebar({ user, onLogout }: SuperAdminSidebarP
                 </button>
                 {accountantReportsExpanded && (
                   <div className="ml-4 mt-1 space-y-0.5 border-l border-white/20 pl-3">
-                    {navItem("/super/accountant/reports/bank-balance", "Bank Balance Summary", <BarChart3 className="w-4 h-4" />)}
-                    {navItem("/super/accountant/reports/bank-ledger", "Bank Ledger Report", <FileText className="w-4 h-4" />)}
-                    {navItem("/super/accountant/reports/owner-fund", "Owner Fund Report", <BarChart3 className="w-4 h-4" />)}
-                    {navItem("/super/accountant/reports/transfer", "Transfer Report", <ArrowRightLeft className="w-4 h-4" />)}
-                    {navItem("/super/accountant/reports/voucher-register", "Voucher Register", <FileText className="w-4 h-4" />)}
-                    {navItem("/super/accountant/reports/cash-flow", "Cash Flow Report", <BarChart3 className="w-4 h-4" />)}
+                    {navItem("/super/accountant/reports/bank-balance", "Bank Balance Summary", <BarChart3 className="w-3.5 h-3.5" />)}
+                    {navItem("/super/accountant/reports/bank-ledger", "Bank Ledger Report", <FileText className="w-3.5 h-3.5" />)}
+                    {navItem("/super/accountant/reports/owner-fund", "Owner Fund Report", <BarChart3 className="w-3.5 h-3.5" />)}
+                    {navItem("/super/accountant/reports/transfer", "Transfer Report", <ArrowRightLeft className="w-3.5 h-3.5" />)}
+                    {navItem("/super/accountant/reports/voucher-register", "Voucher Register", <FileText className="w-3.5 h-3.5" />)}
+                    {navItem("/super/accountant/reports/cash-flow", "Cash Flow Report", <BarChart3 className="w-3.5 h-3.5" />)}
                   </div>
                 )}
               </div>
@@ -762,10 +763,13 @@ export default function SuperAdminSidebar({ user, onLogout }: SuperAdminSidebarP
                 </button>
                 {accountantMaintenanceExpanded && (
                   <div className="ml-4 mt-1 space-y-0.5 border-l border-white/20 pl-3">
-                    {navItem("/super/accountant/maintenance/banks", "Banks", <Banknote className="w-4 h-4" />)}
-                    {navItem("/super/accountant/maintenance/fund-references", "Fund References", <FolderOpen className="w-4 h-4" />)}
-                    {navItem("/super/accountant/maintenance/voucher-series", "Voucher Series", <FileText className="w-4 h-4" />)}
-                    {navItem("/super/accountant/maintenance/chart-of-accounts", "Chart of Accounts", <BookMarked className="w-4 h-4" />)}
+                    {navItem("/super/accountant/maintenance/banks", "Banks", <Banknote className="w-3.5 h-3.5" />)}
+                    {navItem("/super/accountant/maintenance/owners", "Owners", <Users className="w-3.5 h-3.5" />)}
+                    {navItem("/super/accountant/maintenance/properties", "Properties", <Building2 className="w-3.5 h-3.5" />)}
+                    {navItem("/super/accountant/maintenance/bank-accounts", "Bank Accounts", <Banknote className="w-3.5 h-3.5" />)}
+                    {navItem("/super/accountant/maintenance/fund-references", "Fund References", <FolderOpen className="w-3.5 h-3.5" />)}
+                    {navItem("/super/accountant/maintenance/voucher-series", "Voucher Series", <FileText className="w-3.5 h-3.5" />)}
+                    {navItem("/super/accountant/maintenance/chart-of-accounts", "Chart of Accounts", <BookMarked className="w-3.5 h-3.5" />)}
                   </div>
                 )}
               </div>
@@ -786,9 +790,9 @@ export default function SuperAdminSidebar({ user, onLogout }: SuperAdminSidebarP
                 </button>
                 {accountantSettingsExpanded && (
                   <div className="ml-4 mt-1 space-y-0.5 border-l border-white/20 pl-3">
-                    {navItem("/super/accountant/settings/fiscal-year", "Fiscal Year", <CalendarIcon className="w-4 h-4" />)}
-                    {navItem("/super/accountant/settings/user-roles", "User Roles & Permissions", <UsersRound className="w-4 h-4" />)}
-                    {navItem("/super/accountant/settings/system-preferences", "System Preferences", <Sliders className="w-4 h-4" />)}
+                    {navItem("/super/accountant/settings/fiscal-year", "Fiscal Year", <CalendarIcon className="w-3.5 h-3.5" />)}
+                    {navItem("/super/accountant/settings/user-roles", "User Roles & Permissions", <UsersRound className="w-3.5 h-3.5" />)}
+                    {navItem("/super/accountant/settings/system-preferences", "System Preferences", <Sliders className="w-3.5 h-3.5" />)}
                   </div>
                 )}
               </div>
@@ -885,6 +889,9 @@ export default function SuperAdminSidebar({ user, onLogout }: SuperAdminSidebarP
               label="Maintenance"
               items={[
                 { href: "/super/accountant/maintenance/banks", label: "Banks", icon: <Banknote className="w-4 h-4" /> },
+                { href: "/super/accountant/maintenance/owners", label: "Owners", icon: <Users className="w-4 h-4" /> },
+                { href: "/super/accountant/maintenance/properties", label: "Properties", icon: <Building2 className="w-4 h-4" /> },
+                { href: "/super/accountant/maintenance/bank-accounts", label: "Bank Accounts", icon: <Banknote className="w-4 h-4" /> },
                 { href: "/super/accountant/maintenance/fund-references", label: "Fund References", icon: <FolderOpen className="w-4 h-4" /> },
                 { href: "/super/accountant/maintenance/voucher-series", label: "Voucher Series", icon: <FileText className="w-4 h-4" /> },
                 { href: "/super/accountant/maintenance/chart-of-accounts", label: "Chart of Accounts", icon: <BookMarked className="w-4 h-4" /> },

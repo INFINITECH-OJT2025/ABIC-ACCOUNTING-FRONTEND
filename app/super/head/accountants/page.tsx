@@ -53,6 +53,75 @@ const Icons = {
   ),
 };
 
+// Reusable Pagination Component
+const Pagination = ({
+  totalPages,
+  currentPage,
+  setCurrentPage,
+  totalItems,
+  startIndex,
+  endIndex,
+  itemName = "items",
+}: {
+  totalPages: number;
+  currentPage: number;
+  setCurrentPage: (page: number | ((p: number) => number)) => void;
+  totalItems: number;
+  startIndex: number;
+  endIndex: number;
+  itemName?: string;
+}) => {
+  if (totalPages <= 1) return null;
+
+  return (
+    <div className="flex items-center justify-between py-3 border-b" style={{ borderColor: BORDER }}>
+      <div className="text-sm text-neutral-600">
+        Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} {itemName}
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+          disabled={currentPage === 1}
+          className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+          style={{ borderColor: BORDER }}
+        >
+          Previous
+        </button>
+        <div className="flex items-center gap-1">
+          {[...Array(totalPages)].map((_, i) => {
+            const page = i + 1;
+            if (page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)) {
+              return (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+                    currentPage === page ? "bg-[#7a0f1f] text-white" : "border hover:bg-gray-50"
+                  }`}
+                  style={currentPage !== page ? { borderColor: BORDER } : undefined}
+                >
+                  {page}
+                </button>
+              );
+            } else if (page === currentPage - 2 || page === currentPage + 2) {
+              return <span key={page} className="px-2 text-neutral-500">...</span>;
+            }
+            return null;
+          })}
+        </div>
+        <button
+          onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+          disabled={currentPage === totalPages}
+          className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+          style={{ borderColor: BORDER }}
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+};
+
 export default function HeadAccountantsPage() {
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
@@ -375,6 +444,19 @@ export default function HeadAccountantsPage() {
                 </div>
               </div>
 
+              {/* Pagination at the top */}
+              {totalPages > 1 && (
+                <Pagination
+                  totalPages={totalPages}
+                  currentPage={currentPage}
+                  setCurrentPage={setCurrentPage}
+                  totalItems={filtered.length}
+                  startIndex={startIndex}
+                  endIndex={endIndex}
+                  itemName="accountants"
+                />
+              )}
+
               <div className="mt-4">
                 {isLoading ? (
                   viewMode === "cards" ? (
@@ -424,59 +506,6 @@ export default function HeadAccountantsPage() {
                       </div>
                       ))}
                     </div>
-                    {totalPages > 1 && (
-                      <div className="flex items-center justify-between mt-6 pt-4 border-t" style={{ borderColor: BORDER }}>
-                        <div className="text-sm text-neutral-600">
-                          Showing {startIndex + 1} to {Math.min(endIndex, filtered.length)} of {filtered.length} accountants
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                            disabled={currentPage === 1}
-                            className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                            style={{ borderColor: BORDER }}
-                          >
-                            Previous
-                          </button>
-                          <div className="flex items-center gap-1">
-                            {[...Array(totalPages)].map((_, i) => {
-                              const page = i + 1;
-                              if (
-                                page === 1 ||
-                                page === totalPages ||
-                                (page >= currentPage - 1 && page <= currentPage + 1)
-                              ) {
-                                return (
-                                  <button
-                                    key={page}
-                                    onClick={() => setCurrentPage(page)}
-                                    className={`px-3 py-1.5 rounded-md text-sm font-medium ${
-                                      currentPage === page
-                                        ? "bg-[#7a0f1f] text-white"
-                                        : "border hover:bg-gray-50"
-                                    }`}
-                                    style={currentPage !== page ? { borderColor: BORDER } : undefined}
-                                  >
-                                    {page}
-                                  </button>
-                                );
-                              } else if (page === currentPage - 2 || page === currentPage + 2) {
-                                return <span key={page} className="px-2 text-neutral-500">...</span>;
-                              }
-                              return null;
-                            })}
-                          </div>
-                          <button
-                            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                            disabled={currentPage === totalPages}
-                            className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                            style={{ borderColor: BORDER }}
-                          >
-                            Next
-                          </button>
-                        </div>
-                      </div>
-                    )}
                   </>
                 ) : (
                   <div>
@@ -548,59 +577,6 @@ export default function HeadAccountantsPage() {
                       </div>
                     ))}
                   </div>
-                  {totalPages > 1 && (
-                    <div className="flex items-center justify-between mt-6 pt-4 border-t" style={{ borderColor: BORDER }}>
-                      <div className="text-sm text-neutral-600">
-                        Showing {startIndex + 1} to {Math.min(endIndex, filtered.length)} of {filtered.length} accountants
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                          disabled={currentPage === 1}
-                          className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                          style={{ borderColor: BORDER }}
-                        >
-                          Previous
-                        </button>
-                        <div className="flex items-center gap-1">
-                          {[...Array(totalPages)].map((_, i) => {
-                            const page = i + 1;
-                            if (
-                              page === 1 ||
-                              page === totalPages ||
-                              (page >= currentPage - 1 && page <= currentPage + 1)
-                            ) {
-                              return (
-                                <button
-                                  key={page}
-                                  onClick={() => setCurrentPage(page)}
-                                  className={`px-3 py-1.5 rounded-md text-sm font-medium ${
-                                    currentPage === page
-                                      ? "bg-[#7a0f1f] text-white"
-                                      : "border hover:bg-gray-50"
-                                  }`}
-                                  style={currentPage !== page ? { borderColor: BORDER } : undefined}
-                                >
-                                  {page}
-                                </button>
-                              );
-                            } else if (page === currentPage - 2 || page === currentPage + 2) {
-                              return <span key={page} className="px-2 text-neutral-500">...</span>;
-                            }
-                            return null;
-                          })}
-                        </div>
-                        <button
-                          onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                          disabled={currentPage === totalPages}
-                          className="px-3 py-1.5 rounded-md text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                          style={{ borderColor: BORDER }}
-                        >
-                          Next
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
                 )}
               </div>

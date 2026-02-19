@@ -6,6 +6,11 @@ export function middleware(request: NextRequest) {
   const role = request.cookies.get('role')?.value
   const { pathname } = request.nextUrl
 
+  // Allow API routes to pass through
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.next()
+  }
+
   // Public routes that don't require auth
   const publicRoutes = ['/login', '/forgot-password']
   if (publicRoutes.some((r) => pathname === r || pathname.startsWith(r + '/'))) {

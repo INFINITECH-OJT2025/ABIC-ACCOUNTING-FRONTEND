@@ -3,10 +3,10 @@
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 
-export default function DirectoryPage() {
+export default function FormsPage() {
   const router = useRouter()
   useEffect(() => {
-    router.replace("/super/directory/process")
+    router.replace("/super/admin/forms/onboarding-checklist")
   }, [router])
   return null
 }

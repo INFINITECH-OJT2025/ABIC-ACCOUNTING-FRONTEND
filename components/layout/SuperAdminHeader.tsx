@@ -169,7 +169,7 @@
           {/* Admin — SECTION */}
           <div
             className={`relative px-6 py-4 border-r border-[#8E1B3E]/30 hover:bg-[#5E0C20]/50 transition-all duration-200 ${
-              isSection("/super/employee") || isSection("/super/head") || isSection("/super/forms") || isSection("/super/directory") ? "bg-[#5E0C20]/50" : ""
+              isSection("/super/admin/employee") || isSection("/super/head") || isSection("/super/admin/forms") || isSection("/super/admin/directory") || isSection("/super/admin/attendance") ? "bg-[#5E0C20]/50" : ""
             }`}
             onMouseEnter={() => setAdminDropdownOpen(true)}
             onMouseLeave={() => setAdminDropdownOpen(false)}
@@ -180,9 +180,10 @@
 
             {adminDropdownOpen && (
               <Dropdown>
-                <SubBtn active={isSection('/super/employee')} onClick={()=>router.push('/super/employee/masterfile')} label="Employee"/>
-                <SubBtn active={isSection('/super/forms')} onClick={()=>router.push('/super/forms/onboarding-checklist')} label="Forms"/>
-                <SubBtn active={isSection('/super/directory')} onClick={()=>router.push('/super/directory/process')} label="Directory"/>
+                <SubBtn active={isSection('/super/admin/employee')} onClick={()=>router.push('/super/admin/employee/masterfile')} label="Employee"/>
+                <SubBtn active={isSection('/super/admin/forms')} onClick={()=>router.push('/super/admin/forms/onboarding-checklist')} label="Forms"/>
+                <SubBtn active={isSection('/super/admin/directory')} onClick={()=>router.push('/super/admin/directory/process')} label="Directory"/>
+                <SubBtn active={isSection('/super/admin/attendance')} onClick={()=>router.push('/super/admin/attendance/tardiness')} label="Attendance"/>
                 <SubBtn active={isSection('/super/head/admins')} onClick={()=>router.push('/super/head/admins')} label="Admins"/>
               </Dropdown>
             )}
@@ -216,7 +217,7 @@
           <div className="md:hidden bg-[#6A0D25]/95 backdrop-blur-sm">
             <div className="px-6 py-4 space-y-2">
               <MobileBtn active={isExact('/super')} label="Dashboard" onClick={()=>router.push('/super')}/>
-              <MobileBtn active={isSection('/super/employee')} label="Employee" onClick={()=>router.push('/super/employee/masterfile')}/>
+              <MobileBtn active={isSection('/super/admin/employee')} label="Employee" onClick={()=>router.push('/super/admin/employee/masterfile')}/>
               <MobileBtn active={isSection('/super/head/admins')} label="Admins" onClick={()=>router.push('/super/head/admins')}/>
               <MobileBtn active={isExact('/super/accountant')} label="Accountant" onClick={()=>router.push('/super/accountant')}/>
               <MobileBtn active={isSection('/super/accountant/management')} label="Accountant Management" onClick={()=>router.push('/super/accountant/management')}/>
