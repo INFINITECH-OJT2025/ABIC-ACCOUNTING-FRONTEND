@@ -154,7 +154,7 @@ function OnboardPageContent() {
     isOpen: false,
     title: '',
     description: '',
-    onConfirm: () => {},
+    onConfirm: () => { },
     variant: 'default'
   })
 
@@ -289,13 +289,13 @@ function OnboardPageContent() {
       const fallbackDateRaw = matched?.updated_at ?? matched?.created_at
       const fallbackDate = !Number.isNaN(new Date(fallbackDateRaw).getTime())
         ? new Date(fallbackDateRaw).toLocaleString('en-US', {
-            month: 'short',
-            day: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true
-          })
+          month: 'short',
+          day: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        })
         : 'Completed'
 
       const tasks = Array.isArray(matched?.tasks) ? matched.tasks : []
@@ -321,7 +321,7 @@ function OnboardPageContent() {
       setIsActionLoading(true)
       const response = await fetch(`${getApiUrl()}/api/employees/${id}`)
       const data = await response.json()
-      
+
       if (data.success) {
         const emp = data.data
         setOnboardingEmployeeId(id)
@@ -719,13 +719,13 @@ function OnboardPageContent() {
       if (newTasks[task]) {
         delete newTasks[task]
       } else {
-        newTasks[task] = new Date().toLocaleString('en-US', { 
-          month: 'short', 
-          day: '2-digit', 
-          year: 'numeric', 
-          hour: '2-digit', 
-          minute: '2-digit', 
-          hour12: true 
+        newTasks[task] = new Date().toLocaleString('en-US', {
+          month: 'short',
+          day: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
         })
       }
       return newTasks
@@ -737,14 +737,14 @@ function OnboardPageContent() {
     if (allCompleted) {
       setCompletedTasks({})
     } else {
-      const newTasks: {[key: string]: string} = {}
-      const now = new Date().toLocaleString('en-US', { 
-        month: 'short', 
-        day: '2-digit', 
-        year: 'numeric', 
-        hour: '2-digit', 
-        minute: '2-digit', 
-        hour12: true 
+      const newTasks: { [key: string]: string } = {}
+      const now = new Date().toLocaleString('en-US', {
+        month: 'short',
+        day: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
       })
       onboardingTasks.forEach(task => {
         newTasks[task] = now
@@ -1158,7 +1158,7 @@ function OnboardPageContent() {
                   <TableHead className="font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">
                     <div className="flex items-center justify-between">
                       <span>Tasks</span>
-                      <button 
+                      <button
                         onClick={toggleAllTasks}
                         className="text-[8px] normal-case bg-white/50 hover:bg-rose-50 text-[#800020] px-2 py-1 rounded-md border border-[#FFE5EC] transition-all font-black shadow-sm"
                       >
@@ -1170,30 +1170,30 @@ function OnboardPageContent() {
               </TableHeader>
               <TableBody>
                 {onboardingTasks.map((task, index) => (
-                  <TableRow 
-                    key={index} 
+                  <TableRow
+                    key={index}
                     className="border-b border-rose-50/30 last:border-0 hover:bg-[#FFE5EC]/5 transition-colors group cursor-pointer"
                     onClick={() => toggleTask(task)}
                   >
-                    <TableCell className="text-center py-2.5 font-mono text-[10px] font-bold text-slate-400">
+                    <TableCell className="text-center py-4 font-mono text-xs font-bold text-slate-500">
                       {completedTasks[task] || '-'}
                     </TableCell>
-                    <TableCell className="py-2.5">
+                    <TableCell className="py-4">
                       <div className="flex justify-center">
                         <div className={cn(
-                          "w-5 h-5 rounded flex items-center justify-center transition-all border-2",
+                          "w-6 h-6 rounded flex items-center justify-center transition-all border-2",
                           completedTasks[task]
-                            ? "bg-emerald-500 border-emerald-500 text-white shadow-sm" 
-                            : "border-slate-200 bg-white hover:border-[#A4163A]"
+                            ? "bg-emerald-500 border-emerald-500 text-white shadow-sm"
+                            : "border-slate-300 bg-white hover:border-[#A4163A]"
                         )}>
-                          {completedTasks[task] && <Check className="h-3.5 w-3.5" />}
+                          {completedTasks[task] && <Check className="h-4 w-4" />}
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="py-2.5">
+                    <TableCell className="py-4">
                       <span className={cn(
-                        "text-sm font-bold transition-all duration-300",
-                        completedTasks[task] ? "text-slate-300 line-through" : "text-slate-700"
+                        "text-lg font-extrabold transition-all duration-300 block",
+                        completedTasks[task] ? "text-slate-400 line-through" : "text-slate-800"
                       )}>
                         {task}
                       </span>
@@ -1210,7 +1210,7 @@ function OnboardPageContent() {
                   ADMINISTRATION FRAMEWORK • ABIC HR
                 </p>
               </div>
-              
+
               <div className="flex gap-3">
                 <Button
                   onClick={() => setView('update-info')}
@@ -1219,8 +1219,8 @@ function OnboardPageContent() {
                 >
                   PROCEED TO DATA ENTRY
                 </Button>
-                <Button 
-                  onClick={handleSaveChecklist} 
+                <Button
+                  onClick={handleSaveChecklist}
                   disabled={isSaving}
                   className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-[#A4163A] hover:bg-[#800020] text-white shadow-lg active:scale-95 transition-all rounded-xl"
                 >

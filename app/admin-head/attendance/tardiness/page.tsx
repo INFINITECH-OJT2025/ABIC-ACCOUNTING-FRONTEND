@@ -5,10 +5,10 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { ChevronDown, Clock, Plus, Search, Users, ChevronLeft, ChevronRight, FileDown, FileText, Check, AlertTriangle, Loader2, RotateCcw, X } from 'lucide-react'
+import { ChevronDown, Clock, Plus, Search, Users, ChevronLeft, ChevronRight, FileDown, FileText, Check, AlertTriangle, Loader2, RotateCcw, X, Calendar } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
-import { ConfirmationModal } from '@/components/ConfirmationModal'
+
 
 // shadcn/ui components
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -50,6 +50,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
+
 import { cn } from '@/lib/utils'
 
 // ---------- TYPES & MOCK INITIAL DATA ----------
@@ -144,16 +145,72 @@ function formatDate(dateInput: any): string {
   return `${year}-${month}-${day}`
 }
 
-// Calculate warning level for an employee based on their late count across cutoffs
-function calculateWarningLevel(employeeName: string, cutoffNumber: number, allEntries: LateEntry[]): number {
-  // Count how many times this employee has been late in cutoffs
-  const latesInCutoff1 = allEntries.filter(e => e.employee_name === employeeName && e.cutoff_period === 'cutoff1' && exceedsGracePeriod(e.actual_in || e.actualIn || '')).length
-  const latesInCutoff2 = allEntries.filter(e => e.employee_name === employeeName && e.cutoff_period === 'cutoff2' && exceedsGracePeriod(e.actual_in || e.actualIn || '')).length
+// Recalculate warnings for all entries
+function recalculateWarnings(entries: LateEntry[]): LateEntry[] {
+  // We need to process entries by employee and cutoff to count lates correctly
+  // First, group by employee and cutoff
+  const entriesByEmployeeAndCutoff = new Map<string, LateEntry[]>()
 
-  if (cutoffNumber === 1 && latesInCutoff1 > 0) return 1 // 1st warning
-  if (cutoffNumber === 2 && latesInCutoff2 > 0) return 2 // 2nd warning
+  entries.forEach(entry => {
+    const key = `${entry.employee_name}-${entry.cutoffPeriod || entry.cutoff_period}`
+    if (!entriesByEmployeeAndCutoff.has(key)) {
+      entriesByEmployeeAndCutoff.set(key, [])
+    }
+    entriesByEmployeeAndCutoff.get(key)?.push(entry)
+  })
 
-  return 0
+  // Now process each group
+  const updatedEntries: LateEntry[] = []
+
+  entriesByEmployeeAndCutoff.forEach((groupEntries) => {
+    // Sort by date/time to ensure order
+    groupEntries.sort((a, b) => {
+      const dateA = new Date(a.date).getTime()
+      const dateB = new Date(b.date).getTime()
+      if (dateA !== dateB) return dateA - dateB
+      const timeA = parseTimeToMinutes(a.actual_in || a.actualIn || '')
+      const timeB = parseTimeToMinutes(b.actual_in || b.actualIn || '')
+      return timeA - timeB
+    })
+
+    let lateCount = 0
+
+    const processedGroup = groupEntries.map(entry => {
+      let warningLevel = 0
+      const actualIn = entry.actual_in || entry.actualIn || ''
+
+      // Check if late (using the same logic as Summary: > 8:05 AM)
+      if (actualIn && exceedsGracePeriod(actualIn)) {
+        lateCount++
+        // Every 3 lates = 1 warning
+        // We assign the warning level to the entry that triggers it (3rd, 6th, etc.)
+        if (lateCount % 3 === 0) {
+          warningLevel = lateCount / 3
+        }
+      }
+
+      return {
+        ...entry,
+        warningLevel: warningLevel,
+        warning_level: warningLevel // Update both for consistency
+      }
+    })
+
+    updatedEntries.push(...processedGroup)
+  })
+
+  // Return all entries (we might need to re-sort them overall if the global order matters, 
+  // but usually the specific table fitering will handle sorting)
+  // Let's preserve the original global sort order by ID or Date if possible, 
+  // but for now re-sorting by date locally is fine as the tables re-filter them.
+  return updatedEntries.sort((a, b) => {
+    const dateA = new Date(a.date).getTime()
+    const dateB = new Date(b.date).getTime()
+    if (dateA !== dateB) return dateA - dateB
+    const timeA = parseTimeToMinutes(a.actual_in || a.actualIn || '')
+    const timeB = parseTimeToMinutes(b.actual_in || b.actualIn || '')
+    return timeA - timeB
+  })
 }
 
 // ---------- PAGINATION HOOK ----------
@@ -366,6 +423,12 @@ function SummarySheet({ isOpen, onClose, cutoffTitle, entries, selectedYear, sel
                 {cutoffTitle} • {selectedMonth} {selectedYear}
               </SheetDescription>
             </div>
+            <button
+              onClick={onClose}
+              className="rounded-full p-1 hover:bg-white/10 text-white/70 hover:text-white transition-colors"
+            >
+              <X size={24} />
+            </button>
           </div>
           <div className="flex flex-col sm:flex-row items-center gap-4 mt-6">
             <div className="relative flex-1 w-full">
@@ -536,7 +599,10 @@ export default function AttendanceDashboard() {
             if (dateA !== dateB) return dateA - dateB
             return parseTimeToMinutes(a.actual_in || a.actualIn) - parseTimeToMinutes(b.actual_in || b.actualIn)
           })
-          setAllEntries(sortedEntries)
+
+          // Apply dynamic warning calculation
+          const entriesWithWarnings = recalculateWarnings(sortedEntries)
+          setAllEntries(entriesWithWarnings)
         }
 
 
@@ -667,9 +733,9 @@ export default function AttendanceDashboard() {
   const updateEntryTime = (id: string | number, newTime: string) => {
     const minutesLate = calculateMinutesFrom8AM(newTime)
 
-    // Optimistic local update
-    setAllEntries(prev =>
-      prev.map(entry => {
+    // Optimistic local update with recalculation
+    setAllEntries(prev => {
+      const updatedList = prev.map(entry => {
         if (entry.id === id) {
           return {
             ...entry,
@@ -680,7 +746,9 @@ export default function AttendanceDashboard() {
         }
         return entry
       })
-    )
+      // Must recalculate warnings because changing one time might change the count/order of warnings
+      return recalculateWarnings(updatedList)
+    })
 
     // Debounce the API call (600ms)
     if (debounceTimers.current[id]) clearTimeout(debounceTimers.current[id])
@@ -717,8 +785,10 @@ export default function AttendanceDashboard() {
   }
 
 
-  // Handler to save new entry from modal
-  const handleSaveNewEntry = async () => {
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false)
+
+  // Validation before opening confirmation
+  const handleSaveClick = () => {
     if (!newEntryEmployee || !newEntryTime) {
       toast.error('Please select an employee and enter the actual in time.')
       return
@@ -730,18 +800,10 @@ export default function AttendanceDashboard() {
     // ALWAYS use today's date for new entries as requested
     const dateObj = new Date()
     const entryYear = dateObj.getFullYear()
-    const entryMonth = months[dateObj.getMonth()]
     const dayOfMonth = dateObj.getDate()
     const dateStr = `${entryYear}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dayOfMonth).padStart(2, '0')}`
 
-    // Determine cutoff
-    const autoCutoff: 'cutoff1' | 'cutoff2' = dayOfMonth <= 15 ? 'cutoff1' : 'cutoff2'
-
-    // Minutes calculation (parseTimeToMinutes now supports the 24h output from <input type="time">)
-    const minutesLate = calculateMinutesFrom8AM(newEntryTime)
-
     // Validation 2: Check if employee already has an entry for this date (Strict Prevention)
-    // Normalize dates for robust comparison
     const duplicateEntry = allEntries.find(
       entry => entry.employee_id === selectedEmployee.id && formatDate(entry.date) === dateStr
     )
@@ -750,6 +812,24 @@ export default function AttendanceDashboard() {
       toast.error(`${newEntryEmployee} already has a late entry recorded for today (${dateStr}).`)
       return
     }
+
+    // If validation passes, open confirmation modal
+    setShowSaveConfirm(true)
+  }
+
+  // Actual Save Logic (triggered by confirmation modal)
+  const executeSaveEntry = async () => {
+    const selectedEmployee = employees.find(e => e.name === newEntryEmployee)
+    if (!selectedEmployee) return
+
+    const dateObj = new Date()
+    const entryYear = dateObj.getFullYear()
+    const entryMonth = months[dateObj.getMonth()]
+    const dayOfMonth = dateObj.getDate()
+    const dateStr = `${entryYear}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dayOfMonth).padStart(2, '0')}`
+
+    const autoCutoff: 'cutoff1' | 'cutoff2' = dayOfMonth <= 15 ? 'cutoff1' : 'cutoff2'
+    const minutesLate = calculateMinutesFrom8AM(newEntryTime)
 
     setIsSaving(true)
     try {
@@ -792,11 +872,13 @@ export default function AttendanceDashboard() {
             if (dateA !== dateB) return dateA - dateB
             return parseTimeToMinutes(a.actual_in || a.actualIn) - parseTimeToMinutes(b.actual_in || b.actualIn)
           })
-          setAllEntries(sorted)
+          // Apply dynamic warning calculation
+          const entriesWithWarnings = recalculateWarnings(sorted)
+          setAllEntries(entriesWithWarnings)
         }
 
-
         resetAddEntryFields()
+        setShowSaveConfirm(false) // Close modal on success
       } else {
         toast.error(data.message || 'Failed to save entry')
       }
@@ -823,168 +905,172 @@ export default function AttendanceDashboard() {
   // ---------- RENDER ----------
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-2">
+    <div className="min-h-screen w-full bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-12">
       <div className="relative w-full">
 
-        {/* ----- MAROON GRADIENT HEADER ----- */}
-        <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md p-4 md:p-8 mb-4 md:mb-8">
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-            <div>
-              <h1 className="text-2xl md:text-4xl font-bold mb-2 md:mb-3">Tardiness Monitoring</h1>
-              <p className="text-white/80 text-sm md:text-lg flex items-center gap-2">
-                <Clock className="w-4 h-4 md:w-5 h-5" />
-                ABIC REALTY & CONSULTANCY
-              </p>
-            </div>
+        {/* ----- INTEGRATED HEADER & TOOLBAR ----- */}
+        <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md mb-6">
+          {/* Main Header Row */}
+          <div className="w-full px-4 md:px-8 py-6">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold mb-2">Tardiness Monitoring</h1>
+                <p className="text-white/80 text-sm md:text-base flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  ABIC REALTY & CONSULTANCY
+                </p>
+              </div>
 
-
-
-            {/* Year selector */}
-            <div className="flex items-center gap-3">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <div className="bg-white/95 backdrop-blur-sm border border-stone-200 text-red-900 hover:bg-white hover:border-red-200 transition-all duration-200 gap-2 text-lg h-10 px-4 shadow-sm hover:shadow-md font-bold inline-flex items-center justify-center whitespace-nowrap rounded-lg cursor-pointer group">
-                    {selectedYear} <ChevronDown className="w-4 h-4 ml-1 opacity-50 group-hover:opacity-100 transition-opacity" />
-                  </div>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-32 bg-white border-stone-200 shadow-xl rounded-xl p-1.5" align="end">
-                  {yearsList.map(year => (
-                    <DropdownMenuItem
-                      key={year}
-                      onClick={() => setSelectedYear(year)}
-                      className={cn(
-                        "flex items-center justify-between rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors",
-                        selectedYear === year ? "bg-red-50 text-red-900 font-semibold" : "text-stone-600 hover:bg-stone-50"
-                      )}
-                    >
-                      {year}
-                      {selectedYear === year && <Check className="w-4 h-4 text-red-600" />}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <Button onClick={handleAddNewYearConfirm} className="bg-white/95 backdrop-blur-sm border-stone-200 text-red-900 hover:bg-white hover:border-red-200 shadow-sm hover:shadow-md transition-all duration-200 text-lg h-10 px-4 font-bold rounded-lg border">
-                <Plus className="w-4 h-4 mr-1" /> New Year
-              </Button>
-              <Button
-                onClick={() => setIsEntryFormOpen(!isEntryFormOpen)}
-                className={cn(
-                  "bg-white/95 backdrop-blur-sm border border-stone-200 text-red-900 hover:bg-white hover:border-red-200 shadow-sm hover:shadow-md transition-all duration-200 text-lg h-10 px-4 font-bold rounded-lg border flex items-center gap-2",
-                  isEntryFormOpen && "bg-red-50 border-red-200"
-                )}
-              >
-                {isEntryFormOpen ? (
-                  <>
-                    <X className="w-5 h-5" />
-                    <span>CLOSE</span>
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-5 h-5" />
-                    <span>NEW RECORD</span>
-                  </>
-                )}
-              </Button>
+              {/* Year selector & Actions */}
+              <div className="flex items-center gap-3">
+                <Button onClick={handleAddNewYearConfirm} variant="outline" className="border-white/30 text-white hover:bg-white/20 hover:text-white bg-transparent backdrop-blur-sm shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg">
+                  <Plus className="w-4 h-4 mr-2" /> New Year
+                </Button>
+                <Button
+                  onClick={() => setIsEntryFormOpen(!isEntryFormOpen)}
+                  variant="outline"
+                  className={cn(
+                    "border-white/30 text-white hover:bg-white/20 hover:text-white bg-transparent backdrop-blur-sm shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg flex items-center gap-2",
+                    isEntryFormOpen && "bg-white/20 border-white/50"
+                  )}
+                >
+                  {isEntryFormOpen ? (
+                    <>
+                      <X className="w-4 h-4" />
+                      <span>CLOSE</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      <span>NEW RECORD</span>
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* ----- SECONDARY CONTROLS (TOOLBAR) - INSIDE HEADER ----- */}
-        <div className="border-t border-white/10 bg-white/5 backdrop-blur-sm">
-          <div className="w-full px-4 md:px-6 lg:px-8 py-3">
+          {/* Secondary Toolbar */}
+          <div className="border-t border-white/10 bg-white/5 backdrop-blur-sm">
+            <div className="w-full px-4 md:px-8 py-3">
+              <div className="flex flex-wrap items-center gap-3 md:gap-4">
 
+                {/* Year Selection */}
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-bold text-white/70 uppercase tracking-wider">Year</span>
 
-            <div className="flex flex-wrap items-center gap-3 md:gap-4">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <div className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 min-w-[120px] justify-between shadow-sm font-bold inline-flex items-center whitespace-nowrap rounded-lg cursor-pointer group border-2">
+                        {selectedYear} <ChevronDown className="w-4 h-4 ml-2 opacity-50 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-32 bg-white border-stone-200 shadow-xl rounded-xl p-1.5" align="start">
+                      {yearsList.map(year => (
+                        <DropdownMenuItem
+                          key={year}
+                          onClick={() => setSelectedYear(year)}
+                          className={cn(
+                            "flex items-center justify-between rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors",
+                            selectedYear === year ? "bg-red-50 text-red-900 font-semibold" : "text-stone-600 hover:bg-stone-50"
+                          )}
+                        >
+                          {year}
+                          {selectedYear === year && <Check className="w-4 h-4 text-red-600" />}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
 
-              {/* Month Selection */}
-              <div className="flex items-center gap-3">
-                <span className="text-md font-bold text-black/70 uppercase tracking-wider">Month</span>
+                {/* Month Selection */}
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-bold text-white/70 uppercase tracking-wider">Month</span>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <div className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-lg h-10 px-4 min-w-[140px] justify-between shadow-sm font-semibold inline-flex items-center whitespace-nowrap rounded-lg cursor-pointer group border-2">
-                      {selectedMonth} <ChevronDown className="w-4 h-4 ml-2 opacity-50 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </DropdownMenuTrigger>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <div className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 min-w-[140px] justify-between shadow-sm font-bold inline-flex items-center whitespace-nowrap rounded-lg cursor-pointer group border-2">
+                        {selectedMonth} <ChevronDown className="w-4 h-4 ml-2 opacity-50 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    </DropdownMenuTrigger>
 
-                  <DropdownMenuContent className="w-48 bg-white border-stone-200 shadow-xl rounded-xl p-1.5 max-h-[350px] overflow-y-auto" align="start">
-                    {months.map(month => (
+                    <DropdownMenuContent className="w-48 bg-white border-stone-200 shadow-xl rounded-xl p-1.5 max-h-[350px] overflow-y-auto" align="start">
+                      {months.map(month => (
+                        <DropdownMenuItem
+                          key={month}
+                          onClick={() => setSelectedMonth(month)}
+                          className={cn(
+                            "flex items-center justify-between rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors",
+                            selectedMonth === month ? "bg-red-50 text-red-900 font-semibold" : "text-stone-600 hover:bg-stone-50"
+                          )}
+                        >
+                          {month}
+                          {selectedMonth === month && <Check className="w-4 h-4 text-red-600" />}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                {/* Period Selection */}
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-bold text-white/70 uppercase tracking-wider">Period</span>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <div className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 min-w-[180px] justify-between shadow-sm font-bold inline-flex items-center whitespace-nowrap rounded-lg cursor-pointer group border-2">
+                        {showCutoff === 'first' ? '1st - 15th' : showCutoff === 'second' ? (selectedMonth === 'February' ? '16th - 28/29th' : '16th - 30/31st') : 'Show Both'}
+                        <ChevronDown className="w-4 h-4 ml-2 opacity-50 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    </DropdownMenuTrigger>
+
+                    <DropdownMenuContent className="w-56 bg-white border-stone-200 shadow-xl rounded-xl p-1.5" align="start">
                       <DropdownMenuItem
-                        key={month}
-                        onClick={() => setSelectedMonth(month)}
+                        onClick={() => setShowCutoff('first')}
                         className={cn(
                           "flex items-center justify-between rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors",
-                          selectedMonth === month ? "bg-red-50 text-red-900 font-semibold" : "text-stone-600 hover:bg-stone-50"
+                          showCutoff === 'first' ? "bg-red-50 text-red-900 font-semibold" : "text-stone-600 hover:bg-stone-50"
                         )}
                       >
-                        {month}
-                        {selectedMonth === month && <Check className="w-4 h-4 text-red-600" />}
+                        1st - 15th
+                        {showCutoff === 'first' && <Check className="w-4 h-4 text-red-600" />}
                       </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                      <DropdownMenuItem
+                        onClick={() => setShowCutoff('second')}
+                        className={cn(
+                          "flex items-center justify-between rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors",
+                          showCutoff === 'second' ? "bg-red-50 text-red-900 font-semibold" : "text-stone-600 hover:bg-stone-50"
+                        )}
+                      >
+                        {selectedMonth === 'February' ? '16th - 28/29th' : '16th - 30/31st'}
+                        {showCutoff === 'second' && <Check className="w-4 h-4 text-red-600" />}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => setShowCutoff('both')}
+                        className={cn(
+                          "flex items-center justify-between rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors",
+                          showCutoff === 'both' ? "bg-red-50 text-red-900 font-semibold" : "text-stone-600 hover:bg-stone-50"
+                        )}
+                      >
+                        Show Both
+                        {showCutoff === 'both' && <Check className="w-4 h-4 text-red-600" />}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                {/* Global Search Input */}
+                <div className="relative w-full md:w-[350px]">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-[#A0153E]" />
+                  <Input
+                    placeholder="Search employee..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="bg-white border-2 border-[#FFE5EC] text-slate-700 placeholder:text-slate-400 pl-10 h-10 w-full focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A] shadow-sm rounded-lg transition-all"
+                  />
+                </div>
+
               </div>
-
-              {/* Period Selection */}
-              <div className="flex items-center gap-3">
-                <span className="text-md font-bold text-black/70 uppercase tracking-wider">Period</span>
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <div className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-lg h-10 px-4 min-w-[180px] justify-between shadow-sm font-semibold inline-flex items-center whitespace-nowrap rounded-lg cursor-pointer group border-2">
-                      {showCutoff === 'first' ? '1st - 15th' : showCutoff === 'second' ? (selectedMonth === 'February' ? '16th - 28/29th' : '16th - 30/31st') : 'Show Both'}
-                      <ChevronDown className="w-4 h-4 ml-2 opacity-50 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </DropdownMenuTrigger>
-
-                  <DropdownMenuContent className="w-56 bg-white border-stone-200 shadow-xl rounded-xl p-1.5" align="start">
-                    <DropdownMenuItem
-                      onClick={() => setShowCutoff('first')}
-                      className={cn(
-                        "flex items-center justify-between rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors",
-                        showCutoff === 'first' ? "bg-red-50 text-red-900 font-semibold" : "text-stone-600 hover:bg-stone-50"
-                      )}
-                    >
-                      1st - 15th
-                      {showCutoff === 'first' && <Check className="w-4 h-4 text-red-600" />}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => setShowCutoff('second')}
-                      className={cn(
-                        "flex items-center justify-between rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors",
-                        showCutoff === 'second' ? "bg-red-50 text-red-900 font-semibold" : "text-stone-600 hover:bg-stone-50"
-                      )}
-                    >
-                      {selectedMonth === 'February' ? '16th - 28/29th' : '16th - 30/31st'}
-                      {showCutoff === 'second' && <Check className="w-4 h-4 text-red-600" />}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => setShowCutoff('both')}
-                      className={cn(
-                        "flex items-center justify-between rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors",
-                        showCutoff === 'both' ? "bg-red-50 text-red-900 font-semibold" : "text-stone-600 hover:bg-stone-50"
-                      )}
-                    >
-                      Show Both
-                      {showCutoff === 'both' && <Check className="w-4 h-4 text-red-600" />}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-
-              {/* Global Search Input */}
-              <div className="relative w-full md:w-[350px]">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-[#A0153E]" />
-                <Input
-                  placeholder="Search employee..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="bg-white border-2 border-[#FFE5EC] text-slate-700 placeholder:text-slate-400 pl-10 h-10 w-full focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A] shadow-sm rounded-lg transition-all"
-                />
-              </div>
-
-
             </div>
           </div>
         </div>
@@ -992,76 +1078,71 @@ export default function AttendanceDashboard() {
 
 
       <div className="bg-white p-3 md:p-6 rounded-lg shadow-lg border-b-2 md:border-2 border-[#FFE5EC] space-y-6">
-        <div className="flex flex-col gap-4">
-          <div className="flex justify-between items-center">
 
+        <div className={cn(
+          "overflow-hidden transition-all duration-500 ease-in-out",
+          isEntryFormOpen ? "max-h-[500px] opacity-100 mb-2" : "max-h-0 opacity-0 pointer-events-none"
+        )}>
+          <div className="flex justify-center pt-2">
+            <Card className="w-full max-w-5xl bg-white border border-[#FFE5EC] shadow-lg rounded-xl overflow-hidden ring-4 ring-rose-50/50">
+              <CardContent className="p-4 md:p-5">
+                <div className="flex flex-col lg:flex-row items-center gap-4 lg:gap-6">
+                  {/* Minimal Header Part */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="p-1.5 bg-rose-50 rounded-lg">
+                      <Plus className="w-4 h-4 text-[#4A081A]" />
+                    </div>
+                    <h2 className="text-lg font-black text-[#4A081A] uppercase tracking-wider whitespace-nowrap">
+                      New Late Entry
+                    </h2>
+                  </div>
 
-          </div>
-
-          <div className={cn(
-            "overflow-hidden transition-all duration-500 ease-in-out",
-            isEntryFormOpen ? "max-h-[500px] opacity-100 mb-2" : "max-h-0 opacity-0 pointer-events-none"
-          )}>
-            <div className="flex justify-center pt-2">
-              <Card className="w-full max-w-5xl bg-white border border-[#FFE5EC] shadow-lg rounded-xl overflow-hidden ring-4 ring-rose-50/50">
-                <CardContent className="p-4 md:p-5">
-                  <div className="flex flex-col lg:flex-row items-center gap-4 lg:gap-6">
-                    {/* Minimal Header Part */}
-                    <div className="flex items-center gap-2 shrink-0">
-                      <div className="p-1.5 bg-rose-50 rounded-lg">
-                        <Plus className="w-4 h-4 text-[#4A081A]" />
-                      </div>
-                      <h2 className="text-lg font-black text-[#4A081A] uppercase tracking-wider whitespace-nowrap">
-                        New Late Entry
-                      </h2>
+                  {/* Form Fields - Horizontal Inline */}
+                  <div className="flex flex-1 flex-col sm:flex-row items-center gap-4 w-full">
+                    <div className="flex-1 w-full min-w-[200px]">
+                      <EmployeeSelector
+                        value={newEntryEmployee}
+                        onChange={setNewEntryEmployee}
+                        employees={employees}
+                      />
                     </div>
 
-                    {/* Form Fields - Horizontal Inline */}
-                    <div className="flex flex-1 flex-col sm:flex-row items-center gap-4 w-full">
-                      <div className="flex-1 w-full min-w-[200px]">
-                        <EmployeeSelector
-                          value={newEntryEmployee}
-                          onChange={setNewEntryEmployee}
-                          employees={employees}
-                        />
-                      </div>
-
-                      <div className="relative group w-full sm:w-40 shrink-0">
-                        <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 group-focus-within:text-[#4A081A] transition-colors" />
-                        <Input
-                          id="time"
-                          type="time"
-                          value={newEntryTime}
-                          onChange={(e) => setNewEntryTime(e.target.value)}
-                          className="bg-white border border-[#FFE5EC] text-slate-800 pl-9 h-10 w-full rounded-lg text-lg font-bold focus:ring-[#800020]/10 focus:border-[#630C22] transition-all"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Button
-                        type="submit"
-                        onClick={handleSaveNewEntry}
-                        disabled={isSaving || selectedYear !== new Date().getFullYear()}
-                        className="bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#800020] hover:shadow-lg active:scale-95 text-white font-bold text-xl px-6 h-10 rounded-lg transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed min-w-[120px]"
-                      >
-                        {isSaving ? (
-                          <div className="flex items-center gap-2">
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            <span>Saving...</span>
-                          </div>
-                        ) : (
-                          "Save Record"
-                        )}
-                      </Button>
+                    <div className="relative group w-full sm:w-40 shrink-0">
+                      <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 group-focus-within:text-[#4A081A] transition-colors" />
+                      <Input
+                        id="time"
+                        type="time"
+                        value={newEntryTime}
+                        onChange={(e) => setNewEntryTime(e.target.value)}
+                        className="bg-white border border-[#FFE5EC] text-slate-800 pl-9 h-10 w-full rounded-lg text-lg font-bold focus:ring-[#800020]/10 focus:border-[#630C22] transition-all"
+                      />
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      type="submit"
+                      onClick={handleSaveClick}
+                      disabled={isSaving || selectedYear !== new Date().getFullYear()}
+                      className="bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#800020] hover:shadow-lg active:scale-95 text-white font-bold text-xl px-6 h-10 rounded-lg transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed min-w-[120px]"
+                    >
+                      {isSaving ? (
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Saving...</span>
+                        </div>
+                      ) : (
+                        "Save Record"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
+
         {/* ----- CUTOFF TABLES - WITH SUMMARY BUTTONS ----- */}
         <div className={`grid ${showCutoff === 'both' ? 'grid-cols-1 lg:grid-cols-2 gap-4' : 'grid-cols-1'} w-full`}>
           {isLoading ? (
@@ -1117,31 +1198,87 @@ export default function AttendanceDashboard() {
       </div>
 
       {/* Summary Sheet - only appears when Summary button is clicked */}
-      {activeCutoffSummary && (
-        <SummarySheet
-          isOpen={summarySheetOpen}
-          onClose={handleCloseSummary}
-          cutoffTitle={activeCutoffSummary.title}
-          entries={activeCutoffSummary.entries}
-          selectedYear={selectedYear}
-          selectedMonth={selectedMonth}
-          employees={employees}
-        />
-      )}
+      {
+        activeCutoffSummary && (
+          <SummarySheet
+            isOpen={summarySheetOpen}
+            onClose={handleCloseSummary}
+            cutoffTitle={activeCutoffSummary.title}
+            entries={activeCutoffSummary.entries}
+            selectedYear={selectedYear}
+            selectedMonth={selectedMonth}
+            employees={employees}
+          />
+        )
+      }
 
 
 
-      <ConfirmationModal
-        isOpen={showNewYearConfirm}
-        onClose={() => setShowNewYearConfirm(false)}
-        onConfirm={addNewYear}
-        title="Confirm New Year"
-        description={`Are you sure you want to initialize year ${Math.max(...yearsList) + 1}? This will add it to the selection menu.`}
-        variant="warning"
-        confirmText={isAddingYear ? "Initializing..." : "Confirm"}
-        isLoading={isAddingYear}
-      />
-    </div>
+      <Dialog open={showNewYearConfirm} onOpenChange={setShowNewYearConfirm}>
+        <DialogContent className="bg-white border-2 border-[#FFE5EC] rounded-2xl max-w-sm">
+          <DialogHeader className="flex flex-col items-center gap-4 text-center">
+            <div className="p-4 bg-red-50 rounded-full">
+              <Calendar className="w-8 h-8 text-[#4A081A]" />
+            </div>
+            <div className="space-y-2">
+              <DialogTitle className="text-2xl font-bold text-[#4A081A]">Confirm New Year</DialogTitle>
+              <DialogDescription className="text-stone-500 font-medium">
+                Are you sure you want to initialize year {Math.max(...yearsList) + 1}? This will add it to the selection menu.
+              </DialogDescription>
+            </div>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col sm:flex-row gap-3 mt-6">
+            <Button
+              variant="outline"
+              onClick={() => setShowNewYearConfirm(false)}
+              disabled={isAddingYear}
+              className="flex-1 border-2 border-stone-100 text-stone-600 hover:bg-stone-50 font-bold h-12 rounded-xl"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={addNewYear}
+              disabled={isAddingYear}
+              className="flex-1 bg-gradient-to-r from-[#4A081A] to-[#800020] hover:from-[#630C22] hover:to-[#A0153E] text-white font-bold h-12 rounded-xl shadow-md transition-all active:scale-95"
+            >
+              {isAddingYear ? "Initializing..." : "Confirm"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showSaveConfirm} onOpenChange={setShowSaveConfirm}>
+        <DialogContent className="bg-white border-2 border-[#FFE5EC] rounded-2xl max-w-sm">
+          <DialogHeader className="flex flex-col items-center gap-4 text-center">
+            <div className="p-4 bg-red-50 rounded-full">
+              <Clock className="w-8 h-8 text-[#4A081A]" />
+            </div>
+            <div className="space-y-2">
+              <DialogTitle className="text-2xl font-bold text-[#4A081A]">Confirm New Entry</DialogTitle>
+              <DialogDescription className="text-stone-500 font-medium">
+                Are you sure you want to add a late entry for <span className="text-[#4A081A] font-bold">{newEntryEmployee}</span> at <span className="text-[#4A081A] font-bold">{newEntryTime}</span>?
+              </DialogDescription>
+            </div>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col sm:flex-row gap-3 mt-6">
+            <Button
+              variant="outline"
+              onClick={() => setShowSaveConfirm(false)}
+              disabled={isSaving}
+              className="flex-1 border-2 border-stone-100 text-stone-600 hover:bg-stone-50 font-bold h-12 rounded-xl"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={executeSaveEntry}
+              disabled={isSaving}
+              className="flex-1 bg-gradient-to-r from-[#4A081A] to-[#800020] hover:from-[#630C22] hover:to-[#A0153E] text-white font-bold h-12 rounded-xl shadow-md transition-all active:scale-95"
+            >
+              {isSaving ? "Saving..." : "Confirm"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div >
   )
 }
 

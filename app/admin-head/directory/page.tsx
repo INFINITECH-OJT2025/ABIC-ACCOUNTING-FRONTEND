@@ -641,7 +641,7 @@ export default function GovernmentDirectoryPage() {
         {/* Top Pattern Effect (Optional) */}
         <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-white to-transparent" />
 
-        <div className="w-full px-4 md:px-8 py-5 relative z-10">
+        <div className="w-full px-4 md:px-8 pt-10 pb-5 relative z-10">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
             <div>
               <h1 className="text-2xl md:text-3xl font-black tracking-tight flex items-center gap-3">
@@ -683,7 +683,7 @@ export default function GovernmentDirectoryPage() {
                 <Button
                   onClick={startEditMode}
                   variant="outline"
-                  className="border-white/30 text-white hover:bg-white/20 hover:text-white bg-transparent backdrop-blur-sm"
+                  className="border-white/30 rounded-lg text-white hover:bg-white/20 hover:text-white bg-transparent backdrop-blur-sm"
                 >
                   <Edit3 className="w-4 h-4 mr-2" />
                   UPDATE MODE
@@ -692,8 +692,8 @@ export default function GovernmentDirectoryPage() {
             </div>
           </div>
 
-          {/* AGENCY NAVIGATION (Tabs style) */}
-          <div className="flex items-center gap-6 overflow-x-auto pb-2 scrollbar-hide text-sm md:text-base font-black tracking-widest uppercase">
+          {/* AGENCY NAVIGATION */}
+          <div className="flex items-center gap-8 overflow-x-auto pb-4 scrollbar-hide mt-6">
             {mergedAgencies.map((item) => {
               const isActive = item.key === activeAgency
               const Icon = item.icon
@@ -708,14 +708,23 @@ export default function GovernmentDirectoryPage() {
                     setActiveAgency(item.key)
                   }}
                   className={cn(
-                    "relative py-2 px-1 transition-all duration-300 whitespace-nowrap group hover:text-white flex items-center gap-3",
-                    isActive ? "text-white" : "text-white/40"
+                    "relative py-3 transition-all duration-300 whitespace-nowrap group flex items-center gap-3 outline-none",
+                    isActive
+                      ? "text-white scale-110"
+                      : "text-white/60 hover:text-white hover:scale-105"
                   )}
                 >
-                  <Icon className="w-5 h-5" />
-                  <span>{item.shortName}</span>
+                  <Icon className={cn("transition-all duration-300", isActive ? "w-6 h-6 stroke-[3]" : "w-5 h-5 stroke-2")} />
+                  <span className={cn(
+                    "uppercase tracking-widest transition-all duration-300",
+                    isActive ? "font-black text-xl shadow-sm" : "font-bold text-lg"
+                  )}>
+                    {item.shortName}
+                  </span>
+
+                  {/* Active Indicator Underline */}
                   {isActive && (
-                    <span className="absolute bottom-0 left-0 w-full h-1 bg-white rounded-none" />
+                    <span className="absolute bottom-0 left-0 w-full h-1 bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.5)]" />
                   )}
                 </button>
               )

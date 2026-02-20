@@ -23,7 +23,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
-  Save, Lock, ChevronLeft, ChevronRight, Check, Trash2, Plus, Target, UserPlus, ClipboardList, TriangleAlert, FolderPlus, Filter, ArrowUpDown
+  Save, Lock, ChevronLeft, ChevronRight, Check, Trash2, Plus, Target, UserPlus, ClipboardList, TriangleAlert, FolderPlus, Filter, ArrowUpDown, Users, CheckCircle2, Loader2, ChevronDown
 } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { getApiUrl } from '@/lib/api'
@@ -387,265 +387,302 @@ export default function ClearanceChecklistPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-12 font-sans">
-      <header className="-mx-8 -mt-8 mb-8 bg-[#a0153e] text-white px-10 py-10 shadow-lg relative overflow-hidden">
-        <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-          <div className="space-y-4">
-            <h1 className="text-4xl font-extrabold tracking-tight italic">Clearance Checklist</h1>
+    <div className="min-h-screen bg-gradient-to-br from-stone-50 via-white to-red-50 pb-12 font-sans">
+      <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md mb-8">
+        {/* Main Header Row */}
+        <div className="w-full px-4 md:px-8 py-6">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold mb-2">Clearance Checklist</h1>
+              <p className="text-white/80 text-sm md:text-base flex items-center gap-2">
+                <ClipboardList className="w-4 h-4" />
+                ABIC REALTY & CONSULTANCY
+              </p>
+            </div>
 
-            <div className="flex flex-wrap items-center gap-3 text-rose-100/80 text-lg">
-              <span className="opacity-80">Exit processing for</span>
-              <Popover open={open} onOpenChange={setOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" className="h-auto p-0 text-white font-bold text-lg hover:bg-transparent underline underline-offset-4 decoration-rose-400">
-                    {employeeInfo?.name || 'No records yet'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[300px] p-0 rounded-xl border-none shadow-2xl">
-                  <Command>
-                    <CommandInput placeholder="Search records..." />
-                    <CommandList>
-                      <CommandEmpty>No records found.</CommandEmpty>
-                      {doneRecords.length > 0 && (
-                        <CommandGroup heading="DONE">
-                          {doneRecords.map(({ record: emp, index }) => (
-                            <CommandItem key={emp.id} onSelect={() => { selectRecordByIndex(index); setOpen(false); }}>
-                              <Check className={cn("mr-2 h-4 w-4", currentIndex === index ? "opacity-100" : "opacity-0")} />
-                              {emp.name} ({getRecordCompletionPercentage(emp)}%)
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      )}
-                      {pendingRecords.length > 0 && (
-                        <CommandGroup heading="PENDING">
-                          {pendingRecords.map(({ record: emp, index }) => (
-                            <CommandItem key={emp.id} onSelect={() => { selectRecordByIndex(index); setOpen(false); }}>
-                              <Check className={cn("mr-2 h-4 w-4", currentIndex === index ? "opacity-100" : "opacity-0")} />
-                              {emp.name} ({getRecordCompletionPercentage(emp)}%)
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      )}
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => router.push('/admin-head/forms/clearance-checklist/add-clearance-checklist')}
+                variant="outline"
+                className="border-white/30 text-white hover:bg-white/20 hover:text-white bg-transparent backdrop-blur-sm shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg"
+              >
+                <Plus className="w-4 h-4 mr-2" /> Add Record
+              </Button>
+            </div>
+          </div>
+        </div>
 
-              <div className="flex items-center gap-2">
+        {/* Secondary Toolbar */}
+        <div className="border-t border-white/10 bg-white/5 backdrop-blur-sm">
+          <div className="w-full px-4 md:px-8 py-3">
+            <div className="flex flex-wrap items-center gap-4">
+
+              {/* Filter Status */}
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-bold text-white/70 uppercase tracking-wider">Filter</span>
                 <Select value={recordStatusFilter} onValueChange={(value) => setRecordStatusFilter(value as RecordStatusFilter)}>
-                  <SelectTrigger className="h-9 w-[130px] rounded-full border border-white/25 bg-white/10 text-white text-xs font-black uppercase tracking-widest">
-                    <div className="flex items-center gap-2">
-                      <Filter className="h-3.5 w-3.5 text-rose-200" />
-                      <SelectValue />
-                    </div>
+                  <SelectTrigger className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 w-[140px] shadow-sm font-bold rounded-lg border-2 ring-0 focus:ring-0">
+                    <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">All</SelectItem>
-                    <SelectItem value="DONE">Done</SelectItem>
+                  <SelectContent className="rounded-xl border-stone-200 shadow-xl">
+                    <SelectItem value="ALL">All Records</SelectItem>
+                    <SelectItem value="DONE">Completed</SelectItem>
                     <SelectItem value="PENDING">Pending</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select value={recordSort} onValueChange={(value) => setRecordSort(value as RecordSort)}>
-                  <SelectTrigger className="h-9 w-[130px] rounded-full border border-white/25 bg-white/10 text-white text-xs font-black uppercase tracking-widest">
-                    <div className="flex items-center gap-2">
-                      <ArrowUpDown className="h-3.5 w-3.5 text-rose-200" />
-                      <SelectValue />
+              </div>
+
+              {/* Employee Record Selector */}
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-bold text-white/70 uppercase tracking-wider">Employee</span>
+                <Popover open={open} onOpenChange={setOpen}>
+                  <PopoverTrigger asChild>
+                    <div className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 min-w-[220px] justify-between shadow-sm font-bold inline-flex items-center whitespace-nowrap rounded-lg cursor-pointer group border-2">
+                      <span className="truncate max-w-[180px]">{employeeInfo?.name || 'Select Record'}</span>
+                      <ChevronDown className="w-4 h-4 ml-2 opacity-50 group-hover:opacity-100 transition-opacity" />
                     </div>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0 rounded-xl border-stone-200 shadow-2xl" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search records..." className="h-10" />
+                      <CommandList>
+                        <CommandEmpty>No records found.</CommandEmpty>
+                        {doneRecords.length > 0 && (
+                          <CommandGroup heading="DONE">
+                            {doneRecords.map(({ record: emp, index }) => (
+                              <CommandItem key={emp.id} onSelect={() => { selectRecordByIndex(index); setOpen(false); }} className="rounded-lg m-1 cursor-pointer">
+                                <Check className={cn("mr-2 h-4 w-4", currentIndex === index ? "text-[#A4163A]" : "opacity-0")} />
+                                <span className="font-medium text-slate-700">{emp.name}</span>
+                                <span className="ml-auto text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">{getRecordCompletionPercentage(emp)}%</span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        )}
+                        {pendingRecords.length > 0 && (
+                          <CommandGroup heading="PENDING">
+                            {pendingRecords.map(({ record: emp, index }) => (
+                              <CommandItem key={emp.id} onSelect={() => { selectRecordByIndex(index); setOpen(false); }} className="rounded-lg m-1 cursor-pointer">
+                                <Check className={cn("mr-2 h-4 w-4", currentIndex === index ? "text-[#A4163A]" : "opacity-0")} />
+                                <span className="font-medium text-slate-700">{emp.name}</span>
+                                <span className="ml-auto text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">{getRecordCompletionPercentage(emp)}%</span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Sort By */}
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-bold text-white/70 uppercase tracking-wider">Sort</span>
+                <Select value={recordSort} onValueChange={(value) => setRecordSort(value as RecordSort)}>
+                  <SelectTrigger className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 w-[160px] shadow-sm font-bold rounded-lg border-2 ring-0 focus:ring-0">
+                    <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="UPDATED_DESC">Latest</SelectItem>
-                    <SelectItem value="UPDATED_ASC">Oldest</SelectItem>
-                    <SelectItem value="NAME_ASC">A - Z</SelectItem>
-                    <SelectItem value="NAME_DESC">Z - A</SelectItem>
+                  <SelectContent className="rounded-xl border-stone-200 shadow-xl">
+                    <SelectItem value="UPDATED_DESC">Latest First</SelectItem>
+                    <SelectItem value="UPDATED_ASC">Oldest First</SelectItem>
+                    <SelectItem value="NAME_ASC">Name (A-Z)</SelectItem>
+                    <SelectItem value="NAME_DESC">Name (Z-A)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="flex items-center gap-2 ml-2 px-4 py-1.5 bg-white/10 rounded-full border border-white/20 backdrop-blur-sm">
-                <Target className="w-4 h-4 text-rose-300" />
-                <span className="text-xs font-black uppercase tracking-widest text-rose-100">Status:</span>
-                <span className="text-sm font-black text-white">{completionPercentage}% Completed</span>
-                {completionDateText && (
-                  <>
-                    <span className="text-rose-200/70">|</span>
-                    <span className="text-xs font-black uppercase tracking-widest text-rose-100">Date:</span>
-                    <span className="text-sm font-black text-white">{completionDateText}</span>
-                  </>
-                )}
+              {/* Overall Stats (Right Aligned) */}
+              <div className="ml-auto hidden xl:flex items-center gap-4 bg-white/10 px-4 py-1.5 rounded-lg border border-white/10 backdrop-blur-sm">
+                <div className="flex flex-col items-end">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-white/60 leading-none mb-1">Overall</span>
+                  <span className="text-sm font-black text-white">{completionPercentage}%</span>
+                </div>
+                <div className="h-6 w-px bg-white/20" />
+                <div className="flex flex-col">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-white/60 leading-none mb-1">Updated</span>
+                  <span className="text-sm font-black text-white tracking-tight">{completionDateText || '—'}</span>
+                </div>
               </div>
+
             </div>
           </div>
-
-          <div className="flex gap-3">
-            <Button onClick={() => router.push('/admin-head/forms/clearance-checklist/add-clearance-checklist')} className="rounded-full bg-white text-[#a0153e] hover:bg-rose-50 h-12 px-8 font-bold">
-              <UserPlus className="mr-2 h-4 w-4" /> Add Record
-            </Button>
-          </div>
         </div>
-      </header>
+      </div>
 
-      <main className="max-w-[1600px] mx-auto p-8 relative">
-        <div className="absolute left-0 top-[25%] -translate-x-1/2 z-10">
-          <Button onClick={handlePrev} disabled={records.length === 0 || currentIndex === 0} size="icon" className="rounded-full h-12 w-12 bg-white shadow-xl text-[#a0153e] border-none hover:bg-rose-50 transition-colors">
-            <ChevronLeft className="h-6 w-6" />
-          </Button>
-        </div>
-        <div className="absolute right-0 top-[25%] translate-x-1/2 z-10">
-          <Button onClick={handleNext} disabled={records.length === 0 || currentIndex >= records.length - 1} size="icon" className="rounded-full h-12 w-12 bg-white shadow-xl text-[#a0153e] border-none hover:bg-rose-50 transition-colors">
-            <ChevronRight className="h-6 w-6" />
-          </Button>
-        </div>
+      <main className="w-full px-4 md:px-8 relative mb-20 transition-all duration-500 animate-in fade-in slide-in-from-bottom-5">
 
-        <Card className="rounded-[2rem] border-none shadow-2xl overflow-hidden bg-white mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-slate-100">
-            <div className="p-8 bg-slate-50/30">
-              <div className="flex items-center gap-2 mb-3">
-                <p className="text-lg font-bold text-[#a0153e] uppercase tracking-wide">Employee Name</p>
-                <Lock className="w-3 h-3 text-slate-400" />
+        <Card className="rounded-2xl border-2 border-[#FFE5EC] shadow-lg overflow-hidden bg-white mb-6 transition-all hover:shadow-xl">
+          <div className="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-rose-50">
+            <div className="p-4 bg-rose-50/20">
+              <div className="flex items-center gap-2 mb-1">
+                <Users className="w-3.5 h-3.5 text-[#800020]/60" />
+                <p className="text-[9px] font-black text-[#800020]/60 uppercase tracking-widest">Employee Name</p>
               </div>
-              <p className="text-2xl md:text-3xl font-extrabold text-slate-900 leading-tight">{employeeInfo?.name || '-'}</p>
+              <p className="text-lg font-black text-slate-800 leading-tight">{employeeInfo?.name || '-'}</p>
             </div>
 
-            <div className="p-8">
-              <p className="text-lg font-bold text-[#a0153e] uppercase tracking-wide mb-3">Position</p>
+            <div className="p-4">
+              <p className="text-[9px] font-black text-[#800020]/60 uppercase tracking-widest mb-1">Position</p>
               {editMode && employeeInfo ? (
                 <Select value={employeeInfo.position || ''} onValueChange={(val) => setEmployeeInfo({ ...employeeInfo, position: val })}>
-                  <SelectTrigger className="rounded-xl border-slate-200 h-11"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-7 text-lg font-bold text-slate-700 border-none p-0 focus:ring-0 shadow-none"><SelectValue /></SelectTrigger>
                   <SelectContent className="rounded-xl">
                     {positionSelectOptions.map((name) => (
                       <SelectItem key={name} value={name}>{name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              ) : (<p className="text-2xl md:text-3xl font-extrabold text-slate-700">{employeeInfo?.position || '-'}</p>)}
+              ) : (<p className="text-lg font-bold text-slate-700 leading-tight">{employeeInfo?.position || '-'}</p>)}
             </div>
 
-            <div className="p-8">
-              <p className="text-lg font-bold text-[#a0153e] uppercase tracking-wide mb-3">Start Date</p>
+            <div className="p-4">
+              <p className="text-[9px] font-black text-[#800020]/60 uppercase tracking-widest mb-1">Last Day</p>
               {editMode && employeeInfo ? (
-                <Input type="date" value={employeeInfo.startDate} onChange={(e) => setEmployeeInfo({ ...employeeInfo, startDate: e.target.value })} className="rounded-xl border-slate-200 h-11" />
-              ) : (<p className="text-2xl md:text-3xl font-extrabold text-slate-700">{employeeInfo?.startDate ? new Date(employeeInfo.startDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '-'}</p>)}
+                <Input type="date" value={employeeInfo.lastDay} onChange={(e) => setEmployeeInfo({ ...employeeInfo, lastDay: e.target.value })} className="h-7 text-lg font-bold text-slate-700 border-none p-0 focus-visible:ring-0 shadow-none" />
+              ) : (
+                <p className="text-lg font-bold text-slate-700">
+                  {employeeInfo?.lastDay ? new Date(employeeInfo.lastDay).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
+                </p>
+              )}
             </div>
 
-            <div className="p-8">
-              <p className="text-lg font-bold text-[#a0153e] uppercase tracking-wide mb-3">Department</p>
+            <div className="p-4">
+              <p className="text-[9px] font-black text-[#800020]/60 uppercase tracking-widest mb-1">Department</p>
               {editMode && employeeInfo ? (
                 <Select value={employeeInfo.department || ''} onValueChange={(val) => setEmployeeInfo({ ...employeeInfo, department: val })}>
-                  <SelectTrigger className="rounded-xl border-slate-200 h-11"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-7 text-lg font-bold text-slate-700 border-none p-0 focus:ring-0 shadow-none"><SelectValue /></SelectTrigger>
                   <SelectContent className="rounded-xl">
                     {departmentSelectOptions.map((name) => (
                       <SelectItem key={name} value={name}>{name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              ) : (<p className="text-2xl md:text-3xl font-extrabold text-slate-700">{employeeInfo?.department || '-'}</p>)}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100 border-t border-slate-100">
-            <div className="p-8">
-              <p className="text-lg font-bold text-[#a0153e] uppercase tracking-wide mb-3">Resignation Date</p>
-              {editMode && employeeInfo ? (
-                <Input type="date" value={employeeInfo.resignationDate} onChange={(e) => setEmployeeInfo({ ...employeeInfo, resignationDate: e.target.value })} className="rounded-xl border-slate-200 h-11" />
-              ) : (<p className="text-2xl md:text-3xl font-extrabold text-slate-700">{employeeInfo?.resignationDate ? new Date(employeeInfo.resignationDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' }) : '-'}</p>)}
-            </div>
-            <div className="p-8">
-              <p className="text-lg font-bold text-[#a0153e] uppercase tracking-wide mb-3">Last Day</p>
-              {editMode && employeeInfo ? (
-                <Input type="date" value={employeeInfo.lastDay} onChange={(e) => setEmployeeInfo({ ...employeeInfo, lastDay: e.target.value })} className="rounded-xl border-slate-200 h-11" />
-              ) : (<p className="text-2xl md:text-3xl font-extrabold text-slate-700">{employeeInfo?.lastDay ? new Date(employeeInfo.lastDay).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' }) : '-'}</p>)}
+              ) : (<p className="text-lg font-bold text-slate-700 leading-tight">{employeeInfo?.department || '-'}</p>)}
             </div>
           </div>
         </Card>
 
-        <Card className="rounded-[2rem] border-none shadow-2xl bg-white overflow-hidden">
+        {/* Task List Section */}
+        <Card className="rounded-2xl border-2 border-[#FFE5EC] shadow-2xl bg-white overflow-hidden mb-12">
+          {/* Progress Banner */}
+          <div className="bg-[#FFE5EC]/20 p-4 md:px-8 border-b border-[#FFE5EC]">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-[11px] font-black text-[#800020] uppercase tracking-widest">Process Clearance Progress</h3>
+              <span className="text-sm font-black text-[#A4163A] bg-white px-3 py-0.5 rounded-full shadow-sm border border-[#FFE5EC]">
+                {tasks.filter(t => t.status === 'DONE').length} / {tasks.length} Completed
+              </span>
+            </div>
+            <div className="w-full bg-white h-2.5 rounded-full overflow-hidden border border-[#FFE5EC] shadow-inner p-0.5">
+              <div
+                className="bg-gradient-to-r from-[#A4163A] to-[#630C22] h-full rounded-full transition-all duration-1000 ease-out shadow-sm"
+                style={{ width: `${completionPercentage}%` }}
+              />
+            </div>
+          </div>
+
           <Table>
-            <TableHeader className="bg-slate-50/50">
-              <TableRow className="border-b border-slate-100">
-                <TableHead className="w-[220px] text-center font-black text-[#a0153e] uppercase tracking-widest text-[11px] py-8">Date</TableHead>
-                <TableHead className="w-[180px] text-center font-black text-[#a0153e] uppercase tracking-widest text-[11px] py-8">Status</TableHead>
-                <TableHead className="font-black text-[#a0153e] uppercase tracking-widest text-[11px] py-8">Clearance Tasks</TableHead>
-                {editMode && <TableHead className="w-[100px] text-center font-black text-[#a0153e] uppercase tracking-widest text-[11px] py-8">Action</TableHead>}
+            <TableHeader className="bg-[#FFE5EC]/40">
+              <TableRow className="border-b border-[#FFE5EC] hover:bg-transparent">
+                <TableHead className="w-[180px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">Date</TableHead>
+                <TableHead className="w-[80px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">Status</TableHead>
+                <TableHead className="font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">
+                  Required Clearance Tasks
+                </TableHead>
+                <TableHead className="w-[80px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {tasks.map((item) => (
-                <TableRow key={item.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/30 transition-colors">
-                  <TableCell className="py-6 text-center font-semibold text-slate-600">
-                    {item.date
-                      ? new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                      : '-'}
+                <TableRow key={item.id} className="border-b border-rose-50/30 last:border-0 hover:bg-[#FFE5EC]/5 transition-colors group">
+                  <TableCell className="text-center py-2.5 font-mono text-[10px] font-bold text-slate-400">
+                    {item.date ? new Date(item.date).toLocaleString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
+                    }) : '-'}
                   </TableCell>
-                  <TableCell className="py-6">
-                    <div className="flex justify-center items-center gap-4">
-                      <Checkbox
-                        checked={item.status === 'DONE'}
-                        onCheckedChange={(checked) => toggleTaskStatus(item.id, !!checked)}
-                        className="h-5 w-5 rounded-md border-slate-300 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
-                      />
-                      <Badge className={cn(
-                        "rounded-full px-5 py-1 text-[10px] tracking-widest border-none transition-all",
-                        item.status === 'DONE' ? "bg-emerald-50 text-emerald-600 shadow-sm" : "bg-slate-100 text-slate-400 opacity-60"
-                      )}>
-                        {item.status}
-                      </Badge>
+                  <TableCell className="py-2.5">
+                    <div className="flex justify-center">
+                      <div
+                        onClick={() => toggleTaskStatus(item.id, item.status !== 'DONE')}
+                        className={cn(
+                          "w-5 h-5 rounded flex items-center justify-center cursor-pointer transition-all border-2",
+                          item.status === 'DONE'
+                            ? "bg-emerald-500 border-emerald-500 text-white shadow-sm"
+                            : "border-slate-200 bg-white hover:border-[#A4163A]"
+                        )}
+                      >
+                        {item.status === 'DONE' && <CheckCircle2 className="h-3.5 w-3.5" />}
+                      </div>
                     </div>
                   </TableCell>
-                  <TableCell className="py-6">
+                  <TableCell className="py-2.5">
                     {editMode ? (
-                      <Input value={item.task} onChange={(e) => updateTaskText(item.id, e.target.value)} className="rounded-xl border-slate-200 h-11 bg-slate-50/30" />
+                      <Input
+                        value={item.task}
+                        onChange={(e) => updateTaskText(item.id, e.target.value)}
+                        className={cn(
+                          "h-8 border-transparent bg-transparent hover:border-[#FFE5EC]/50 focus:border-[#A4163A] focus-visible:ring-0 transition-all font-bold px-0 text-sm",
+                          item.status === 'DONE' ? "text-slate-300 line-through" : "text-slate-700"
+                        )}
+                        placeholder="Define clearance task..."
+                      />
                     ) : (
-                      <span className={cn("text-[15px] font-medium transition-all duration-300", item.status === 'DONE' && "text-slate-400 line-through decoration-slate-200")}>
+                      <span className={cn(
+                        "text-sm font-bold transition-all duration-300",
+                        item.status === 'DONE' ? "text-slate-300 line-through" : "text-slate-700"
+                      )}>
                         {item.task}
                       </span>
                     )}
                   </TableCell>
-                  {editMode && (
-                    <TableCell className="py-6 text-center">
-                      <Button variant="ghost" size="icon" onClick={() => setTaskIdToDelete(item.id)} className="text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-full">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  )}
+                  <TableCell className="py-2.5 text-center">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setTaskIdToDelete(item.id)}
+                      className="h-7 w-7 text-slate-300 hover:text-rose-500 transition-colors rounded-lg group-hover:bg-rose-50"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
+
               {tasks.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={emptyTaskColSpan} className="py-16">
-                    <div className="flex flex-col items-center justify-center text-center gap-3">
-                      <div className="h-14 w-14 rounded-full bg-[#a0153e]/10 flex items-center justify-center">
-                        <ClipboardList className="h-7 w-7 text-[#a0153e]" />
-                      </div>
-                      <p className="text-base font-bold text-slate-700">No tasks to display</p>
-                      <p className="text-sm text-slate-500">
-                        {records.length === 0 ? 'No clearance records found yet. Add a record to begin.' : 'This record has no tasks yet.'}
-                      </p>
-                    </div>
+                  <TableCell colSpan={4} className="py-24 text-center">
+                    <ClipboardList className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+                    <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">No tasks initialized</p>
+                    <Button onClick={addTask} variant="outline" size="sm" className="mt-4 border-[#FFE5EC] text-[#A4163A] font-black h-9 rounded-xl">
+                      <Plus className="w-4 h-4 mr-1" /> START CHECKLIST
+                    </Button>
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
 
-          <div className="bg-slate-50/50 px-10 py-8 flex justify-between items-center border-t border-slate-100">
-            <div className="flex items-center gap-4">
-              <p className="text-[10px] text-slate-400 font-bold tracking-[0.2em] uppercase">ABIC Realty Exit Clearance</p>
-              {editMode && (
-                <Button onClick={addTask} size="sm" variant="ghost" className="rounded-full text-[#a0153e] font-bold bg-[#a0153e]/5 hover:bg-[#a0153e]/10 px-6">
-                  <Plus className="mr-2 h-4 w-4" /> Add Task
-                </Button>
-              )}
-            </div>
-            <div className="flex gap-4">
-              <Button variant="outline" className="rounded-full px-8 h-12 shadow-sm border-slate-200 font-bold text-slate-600 hover:bg-slate-100 transition-colors">
-                <FolderPlus className="mr-2 h-4 w-4" /> Update Masterfile
+          {/* Table Footer */}
+          <div className="p-4 md:px-8 bg-slate-50/50 border-t border-[#FFE5EC] flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex items-center gap-3">
+              <Button onClick={addTask} size="sm" className="bg-[#A4163A] hover:bg-[#800020] text-white font-black text-xs h-9 px-6 rounded-xl shadow-md active:scale-95 transition-all">
+                <Plus className="w-3.5 h-3.5 mr-2" /> ADD ROW
               </Button>
+              <div className="h-4 w-px bg-slate-200 hidden md:block" />
+              <p className="text-[8px] font-black text-slate-300 uppercase tracking-[0.2em] italic hidden md:block">
+                ADMINISTRATION FRAMEWORK • ABIC HR
+              </p>
+            </div>
+
+            <div className="flex gap-3">
               <Button
                 onClick={handleSave}
                 disabled={saving || !employeeInfo}
-                className="rounded-full px-12 h-12 font-bold shadow-xl transition-all bg-emerald-600 hover:bg-emerald-700 text-white"
+                className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg active:scale-95 transition-all rounded-xl"
               >
-                <><Save className="mr-2 h-4 w-4" /> {saving ? 'Saving...' : 'Save'}</>
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <Save className="w-3.5 h-3.5 mr-2" />}
+                {saving ? 'UPDATING...' : 'FINALIZE SAVE'}
               </Button>
             </div>
           </div>
