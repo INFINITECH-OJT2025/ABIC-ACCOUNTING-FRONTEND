@@ -68,7 +68,7 @@ export default function MasterfilePage() {
   const [pendingPage, setPendingPage] = useState(1)
   const [employedPage, setEmployedPage] = useState(1)
   const [terminatedPage, setTerminatedPage] = useState(1)
-  const ITEMS_PER_PAGE_CARDS = 6
+  const ITEMS_PER_PAGE_CARDS = 12
   const ITEMS_PER_PAGE_TABLE = 10
   const [sortOrder, setSortOrder] = useState<'recent' | 'oldest' | 'az' | 'za'>('recent')
 
@@ -548,7 +548,7 @@ export default function MasterfilePage() {
                         {pendingList.length}
                       </Badge>
                     </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                       {paginatedPending.map((employee) => {
                          const { isComplete, status } = checkCompleteness(employee as any)
                          
@@ -566,20 +566,20 @@ export default function MasterfilePage() {
                               {isComplete && <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>}
 
                              <div className="flex items-center gap-4 mb-4">
-                               <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold transition-colors duration-200 ${
+                               <div className={`w-14 h-14 min-w-[3.5rem] rounded-full flex items-center justify-center text-xl font-bold transition-colors duration-200 ${
                                  isComplete 
                                    ? 'bg-emerald-100 text-emerald-700 group-hover:bg-emerald-500 group-hover:text-white' 
                                    : 'bg-orange-100 text-orange-700 group-hover:bg-orange-500 group-hover:text-white'
                                }`}>
                                  {employee.first_name.charAt(0)}{employee.last_name.charAt(0)}
                                </div>
-                               <div className="overflow-hidden">
-                                 <h1 className="font-bold text-slate-800 truncate group-hover:text-[#630C22] transition-colors">
-                                   {employee.first_name} {employee.last_name}
-                                 </h1>
-                                 <p className="text-xs text-slate-500 truncate font-medium">
+                               <div className="overflow-hidden flex flex-col justify-center">
+                                 <p className="font-semibold text-[#4A081A] text-xs uppercase tracking-wider mb-0.5 truncate">
                                    {employee.position || 'No Position'}
                                  </p>
+                                 <h1 className="text-lg md:text-xl font-bold text-slate-800 leading-tight group-hover:text-[#630C22] transition-colors break-words">
+                                   {employee.first_name} {employee.last_name}
+                                 </h1>
                                </div>
                              </div>
                              <div className="flex justify-between items-center pt-3 border-t border-slate-50">
