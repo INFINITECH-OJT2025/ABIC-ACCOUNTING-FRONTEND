@@ -1,4 +1,8 @@
+//sidebar
+
 "use client"
+
+
 
 
 import React, { useState } from 'react'
@@ -38,6 +42,8 @@ import {
 import { Button } from "@/components/ui/button"
 
 
+
+
 export default function AdminHeadSidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isEmployeeOpen, setIsEmployeeOpen] = useState(false)
@@ -49,7 +55,11 @@ export default function AdminHeadSidebar() {
 
 
 
+
+
+
   const toggleSidebar = () => setIsCollapsed(!isCollapsed)
+
 
   const handleLogout = () => {
     // Perform any logout logic here (e.g., clearing tokens)
@@ -57,8 +67,11 @@ export default function AdminHeadSidebar() {
   }
 
 
+
+
   return (
-    <div className={`${isCollapsed ? 'w-20' : 'w-64'} bg-gradient-to-r from-[#7B0F2B] to-[#A4163A] text-white min-h-screen p-4 flex flex-col transition-all duration-300 ease-in-out relative`}>
+    <div className={`${isCollapsed ? 'w-20' : 'w-64'} bg-gradient-to-r from-[#7B0F2B] to-[#A4163A] text-white min-h-screen p-4 flex flex-col transition-all duration-300 ease-in-out relative z-50`}>
+
 
       <button
         onClick={toggleSidebar}
@@ -74,68 +87,65 @@ export default function AdminHeadSidebar() {
 
 
 
+
+
+
+
       {/* Profile Summary - Static Horizontal Display */}
       <div
         className={cn(
           "mb-6 flex items-center transition-all duration-300",
-          isCollapsed ? "flex-col justify-center px-0 mt-2 gap-2" : "flex-row px-4 mt-8 gap-4"
+          isCollapsed ? "flex-col justify-center px-0 mt-2 gap-2" : "flex-row px-4 mt-10 gap-5"
         )}
       >
         {/* Avatar with Ring */}
         <div className={cn(
           "bg-white/10 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white/50 backdrop-blur-md shrink-0 transition-all duration-300",
-          isCollapsed ? "w-8 h-8" : "w-12 h-12"
+          isCollapsed ? "w-10 h-10" : "w-16 h-16"
         )}>
           <div className="w-full h-full rounded-full overflow-hidden border border-transparent">
             <div className="w-full h-full bg-gradient-to-br from-white/20 to-white/5 flex items-center justify-center">
-              <User size={isCollapsed ? 14 : 22} className="text-white opacity-90" />
+              <User size={isCollapsed ? 18 : 28} className="text-white opacity-90" />
             </div>
           </div>
         </div>
 
+
         {/* Position & Name */}
         {!isCollapsed && (
           <div className="flex flex-col justify-center overflow-hidden">
-            <span className="text-[10px] font-bold text-white/50 uppercase tracking-[0.15em] mb-0.5 leading-none">
+            <span className="text-xs font-bold text-white/50 uppercase tracking-[0.15em] mb-0.5 leading-none">
               Admin Head
             </span>
-            <h2 className="text-xl font-bold text-white truncate tracking-tight leading-tight">
-              Aizle
+            <h2 className="text-2xl font-bold text-white truncate tracking-tight leading-tight">
+              Sachi
             </h2>
           </div>
         )}
       </div>
 
-      <div className="flex justify-center mb-4">
-        <button
-          onClick={() => setShowLogoutConfirm(true)}
-          className={cn(
-            "flex items-center gap-2 rounded-lg transition-all duration-300 font-bold text-[10px] tracking-widest",
-            "bg-white/5 hover:bg-white/10 text-white/70 hover:text-white",
-            "group active:scale-95 py-1.5 px-3 uppercase border border-white/10",
-            isCollapsed ? "hidden" : "flex"
-          )}
-          title="Sign Out"
-        >
-          <LogOut size={12} className="group-hover:-translate-x-0.5 transition-transform duration-300" />
-          <span>LOGOUT</span>
-        </button>
-      </div>
 
-      <div className="mx-6 mb-4 border-t border-white/10" />
+
+
+
+
+
 
 
 
       {/* Navigation Menu */}
       <nav className="flex-1 space-y-2 overflow-y-auto no-scrollbar py-2">
         {/* EMPLOYEE with Dropdown */}
-        <div className="group relative" onMouseEnter={() => setIsEmployeeOpen(true)} onMouseLeave={() => setIsEmployeeOpen(false)}>
+        <div className="group relative">
           <button
             onClick={() => setIsEmployeeOpen(!isEmployeeOpen)}
-            className="w-full flex items-center justify-between px-3 py-3 rounded-lg hover:bg-white/10 transition-all duration-200 font-semibold text-sm group"
+            className={cn(
+              "w-full flex items-center px-4 py-3.5 rounded-lg hover:bg-white/10 transition-all duration-200 font-semibold text-base group",
+              isCollapsed ? "justify-center" : "justify-between"
+            )}
           >
             <div className="flex items-center gap-3">
-              <Users size={20} className="shrink-0" />
+              <Users size={22} className="shrink-0" />
               {!isCollapsed && <span className="font-medium whitespace-nowrap">EMPLOYEE</span>}
             </div>
             {!isCollapsed && (
@@ -144,50 +154,59 @@ export default function AdminHeadSidebar() {
                 className={`transition-transform shrink-0 ${isEmployeeOpen ? 'rotate-180' : ''} group-hover:rotate-180`}
               />
             )}
+
+
           </button>
 
-          {/* Employee Dropdown Menu (hover OR click) */}
-          <div className={`${isCollapsed ? 'fixed left-20 top-auto ml-1 w-48 z-50' : 'ml-9 mt-1'} space-y-1 bg-[#7B0F2B]/95 rounded-lg p-2 border border-white/10 backdrop-blur-md transition-all duration-200 ${isEmployeeOpen ? 'block' : 'hidden'} group-hover:block`}>
+
+          {/* Employee Dropdown Menu (Hover + Click) */}
+          <div className={`${isCollapsed ? 'fixed left-20 top-auto w-56 z-50' : 'ml-10 mt-1'} space-y-1 bg-[#7B0F2B]/95 rounded-lg p-2 border border-white/10 backdrop-blur-md transition-all duration-200 ${isEmployeeOpen ? 'block' : 'hidden'} group-hover:block`}>
+            {isCollapsed && <div className="px-3 py-2 text-xs font-bold text-white/50 border-b border-white/10 mb-1 leading-none uppercase tracking-widest">EMPLOYEE</div>}
             <Link
               href="/admin-head/employee/masterfile"
-              className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/10 transition-all duration-150 text-xs font-medium text-red-50 hover:text-white"
+              className="flex items-center gap-2 px-3 py-2.5 rounded-md hover:bg-white/10 transition-all duration-150 text-sm font-medium text-red-50 hover:text-white"
             >
-              <BookOpen size={14} />
+              <BookOpen size={18} />
               <span>Masterfile</span>
             </Link>
             <Link
               href="/admin-head/employee/onboard"
-              className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/10 transition-all duration-150 text-xs font-medium text-red-50 hover:text-white"
+              className="flex items-center gap-2 px-3 py-2.5 rounded-md hover:bg-white/10 transition-all duration-150 text-sm font-medium text-red-50 hover:text-white"
             >
-              <UserPlus size={14} />
+              <UserPlus size={18} />
               <span>Onboard Employee</span>
             </Link>
             <Link
               href="/admin-head/employee/terminate"
-              className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/10 transition-all duration-150 text-xs font-medium text-red-50 hover:text-white"
+              className="flex items-center gap-2 px-3 py-2.5 rounded-md hover:bg-white/10 transition-all duration-150 text-sm font-medium text-red-50 hover:text-white"
             >
-              <UserMinus size={14} />
+              <UserMinus size={18} />
               <span>Terminate Employee</span>
             </Link>
             <Link
               href="/admin-head/employee/evaluation"
-              className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/10 transition-all duration-150 text-xs font-medium text-red-50 hover:text-white"
+              className="flex items-center gap-2 px-3 py-2.5 rounded-md hover:bg-white/10 transition-all duration-150 text-sm font-medium text-red-50 hover:text-white"
             >
-              <CheckSquare size={14} />
+              <CheckSquare size={18} />
               <span>Evaluation</span>
             </Link>
           </div>
         </div>
 
 
+
+
         {/* FORMS with Dropdown */}
-        <div className="group relative" onMouseEnter={() => setIsFormsOpen(true)} onMouseLeave={() => setIsFormsOpen(false)}>
+        <div className="group relative">
           <button
             onClick={() => setIsFormsOpen(!isFormsOpen)}
-            className="w-full flex items-center justify-between px-3 py-3 rounded-lg hover:bg-white/10 transition-all duration-200 font-semibold text-sm group"
+            className={cn(
+              "w-full flex items-center px-4 py-3.5 rounded-lg hover:bg-white/10 transition-all duration-200 font-semibold text-base group",
+              isCollapsed ? "justify-center" : "justify-between"
+            )}
           >
             <div className="flex items-center gap-3">
-              <FileText size={20} className="shrink-0" />
+              <FileText size={22} className="shrink-0" />
               {!isCollapsed && <span className="font-medium whitespace-nowrap">FORMS</span>}
             </div>
             {!isCollapsed && (
@@ -199,46 +218,66 @@ export default function AdminHeadSidebar() {
           </button>
 
 
-          {/* Forms Dropdown Menu (hover OR click) */}
-          <div className={`${isCollapsed ? 'fixed left-20 top-auto ml-1 w-48 z-50' : 'ml-9 mt-1'} space-y-1 bg-[#7B0F2B]/95 rounded-lg p-2 border border-white/10 backdrop-blur-md transition-all duration-200 ${isFormsOpen ? 'block' : 'hidden'} group-hover:block`}>
+
+
+          {/* Forms Dropdown Menu (Hover + Click) */}
+          <div className={`${isCollapsed ? 'fixed left-20 top-auto w-56 z-50' : 'ml-10 mt-1'} space-y-1 bg-[#7B0F2B]/95 rounded-lg p-2 border border-white/10 backdrop-blur-md transition-all duration-200 ${isFormsOpen ? 'block' : 'hidden'} group-hover:block`}>
+            {isCollapsed && <div className="px-3 py-2 text-xs font-bold text-white/50 border-b border-white/10 mb-1 leading-none uppercase tracking-widest">FORMS</div>}
             <Link
               href="/admin-head/forms/clearance-checklist"
-              className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/10 transition-all duration-150 text-xs font-medium text-red-50 hover:text-white"
+              className="flex items-center gap-2 px-3 py-2.5 rounded-md hover:bg-white/10 transition-all duration-150 text-sm font-medium text-red-50 hover:text-white"
             >
-              <ClipboardCheck size={14} />
+              <ClipboardCheck size={18} />
               <span>Clearance</span>
             </Link>
             <Link
               href="/admin-head/forms/onboarding"
-              className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/10 transition-all duration-150 text-xs font-medium text-red-50 hover:text-white"
+              className="flex items-center gap-2 px-3 py-2.5 rounded-md hover:bg-white/10 transition-all duration-150 text-sm font-medium text-red-50 hover:text-white"
             >
-              <FilePlus size={14} />
+              <FilePlus size={18} />
               <span>Onboarding</span>
             </Link>
           </div>
         </div>
 
 
+
+
         {/* DIRECTORY */}
         <Link
           href="/admin-head/directory"
-          className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-white/10 transition-all duration-200 font-semibold text-sm group"
+          className={cn(
+            "flex items-center gap-3 px-4 py-3.5 rounded-lg hover:bg-white/10 transition-all duration-200 font-semibold text-base group relative",
+            isCollapsed && "justify-center"
+          )}
         >
-          <BookOpen size={20} className="shrink-0" />
+          <BookOpen size={22} className="shrink-0" />
           {!isCollapsed && <span className="font-medium whitespace-nowrap">DIRECTORY</span>}
+          {isCollapsed && (
+            <div className="absolute left-full top-1/2 -translate-y-1/2 ml-4 bg-[#7B0F2B] text-white text-xs px-3 py-2 rounded-md border border-white/10 shadow-lg whitespace-nowrap hidden group-hover:block z-[60]">
+              DIRECTORY
+            </div>
+          )}
         </Link>
 
 
 
 
+
+
+
+
         {/* ATTENDANCE with Dropdown */}
-        <div className="group relative" onMouseEnter={() => setIsAttendanceOpen(true)} onMouseLeave={() => setIsAttendanceOpen(false)}>
+        <div className="group relative">
           <button
             onClick={() => setIsAttendanceOpen(!isAttendanceOpen)}
-            className="w-full flex items-center justify-between px-3 py-3 rounded-lg hover:bg-white/10 transition-all duration-200 font-semibold text-sm group"
+            className={cn(
+              "w-full flex items-center px-4 py-3.5 rounded-lg hover:bg-white/10 transition-all duration-200 font-semibold text-base group",
+              isCollapsed ? "justify-center" : "justify-between"
+            )}
           >
             <div className="flex items-center gap-3">
-              <Calendar size={20} className="shrink-0" />
+              <Calendar size={22} className="shrink-0" />
               {!isCollapsed && <span className="font-medium whitespace-nowrap">ATTENDANCE</span>}
             </div>
             {!isCollapsed && (
@@ -250,41 +289,75 @@ export default function AdminHeadSidebar() {
           </button>
 
 
-          {/* Attendance Dropdown Menu (hover OR click) */}
-          <div className={`${isCollapsed ? 'fixed left-20 top-auto ml-1 w-48 z-50' : 'ml-9 mt-1'} space-y-1 bg-[#7B0F2B]/95 rounded-lg p-2 border border-white/10 backdrop-blur-md transition-all duration-200 ${isAttendanceOpen ? 'block' : 'hidden'} group-hover:block`}>
+
+
+          {/* Attendance Dropdown Menu (Hover + Click) */}
+          <div className={`${isCollapsed ? 'fixed left-20 top-auto w-56 z-50' : 'ml-10 mt-1'} space-y-1 bg-[#7B0F2B]/95 rounded-lg p-2 border border-white/10 backdrop-blur-md transition-all duration-200 ${isAttendanceOpen ? 'block' : 'hidden'} group-hover:block`}>
+            {isCollapsed && <div className="px-3 py-2 text-xs font-bold text-white/50 border-b border-white/10 mb-1 leading-none uppercase tracking-widest">ATTENDANCE</div>}
             <Link
               href="/admin-head/attendance/leave"
-              className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/10 transition-all duration-150 text-xs font-medium text-red-50 hover:text-white"
+              className="flex items-center gap-2 px-3 py-2.5 rounded-md hover:bg-white/10 transition-all duration-150 text-sm font-medium text-red-50 hover:text-white"
             >
-              <LogOut size={14} />
+              <LogOut size={18} />
               <span>Leave</span>
             </Link>
             <Link
               href="/admin-head/attendance/leave-credits"
-              className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/10 transition-all duration-150 text-xs font-medium text-red-50 hover:text-white"
+              className="flex items-center gap-2 px-3 py-2.5 rounded-md hover:bg-white/10 transition-all duration-150 text-sm font-medium text-red-50 hover:text-white"
             >
-              <CalendarDays size={14} />
+              <CalendarDays size={18} />
               <span>Leave Credits</span>
             </Link>
             <Link
               href="/admin-head/attendance/tardiness"
-              className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-white/10 transition-all duration-150 text-xs font-medium text-red-50 hover:text-white"
+              className="flex items-center gap-2 px-3 py-2.5 rounded-md hover:bg-white/10 transition-all duration-150 text-sm font-medium text-red-50 hover:text-white"
             >
-              <Clock size={14} />
+              <Clock size={18} />
               <span>Tardiness</span>
             </Link>
           </div>
         </div>
 
+
         <Link
           href="/admin-head"
-          className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-white/10 transition-all duration-200 font-semibold text-sm group"
+          className={cn(
+            "flex items-center gap-3 px-4 py-3.5 rounded-lg hover:bg-white/10 transition-all duration-200 font-semibold text-base group relative",
+            isCollapsed && "justify-center"
+          )}
         >
-          <Activity size={20} className="shrink-0" />
+          <Activity size={22} className="shrink-0" />
           {!isCollapsed && <span className="font-medium whitespace-nowrap">ACTIVITY LOGS</span>}
+          {isCollapsed && (
+            <div className="absolute left-full top-1/2 -translate-y-1/2 ml-4 bg-[#7B0F2B] text-white text-xs px-3 py-2 rounded-md border border-white/10 shadow-lg whitespace-nowrap hidden group-hover:block z-[60]">
+              ACTIVITY LOGS
+            </div>
+          )}
         </Link>
 
+
       </nav>
+
+
+      <div className="mx-6 mb-4 border-t border-white/10" />
+
+
+      <div className="flex justify-center mb-4 w-full px-4">
+        <button
+          onClick={() => setShowLogoutConfirm(true)}
+          className={cn(
+            "flex items-center gap-3 rounded-xl transition-all duration-300 font-bold text-sm tracking-widest w-full justify-center",
+            "bg-gradient-to-r from-white/10 to-white/5 hover:from-white/20 hover:to-white/10 text-white shadow-lg shadow-black/20",
+            "group active:scale-95 py-3.5 uppercase border border-white/20 hover:border-white/40 hover:shadow-white/5",
+            isCollapsed ? "px-0 w-12 h-12" : ""
+          )}
+          title="Log Out"
+        >
+          <LogOut size={20} className="group-hover:-translate-x-0.5 transition-transform duration-300" />
+          {!isCollapsed && <span>LOGOUT</span>}
+        </button>
+      </div>
+
 
       {/* Logout Confirmation Dialog */}
       <Dialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
@@ -320,8 +393,9 @@ export default function AdminHeadSidebar() {
 
 
 
-    </div>
+
+
+
+    </div >
   )
 }
-
-
