@@ -100,7 +100,7 @@ export default function AdminHeadSidebar() {
               Admin Head
             </span>
             <h2 className="text-xl font-bold text-white truncate tracking-tight leading-tight">
-              Krissane
+              Aizle
             </h2>
           </div>
         )}

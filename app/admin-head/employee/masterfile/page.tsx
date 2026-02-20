@@ -190,37 +190,48 @@ export default function MasterfilePage() {
   }
 
   const checkCompleteness = (emp: any) => {
-    if (!emp) return { isComplete: false, status: 'Incomplete' }
+    if (!emp) return { isComplete: false, status: 'Incomplete', batchId: 1 }
     
-    // Check basic info (Batch 1 & 2)
-    const basicFields = [
-      'position', 'date_hired', 'last_name', 'first_name', 'birthday', 'birthplace', 'civil_status', 'gender'
-    ]
-    for (const field of basicFields) {
+    // Batch 1: Employment Information
+    if (!emp.position || emp.position.toString().trim() === '' || !emp.date_hired) {
+      return { isComplete: false, status: 'Pending: Employment Information', batchId: 1 }
+    }
+
+    // Batch 2: Personal Information
+    const personalFields = ['last_name', 'first_name', 'birthday', 'birthplace', 'civil_status', 'gender']
+    for (const field of personalFields) {
       if (!emp[field] || emp[field].toString().trim() === '') {
-        return { isComplete: false, status: 'Pending' }
+        return { isComplete: false, status: 'Pending: Personal Information', batchId: 2 }
       }
     }
 
-    // Check contact info (Batch 3)
-    if (!emp.mobile_number || (!emp.email && !emp.email_address)) {
-      return { isComplete: false, status: 'Pending: Contact Information' }
+    // Batch 3: Contact Information
+    if (!emp.mobile_number || emp.mobile_number.toString().trim() === '' || (!emp.email && !emp.email_address)) {
+      return { isComplete: false, status: 'Pending: Contact Information', batchId: 3 }
     }
 
-    // Check family background (Batch 5)
-    if (!emp.mlast_name || !emp.mfirst_name) {
-      return { isComplete: false, status: 'Pending: Family Information' }
+    // Batch 4: Government IDs
+    const govFields = ['sss_number', 'philhealth_number', 'pagibig_number', 'tin_number']
+    for (const field of govFields) {
+      if (!emp[field] || emp[field].toString().trim() === '') {
+        return { isComplete: false, status: 'Pending: Government IDs', batchId: 4 }
+      }
     }
 
-    // Check address (Batch 6)
+    // Batch 5: Family Information
+    if (!emp.mlast_name || emp.mlast_name.toString().trim() === '' || !emp.mfirst_name || emp.mfirst_name.toString().trim() === '') {
+      return { isComplete: false, status: 'Pending: Family Information', batchId: 5 }
+    }
+
+    // Batch 6: Address Information
     const addressFields = ['street', 'barangay', 'region', 'province', 'city_municipality', 'zip_code']
     for (const field of addressFields) {
       if (!emp[field] || emp[field].toString().trim() === '') {
-        return { isComplete: false, status: 'Pending: Address Information' }
+        return { isComplete: false, status: 'Pending: Address Information', batchId: 6 }
       }
     }
 
-    return { isComplete: true, status: 'READY TO EMPLOY' }
+    return { isComplete: true, status: 'READY TO EMPLOY', batchId: 1 }
   }
 
   const handleSetAsEmployed = async () => {
@@ -727,12 +738,12 @@ export default function MasterfilePage() {
                              <div className="flex justify-between items-center pt-3 border-t border-slate-50">
                                {isComplete ? (
                                  <Badge variant="outline" className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border-emerald-100">
-                                   {status}
+                                   {employee.onboarding_tasks?.isComplete ? status : "PENDING: ONBOARDING CHECKLIST"}
                                  </Badge>
                               ) : (
                                  <div className="flex flex-col gap-1 items-start">
                                    <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">
-                                     {status}
+                                     {employee.onboarding_tasks?.isComplete ? status : "PENDING: ONBOARDING CHECKLIST"}
                                    </span>
                                    {employee.onboarding_tasks && (
                                      <span className="text-[9px] font-medium text-slate-400">
@@ -749,8 +760,8 @@ export default function MasterfilePage() {
                                      onClick={() =>
                                        router.push(
                                          employee.onboarding_tasks?.isComplete
-                                           ? `/admin-head/employee/onboard?id=${employee.id}`
-                                           : `/admin-head/employee/onboard?id=${employee.id}&view=checklist`
+                                           ? `/admin-head/employee/onboard?id=${employee.id}&batch=${checkCompleteness(employee as any).batchId}`
+                                           : `/admin-head/employee/onboard?id=${employee.id}&view=checklist&batch=${checkCompleteness(employee as any).batchId}`
                                        )
                                      }
                                      className={`h-7 px-2 text-[10px] font-bold border rounded-lg transition-all ${
@@ -863,12 +874,12 @@ export default function MasterfilePage() {
                       <div className="flex items-center gap-3">
                         <p className="text-slate-500 font-medium">{selectedEmployee?.position || 'No Position'}</p>
                         {selectedEmployee?.status === 'pending' ? (
-                          <Badge className={`border shadow-none px-3 py-0.5 ${
-                            checkCompleteness(selectedEmployee).isComplete 
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                          <Badge className={`border shadow-none px-3 py-0.5 transition-colors duration-300 ${
+                            (checkCompleteness(selectedEmployee).status === "READY TO EMPLOY" && selectedEmployee.onboarding_tasks?.isComplete)
+                              ? 'bg-emerald-500 text-white border-emerald-600 shadow-sm' 
                               : 'bg-amber-50 text-amber-700 border-amber-200'
                           }`}>
-                            {checkCompleteness(selectedEmployee).status}
+                            {selectedEmployee.onboarding_tasks?.isComplete ? checkCompleteness(selectedEmployee).status : "PENDING: ONBOARDING CHECKLIST"}
                           </Badge>
                         ) : (
                           <Badge className={`${statusBadgeColors[selectedEmployee?.status || 'pending']} border shadow-none px-3 py-0.5`}>
@@ -1000,7 +1011,7 @@ export default function MasterfilePage() {
                    <>
                     {selectedEmployee.onboarding_tasks?.isComplete && !checkCompleteness(selectedEmployee).isComplete && (
                       <Button
-                        onClick={() => router.push(`/admin-head/employee/onboard?id=${selectedEmployee.id}`)}
+                        onClick={() => router.push(`/admin-head/employee/onboard?id=${selectedEmployee.id}&batch=${checkCompleteness(selectedEmployee).batchId}`)}
                         className="h-12 px-8 font-bold rounded-xl text-white transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 bg-[#630C22] hover:bg-[#4A081A]"
                       >
                         Update Profile

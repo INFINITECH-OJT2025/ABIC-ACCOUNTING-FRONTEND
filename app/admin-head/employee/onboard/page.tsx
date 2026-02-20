@@ -99,6 +99,7 @@ function OnboardPageContent() {
   const searchParams = useSearchParams()
   const employeeIdParam = searchParams.get('id')
   const requestedViewParam = searchParams.get('view')
+  const batchParam = searchParams.get('batch')
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<'onboard' | 'checklist' | 'update-info'>('onboard')
 
@@ -227,6 +228,14 @@ function OnboardPageContent() {
     fetchDepartments()
     fetchRegions()
     
+    // Override batch if provided in query param
+    if (batchParam) {
+      const bId = parseInt(batchParam)
+      if (!isNaN(bId) && bId >= 1 && bId <= 6) {
+        setCurrentBatch(bId)
+      }
+    }
+
     // Load employee if ID is provided in URL
     if (employeeIdParam) {
       const requestedView = requestedViewParam === 'checklist' ? 'checklist' : 'update-info'
@@ -235,7 +244,7 @@ function OnboardPageContent() {
       const timer = setTimeout(() => setLoading(false), 1200)
       return () => clearTimeout(timer)
     }
-  }, [employeeIdParam, requestedViewParam])
+  }, [employeeIdParam, requestedViewParam, batchParam])
 
   const fetchChecklistProgress = async (employeeName: string) => {
     try {
