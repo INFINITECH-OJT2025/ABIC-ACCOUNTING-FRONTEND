@@ -429,6 +429,26 @@ export default function TerminatePage() {
                         </div>
                     </div>
 
+                    {/* Termination Date */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start pt-6 border-t border-slate-50">
+                        <div className="md:col-span-4 pt-2">
+                            <Label className="text-base font-bold text-slate-700 flex items-center gap-2">
+                                Termination Date <span className="text-rose-500">*</span>
+                            </Label>
+                            <p className="text-xs text-slate-400 mt-1">Select the effective date of termination.</p>
+                        </div>
+                        <div className="md:col-span-8">
+                            <input
+                                type="date"
+                                name="termination_date"
+                                value={formData.termination_date}
+                                onChange={handleInputChange}
+                                className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#800020] focus:border-transparent transition-all uppercase text-slate-600 font-medium"
+                                disabled={submitting}
+                            />
+                        </div>
+                    </div>
+
                      {/* Reason */}
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start pt-6 border-t border-slate-50">
                         <div className="md:col-span-4 pt-2">

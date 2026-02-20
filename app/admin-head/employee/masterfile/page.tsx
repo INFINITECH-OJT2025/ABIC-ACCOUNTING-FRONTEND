@@ -37,6 +37,8 @@ interface Employee {
     total: number
     isComplete: boolean
   }
+  termination_date?: string
+  termination_reason?: string
 }
 
 interface EmployeeDetails extends Employee {
@@ -108,25 +110,40 @@ export default function MasterfilePage() {
       const employeesUrl = `${apiUrl}/api/employees`
       const checklistsUrl = `${apiUrl}/api/onboarding-checklist`
       
-      const [empRes, checkRes] = await Promise.all([
+      const terminationsUrl = `${apiUrl}/api/terminations`
+      
+      const [empRes, checkRes, termRes] = await Promise.all([
         fetch(employeesUrl, { headers: { Accept: 'application/json' }, credentials: 'include' }),
-        fetch(checklistsUrl, { headers: { Accept: 'application/json' }, credentials: 'include' })
+        fetch(checklistsUrl, { headers: { Accept: 'application/json' }, credentials: 'include' }),
+        fetch(terminationsUrl, { headers: { Accept: 'application/json' }, credentials: 'include' })
       ])
       
       const empData = await empRes.json()
       const checkData = await checkRes.json()
+      const termData = await termRes.json()
       
       if (empData.success) {
         const checklistsList = Array.isArray(checkData.data) ? checkData.data : []
+        const terminationsList = termData.success && Array.isArray(termData.data) ? termData.data : []
+        
         setChecklists(checklistsList)
 
         const enhancedEmployees = empData.data.map((emp: Employee) => {
           const checklist = checklistsList.find((c: any) => c.name === `${emp.first_name} ${emp.last_name}`)
+          const termination = terminationsList.find((t: any) => t.employee_id === emp.id)
+          
+          let enhancedEmp = { ...emp }
+
+          if (termination) {
+            enhancedEmp.termination_date = termination.termination_date
+            enhancedEmp.termination_reason = termination.reason
+          }
+
           if (checklist) {
             const tasks = Array.isArray(checklist.tasks) ? checklist.tasks : []
             const doneCount = tasks.filter((t: any) => t.status === 'DONE').length
-            return {
-              ...emp,
+            enhancedEmp = {
+              ...enhancedEmp,
               onboarding_tasks: {
                 done: doneCount,
                 total: tasks.length,
@@ -134,7 +151,7 @@ export default function MasterfilePage() {
               }
             }
           }
-          return emp
+          return enhancedEmp
         })
         setEmployees(enhancedEmployees || [])
       } else {
@@ -169,12 +186,14 @@ export default function MasterfilePage() {
       }
       
       const data = await response.json()
-      if (data.success) {
-        // Find existing onboarding tasks from the employees list to preserve state
+        if (data.success) {
+        // Find existing onboarding tasks and termination details from the employees list to preserve state
         const existingEmp = employees.find(e => e.id === employeeId)
         const enhancedDetails = {
           ...data.data,
-          onboarding_tasks: existingEmp?.onboarding_tasks
+          onboarding_tasks: existingEmp?.onboarding_tasks,
+          termination_date: existingEmp?.termination_date,
+          termination_reason: existingEmp?.termination_reason
         }
         setSelectedEmployee(enhancedDetails)
       } else {
@@ -452,7 +471,7 @@ export default function MasterfilePage() {
               <th className="text-left py-4 px-6 font-semibold text-[#4A081A] text-xs uppercase tracking-wider">Email</th>
               <th className="text-left py-4 px-6 font-semibold text-[#4A081A] text-xs uppercase tracking-wider">Position</th>
               <th className="text-left py-4 px-6 font-semibold text-[#4A081A] text-xs uppercase tracking-wider">Status</th>
-              <th className="text-left py-4 px-6 font-semibold text-[#4A081A] text-xs uppercase tracking-wider">Joined</th>
+              <th className="text-left py-4 px-6 font-semibold text-[#4A081A] text-xs uppercase tracking-wider">Date</th>
               <th className="text-right py-4 px-6 font-semibold text-[#4A081A] text-xs uppercase tracking-wider">Action</th>
             </tr>
           </thead>
@@ -470,7 +489,14 @@ export default function MasterfilePage() {
                   </Badge>
                 </td>
                 <td className="py-4 px-6 text-slate-500 text-sm">
-                  {new Date(employee.created_at).toLocaleDateString()}
+                  {employee.status === 'terminated' && employee.termination_date ? (
+                     <div className="flex flex-col">
+                       <span className="font-semibold text-rose-700">{new Date(employee.termination_date).toLocaleDateString()}</span>
+                       <span className="text-[10px] uppercase font-bold text-rose-300">Terminated</span>
+                     </div>
+                  ) : (
+                     <span>{new Date(employee.created_at).toLocaleDateString()}</span>
+                  )}
                 </td>
                 <td className="py-4 px-6 text-right">
                   <Button
@@ -991,6 +1017,30 @@ export default function MasterfilePage() {
                        <DetailItem label="Subdivision" value={selectedEmployee.subdivision} />
                     </div>
                   </section>
+
+                  {/* TERMINATION DETAILS (If Terminated) */}
+                  {selectedEmployee.status === 'terminated' && (
+                    <section className="bg-rose-50 border border-rose-100 rounded-xl p-6">
+                      <h3 className="text-sm font-bold text-[#A4163A] uppercase tracking-widest mb-4 flex items-center gap-3">
+                        <span className="w-8 h-1 bg-[#A4163A] rounded-full"></span>
+                        Termination Details
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                         <div>
+                            <p className="text-xs font-bold text-rose-400 mb-1.5 uppercase">Termination Date</p>
+                            <p className="font-semibold text-rose-900">
+                              {selectedEmployee.termination_date ? new Date(selectedEmployee.termination_date).toLocaleDateString() : 'N/A'}
+                            </p>
+                         </div>
+                         <div>
+                            <p className="text-xs font-bold text-rose-400 mb-1.5 uppercase">Reason</p>
+                            <p className="font-medium text-rose-800 italic">
+                              "{selectedEmployee.termination_reason || 'No reason provided'}"
+                            </p>
+                         </div>
+                      </div>
+                    </section>
+                  )}
 
                   {/* FAMILY & GOV */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
