@@ -1175,25 +1175,25 @@ function OnboardPageContent() {
                     className="border-b border-rose-50/30 last:border-0 hover:bg-[#FFE5EC]/5 transition-colors group cursor-pointer"
                     onClick={() => toggleTask(task)}
                   >
-                    <TableCell className="text-center py-4 font-mono text-xs font-bold text-slate-500">
+                    <TableCell className="text-center py-2.5 font-mono text-[10px] font-bold text-slate-400">
                       {completedTasks[task] || '-'}
                     </TableCell>
-                    <TableCell className="py-4">
+                    <TableCell className="py-2.5">
                       <div className="flex justify-center">
                         <div className={cn(
-                          "w-6 h-6 rounded flex items-center justify-center transition-all border-2",
+                          "w-5 h-5 rounded flex items-center justify-center transition-all border-2",
                           completedTasks[task]
                             ? "bg-emerald-500 border-emerald-500 text-white shadow-sm"
-                            : "border-slate-300 bg-white hover:border-[#A4163A]"
+                            : "border-slate-200 bg-white hover:border-[#A4163A]"
                         )}>
-                          {completedTasks[task] && <Check className="h-4 w-4" />}
+                          {completedTasks[task] && <Check className="h-3.5 w-3.5" />}
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="py-4">
+                    <TableCell className="py-2.5">
                       <span className={cn(
-                        "text-lg font-extrabold transition-all duration-300 block",
-                        completedTasks[task] ? "text-slate-400 line-through" : "text-slate-800"
+                        "text-sm font-bold transition-all duration-300",
+                        completedTasks[task] ? "text-slate-300 line-through" : "text-slate-700"
                       )}>
                         {task}
                       </span>
