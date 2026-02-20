@@ -249,9 +249,9 @@ function OnboardPageContent() {
     if (savedState) {
       try {
         const parsed = JSON.parse(savedState)
-        const sameEmployee = employeeIdParam
-          ? String(parsed.onboardingEmployeeId ?? '') === employeeIdParam
-          : true
+        const hasExplicitEmployee = Boolean(employeeIdParam)
+        const sameEmployee = hasExplicitEmployee &&
+          String(parsed.onboardingEmployeeId ?? '') === employeeIdParam
 
         if (sameEmployee) {
           if (parsed.view) setView(parsed.view)
@@ -261,6 +261,9 @@ function OnboardPageContent() {
           if (parsed.checklistData) setChecklistData(parsed.checklistData)
           if (parsed.checklistRecordId) setChecklistRecordId(parsed.checklistRecordId)
           if (parsed.completedTasks) setCompletedTasks(parsed.completedTasks)
+        } else if (!hasExplicitEmployee) {
+          // Opening /onboard without an ID should always start a clean onboarding session.
+          localStorage.removeItem('employee_onboarding_state')
         }
       } catch (e) {
         console.error('Failed to restore state', e)
