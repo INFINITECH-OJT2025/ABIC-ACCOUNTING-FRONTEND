@@ -1,14 +1,29 @@
 "use client"
 
+
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getApiUrl } from '@/lib/api'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { X } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmationModal } from '@/components/ConfirmationModal'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+} from "@/components/ui/select"
+import { ArrowUpDown, ListFilter, ArrowUpAZ, ArrowDownAZ, Clock3, History } from 'lucide-react'
+
+
+interface OnboardingChecklist {
+  id: number
+  name: string
+  tasks: any[]
+  status: string
+  updated_at: string
+}
+
 
 interface Employee {
   id: number
@@ -18,11 +33,18 @@ interface Employee {
   position: string
   status: 'pending' | 'employed' | 'terminated'
   created_at: string
+  onboarding_tasks?: {
+    done: number
+    total: number
+    isComplete: boolean
+  }
 }
+
 
 interface EmployeeDetails extends Employee {
   [key: string]: any
 }
+
 
 const statusBadgeColors = {
   pending: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -30,11 +52,13 @@ const statusBadgeColors = {
   terminated: 'bg-rose-50 text-rose-700 border-rose-200',
 }
 
+
 const statusLabels = {
   pending: 'Pending',
   employed: 'Employed',
   terminated: 'Terminated',
 }
+
 
 export default function MasterfilePage() {
   const router = useRouter()
@@ -45,6 +69,17 @@ export default function MasterfilePage() {
   const [viewMode, setViewMode] = useState<'list' | 'details'>('list')
   const [activeTab, setActiveTab] = useState<'employed' | 'terminated'>('employed')
   const [isUpdating, setIsUpdating] = useState(false)
+  const [checklists, setChecklists] = useState<OnboardingChecklist[]>([])
+
+
+  // Pagination States
+  const [pendingPage, setPendingPage] = useState(1)
+  const [employedPage, setEmployedPage] = useState(1)
+  const [terminatedPage, setTerminatedPage] = useState(1)
+  const ITEMS_PER_PAGE_CARDS = 6
+  const ITEMS_PER_PAGE_TABLE = 10
+  const [sortOrder, setSortOrder] = useState<'recent' | 'oldest' | 'az' | 'za'>('recent')
+
 
   // Modal State
   const [confirmModal, setConfirmModal] = useState<{
@@ -65,33 +100,50 @@ export default function MasterfilePage() {
     hideCancel: false
   })
 
+
   useEffect(() => {
     fetchEmployees()
   }, [])
 
+
   const fetchEmployees = async () => {
     try {
       const apiUrl = getApiUrl()
-      const fullUrl = `${apiUrl}/api/employees`
+      const employeesUrl = `${apiUrl}/api/employees`
+      const checklistsUrl = `${apiUrl}/api/onboarding-checklist`
 
-      const response = await fetch(fullUrl, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        credentials: 'include',
-      })
+      const [empRes, checkRes] = await Promise.all([
+        fetch(employeesUrl, { headers: { Accept: 'application/json' }, credentials: 'include' }),
+        fetch(checklistsUrl, { headers: { Accept: 'application/json' }, credentials: 'include' })
+      ])
 
-      if (!response.ok) {
-        throw new Error(`HTTP Error: ${response.status}`)
-      }
+      const empData = await empRes.json()
+      const checkData = await checkRes.json()
 
-      const data = await response.json()
-      if (data.success) {
-        setEmployees(data.data || [])
+      if (empData.success) {
+        const checklistsList = Array.isArray(checkData.data) ? checkData.data : []
+        setChecklists(checklistsList)
+
+
+        const enhancedEmployees = empData.data.map((emp: Employee) => {
+          const checklist = checklistsList.find((c: any) => c.name === `${emp.first_name} ${emp.last_name}`)
+          if (checklist) {
+            const tasks = Array.isArray(checklist.tasks) ? checklist.tasks : []
+            const doneCount = tasks.filter((t: any) => t.status === 'DONE').length
+            return {
+              ...emp,
+              onboarding_tasks: {
+                done: doneCount,
+                total: tasks.length,
+                isComplete: doneCount === tasks.length && tasks.length > 0
+              }
+            }
+          }
+          return emp
+        })
+        setEmployees(enhancedEmployees || [])
       } else {
-        toast.error(data.message || 'Failed to fetch employees')
+        toast.error(empData.message || 'Failed to fetch employees')
       }
     } catch (error) {
       console.error('Error fetching employees:', error)
@@ -100,6 +152,7 @@ export default function MasterfilePage() {
       setLoading(false)
     }
   }
+
 
   const fetchEmployeeDetails = async (employeeId: number) => {
     try {
@@ -134,6 +187,7 @@ export default function MasterfilePage() {
     }
   }
 
+
   const checkCompleteness = (emp: any) => {
     if (!emp) return { isComplete: false, status: 'Incomplete' }
 
@@ -147,15 +201,18 @@ export default function MasterfilePage() {
       }
     }
 
+
     // Check contact info (Batch 3)
     if (!emp.mobile_number || (!emp.email && !emp.email_address)) {
       return { isComplete: false, status: 'Pending: Contact Information' }
     }
 
+
     // Check family background (Batch 5)
     if (!emp.mlast_name || !emp.mfirst_name) {
       return { isComplete: false, status: 'Pending: Family Information' }
     }
+
 
     // Check address (Batch 6)
     const addressFields = ['street', 'barangay', 'region', 'province', 'city_municipality', 'zip_code']
@@ -165,8 +222,10 @@ export default function MasterfilePage() {
       }
     }
 
+
     return { isComplete: true, status: 'READY TO EMPLOY' }
   }
+
 
   const handleSetAsEmployed = async () => {
     if (!selectedEmployee) return
@@ -185,6 +244,7 @@ export default function MasterfilePage() {
       return
     }
 
+
     setConfirmModal({
       isOpen: true,
       title: 'Confirm Employment',
@@ -201,6 +261,7 @@ export default function MasterfilePage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: 'employed' }),
           })
+
 
           const data = await response.json()
           if (data.success) {
@@ -232,20 +293,150 @@ export default function MasterfilePage() {
     })
   }
 
+
   const filterEmployees = (list: Employee[]) => {
-    if (!searchQuery) return list
-    const query = searchQuery.toLowerCase()
-    return list.filter((emp) =>
-      emp.first_name?.toLowerCase().includes(query) ||
-      emp.last_name?.toLowerCase().includes(query) ||
-      emp.email?.toLowerCase().includes(query) ||
-      emp.position?.toLowerCase().includes(query)
-    )
+    let result = [...list]
+
+    // Search Filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      result = result.filter((emp) =>
+        emp.first_name?.toLowerCase().includes(query) ||
+        emp.last_name?.toLowerCase().includes(query) ||
+        emp.email?.toLowerCase().includes(query) ||
+        emp.position?.toLowerCase().includes(query)
+      )
+    }
+
+
+    // Sort Logic
+    result.sort((a, b) => {
+      switch (sortOrder) {
+        case 'recent':
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        case 'oldest':
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        case 'az':
+          return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`)
+        case 'za':
+          return `${b.first_name} ${b.last_name}`.localeCompare(`${a.first_name} ${a.last_name}`)
+        default:
+          return 0
+      }
+    })
+
+
+    return result
   }
+
 
   const employedList = filterEmployees(employees.filter(e => e.status === 'employed'))
   const terminatedList = filterEmployees(employees.filter(e => e.status === 'terminated'))
   const pendingList = filterEmployees(employees.filter(e => e.status === 'pending'))
+
+
+  const paginatedPending = pendingList.slice((pendingPage - 1) * ITEMS_PER_PAGE_CARDS, pendingPage * ITEMS_PER_PAGE_CARDS)
+  const paginatedEmployed = employedList.slice((employedPage - 1) * ITEMS_PER_PAGE_TABLE, employedPage * ITEMS_PER_PAGE_TABLE)
+  const paginatedTerminated = terminatedList.slice((terminatedPage - 1) * ITEMS_PER_PAGE_TABLE, terminatedPage * ITEMS_PER_PAGE_TABLE)
+
+
+  const PaginationControls = ({
+    currentPage,
+    totalItems,
+    itemsPerPage,
+    onPageChange
+  }: {
+    currentPage: number,
+    totalItems: number,
+    itemsPerPage: number,
+    onPageChange: (page: number) => void
+  }) => {
+    const totalPages = Math.ceil(totalItems / itemsPerPage)
+    if (totalPages <= 1) return null
+
+
+    return (
+      <div className="flex items-center justify-between mt-6 px-2">
+        <p className="text-sm text-slate-500 font-medium">
+          Showing <span className="text-slate-800">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="text-slate-800">{Math.min(currentPage * itemsPerPage, totalItems)}</span> of <span className="text-slate-800">{totalItems}</span> results
+        </p>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => onPageChange(1)}
+            disabled={currentPage === 1}
+            className="h-9 w-9 border-slate-200 rounded-lg text-slate-500 hover:text-[#630C22] disabled:opacity-40"
+          >
+            <ChevronsLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="h-9 w-9 border-slate-200 rounded-lg text-slate-500 hover:text-[#630C22] disabled:opacity-40"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+
+          <div className="flex items-center gap-1 mx-2">
+            {[...Array(totalPages)].map((_, i) => {
+              const pageNum = i + 1
+              // Show only current, first, last, and pages around current
+              if (
+                pageNum === 1 ||
+                pageNum === totalPages ||
+                (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
+              ) {
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={currentPage === pageNum ? "default" : "outline"}
+                    onClick={() => onPageChange(pageNum)}
+                    className={`h-9 w-9 rounded-lg text-sm font-bold transition-all ${currentPage === pageNum
+                      ? 'bg-[#630C22] hover:bg-[#4A081A] text-white shadow-sm'
+                      : 'border-slate-200 text-slate-600 hover:border-[#630C22] hover:text-[#630C22]'
+                      }`}
+                  >
+                    {pageNum}
+                  </Button>
+                )
+              }
+              if (
+                (pageNum === 2 && currentPage > 3) ||
+                (pageNum === totalPages - 1 && currentPage < totalPages - 2)
+              ) {
+                return <span key={pageNum} className="text-slate-300 mx-1">...</span>
+              }
+              return null
+            })}
+          </div>
+
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className="h-9 w-9 border-slate-200 rounded-lg text-slate-500 hover:text-[#630C22] disabled:opacity-40"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => onPageChange(totalPages)}
+            disabled={currentPage === totalPages}
+            className="h-9 w-9 border-slate-200 rounded-lg text-slate-500 hover:text-[#630C22] disabled:opacity-40"
+          >
+            <ChevronsRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
 
   const EmployeeTable = ({ list, emptyMessage }: { list: Employee[], emptyMessage: string }) => (
     list.length === 0 ? (
@@ -299,56 +490,77 @@ export default function MasterfilePage() {
     )
   )
 
+
   return (
-    <div className="min-h-screen w-full animate-in fade-in duration-500">
-
-      {/* ----- MAROON GRADIENT HEADER ----- */}
-      <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md p-4 md:p-8 mb-6 md:mb-8 ">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-
-          {/* LEFT SIDE */}
-          <div>
-            <h1 className="text-2xl md:text-4xl font-bold mb-2 md:mb-3">
-              Employee Records
-            </h1>
-            <p className="text-white/80 text-sm md:text-lg">
-              Manage and monitor employee master data and records.
-            </p>
-          </div>
-
-          {/* RIGHT SIDE ACTIONS */}
-          <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
-
-            {/* Search */}
-            <div className="relative w-full sm:w-72">
-              <Input
-                type="text"
-                placeholder="Search employees..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-white/95 backdrop-blur-sm border border-white/30 text-slate-800 placeholder:text-slate-400 pl-10 h-11 rounded-lg shadow-sm focus:ring-2 focus:ring-white/40 focus:border-white transition-all"
-              />
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7B0F2B]">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="8" />
-                  <path d="m21 21-4.3-4.3" />
-                </svg>
-              </div>
-            </div>
-
-            {/* Onboard Button */}
-            <Button
-              onClick={() => router.push('/admin-head/employee/onboard')}
-              className="bg-white/95 backdrop-blur-sm border border-white/30 text-[#7B0F2B] hover:bg-white hover:border-white shadow-sm hover:shadow-md transition-all duration-200 font-bold h-11 px-6 rounded-lg"
-            >
-              + ONBOARD NEW EMPLOYEE
-            </Button>
-
-          </div>
-        </div>
-      </div> {viewMode === 'list' ? (
+    <div className="min-h-screen p-8 bg-slate-50 animate-in fade-in duration-500">
+      {viewMode === 'list' ? (
         <>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6">
+            <div>
+              <h1 className="text-3xl font-extrabold text-[#4A081A] tracking-tight">Employee Records</h1>
+              <p className="text-slate-500 mt-2 text-lg">Manage and monitor employee master data and records.</p>
+            </div>
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+              <div className="relative w-full sm:w-72">
+                <Input
+                  type="text"
+                  placeholder="Search employees..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-white border-slate-200 pl-10 h-11 focus:ring-2 focus:ring-[#630C22] focus:border-transparent rounded-xl shadow-sm transition-all"
+                />
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
+                </div>
+              </div>
 
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Select value={sortOrder} onValueChange={(value: any) => setSortOrder(value)}>
+                  <SelectTrigger className="w-full sm:w-[180px] bg-white border-slate-200 h-11 rounded-xl shadow-sm focus:ring-[#630C22]">
+                    <div className="flex items-center gap-2 text-slate-600 font-bold text-xs uppercase tracking-wider">
+                      <ArrowUpDown className="h-4 w-4 text-slate-400" />
+                      <SelectValue placeholder="Sort by" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-slate-200 shadow-xl overflow-hidden">
+                    <SelectItem value="recent" className="focus:bg-red-50 focus:text-[#630C22] font-bold text-xs py-3 uppercase tracking-wider cursor-pointer border-b border-slate-50 last:border-0 translate-x-1">
+                      <div className="flex items-center gap-3">
+                        <History className="h-4 w-4" />
+                        <span>Recent First</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="oldest" className="focus:bg-red-50 focus:text-[#630C22] font-bold text-xs py-3 uppercase tracking-wider cursor-pointer border-b border-slate-50 last:border-0 translate-x-1">
+                      <div className="flex items-center gap-3">
+                        <Clock3 className="h-4 w-4" />
+                        <span>Oldest First</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="az" className="focus:bg-red-50 focus:text-[#630C22] font-bold text-xs py-3 uppercase tracking-wider cursor-pointer border-b border-slate-50 last:border-0 translate-x-1">
+                      <div className="flex items-center gap-3">
+                        <ArrowUpAZ className="h-4 w-4" />
+                        <span>Alphabet (A-Z)</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="za" className="focus:bg-red-50 focus:text-[#630C22] font-bold text-xs py-3 uppercase tracking-wider cursor-pointer border-b border-slate-50 last:border-0 translate-x-1">
+                      <div className="flex items-center gap-3">
+                        <ArrowDownAZ className="h-4 w-4" />
+                        <span>Alphabet (Z-A)</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+
+              <Button
+                onClick={() => router.push('/admin-head/employee/onboard')}
+                className="w-full sm:w-auto bg-[#630C22] hover:bg-[#4A081A] text-white font-bold px-6 h-11 rounded-xl transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+              >
+                + ONBOARD NEW EMPLOYEE
+              </Button>
+            </div>
+          </div>
 
 
           <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
@@ -369,8 +581,8 @@ export default function MasterfilePage() {
                         {pendingList.length}
                       </Badge>
                     </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                      {pendingList.map((employee) => {
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {paginatedPending.map((employee) => {
                         const { isComplete, status } = checkCompleteness(employee as any)
 
                         return (
@@ -384,6 +596,7 @@ export default function MasterfilePage() {
                           >
                             {/* Ready Indicator Strip */}
                             {isComplete && <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>}
+
 
                             <div className="flex items-center gap-4 mb-4">
                               <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold transition-colors duration-200 ${isComplete
@@ -407,20 +620,58 @@ export default function MasterfilePage() {
                                   {status}
                                 </Badge>
                               ) : (
-                                <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">
-                                  {status}
-                                </span>
+                                <div className="flex flex-col gap-1 items-start">
+                                  <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">
+                                    {status}
+                                  </span>
+                                  {employee.onboarding_tasks && (
+                                    <span className="text-[9px] font-medium text-slate-400">
+                                      Tasks: {employee.onboarding_tasks.done}/{employee.onboarding_tasks.total}
+                                    </span>
+                                  )}
+                                </div>
                               )}
-                              <span className="text-[10px] text-slate-400 font-medium group-hover:translate-x-1 transition-transform">
-                                Review →
-                              </span>
+                              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                {employee.status === 'pending' && (!isComplete || !employee.onboarding_tasks?.isComplete) && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      router.push(
+                                        employee.onboarding_tasks?.isComplete
+                                          ? `/admin-head/employee/onboard?id=${employee.id}`
+                                          : `/admin-head/employee/onboard?id=${employee.id}&view=checklist`
+                                      )
+                                    }
+                                    className={`h-7 px-2 text-[10px] font-bold border rounded-lg transition-all ${employee.onboarding_tasks?.isComplete
+                                      ? 'text-[#630C22] bg-rose-50 hover:bg-rose-100 border-rose-100'
+                                      : 'text-blue-600 bg-blue-50 hover:bg-blue-100 border-blue-100 animate-pulse hover:animate-none'
+                                      }`}
+                                  >
+                                    {employee.onboarding_tasks?.isComplete ? 'Update Profile' : 'Continue Onboarding'}
+                                  </Button>
+                                )}
+                                <button
+                                  onClick={() => fetchEmployeeDetails(employee.id)}
+                                  className="text-[10px] text-slate-400 font-medium group-hover:text-[#630C22] group-hover:translate-x-1 transition-all flex items-center gap-1 py-1"
+                                >
+                                  Review <span className="text-xs">→</span>
+                                </button>
+                              </div>
                             </div>
                           </div>
                         )
                       })}
                     </div>
+                    <PaginationControls
+                      currentPage={pendingPage}
+                      totalItems={pendingList.length}
+                      itemsPerPage={ITEMS_PER_PAGE_CARDS}
+                      onPageChange={setPendingPage}
+                    />
                   </div>
                 )}
+
 
                 {/* Main Content Area */}
                 <div>
@@ -450,13 +701,20 @@ export default function MasterfilePage() {
                     </div>
                   </div>
 
+
                   <EmployeeTable
-                    list={activeTab === 'employed' ? employedList : terminatedList}
+                    list={activeTab === 'employed' ? paginatedEmployed : paginatedTerminated}
                     emptyMessage={
                       searchQuery
                         ? `No ${activeTab} employees match your search.`
                         : `No ${activeTab} employees found.`
                     }
+                  />
+                  <PaginationControls
+                    currentPage={activeTab === 'employed' ? employedPage : terminatedPage}
+                    totalItems={activeTab === 'employed' ? employedList.length : terminatedList.length}
+                    itemsPerPage={ITEMS_PER_PAGE_TABLE}
+                    onPageChange={activeTab === 'employed' ? setEmployedPage : setTerminatedPage}
                   />
                 </div>
               </div>
@@ -475,36 +733,8 @@ export default function MasterfilePage() {
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2"><path d="m15 18-6-6 6-6" /></svg>
               Back to Employee List
             </Button>
-
-            {/* Set as Employed Action */}
-            {selectedEmployee?.status === 'pending' && (
-              <div className="flex items-center gap-3">
-                {!checkCompleteness(selectedEmployee).isComplete && (
-                  <>
-                    <span className="text-xs font-medium text-rose-500 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100">
-                      Complete all required fields to employ
-                    </span>
-                    <Button
-                      onClick={() => router.push(`/admin-head/employee/onboard?id=${selectedEmployee.id}`)}
-                      className="h-10 px-6 font-bold rounded-xl bg-[#630C22] hover:bg-[#4A081A] text-white transition-all shadow-md hover:shadow-lg"
-                    >
-                      Update Profile
-                    </Button>
-                  </>
-                )}
-                <Button
-                  onClick={handleSetAsEmployed}
-                  disabled={!checkCompleteness(selectedEmployee).isComplete || isUpdating}
-                  className={`h-10 px-6 font-bold rounded-xl transition-all ${!checkCompleteness(selectedEmployee).isComplete
-                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                    : 'bg-[#630C22] hover:bg-[#4A081A] text-white shadow-md hover:shadow-lg'
-                    }`}
-                >
-                  {isUpdating ? 'Updating...' : 'Set as Employed'}
-                </Button>
-              </div>
-            )}
           </div>
+
 
           <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
             {/* Header */}
@@ -531,6 +761,7 @@ export default function MasterfilePage() {
               </div>
             </div>
 
+
             {/* Content */}
             <div className="p-8 md:p-10 space-y-12">
               {selectedEmployee && (
@@ -548,6 +779,7 @@ export default function MasterfilePage() {
                       <DetailItem label="Employment Status" value={selectedEmployee.status} />
                     </div>
                   </section>
+
 
                   {/* PERSONAL */}
                   <section>
@@ -567,6 +799,7 @@ export default function MasterfilePage() {
                     </div>
                   </section>
 
+
                   {/* CONTACT */}
                   <section>
                     <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
@@ -579,6 +812,7 @@ export default function MasterfilePage() {
                       <DetailItem label="Tel Number" value={selectedEmployee.phone_number} />
                     </div>
                   </section>
+
 
                   {/* ADDRESS */}
                   <section>
@@ -598,6 +832,7 @@ export default function MasterfilePage() {
                       <DetailItem label="Subdivision" value={selectedEmployee.subdivision} />
                     </div>
                   </section>
+
 
                   {/* FAMILY & GOV */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
@@ -624,6 +859,7 @@ export default function MasterfilePage() {
                       </div>
                     </section>
 
+
                     <section>
                       <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
                         <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
@@ -645,18 +881,18 @@ export default function MasterfilePage() {
             <div className="bg-slate-50 px-8 py-6 border-t border-slate-200 flex justify-end gap-3">
               {selectedEmployee?.status === 'pending' ? (
                 <>
-                  {!checkCompleteness(selectedEmployee).isComplete && (
+                  {selectedEmployee.onboarding_tasks?.isComplete && !checkCompleteness(selectedEmployee).isComplete && (
                     <Button
                       onClick={() => router.push(`/admin-head/employee/onboard?id=${selectedEmployee.id}`)}
-                      className="h-12 px-8 font-bold rounded-xl bg-[#630C22] hover:bg-[#4A081A] text-white transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                      className="h-12 px-8 font-bold rounded-xl text-white transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 bg-[#630C22] hover:bg-[#4A081A]"
                     >
                       Update Profile
                     </Button>
                   )}
                   <Button
                     onClick={handleSetAsEmployed}
-                    disabled={!checkCompleteness(selectedEmployee).isComplete || isUpdating}
-                    className={`h-12 px-8 font-bold rounded-xl transition-all ${!checkCompleteness(selectedEmployee).isComplete
+                    disabled={!checkCompleteness(selectedEmployee).isComplete || !selectedEmployee.onboarding_tasks?.isComplete || isUpdating}
+                    className={`h-12 px-8 font-bold rounded-xl transition-all ${(!checkCompleteness(selectedEmployee).isComplete || !selectedEmployee.onboarding_tasks?.isComplete)
                       ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                       : 'bg-[#630C22] hover:bg-[#4A081A] text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5'
                       }`}
@@ -674,6 +910,7 @@ export default function MasterfilePage() {
         </div>
       )}
 
+
       <ConfirmationModal
         isOpen={confirmModal.isOpen}
         onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
@@ -689,6 +926,7 @@ export default function MasterfilePage() {
   )
 }
 
+
 function DetailItem({ label, value, required }: { label: string, value: any, required?: boolean }) {
   const isEmpty = !value || value.toString().trim() === ''
   return (
@@ -703,3 +941,7 @@ function DetailItem({ label, value, required }: { label: string, value: any, req
     </div>
   )
 }
+
+
+
+
