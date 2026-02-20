@@ -12,9 +12,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   Table,
@@ -37,7 +35,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { Users, FileText, Search, AlertCircle, Check, ChevronsUpDown, CheckCircle2 } from 'lucide-react'
+import { Users, FileText, Check, ChevronsUpDown, X } from 'lucide-react'
 import { cn } from "@/lib/utils"
 
 interface Employee {
@@ -82,6 +80,8 @@ export default function TerminatePage() {
     reason: '',
     notes: '',
   })
+  const [isActionLoading, setIsActionLoading] = useState(false)
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   // Modal State
   const [confirmModal, setConfirmModal] = useState<{
@@ -105,8 +105,9 @@ export default function TerminatePage() {
   }, [])
 
   const fetchData = async () => {
+    setFetchError(null)
+    setLoading(true)
     try {
-      setLoading(true)
       const [empRes, termRes] = await Promise.all([
         fetch(`${getApiUrl()}/api/employees`),
         fetch(`${getApiUrl()}/api/terminations`)
@@ -130,9 +131,11 @@ export default function TerminatePage() {
       }
     } catch (error) {
       console.error('Error fetching data:', error)
-      toast.error('Failed to connect to server. Please try again.')
+      setFetchError('Network Error: Could not connect to the server.')
+      toast.error('Network Error: Could not connect to the server.')
     } finally {
       setLoading(false)
+      setIsActionLoading(false)
     }
   }
 
@@ -201,7 +204,6 @@ export default function TerminatePage() {
             })
             fetchData()
           } else {
-            // Parse validation errors if present
             if (data.errors) {
               const errorMessages = Object.values(data.errors).flat().join(' ')
               toast.error(errorMessages || data.message)
@@ -211,13 +213,10 @@ export default function TerminatePage() {
           }
         } catch (error) {
           console.error('Error:', error)
-          if (error instanceof TypeError && error.message === 'Failed to fetch') {
-            toast.error('Could not connect to server. Please check your connection.')
-          } else {
-            toast.error('Failed to terminate employee')
-          }
+          toast.error('Network Error: Could not connect to the server.')
         } finally {
           setSubmitting(false)
+          setIsActionLoading(false)
           setConfirmModal(prev => ({ ...prev, isOpen: false }))
         }
       }
@@ -248,7 +247,6 @@ export default function TerminatePage() {
             fetchData()
             setShowDetailDialog(false)
           } else {
-            // Parse validation errors if present
             if (data.errors) {
               const errorMessages = Object.values(data.errors).flat().join(' ')
               toast.error(errorMessages || data.message)
@@ -258,11 +256,7 @@ export default function TerminatePage() {
           }
         } catch (error) {
           console.error('Error re-hiring:', error)
-          if (error instanceof TypeError && error.message === 'Failed to fetch') {
-            toast.error('Could not connect to server.')
-          } else {
-            toast.error('Failed to re-hire employee')
-          }
+          toast.error('Network Error: Could not connect to the server.')
         } finally {
           setRehireLoading(null)
           setConfirmModal(prev => ({ ...prev, isOpen: false }))
@@ -273,6 +267,24 @@ export default function TerminatePage() {
 
   return (
     <div className="min-h-screen pb-12 bg-slate-50">
+      {/* ----- GLOBAL LOADING OVERLAY ----- */}
+      {(loading || submitting || rehireLoading !== null || isActionLoading) && (
+        <div className="fixed inset-0 z-[100] bg-white/40 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-500">
+          <div className="bg-white/80 backdrop-blur-xl w-[400px] h-auto p-12 rounded-[40px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] border border-white/50 flex flex-col items-center gap-10 animate-in zoom-in-95 duration-300">
+            <div className="relative">
+              <div className="w-14 h-14 border-[3px] border-slate-100 border-t-[#A4163A] rounded-full animate-spin" />
+            </div>
+            <div className="flex flex-col items-center text-center">
+              <h3 className="text-2xl font-bold text-[#1e293b] tracking-tight">Loading...</h3>
+            </div>
+            <div className="flex gap-2.5">
+              <div className="w-2.5 h-2.5 bg-[#A4163A]/60 rounded-full animate-bounce [animation-delay:-0.3s]" />
+              <div className="w-2.5 h-2.5 bg-[#A4163A]/60 rounded-full animate-bounce [animation-delay:-0.15s]" />
+              <div className="w-2.5 h-2.5 bg-[#A4163A]/60 rounded-full animate-bounce" />
+            </div>
+          </div>
+        </div>
+      )}
       {/* Maroon Gradient Header */}
       <div className="bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#7B0F2B] text-white shadow-lg p-8 mb-8">
         <div className="flex justify-between items-center">
@@ -296,124 +308,139 @@ export default function TerminatePage() {
 
       <div className="max-w-4xl mx-auto px-4">
         <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-            <div className="bg-slate-50/50 p-8 border-b border-slate-100">
-                <h2 className="text-2xl font-bold text-[#4A081A]">Termination Request</h2>
-                <p className="text-slate-500 mt-1">Select an employee and provide a reason to proceed.</p>
-            </div>
-            
-            <div className="p-8 md:p-10 space-y-8">
-                {/* Employee Selection */}
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-                    <div className="md:col-span-4 pt-2">
-                        <Label className="text-base font-bold text-slate-700 flex items-center gap-2">
-                            Terminate Employee <span className="text-rose-500">*</span>
-                        </Label>
-                        <p className="text-xs text-slate-400 mt-1">Select the employee to be terminated.</p>
-                    </div>
-                    <div className="md:col-span-8">
-                         <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              aria-expanded={openCombobox}
-                              disabled={loading || submitting}
-                              className={cn(
-                                "w-full justify-between h-12 bg-white border-slate-200 hover:bg-slate-50 hover:border-[#800020] focus:ring-2 focus:ring-[#800020] text-base font-normal",
-                                !selectedEmployeeId && "text-slate-400"
-                              )}
-                            >
-                              {selectedEmployeeId
-                                ? (() => {
-                                    const emp = employees.find((employee) => employee.id.toString() === selectedEmployeeId)
-                                    return emp ? `${emp.last_name}, ${emp.first_name} (${emp.position})` : "Select employee..."
-                                  })()
-                                : "Select employee..."}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                            <Command>
-                              <CommandInput placeholder="Search employee..." />
-                              <CommandList>
-                                <CommandEmpty>No employee found.</CommandEmpty>
-                                <CommandGroup>
-                                  {employees.map((emp) => (
-                                    <CommandItem
-                                      key={emp.id}
-                                      value={`${emp.last_name}, ${emp.first_name} ${emp.position}`} // Search against this string
-                                      onSelect={() => {
-                                        setSelectedEmployeeId(emp.id.toString())
-                                        setOpenCombobox(false)
-                                      }}
-                                      className="py-3 cursor-pointer"
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          selectedEmployeeId === emp.id.toString() ? "opacity-100 text-[#800020]" : "opacity-0"
-                                        )}
-                                      />
-                                      <div className="flex flex-col">
-                                        <span className="font-medium text-slate-900">{emp.last_name}, {emp.first_name}</span>
-                                        <span className="text-xs text-slate-500">{emp.position}</span>
-                                      </div>
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                    </div>
+            {fetchError ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center animate-in fade-in zoom-in-95 duration-500">
+                <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center mb-6 group">
+                  <Badge variant="outline" className="h-12 w-12 border-rose-200 bg-white shadow-sm flex items-center justify-center rounded-2xl group-hover:scale-110 transition-transform duration-300">
+                    <X className="w-6 h-6 text-rose-500" />
+                  </Badge>
                 </div>
-
-                 {/* Reason */}
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start pt-6 border-t border-slate-50">
-                    <div className="md:col-span-4 pt-2">
-                        <Label className="text-base font-bold text-slate-700 flex items-center gap-2">
-                            Reason <span className="text-rose-500">*</span>
-                        </Label>
-                        <p className="text-xs text-slate-400 mt-1">Provide a detailed reason for this action.</p>
-                    </div>
-                    <div className="md:col-span-8 space-y-4">
-                        <textarea
-                            name="reason"
-                            value={formData.reason}
-                            onChange={handleInputChange}
-                            placeholder="Enter the reason for termination (minimum 10 characters)..."
-                            rows={6}
-                            className="w-full p-4 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#800020] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed resize-y min-h-[120px]"
-                            disabled={submitting}
-                        />
-                         <div className="flex justify-end text-xs text-slate-400 font-medium">
-                            {formData.reason.length} / 10 characters minimum
+                <h3 className="text-2xl font-bold text-slate-800 mb-2">Connection Failed</h3>
+                <p className="text-slate-500 max-w-md mx-auto mb-8">
+                  {fetchError} Please ensure the backend server is running and try again.
+                </p>
+                <Button 
+                  onClick={fetchData}
+                  className="bg-[#A4163A] hover:bg-[#80122D] text-white px-8 h-12 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5"
+                >
+                  Retry Connection
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="bg-slate-50/50 p-8 border-b border-slate-100">
+                    <h2 className="text-2xl font-bold text-[#4A081A]">Termination Request</h2>
+                    <p className="text-slate-500 mt-1">Select an employee and provide a reason to proceed.</p>
+                </div>
+                
+                <div className="p-8 md:p-10 space-y-8">
+                    {/* Employee Selection */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+                        <div className="md:col-span-4 pt-2">
+                            <Label className="text-base font-bold text-slate-700 flex items-center gap-2">
+                                Terminate Employee <span className="text-rose-500">*</span>
+                            </Label>
+                            <p className="text-xs text-slate-400 mt-1">Select the employee to be terminated.</p>
+                        </div>
+                        <div className="md:col-span-8">
+                             <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  aria-expanded={openCombobox}
+                                  disabled={loading || submitting}
+                                  className={cn(
+                                    "w-full justify-between h-12 bg-white border-slate-200 hover:bg-slate-50 hover:border-[#800020] focus:ring-2 focus:ring-[#800020] text-base font-normal",
+                                    !selectedEmployeeId && "text-slate-400"
+                                  )}
+                                >
+                                  {selectedEmployeeId
+                                    ? (() => {
+                                        const emp = employees.find((employee) => employee.id.toString() === selectedEmployeeId)
+                                        return emp ? `${emp.last_name}, ${emp.first_name} (${emp.position})` : "Select employee..."
+                                      })()
+                                    : "Select employee..."}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                                <Command>
+                                  <CommandInput placeholder="Search employee..." />
+                                  <CommandList>
+                                    <CommandEmpty>No employee found.</CommandEmpty>
+                                    <CommandGroup>
+                                      {employees.map((emp) => (
+                                        <CommandItem
+                                          key={emp.id}
+                                          value={`${emp.last_name}, ${emp.first_name} ${emp.position}`}
+                                          onSelect={() => {
+                                            setSelectedEmployeeId(emp.id.toString())
+                                            setOpenCombobox(false)
+                                          }}
+                                          className="py-3 cursor-pointer"
+                                        >
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4",
+                                              selectedEmployeeId === emp.id.toString() ? "opacity-100 text-[#800020]" : "opacity-0"
+                                            )}
+                                          />
+                                          <div className="flex flex-col">
+                                            <span className="font-medium text-slate-900">{emp.last_name}, {emp.first_name}</span>
+                                            <span className="text-xs text-slate-500">{emp.position}</span>
+                                          </div>
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
                         </div>
                     </div>
-                </div>
 
-                {/* Confirm Button */}
-                <div className="pt-8 border-t border-slate-100 flex justify-end">
-                     <Button 
-                        onClick={handleSubmit as any}
-                        disabled={submitting || !selectedEmployeeId || formData.reason.length < 10}
-                        className={`h-12 px-8 text-base font-bold rounded-xl transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 ${
-                            submitting || !selectedEmployeeId || formData.reason.length < 10
-                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none hover:translate-y-0'
-                            : 'bg-gradient-to-r from-[#800020] to-[#A0153E] text-white hover:from-[#A0153E] hover:to-[#C9184A]'
-                        }`}
-                     >
-                        {submitting ? (
-                            <div className="flex items-center gap-2">
-                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                Processing...
+                     {/* Reason */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start pt-6 border-t border-slate-50">
+                        <div className="md:col-span-4 pt-2">
+                            <Label className="text-base font-bold text-slate-700 flex items-center gap-2">
+                                Reason <span className="text-rose-500">*</span>
+                            </Label>
+                            <p className="text-xs text-slate-400 mt-1">Provide a detailed reason for this action.</p>
+                        </div>
+                        <div className="md:col-span-8 space-y-4">
+                            <textarea
+                                name="reason"
+                                value={formData.reason}
+                                onChange={handleInputChange}
+                                placeholder="Enter the reason for termination (minimum 10 characters)..."
+                                rows={6}
+                                className="w-full p-4 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#800020] focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed resize-y min-h-[120px]"
+                                disabled={submitting}
+                            />
+                             <div className="flex justify-end text-xs text-slate-400 font-medium">
+                                {formData.reason.length} / 10 characters minimum
                             </div>
-                        ) : (
-                            'PROCEED'
-                        )}
-                     </Button>
+                        </div>
+                    </div>
+
+                    {/* Confirm Button */}
+                    <div className="pt-8 border-t border-slate-100 flex justify-end">
+                         <Button 
+                            onClick={handleSubmit as any}
+                            disabled={submitting || !selectedEmployeeId || formData.reason.length < 10}
+                            className={`h-12 px-8 text-base font-bold rounded-xl transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 ${
+                                submitting || !selectedEmployeeId || formData.reason.length < 10
+                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none hover:translate-y-0'
+                                : 'bg-gradient-to-r from-[#800020] to-[#A0153E] text-white hover:from-[#A0153E] hover:to-[#C9184A]'
+                            }`}
+                         >
+                            PROCEED
+                         </Button>
+                    </div>
                 </div>
-            </div>
+              </>
+            )}
         </div>
       </div>
 

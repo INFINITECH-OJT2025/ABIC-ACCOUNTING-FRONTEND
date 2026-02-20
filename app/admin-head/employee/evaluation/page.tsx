@@ -4,10 +4,54 @@ import React from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { X } from 'lucide-react'
 
 export default function EvaluationPage() {
+  const [isActionLoading, setIsActionLoading] = React.useState(false)
+  const [fetchError, setFetchError] = React.useState<string | null>(null)
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-slate-50">
+      {/* ----- GLOBAL LOADING OVERLAY ----- */}
+      {isActionLoading && (
+        <div className="fixed inset-0 z-[100] bg-white/40 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-500">
+          <div className="bg-white/80 backdrop-blur-xl w-[400px] h-auto p-12 rounded-[40px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] border border-white/50 flex flex-col items-center gap-10 animate-in zoom-in-95 duration-300">
+            <div className="relative">
+              <div className="w-14 h-14 border-[3px] border-slate-100 border-t-[#A4163A] rounded-full animate-spin" />
+            </div>
+            <div className="flex flex-col items-center text-center">
+              <h3 className="text-2xl font-bold text-[#1e293b] tracking-tight">Loading...</h3>
+            </div>
+            <div className="flex gap-2.5">
+              <div className="w-2.5 h-2.5 bg-[#A4163A]/60 rounded-full animate-bounce [animation-delay:-0.3s]" />
+              <div className="w-2.5 h-2.5 bg-[#A4163A]/60 rounded-full animate-bounce [animation-delay:-0.15s]" />
+              <div className="w-2.5 h-2.5 bg-[#A4163A]/60 rounded-full animate-bounce" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {fetchError ? (
+        <div className="min-h-screen flex items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-500">
+          <div className="bg-white/80 backdrop-blur-xl w-[500px] h-auto p-16 rounded-[48px] shadow-2xl shadow-slate-200/50 border border-slate-200/60 flex flex-col items-center">
+            <div className="w-24 h-24 bg-rose-50 rounded-full flex items-center justify-center mb-8 group">
+              <Badge variant="outline" className="h-14 w-14 border-rose-200 bg-white shadow-sm flex items-center justify-center rounded-2xl group-hover:scale-110 transition-transform duration-300">
+                <X className="w-8 h-8 text-rose-500" />
+              </Badge>
+            </div>
+            <h3 className="text-3xl font-bold text-slate-800 mb-4 tracking-tight">Connection Failed</h3>
+            <p className="text-slate-500 text-lg max-w-md mx-auto mb-10 leading-relaxed">
+              {fetchError} Please ensure the backend server is running and try again.
+            </p>
+            <Button 
+              onClick={() => window.location.reload()}
+              className="bg-[#A4163A] hover:bg-[#80122D] text-white px-10 h-14 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5 text-lg"
+            >
+              Retry Connection
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <>
       {/* Maroon Gradient Header */}
       <div className="bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#7B0F2B] text-white shadow-lg p-8 mb-8">
         <h1 className="text-4xl font-bold mb-3">Employee Evaluation</h1>
@@ -121,6 +165,8 @@ export default function EvaluationPage() {
           </CardContent>
         </Card>
       </div>
+        </>
+      )}
     </div>
   )
 }

@@ -62,6 +62,8 @@ export default function MasterfilePage() {
   const [viewMode, setViewMode] = useState<'list' | 'details'>('list')
   const [activeTab, setActiveTab] = useState<'employed' | 'terminated'>('employed')
   const [isUpdating, setIsUpdating] = useState(false)
+  const [isActionLoading, setIsActionLoading] = useState(false)
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const [checklists, setChecklists] = useState<OnboardingChecklist[]>([])
 
   // Pagination States
@@ -96,6 +98,7 @@ export default function MasterfilePage() {
   }, [])
 
   const fetchEmployees = async () => {
+    setFetchError(null)
     try {
       const apiUrl = getApiUrl()
       const employeesUrl = `${apiUrl}/api/employees`
@@ -135,7 +138,8 @@ export default function MasterfilePage() {
       }
     } catch (error) {
       console.error('Error fetching employees:', error)
-      toast.error('Could not connect to the server. Please check your connection.')
+      setFetchError('Network Error: Could not connect to the server.')
+      toast.error('Network Error: Could not connect to the server.')
     } finally {
       setLoading(false)
     }
@@ -143,6 +147,7 @@ export default function MasterfilePage() {
 
   const fetchEmployeeDetails = async (employeeId: number) => {
     try {
+      setIsActionLoading(true)
       const apiUrl = getApiUrl()
       const fullUrl = `${apiUrl}/api/employees/${employeeId}`
       
@@ -166,11 +171,9 @@ export default function MasterfilePage() {
       }
     } catch (error) {
       console.error('Error fetching employee details:', error)
-      if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        toast.error('Network Error: Could not load employee details.')
-      } else {
-        toast.error('Failed to load employee details')
-      }
+      toast.error('Network Error: Could not connect to the server.')
+    } finally {
+      setIsActionLoading(false)
     }
   }
 
@@ -463,6 +466,25 @@ export default function MasterfilePage() {
 
   return (
     <div className="min-h-screen p-8 bg-slate-50 animate-in fade-in duration-500">
+      {/* ----- GLOBAL LOADING OVERLAY ----- */}
+      {(loading || isUpdating || isActionLoading) && (
+        <div className="fixed inset-0 z-[100] bg-white/40 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-500">
+          <div className="bg-white/80 backdrop-blur-xl w-[400px] h-auto p-12 rounded-[40px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] border border-white/50 flex flex-col items-center gap-10 animate-in zoom-in-95 duration-300">
+            <div className="relative">
+              <div className="w-14 h-14 border-[3px] border-slate-100 border-t-[#A4163A] rounded-full animate-spin" />
+            </div>
+            <div className="flex flex-col items-center text-center">
+              <h3 className="text-2xl font-bold text-[#1e293b] tracking-tight">Loading...</h3>
+            </div>
+            <div className="flex gap-2.5">
+              <div className="w-2.5 h-2.5 bg-[#A4163A]/60 rounded-full animate-bounce [animation-delay:-0.3s]" />
+              <div className="w-2.5 h-2.5 bg-[#A4163A]/60 rounded-full animate-bounce [animation-delay:-0.15s]" />
+              <div className="w-2.5 h-2.5 bg-[#A4163A]/60 rounded-full animate-bounce" />
+            </div>
+          </div>
+        </div>
+      )}
+
       {viewMode === 'list' ? (
         <>
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6">
@@ -531,10 +553,27 @@ export default function MasterfilePage() {
           </div>
 
           <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-24">
-                <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-100 border-t-[#630C22] mb-4"></div>
-                <p className="text-slate-500 font-medium animate-pulse">Loading employees...</p>
+            {fetchError ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center animate-in fade-in zoom-in-95 duration-500">
+                <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center mb-6 group">
+                  <Badge variant="outline" className="h-12 w-12 border-rose-200 bg-white shadow-sm flex items-center justify-center rounded-2xl group-hover:scale-110 transition-transform duration-300">
+                    <X className="w-6 h-6 text-rose-500" />
+                  </Badge>
+                </div>
+                <h3 className="text-2xl font-bold text-slate-800 mb-2">Connection Failed</h3>
+                <p className="text-slate-500 max-w-md mx-auto mb-8">
+                  {fetchError} Please ensure the backend server is running and try again.
+                </p>
+                <Button 
+                  onClick={fetchEmployees}
+                  className="bg-[#A4163A] hover:bg-[#80122D] text-white px-8 h-12 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5"
+                >
+                  Retry Connection
+                </Button>
+              </div>
+            ) : employees.length === 0 && !loading ? (
+              <div className="flex flex-col items-center justify-center py-24 text-slate-400">
+                <p>No employees found.</p>
               </div>
             ) : (
               <div className="space-y-12">
@@ -859,7 +898,7 @@ export default function MasterfilePage() {
                         : 'bg-[#630C22] hover:bg-[#4A081A] text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5'
                       }`}
                     >
-                      {isUpdating ? 'Processing...' : 'Approve & Set as Employed'}
+                      Approve & Set as Employed
                     </Button>
                    </>
                 ) : (

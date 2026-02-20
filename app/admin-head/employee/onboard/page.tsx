@@ -636,7 +636,7 @@ function OnboardPageContent() {
     } catch (error) {
       console.error('Error:', error)
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        toast.error('Could not connect to server. Please ensure the backend is running.')
+        toast.error('Network Error: Could not connect to the server.')
       } else {
         toast.error(error instanceof Error ? error.message : 'Failed to complete onboarding')
       }
