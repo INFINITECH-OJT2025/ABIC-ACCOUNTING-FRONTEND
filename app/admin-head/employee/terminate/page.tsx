@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/popover"
 import { Users, FileText, Check, ChevronsUpDown, X } from 'lucide-react'
 import { cn } from "@/lib/utils"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface Employee {
   id: number
@@ -267,8 +268,8 @@ export default function TerminatePage() {
 
   return (
     <div className="min-h-screen pb-12 bg-slate-50">
-      {/* ----- GLOBAL LOADING OVERLAY ----- */}
-      {(loading || submitting || rehireLoading !== null || isActionLoading) && (
+      {/* ----- GLOBAL LOADING OVERLAY (For Actions Only) ----- */}
+      {(submitting || rehireLoading !== null || isActionLoading) && (
         <div className="fixed inset-0 z-[100] bg-white/40 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-500">
           <div className="bg-white/80 backdrop-blur-xl w-[400px] h-auto p-12 rounded-[40px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] border border-white/50 flex flex-col items-center gap-10 animate-in zoom-in-95 duration-300">
             <div className="relative">
@@ -325,6 +326,34 @@ export default function TerminatePage() {
                 >
                   Retry Connection
                 </Button>
+              </div>
+            ) : loading ? (
+              <div className="p-8 md:p-10 space-y-10 animate-pulse">
+                <div className="bg-slate-50/50 -m-8 -mb-0 p-8 border-b border-slate-100 rounded-t-2xl">
+                  <Skeleton className="h-8 w-64 mb-2" />
+                  <Skeleton className="h-4 w-96 text-slate-500" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start pt-10">
+                  <div className="md:col-span-4 space-y-2">
+                    <Skeleton className="h-6 w-40" />
+                    <Skeleton className="h-4 w-32" />
+                  </div>
+                  <div className="md:col-span-8">
+                    <Skeleton className="h-12 w-full rounded-xl" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+                  <div className="md:col-span-4 space-y-2">
+                    <Skeleton className="h-6 w-24" />
+                    <Skeleton className="h-4 w-48" />
+                  </div>
+                  <div className="md:col-span-8">
+                    <Skeleton className="h-32 w-full rounded-xl" />
+                  </div>
+                </div>
+                <div className="flex justify-end pt-6">
+                  <Skeleton className="h-12 w-40 rounded-xl" />
+                </div>
               </div>
             ) : (
               <>

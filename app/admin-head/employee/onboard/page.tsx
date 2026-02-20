@@ -36,6 +36,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmationModal } from '@/components/ConfirmationModal'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface EmployeeDetails {
   [key: string]: any
@@ -98,6 +99,7 @@ function OnboardPageContent() {
   const searchParams = useSearchParams()
   const employeeIdParam = searchParams.get('id')
   const requestedViewParam = searchParams.get('view')
+  const [loading, setLoading] = useState(true)
   const [view, setView] = useState<'onboard' | 'checklist' | 'update-info'>('onboard')
 
   // Form States
@@ -224,11 +226,14 @@ function OnboardPageContent() {
     fetchPositions()
     fetchDepartments()
     fetchRegions()
-
+    
     // Load employee if ID is provided in URL
     if (employeeIdParam) {
       const requestedView = requestedViewParam === 'checklist' ? 'checklist' : 'update-info'
       loadExistingEmployee(parseInt(employeeIdParam), requestedView)
+    } else {
+      const timer = setTimeout(() => setLoading(false), 1200)
+      return () => clearTimeout(timer)
     }
   }, [employeeIdParam, requestedViewParam])
 
@@ -318,7 +323,7 @@ function OnboardPageContent() {
 
   const loadExistingEmployee = async (id: number, targetView: 'checklist' | 'update-info' = 'update-info') => {
     try {
-      setIsActionLoading(true)
+      setLoading(true)
       const response = await fetch(`${getApiUrl()}/api/employees/${id}`)
       const data = await response.json()
       
@@ -344,7 +349,7 @@ function OnboardPageContent() {
       console.error('Error loading employee:', error)
       toast.error('Failed to load employee details')
     } finally {
-      setIsActionLoading(false)
+      setLoading(false)
     }
   }
 
@@ -904,7 +909,7 @@ function OnboardPageContent() {
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-12 relative">
-      {/* ----- GLOBAL LOADING OVERLAY (Simplified Minimalist) ----- */}
+      {/* ----- GLOBAL LOADING OVERLAY (For Actions Only) ----- */}
       {(isSaving || isActionLoading) && (
         <div className="fixed inset-0 z-[100] bg-white/40 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-500">
           <div className="bg-white/80 backdrop-blur-xl w-[400px] h-auto p-12 rounded-[40px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] border border-white/50 flex flex-col items-center gap-10 animate-in zoom-in-95 duration-300">
@@ -1009,7 +1014,82 @@ function OnboardPageContent() {
         </div>
       </header>
 
-      {view === 'onboard' && (
+      {loading ? (
+        <div className="max-w-7xl mx-auto py-8 px-8 space-y-12">
+           {/* Progress Skeleton (Hidden in initial view) */}
+           {view !== 'onboard' && (
+             <Card className="border-none shadow-lg bg-white/50 p-8 space-y-6">
+                <div className="flex justify-between items-center">
+                   <Skeleton className="h-6 w-48" />
+                   <Skeleton className="h-4 w-32" />
+                </div>
+                <Skeleton className="h-2 w-full rounded-full" />
+                <div className="grid grid-cols-6 gap-2">
+                   {Array(6).fill(0).map((_, i) => (
+                      <Skeleton key={i} className="h-1.5 w-full rounded-full" />
+                   ))}
+                </div>
+             </Card>
+           )}
+
+           <div className="bg-white/50 backdrop-blur-sm rounded-3xl p-8 border border-slate-200/60 shadow-xl space-y-12">
+              <div className="flex justify-between items-center">
+                 <div className="space-y-4">
+                    <Skeleton className="h-10 w-64" />
+                    <Skeleton className="h-4 w-96" />
+                 </div>
+                 {view === 'onboard' && <Skeleton className="h-12 w-48 rounded-xl" />}
+              </div>
+
+              {view === 'onboard' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                   {Array(4).fill(0).map((_, i) => (
+                      <div key={i} className="space-y-2">
+                         <Skeleton className="h-4 w-32" />
+                         <Skeleton className="h-12 w-full rounded-xl" />
+                      </div>
+                   ))}
+                   <div className="md:col-span-2 pt-6 flex gap-4">
+                      <Skeleton className="h-12 flex-1 rounded-xl" />
+                      <Skeleton className="h-12 flex-1 rounded-xl" />
+                   </div>
+                </div>
+              ) : view === 'checklist' ? (
+                <div className="space-y-4">
+                  <div className="border border-slate-100 rounded-xl overflow-hidden">
+                    <div className="bg-slate-50 p-4 flex gap-4">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-4 flex-1" />
+                    </div>
+                    <div className="p-4 space-y-6">
+                      {Array(8).fill(0).map((_, i) => (
+                        <div key={i} className="flex gap-4 items-center">
+                          <Skeleton className="h-4 w-32" />
+                          <Skeleton className="h-6 w-6 rounded" />
+                          <Skeleton className="h-4 flex-1" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-3">
+                    <Skeleton className="h-10 w-48 rounded-xl" />
+                    <Skeleton className="h-10 w-40 rounded-xl" />
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                   {Array(8).fill(0).map((_, i) => (
+                      <div key={i} className="space-y-2">
+                         <Skeleton className="h-4 w-32" />
+                         <Skeleton className="h-12 w-full rounded-xl" />
+                      </div>
+                   ))}
+                </div>
+              )}
+           </div>
+        </div>
+      ) : view === 'onboard' && (
         <div className="w-full">
           <div className="max-w-3xl mx-auto py-4">
             <div className="bg-white border border-slate-100 rounded-2xl p-8 shadow-sm space-y-6">

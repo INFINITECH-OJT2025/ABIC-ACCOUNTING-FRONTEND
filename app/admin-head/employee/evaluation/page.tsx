@@ -5,13 +5,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { X } from 'lucide-react'
+import { Skeleton } from "@/components/ui/skeleton"
 
 export default function EvaluationPage() {
+  const [loading, setLoading] = React.useState(true)
   const [isActionLoading, setIsActionLoading] = React.useState(false)
   const [fetchError, setFetchError] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    // Mock loading for demo purposes
+    const timer = setTimeout(() => setLoading(false), 1500)
+    return () => clearTimeout(timer)
+  }, [])
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* ----- GLOBAL LOADING OVERLAY ----- */}
+      {/* ----- GLOBAL LOADING OVERLAY (For Actions Only) ----- */}
       {isActionLoading && (
         <div className="fixed inset-0 z-[100] bg-white/40 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-500">
           <div className="bg-white/80 backdrop-blur-xl w-[400px] h-auto p-12 rounded-[40px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] border border-white/50 flex flex-col items-center gap-10 animate-in zoom-in-95 duration-300">
@@ -19,7 +27,7 @@ export default function EvaluationPage() {
               <div className="w-14 h-14 border-[3px] border-slate-100 border-t-[#A4163A] rounded-full animate-spin" />
             </div>
             <div className="flex flex-col items-center text-center">
-              <h3 className="text-2xl font-bold text-[#1e293b] tracking-tight">Loading...</h3>
+              <h1 className="text-2xl font-bold text-[#1e293b] tracking-tight">Loading...</h1>
             </div>
             <div className="flex gap-2.5">
               <div className="w-2.5 h-2.5 bg-[#A4163A]/60 rounded-full animate-bounce [animation-delay:-0.3s]" />
@@ -48,6 +56,30 @@ export default function EvaluationPage() {
             >
               Retry Connection
             </Button>
+          </div>
+        </div>
+      ) : loading ? (
+        <div className="max-w-6xl mx-auto py-12 px-8 space-y-12">
+          {/* Header Skeleton */}
+          <div className="bg-slate-200/50 h-32 w-full rounded-3xl animate-pulse flex flex-col justify-center px-8 space-y-3">
+             <Skeleton className="h-10 w-64" />
+             <Skeleton className="h-4 w-96" />
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {Array(4).fill(0).map((_, i) => (
+              <Card key={i} className="border-2 border-slate-100 p-8 space-y-4">
+                 <div className="flex items-center gap-4">
+                    <Skeleton className="h-12 w-12 rounded-full" />
+                    <div className="space-y-2">
+                       <Skeleton className="h-6 w-48" />
+                       <Skeleton className="h-4 w-32" />
+                    </div>
+                 </div>
+                 <Skeleton className="h-20 w-full rounded-xl" />
+                 <Skeleton className="h-12 w-full rounded-xl" />
+              </Card>
+            ))}
           </div>
         </div>
       ) : (

@@ -22,6 +22,8 @@ interface OnboardingChecklist {
   updated_at: string
 }
 
+import { Skeleton } from '@/components/ui/skeleton'
+
 interface Employee {
   id: number
   first_name: string
@@ -186,7 +188,7 @@ export default function MasterfilePage() {
     ]
     for (const field of basicFields) {
       if (!emp[field] || emp[field].toString().trim() === '') {
-        return { isComplete: false, status: 'Pending: User Information' }
+        return { isComplete: false, status: 'Pending' }
       }
     }
 
@@ -466,8 +468,8 @@ export default function MasterfilePage() {
 
   return (
     <div className="min-h-screen p-8 bg-slate-50 animate-in fade-in duration-500">
-      {/* ----- GLOBAL LOADING OVERLAY ----- */}
-      {(loading || isUpdating || isActionLoading) && (
+      {/* ----- GLOBAL LOADING OVERLAY (For Actions Only) ----- */}
+      {isActionLoading && (
         <div className="fixed inset-0 z-[100] bg-white/40 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-500">
           <div className="bg-white/80 backdrop-blur-xl w-[400px] h-auto p-12 rounded-[40px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] border border-white/50 flex flex-col items-center gap-10 animate-in zoom-in-95 duration-300">
             <div className="relative">
@@ -570,6 +572,56 @@ export default function MasterfilePage() {
                 >
                   Retry Connection
                 </Button>
+              </div>
+            ) : loading ? (
+              <div className="space-y-12">
+                {/* Pending Skeletons */}
+                <div className="bg-orange-50/50 rounded-2xl p-6 border border-orange-100/50 mb-12">
+                  <div className="flex items-center gap-3 mb-6">
+                    <Skeleton className="h-6 w-1.5 rounded-full" />
+                    <Skeleton className="h-6 w-40" />
+                    <Skeleton className="h-6 w-12 rounded-full" />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {Array(4).fill(0).map((_, i) => (
+                      <div key={i} className="bg-white border border-slate-100 rounded-xl p-5 space-y-4">
+                        <div className="flex items-center gap-4">
+                          <Skeleton className="h-14 w-14 rounded-full" />
+                          <div className="space-y-2 flex-1">
+                            <Skeleton className="h-3 w-20" />
+                            <Skeleton className="h-5 w-32" />
+                          </div>
+                        </div>
+                        <div className="pt-3 border-t border-slate-50 flex justify-between items-center">
+                           <Skeleton className="h-5 w-20 rounded-full" />
+                           <Skeleton className="h-6 w-6 rounded-full" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-10 w-64 rounded-xl" />
+                  <Skeleton className="h-10 w-48 rounded-xl" />
+                </div>
+                <div className="border border-slate-100 rounded-2xl overflow-hidden">
+                  <div className="bg-slate-50/50 p-4 border-b border-slate-100 flex gap-4">
+                    {Array(5).fill(0).map((_, i) => (
+                      <Skeleton key={i} className="h-4 flex-1" />
+                    ))}
+                  </div>
+                  <div className="p-4 space-y-4">
+                    {Array(5).fill(0).map((_, i) => (
+                      <div key={i} className="flex gap-4 items-center">
+                        <Skeleton className="h-12 w-12 rounded-full" />
+                        <Skeleton className="h-4 flex-1" />
+                        <Skeleton className="h-4 flex-1" />
+                        <Skeleton className="h-4 w-24" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             ) : employees.length === 0 && !loading ? (
               <div className="flex flex-col items-center justify-center py-24 text-slate-400">
