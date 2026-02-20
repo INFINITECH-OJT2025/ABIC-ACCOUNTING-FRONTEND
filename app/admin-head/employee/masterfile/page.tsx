@@ -113,10 +113,14 @@ export default function MasterfilePage() {
       const terminationsUrl = `${apiUrl}/api/terminations`
       
       const [empRes, checkRes, termRes] = await Promise.all([
-        fetch(employeesUrl, { headers: { Accept: 'application/json' }, credentials: 'include' }),
-        fetch(checklistsUrl, { headers: { Accept: 'application/json' }, credentials: 'include' }),
-        fetch(terminationsUrl, { headers: { Accept: 'application/json' }, credentials: 'include' })
+        fetch(employeesUrl, { headers: { Accept: 'application/json' } }),
+        fetch(checklistsUrl, { headers: { Accept: 'application/json' } }),
+        fetch(terminationsUrl, { headers: { Accept: 'application/json' } })
       ])
+
+      if (!empRes.ok || !checkRes.ok || !termRes.ok) {
+        throw new Error(`HTTP Error: employees=${empRes.status}, checklists=${checkRes.status}, terminations=${termRes.status}`)
+      }
       
       const empData = await empRes.json()
       const checkData = await checkRes.json()
@@ -125,11 +129,35 @@ export default function MasterfilePage() {
       if (empData.success) {
         const checklistsList = Array.isArray(checkData.data) ? checkData.data : []
         const terminationsList = termData.success && Array.isArray(termData.data) ? termData.data : []
+        const normalizeName = (value: unknown) =>
+          String(value ?? '')
+            .toLowerCase()
+            .replace(/\s+/g, ' ')
+            .trim()
         
         setChecklists(checklistsList)
 
         const enhancedEmployees = empData.data.map((emp: Employee) => {
-          const checklist = checklistsList.find((c: any) => c.name === `${emp.first_name} ${emp.last_name}`)
+          const fullName = normalizeName(`${emp.first_name} ${emp.last_name}`)
+          const nameParts = fullName.split(' ').filter(Boolean)
+          const firstName = nameParts[0] || ''
+          const lastName = nameParts[nameParts.length - 1] || ''
+          const checklistMatches = checklistsList
+            .filter((c: any) => {
+              const candidate = normalizeName(c?.name)
+              if (!candidate) return false
+              if (candidate === fullName) return true
+              if (firstName && lastName) {
+                return candidate.includes(firstName) && candidate.includes(lastName)
+              }
+              return false
+            })
+            .sort((a: any, b: any) => {
+              const aTime = new Date(a?.updated_at ?? a?.created_at ?? 0).getTime()
+              const bTime = new Date(b?.updated_at ?? b?.created_at ?? 0).getTime()
+              return bTime - aTime
+            })
+          const checklist = checklistMatches[0]
           const termination = terminationsList.find((t: any) => t.employee_id === emp.id)
           
           let enhancedEmp = { ...emp }
@@ -141,7 +169,7 @@ export default function MasterfilePage() {
 
           if (checklist) {
             const tasks = Array.isArray(checklist.tasks) ? checklist.tasks : []
-            const doneCount = tasks.filter((t: any) => t.status === 'DONE').length
+            const doneCount = tasks.filter((t: any) => String(t?.status ?? '').toUpperCase() === 'DONE').length
             enhancedEmp = {
               ...enhancedEmp,
               onboarding_tasks: {
@@ -178,7 +206,6 @@ export default function MasterfilePage() {
       const response = await fetch(fullUrl, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        credentials: 'include',
       })
       
       if (!response.ok) {
@@ -230,13 +257,7 @@ export default function MasterfilePage() {
       return { isComplete: false, status: 'Pending: Contact Information', batchId: 3 }
     }
 
-    // Batch 4: Government IDs
-    const govFields = ['sss_number', 'philhealth_number', 'pagibig_number', 'tin_number']
-    for (const field of govFields) {
-      if (!emp[field] || emp[field].toString().trim() === '') {
-        return { isComplete: false, status: 'Pending: Government IDs', batchId: 4 }
-      }
-    }
+    // Batch 4: Government IDs (optional in onboarding flow)
 
     // Batch 5: Family Information
     if (!emp.mlast_name || emp.mlast_name.toString().trim() === '' || !emp.mfirst_name || emp.mfirst_name.toString().trim() === '') {

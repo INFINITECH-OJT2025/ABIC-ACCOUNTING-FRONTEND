@@ -200,6 +200,49 @@ function OnboardPageContent() {
     return dates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0]
   }, [completedTasks])
 
+  const getApiBaseCandidates = () => {
+    const primary = getApiUrl().replace(/\/+$/, '')
+    const candidates = [primary]
+
+    if (typeof window !== 'undefined') {
+      if (primary.includes('localhost:8000')) {
+        candidates.push('http://127.0.0.1:8000')
+      }
+      const host = window.location.hostname
+      if (host && host !== 'localhost' && host !== '127.0.0.1') {
+        candidates.push(`http://${host}:8000`)
+      }
+    }
+
+    return [...new Set(candidates)]
+  }
+
+  const apiFetch = async (path: string, init?: RequestInit) => {
+    const candidates = getApiBaseCandidates()
+    let lastError: unknown = null
+
+    for (const base of candidates) {
+      try {
+        return await fetch(`${base}${path}`, init)
+      } catch (error) {
+        lastError = error
+      }
+    }
+
+    // Retry once for transient network-change failures.
+    await new Promise((resolve) => setTimeout(resolve, 300))
+
+    for (const base of candidates) {
+      try {
+        return await fetch(`${base}${path}`, init)
+      } catch (error) {
+        lastError = error
+      }
+    }
+
+    throw lastError ?? new Error('Failed to fetch')
+  }
+
   // Persistence Logic
   useEffect(() => {
     const savedState = localStorage.getItem('employee_onboarding_state')
@@ -250,7 +293,6 @@ function OnboardPageContent() {
     try {
       const response = await fetch(`${getApiUrl()}/api/onboarding-checklist`, {
         headers: { Accept: 'application/json' },
-        credentials: 'include',
       })
       const data = await response.json()
       const list = Array.isArray(data?.data) ? data.data : []
@@ -659,7 +701,11 @@ function OnboardPageContent() {
     }
   }
 
-  const handleSaveChecklist = async (redirect = true) => {
+  const handleSaveChecklist = async (
+    redirect = true,
+    options: { showSuccessToast?: boolean } = {}
+  ) => {
+    const { showSuccessToast = true } = options
     if (!checklistData) return false
 
     setIsSaving(true)
@@ -671,11 +717,15 @@ function OnboardPageContent() {
       }))
 
       const normalizedDepartment =
-        toPlainString(checklistData.department) || toPlainString(progressionFormData.department)
+        toPlainString(checklistData.department) ||
+        toPlainString(progressionFormData.department) ||
+        toPlainString(onboardFormData.department)
       const normalizedStartDate =
         toIsoDate(checklistData.raw_date) ||
+        toIsoDate(checklistData.date) ||
         toIsoDate(progressionFormData.onboarding_date) ||
-        toIsoDate(progressionFormData.date_hired)
+        toIsoDate(progressionFormData.date_hired) ||
+        toIsoDate(onboardFormData.onboarding_date)
 
       const isUpdate = checklistRecordId !== null
       if (!normalizedDepartment || !normalizedStartDate) {
@@ -683,8 +733,8 @@ function OnboardPageContent() {
         return false
       }
 
-      const response = await fetch(
-        `${getApiUrl()}/api/onboarding-checklist${isUpdate ? `/${checklistRecordId}` : ''}`,
+      const response = await apiFetch(
+        `/api/onboarding-checklist${isUpdate ? `/${checklistRecordId}` : ''}`,
         {
           method: isUpdate ? 'PUT' : 'POST',
           headers: {
@@ -692,6 +742,7 @@ function OnboardPageContent() {
             'Accept': 'application/json',
           },
           body: JSON.stringify({
+            employeeId: onboardingEmployeeId,
             name: toPlainString(checklistData.name),
             position: toPlainString(checklistData.position),
             department: normalizedDepartment,
@@ -702,13 +753,19 @@ function OnboardPageContent() {
         }
       )
 
+      if (!response.ok) {
+        throw new Error(`HTTP Error: ${response.status}`)
+      }
+
       const data = await response.json()
       if (data.success) {
         const savedId = Number(data?.data?.id)
         if (Number.isFinite(savedId)) {
           setChecklistRecordId(savedId)
         }
-        toast.success('Checklist progress saved successfully')
+        if (showSuccessToast) {
+          toast.success('Checklist progress saved successfully')
+        }
         if (redirect) {
           clearStorage()
           router.push('/admin-head/employee/masterfile')
@@ -842,12 +899,23 @@ function OnboardPageContent() {
   const handleProgressionSave = async () => {
     setIsSaving(true)
     try {
+      if (Object.keys(completedTasks).length < onboardingTasks.length) {
+        toast.error('Please complete all onboarding tasks before finishing.')
+        return
+      }
+
+      const checklistSaved = await handleSaveChecklist(false, { showSuccessToast: false })
+      if (!checklistSaved) {
+        toast.error('Failed to save onboarding checklist. Please try again.')
+        return
+      }
+
       const cleanedData = Object.entries(progressionFormData).reduce((acc, [key, value]) => {
         acc[key] = value === '' ? null : value
         return acc
       }, {} as any)
 
-      const response = await fetch(`${getApiUrl()}/api/employees/${onboardingEmployeeId}`, {
+      const response = await apiFetch(`/api/employees/${onboardingEmployeeId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(cleanedData),
@@ -878,7 +946,7 @@ function OnboardPageContent() {
         return acc
       }, {} as any)
 
-      const response = await fetch(`${getApiUrl()}/api/employees/${onboardingEmployeeId}`, {
+      const response = await apiFetch(`/api/employees/${onboardingEmployeeId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(cleanedData),
