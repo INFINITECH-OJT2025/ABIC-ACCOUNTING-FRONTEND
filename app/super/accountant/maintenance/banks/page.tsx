@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState, useEffect } from "react";
-import { Search, Grid, List, X, Inbox, Plus, Eye, Banknote, Edit2, User, ChevronDown } from "lucide-react";
+import { Search, Grid, List, X, Inbox, Plus, Eye, Banknote, User, ChevronDown } from "lucide-react";
 import SuccessModal from "@/components/ui/SuccessModal";
 import LoadingModal from "@/components/ui/LoadingModal";
 import FailModal from "@/components/ui/FailModal";
@@ -229,7 +229,6 @@ export default function BanksPage() {
   const [detailBank, setDetailBank] = useState<Bank | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detailLoadError, setDetailLoadError] = useState<string | null>(null);
-  const [detailEditing, setDetailEditing] = useState(false);
   const [detailFormData, setDetailFormData] = useState<Partial<Bank>>({});
   const [savingBank, setSavingBank] = useState(false);
   const [showSaveLoading, setShowSaveLoading] = useState(false);
@@ -278,9 +277,9 @@ export default function BanksPage() {
     return () => clearTimeout(timeoutId);
   }, [formData.name]);
 
-  // Debounce bank name checking for edit mode
+  // Debounce bank name checking for detail form
   useEffect(() => {
-    if (!detailEditing || !detailFormData.name?.trim()) {
+    if (!detailBank?.id || !detailFormData.name?.trim()) {
       return;
     }
 
@@ -289,7 +288,7 @@ export default function BanksPage() {
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [detailFormData.name, detailEditing, detailBank?.id]);
+  }, [detailFormData.name, detailBank?.id]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -386,8 +385,9 @@ export default function BanksPage() {
       setDetailDrawerOpen(false);
       setDetailDrawerClosing(false);
       setDetailBank(null);
-      setDetailEditing(false);
       setDetailLoadError(null);
+      setDetailFormData({});
+      setNameError(null);
       setBankContacts([]);
       setShowContactForm(false);
       setEditingContact(null);
@@ -526,7 +526,6 @@ export default function BanksPage() {
       if (res.ok && data.success) {
         setDetailBank((prev) => (prev ? { ...prev, ...data.data } : null));
         setDetailFormData((prev) => (prev ? { ...prev, ...data.data } : {}));
-        setDetailEditing(false);
         setNameError(null);
         await fetchBanks();
         setSuccessTitle("Bank Updated Successfully");
@@ -729,6 +728,8 @@ export default function BanksPage() {
     }
   };
 
+
+  
 
   return (
     <div className="min-h-full flex flex-col">
@@ -1137,85 +1138,68 @@ export default function BanksPage() {
                         <label className="block text-sm font-medium text-neutral-900 mb-2">
                           Bank Name <span className="text-red-500">*</span>
                         </label>
-                        {detailEditing ? (
-                          <div>
-                            <input
-                              type="text"
-                              value={detailFormData.name || ""}
-                              onChange={(e) => setDetailFormData({ ...detailFormData, name: e.target.value })}
-                              className={`w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20 ${
-                                nameError ? "border-red-500" : ""
-                              }`}
-                              style={nameError ? {} : { borderColor: BORDER }}
-                            />
-                            {checkingName && (
-                              <p className="text-xs text-gray-500 mt-1">Checking availability...</p>
-                            )}
-                            {nameError && !checkingName && (
-                              <p className="text-xs text-red-500 mt-1">{nameError}</p>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="text-sm text-neutral-900">{detailBank.name}</div>
-                        )}
+                        <div>
+                          <input
+                            type="text"
+                            value={detailFormData.name || ""}
+                            onChange={(e) => setDetailFormData({ ...detailFormData, name: e.target.value })}
+                            className={`w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20 ${
+                              nameError ? "border-red-500" : ""
+                            }`}
+                            style={nameError ? {} : { borderColor: BORDER }}
+                          />
+                          {checkingName && (
+                            <p className="text-xs text-gray-500 mt-1">Checking availability...</p>
+                          )}
+                          {nameError && !checkingName && (
+                            <p className="text-xs text-red-500 mt-1">{nameError}</p>
+                          )}
+                        </div>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-neutral-900 mb-2">Short Name</label>
-                        {detailEditing ? (
-                          <input
-                            type="text"
-                            value={detailFormData.short_name || ""}
-                            onChange={(e) => setDetailFormData({ ...detailFormData, short_name: e.target.value })}
-                            className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
-                            style={{ borderColor: BORDER }}
-                          />
-                        ) : (
-                          <div className="text-sm text-neutral-900">{detailBank.short_name || "—"}</div>
-                        )}
+                        <input
+                          type="text"
+                          value={detailFormData.short_name || ""}
+                          onChange={(e) => setDetailFormData({ ...detailFormData, short_name: e.target.value })}
+                          className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
+                          style={{ borderColor: BORDER }}
+                        />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-neutral-900 mb-2">Country</label>
-                        {detailEditing ? (
-                          <select
-                            value={detailFormData.country || ""}
-                            onChange={(e) => setDetailFormData({ ...detailFormData, country: e.target.value })}
-                            className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
-                            style={{ borderColor: BORDER }}
-                          >
-                            <option value="">Select a country</option>
-                            {COUNTRIES.map((country) => (
-                              <option key={country.code} value={country.name}>
-                                {country.name}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <div className="text-sm text-neutral-900">{detailBank.country || "—"}</div>
-                        )}
+                        <select
+                          value={detailFormData.country || ""}
+                          onChange={(e) => setDetailFormData({ ...detailFormData, country: e.target.value })}
+                          className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
+                          style={{ borderColor: BORDER }}
+                        >
+                          <option value="">Select a country</option>
+                          {COUNTRIES.map((country) => (
+                            <option key={country.code} value={country.name}>
+                              {country.name}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-neutral-900 mb-2">
                           Status <span className="text-red-500">*</span>
                         </label>
-                        {detailEditing ? (
-                          <select
-                            value={detailFormData.status || "ACTIVE"}
-                            onChange={(e) => setDetailFormData({ ...detailFormData, status: e.target.value as BankStatus })}
-                            className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
-                            style={{ borderColor: BORDER }}
-                          >
-                            <option value="ACTIVE">Active</option>
-                            <option value="INACTIVE">Inactive</option>
-                          </select>
-                        ) : (
-                          <div className="text-sm text-neutral-900">{detailBank.status}</div>
-                        )}
+                        <select
+                          value={detailFormData.status || "ACTIVE"}
+                          onChange={(e) => setDetailFormData({ ...detailFormData, status: e.target.value as BankStatus })}
+                          className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
+                          style={{ borderColor: BORDER }}
+                        >
+                          <option value="ACTIVE">Active</option>
+                          <option value="INACTIVE">Inactive</option>
+                        </select>
                       </div>
                     </div>
 
                     {/* Bank Contacts Section */}
-                    {!detailEditing && (
-                      <div className="mt-8 pt-8 border-t" style={{ borderColor: BORDER }}>
+                    <div className="mt-8 pt-8 border-t" style={{ borderColor: BORDER }}>
                         <div className="flex items-center justify-between mb-4">
                           <div>
                             <h3 className="text-base font-semibold text-neutral-900">Bank Contacts</h3>
@@ -1342,44 +1326,19 @@ export default function BanksPage() {
                           </div>
                         )}
                       </div>
-                    )}
                   </div>
                 )}
               </div>
               {detailBank && (
                 <div className="flex-shrink-0 flex items-center justify-end gap-3 p-4 border-t" style={{ borderColor: BORDER }}>
-                  {detailEditing ? (
-                    <>
-                      <button
-                        onClick={() => setDetailEditing(false)}
-                        className="px-6 py-2.5 rounded-md font-semibold border-2 hover:bg-slate-50 transition-colors"
-                        style={{ borderColor: BORDER }}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => handleSaveBank(detailFormData)}
-                        disabled={savingBank}
-                        className="px-6 py-2.5 rounded-md font-semibold text-white hover:opacity-95 transition-opacity disabled:opacity-60"
-                        style={{ background: "#7a0f1f" }}
-                      >
-                        {savingBank ? "Saving..." : "Save"}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => {
-                          setDetailFormData({ ...detailBank });
-                          setDetailEditing(true);
-                        }}
-                        className="px-6 py-2.5 rounded-md font-semibold border-2 hover:bg-slate-50 transition-colors"
-                        style={{ borderColor: "#7a0f1f", color: "#7a0f1f" }}
-                      >
-                        Edit
-                      </button>
-                    </>
-                  )}
+                  <button
+                    onClick={() => handleSaveBank(detailFormData)}
+                    disabled={savingBank || !!nameError}
+                    className="px-6 py-2.5 rounded-md font-semibold text-white hover:opacity-95 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
+                    style={{ background: "#7a0f1f" }}
+                  >
+                    {savingBank ? "Saving..." : "Save"}
+                  </button>
                 </div>
               )}
             </div>

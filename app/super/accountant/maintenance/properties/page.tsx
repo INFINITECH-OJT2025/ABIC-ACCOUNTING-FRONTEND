@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Search, Grid, List, X, Inbox, Plus, Eye, Building2, Edit2, ChevronDown } from "lucide-react";
+import { Search, Grid, List, X, Inbox, Plus, Eye, Building2, ChevronDown } from "lucide-react";
 import SuccessModal from "@/components/ui/SuccessModal";
 import LoadingModal from "@/components/ui/LoadingModal";
 import FailModal from "@/components/ui/FailModal";
@@ -224,7 +224,6 @@ export default function PropertiesPage() {
   const [detailProperty, setDetailProperty] = useState<Property | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detailLoadError, setDetailLoadError] = useState<string | null>(null);
-  const [detailEditing, setDetailEditing] = useState(false);
   const [detailFormData, setDetailFormData] = useState<Partial<Property>>({});
   const [savingProperty, setSavingProperty] = useState(false);
   const [showSaveLoading, setShowSaveLoading] = useState(false);
@@ -275,9 +274,9 @@ export default function PropertiesPage() {
     return () => clearTimeout(timeoutId);
   }, [formData.name]);
 
-  // Debounce property name checking for edit mode
+  // Debounce property name checking for detail form
   useEffect(() => {
-    if (!detailFormData.name?.trim() || !detailProperty?.id) {
+    if (!detailProperty?.id || !detailFormData.name?.trim()) {
       setNameError(null);
       return;
     }
@@ -389,7 +388,6 @@ export default function PropertiesPage() {
       setDetailDrawerClosing(false);
       setDetailProperty(null);
       setDetailFormData({});
-      setDetailEditing(false);
       setDetailLoadError(null);
       setNameError(null);
       setUnits([]);
@@ -550,7 +548,6 @@ export default function PropertiesPage() {
       if (res.ok && data.success) {
         setDetailProperty((prev) => (prev ? { ...prev, ...data.data } : null));
         setDetailFormData((prev) => (prev ? { ...prev, ...data.data } : {}));
-        setDetailEditing(false);
         setNameError(null);
         await fetchProperties();
         setSuccessTitle("Property Updated Successfully");
@@ -1038,85 +1035,68 @@ export default function PropertiesPage() {
                         <label className="block text-sm font-medium text-neutral-900 mb-2">
                           Property Name <span className="text-red-500">*</span>
                         </label>
-                        {detailEditing ? (
-                          <div>
-                            <input
-                              type="text"
-                              value={detailFormData.name || ""}
-                              onChange={(e) => setDetailFormData({ ...detailFormData, name: e.target.value })}
-                              className={`w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20 ${
-                                nameError ? "border-red-500" : ""
-                              }`}
-                              style={nameError ? {} : { borderColor: BORDER }}
-                            />
-                            {checkingName && (
-                              <p className="text-xs text-gray-500 mt-1">Checking availability...</p>
-                            )}
-                            {nameError && !checkingName && (
-                              <p className="text-xs text-red-500 mt-1">{nameError}</p>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="text-sm text-neutral-900">{detailProperty.name}</div>
-                        )}
+                        <div>
+                          <input
+                            type="text"
+                            value={detailFormData.name || ""}
+                            onChange={(e) => setDetailFormData({ ...detailFormData, name: e.target.value })}
+                            className={`w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20 ${
+                              nameError ? "border-red-500" : ""
+                            }`}
+                            style={nameError ? {} : { borderColor: BORDER }}
+                          />
+                          {checkingName && (
+                            <p className="text-xs text-gray-500 mt-1">Checking availability...</p>
+                          )}
+                          {nameError && !checkingName && (
+                            <p className="text-xs text-red-500 mt-1">{nameError}</p>
+                          )}
+                        </div>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-neutral-900 mb-2">
                           Property Type <span className="text-red-500">*</span>
                         </label>
-                        {detailEditing ? (
-                          <select
-                            value={detailFormData.property_type || "CONDOMINIUM"}
-                            onChange={(e) => setDetailFormData({ ...detailFormData, property_type: e.target.value as PropertyType })}
-                            className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
-                            style={{ borderColor: BORDER }}
-                          >
-                            <option value="CONDOMINIUM">Condominium</option>
-                            <option value="HOUSE">House</option>
-                            <option value="LOT">Lot</option>
-                            <option value="COMMERCIAL">Commercial</option>
-                          </select>
-                        ) : (
-                          <div className="text-sm text-neutral-900">{detailProperty.property_type}</div>
-                        )}
+                        <select
+                          value={detailFormData.property_type || "CONDOMINIUM"}
+                          onChange={(e) => setDetailFormData({ ...detailFormData, property_type: e.target.value as PropertyType })}
+                          className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
+                          style={{ borderColor: BORDER }}
+                        >
+                          <option value="CONDOMINIUM">Condominium</option>
+                          <option value="HOUSE">House</option>
+                          <option value="LOT">Lot</option>
+                          <option value="COMMERCIAL">Commercial</option>
+                        </select>
                       </div>
                       <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-neutral-900 mb-2">Address</label>
-                        {detailEditing ? (
-                          <textarea
-                            value={detailFormData.address || ""}
-                            onChange={(e) => setDetailFormData({ ...detailFormData, address: e.target.value })}
-                            className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
-                            style={{ borderColor: BORDER }}
-                            rows={3}
-                          />
-                        ) : (
-                          <div className="text-sm text-neutral-900">{detailProperty.address || "—"}</div>
-                        )}
+                        <textarea
+                          value={detailFormData.address || ""}
+                          onChange={(e) => setDetailFormData({ ...detailFormData, address: e.target.value })}
+                          className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
+                          style={{ borderColor: BORDER }}
+                          rows={3}
+                        />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-neutral-900 mb-2">
-                          Status
+                          Status <span className="text-red-500">*</span>
                         </label>
-                        {detailEditing ? (
-                          <select
-                            value={detailFormData.status || "ACTIVE"}
-                            onChange={(e) => setDetailFormData({ ...detailFormData, status: e.target.value as PropertyStatus })}
-                            className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
-                            style={{ borderColor: BORDER }}
-                          >
-                            <option value="ACTIVE">Active</option>
-                            <option value="INACTIVE">Inactive</option>
-                          </select>
-                        ) : (
-                          <div className="text-sm text-neutral-900">{detailProperty.status}</div>
-                        )}
+                        <select
+                          value={detailFormData.status || "ACTIVE"}
+                          onChange={(e) => setDetailFormData({ ...detailFormData, status: e.target.value as PropertyStatus })}
+                          className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
+                          style={{ borderColor: BORDER }}
+                        >
+                          <option value="ACTIVE">Active</option>
+                          <option value="INACTIVE">Inactive</option>
+                        </select>
                       </div>
                     </div>
 
                     {/* Units Section */}
-                    {!detailEditing && (
-                      <div className="mt-8 pt-8 border-t" style={{ borderColor: BORDER }}>
+                    <div className="mt-8 pt-8 border-t" style={{ borderColor: BORDER }}>
                         <div className="mb-4">
                           <h3 className="text-base font-semibold text-neutral-900">Units</h3>
                           <p className="text-sm text-neutral-600 mt-0.5">Units associated with this property</p>
@@ -1189,48 +1169,19 @@ export default function PropertiesPage() {
                           </div>
                         )}
                       </div>
-                    )}
                   </div>
                 )}
               </div>
               {detailProperty && (
                 <div className="flex-shrink-0 flex items-center justify-end gap-3 p-4 border-t" style={{ borderColor: BORDER }}>
-                  {detailEditing ? (
-                    <>
-                      <button
-                        onClick={() => {
-                          setDetailEditing(false);
-                          setDetailFormData(detailProperty);
-                          setNameError(null);
-                        }}
-                        className="px-6 py-2.5 rounded-md font-semibold border-2 hover:bg-slate-50 transition-colors"
-                        style={{ borderColor: BORDER }}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => handleSaveProperty(detailFormData)}
-                        disabled={savingProperty || !!nameError}
-                        className="px-6 py-2.5 rounded-md font-semibold text-white hover:opacity-95 transition-opacity disabled:opacity-60"
-                        style={{ background: "#7a0f1f" }}
-                      >
-                        {savingProperty ? "Saving..." : "Save"}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => {
-                          setDetailFormData({ ...detailProperty });
-                          setDetailEditing(true);
-                        }}
-                        className="px-6 py-2.5 rounded-md font-semibold border-2 hover:bg-slate-50 transition-colors"
-                        style={{ borderColor: "#7a0f1f", color: "#7a0f1f" }}
-                      >
-                        Edit
-                      </button>
-                    </>
-                  )}
+                  <button
+                    onClick={() => handleSaveProperty(detailFormData)}
+                    disabled={savingProperty || !!nameError}
+                    className="px-6 py-2.5 rounded-md font-semibold text-white hover:opacity-95 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
+                    style={{ background: "#7a0f1f" }}
+                  >
+                    {savingProperty ? "Saving..." : "Save"}
+                  </button>
                 </div>
               )}
             </div>

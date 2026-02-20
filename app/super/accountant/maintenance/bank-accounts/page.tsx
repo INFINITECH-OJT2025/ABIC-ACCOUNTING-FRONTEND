@@ -8,7 +8,7 @@ import LoadingModal from "@/components/ui/LoadingModal";
 import FailModal from "@/components/ui/FailModal";
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
 
-type AccountStatus = "ACTIVE" | "INACTIVE" | "CLOSED";
+type AccountStatus = "ACTIVE" | "INACTIVE" ;
 type AccountType = "BANK" | "GCASH" | "CASH" | "INTERNAL";
 
 type Owner = {
@@ -264,7 +264,6 @@ export default function BankAccountsPage() {
   const [detailAccount, setDetailAccount] = useState<BankAccount | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detailLoadError, setDetailLoadError] = useState<string | null>(null);
-  const [detailEditing, setDetailEditing] = useState(false);
   const [detailFormData, setDetailFormData] = useState<Partial<BankAccount>>({});
   const [savingAccount, setSavingAccount] = useState(false);
   const [showSaveLoading, setShowSaveLoading] = useState(false);
@@ -468,7 +467,6 @@ export default function BankAccountsPage() {
       setDetailDrawerClosing(false);
       setDetailAccount(null);
       setDetailFormData({});
-      setDetailEditing(false);
       setDetailLoadError(null);
       setOwnerSearchQuery("");
       setBankSearchQuery("");
@@ -657,7 +655,6 @@ export default function BankAccountsPage() {
       if (res.ok && data.success) {
         setDetailAccount((prev) => (prev ? { ...prev, ...data.data } : null));
         setDetailFormData((prev) => (prev ? { ...prev, ...data.data } : {}));
-        setDetailEditing(false);
         await fetchBankAccounts();
         setSuccessTitle("Bank Account Updated Successfully");
         setSuccessMessage("The bank account has been updated successfully.");
@@ -1291,7 +1288,6 @@ export default function BankAccountsPage() {
                     >
                       <option value="ACTIVE">Active</option>
                       <option value="INACTIVE">Inactive</option>
-                      <option value="CLOSED">Closed</option>
                     </select>
                   </div>
                 </div>
@@ -1346,7 +1342,7 @@ export default function BankAccountsPage() {
                     <div
                       className={`px-2 py-1 rounded text-xs font-semibold ${
                         detailAccount.status === "ACTIVE" ? "bg-green-100 text-green-700" : 
-                        detailAccount.status === "CLOSED" ? "bg-red-100 text-red-700" : 
+                        detailAccount.status === "INACTIVE" ? "bg-red-100 text-red-700" : 
                         "bg-gray-100 text-gray-700"
                       }`}
                     >
@@ -1374,8 +1370,7 @@ export default function BankAccountsPage() {
                         <label className="block text-sm font-medium text-neutral-900 mb-2">
                           Owner <span className="text-red-500">*</span>
                         </label>
-                        {detailEditing ? (
-                          <div className="relative">
+                        <div className="relative">
                             <div className="relative">
                               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500 pointer-events-none" />
                               <input
@@ -1437,41 +1432,34 @@ export default function BankAccountsPage() {
                               </>
                             )}
                           </div>
-                        ) : (
-                          <div className="text-sm text-neutral-900">{detailAccount.owner?.name || "—"}</div>
-                        )}
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-neutral-900 mb-2">
                           Account Type <span className="text-red-500">*</span>
                         </label>
-                        {detailEditing ? (
-                          <select
-                            value={detailFormData.account_type || "BANK"}
-                            onChange={(e) => {
-                              const newType = e.target.value as AccountType;
-                              setDetailFormData({ 
-                                ...detailFormData, 
-                                account_type: newType,
-                                bank_id: newType !== "BANK" ? null : detailFormData.bank_id,
-                                account_number: newType !== "BANK" ? null : detailFormData.account_number,
-                              });
-                            }}
-                            className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
-                            style={{ borderColor: BORDER }}
-                          >
-                            <option value="BANK">Bank</option>
-                            <option value="GCASH">GCash</option>
-                            <option value="CASH">Cash</option>
-                            <option value="INTERNAL">Internal</option>
-                          </select>
-                        ) : (
-                          <div className="text-sm text-neutral-900">{detailAccount.account_type}</div>
-                        )}
+                        <select
+                          value={detailFormData.account_type || "BANK"}
+                          onChange={(e) => {
+                            const newType = e.target.value as AccountType;
+                            setDetailFormData({ 
+                              ...detailFormData, 
+                              account_type: newType,
+                              bank_id: newType !== "BANK" ? null : detailFormData.bank_id,
+                              account_number: newType !== "BANK" ? null : detailFormData.account_number,
+                            });
+                          }}
+                          className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
+                          style={{ borderColor: BORDER }}
+                        >
+                          <option value="BANK">Bank</option>
+                          <option value="GCASH">GCash</option>
+                          <option value="CASH">Cash</option>
+                          <option value="INTERNAL">Internal</option>
+                        </select>
                       </div>
 
-                      {detailEditing && detailFormData.account_type === "BANK" && (
+                      {detailFormData.account_type === "BANK" && (
                         <div className="relative">
                           <label className="block text-sm font-medium text-neutral-900 mb-2">
                             Bank <span className="text-red-500">*</span>
@@ -1541,155 +1529,115 @@ export default function BankAccountsPage() {
                         </div>
                       )}
 
-                      {!detailEditing && detailAccount.account_type === "BANK" && (
-                        <div>
-                          <label className="block text-sm font-medium text-neutral-900 mb-2">Bank</label>
-                          <div className="text-sm text-neutral-900">{detailAccount.bank?.name || "—"}</div>
-                        </div>
-                      )}
-
                       <div>
                         <label className="block text-sm font-medium text-neutral-900 mb-2">
                           Account Name <span className="text-red-500">*</span>
                         </label>
-                        {detailEditing ? (
-                          <input
-                            type="text"
-                            value={detailFormData.account_name || ""}
-                            onChange={(e) => setDetailFormData({ ...detailFormData, account_name: e.target.value })}
-                            className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
-                            style={{ borderColor: BORDER }}
-                          />
-                        ) : (
-                          <div className="text-sm text-neutral-900">{detailAccount.account_name}</div>
-                        )}
+                        <input
+                          type="text"
+                          value={detailFormData.account_name || ""}
+                          onChange={(e) => setDetailFormData({ ...detailFormData, account_name: e.target.value })}
+                          className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
+                          style={{ borderColor: BORDER }}
+                        />
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-neutral-900 mb-2">
-                          Account Number {detailAccount.account_type === "BANK" && <span className="text-red-500">*</span>}
+                          Account Number {detailFormData.account_type === "BANK" && <span className="text-red-500">*</span>}
                         </label>
-                        {detailEditing ? (
-                          <input
-                            type="text"
-                            value={detailFormData.account_number || ""}
-                            onChange={(e) => setDetailFormData({ ...detailFormData, account_number: e.target.value })}
-                            className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
-                            style={{ borderColor: BORDER }}
-                            placeholder={detailFormData.account_type === "BANK" ? "Required" : "Optional"}
-                          />
-                        ) : (
-                          <div className="text-sm text-neutral-900">{detailAccount.account_number || "—"}</div>
-                        )}
+                        <input
+                          type="text"
+                          value={detailFormData.account_number || ""}
+                          onChange={(e) => setDetailFormData({ ...detailFormData, account_number: e.target.value })}
+                          className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
+                          style={{ borderColor: BORDER }}
+                          placeholder={detailFormData.account_type === "BANK" ? "Required" : "Optional"}
+                        />
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-neutral-900 mb-2">
                           Account Holder <span className="text-red-500">*</span>
                         </label>
-                        {detailEditing ? (
-                          <input
-                            type="text"
-                            value={detailFormData.account_holder || ""}
-                            onChange={(e) => setDetailFormData({ ...detailFormData, account_holder: e.target.value })}
-                            className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
-                            style={{ borderColor: BORDER }}
-                          />
-                        ) : (
-                          <div className="text-sm text-neutral-900">{detailAccount.account_holder}</div>
-                        )}
+                        <input
+                          type="text"
+                          value={detailFormData.account_holder || ""}
+                          onChange={(e) => setDetailFormData({ ...detailFormData, account_holder: e.target.value })}
+                          className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
+                          style={{ borderColor: BORDER }}
+                        />
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-neutral-900 mb-2">
                           Opening Balance <span className="text-red-500">*</span>
                         </label>
-                        {detailEditing ? (
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={detailFormData.opening_balance || ""}
-                            onChange={(e) => setDetailFormData({ ...detailFormData, opening_balance: parseFloat(e.target.value) || 0 })}
-                            className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
-                            style={{ borderColor: BORDER }}
-                          />
-                        ) : (
-                          <div className="text-sm text-neutral-900">{formatCurrency(detailAccount.opening_balance, detailAccount.currency)}</div>
-                        )}
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={detailFormData.opening_balance || ""}
+                          onChange={(e) => setDetailFormData({ ...detailFormData, opening_balance: parseFloat(e.target.value) || 0 })}
+                          className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
+                          style={{ borderColor: BORDER }}
+                        />
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-neutral-900 mb-2">
                           Opening Date <span className="text-red-500">*</span>
                         </label>
-                        {detailEditing ? (
-                          <input
-                            type="date"
-                            value={detailFormData.opening_date ? new Date(detailFormData.opening_date).toISOString().split("T")[0] : ""}
-                            onChange={(e) => setDetailFormData({ ...detailFormData, opening_date: e.target.value })}
-                            className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
-                            style={{ borderColor: BORDER }}
-                          />
-                        ) : (
-                          <div className="text-sm text-neutral-900">{formatDate(detailAccount.opening_date)}</div>
-                        )}
+                        <input
+                          type="date"
+                          value={detailFormData.opening_date ? new Date(detailFormData.opening_date).toISOString().split("T")[0] : ""}
+                          onChange={(e) => setDetailFormData({ ...detailFormData, opening_date: e.target.value })}
+                          className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
+                          style={{ borderColor: BORDER }}
+                        />
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-neutral-900 mb-2">
                           Currency <span className="text-red-500">*</span>
                         </label>
-                        {detailEditing ? (
-                          <select
-                            value={detailFormData.currency || "PHP"}
-                            onChange={(e) => setDetailFormData({ ...detailFormData, currency: e.target.value })}
-                            className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
-                            style={{ borderColor: BORDER }}
-                          >
-                            <option value="PHP">PHP - Philippine Peso</option>
-                            <option value="USD">USD - US Dollar</option>
-                            <option value="EUR">EUR - Euro</option>
-                            <option value="GBP">GBP - British Pound</option>
-                            <option value="JPY">JPY - Japanese Yen</option>
-                          </select>
-                        ) : (
-                          <div className="text-sm text-neutral-900">{detailAccount.currency}</div>
-                        )}
+                        <select
+                          value={detailFormData.currency || "PHP"}
+                          onChange={(e) => setDetailFormData({ ...detailFormData, currency: e.target.value })}
+                          className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
+                          style={{ borderColor: BORDER }}
+                        >
+                          <option value="PHP">PHP - Philippine Peso</option>
+                          <option value="USD">USD - US Dollar</option>
+                          <option value="EUR">EUR - Euro</option>
+                          <option value="GBP">GBP - British Pound</option>
+                          <option value="JPY">JPY - Japanese Yen</option>
+                        </select>
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-neutral-900 mb-2">
                           Status <span className="text-red-500">*</span>
                         </label>
-                        {detailEditing ? (
-                          <select
-                            value={detailFormData.status || "ACTIVE"}
-                            onChange={(e) => setDetailFormData({ ...detailFormData, status: e.target.value as AccountStatus })}
-                            className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
-                            style={{ borderColor: BORDER }}
-                          >
-                            <option value="ACTIVE">Active</option>
-                            <option value="INACTIVE">Inactive</option>
-                            <option value="CLOSED">Closed</option>
-                          </select>
-                        ) : (
-                          <div className="text-sm text-neutral-900">{detailAccount.status}</div>
-                        )}
+                        <select
+                          value={detailFormData.status || "ACTIVE"}
+                          onChange={(e) => setDetailFormData({ ...detailFormData, status: e.target.value as AccountStatus })}
+                          className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
+                          style={{ borderColor: BORDER }}
+                        >
+                          <option value="ACTIVE">Active</option>
+                          <option value="INACTIVE">Inactive</option>
+                        </select>
                       </div>
 
                       <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-neutral-900 mb-2">Notes</label>
-                        {detailEditing ? (
-                          <textarea
-                            value={detailFormData.notes || ""}
-                            onChange={(e) => setDetailFormData({ ...detailFormData, notes: e.target.value })}
-                            className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
-                            style={{ borderColor: BORDER }}
-                            rows={3}
-                          />
-                        ) : (
-                          <div className="text-sm text-neutral-900">{detailAccount.notes || "—"}</div>
-                        )}
+                        <textarea
+                          value={detailFormData.notes || ""}
+                          onChange={(e) => setDetailFormData({ ...detailFormData, notes: e.target.value })}
+                          className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
+                          style={{ borderColor: BORDER }}
+                          rows={3}
+                        />
                       </div>
                     </div>
                   </div>
@@ -1697,43 +1645,14 @@ export default function BankAccountsPage() {
               </div>
               {detailAccount && (
                 <div className="flex-shrink-0 flex items-center justify-end gap-3 p-4 border-t" style={{ borderColor: BORDER }}>
-                  {detailEditing ? (
-                    <>
-                      <button
-                        onClick={() => {
-                          setDetailEditing(false);
-                          setDetailFormData(detailAccount);
-                          setOwnerSearchQuery(detailAccount.owner?.name || "");
-                          setBankSearchQuery(detailAccount.bank?.name || "");
-                        }}
-                        className="px-6 py-2.5 rounded-md font-semibold border-2 hover:bg-slate-50 transition-colors"
-                        style={{ borderColor: BORDER }}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => handleSaveAccount(detailFormData)}
-                        disabled={savingAccount || !detailFormData.owner_id || (detailFormData.account_type === "BANK" && !detailFormData.bank_id)}
-                        className="px-6 py-2.5 rounded-md font-semibold text-white hover:opacity-95 transition-opacity disabled:opacity-60"
-                        style={{ background: "#7a0f1f" }}
-                      >
-                        {savingAccount ? "Saving..." : "Save"}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => {
-                          setDetailFormData({ ...detailAccount });
-                          setDetailEditing(true);
-                        }}
-                        className="px-6 py-2.5 rounded-md font-semibold border-2 hover:bg-slate-50 transition-colors"
-                        style={{ borderColor: "#7a0f1f", color: "#7a0f1f" }}
-                      >
-                        Edit
-                      </button>
-                    </>
-                  )}
+                  <button
+                    onClick={() => handleSaveAccount(detailFormData)}
+                    disabled={savingAccount || !detailFormData.owner_id || (detailFormData.account_type === "BANK" && !detailFormData.bank_id)}
+                    className="px-6 py-2.5 rounded-md font-semibold text-white hover:opacity-95 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
+                    style={{ background: "#7a0f1f" }}
+                  >
+                    {savingAccount ? "Saving..." : "Save"}
+                  </button>
                 </div>
               )}
             </div>

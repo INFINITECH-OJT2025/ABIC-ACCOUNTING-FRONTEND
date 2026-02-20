@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useMemo, useState, useEffect } from "react";
-import { Search, Grid, List, X, Inbox, Plus, Eye, User, Edit2, Building2, ChevronDown } from "lucide-react";
+import { Search, Grid, List, X, Inbox, Plus, Eye, User, Building2, ChevronDown } from "lucide-react";
 import SuccessModal from "@/components/ui/SuccessModal";
 import LoadingModal from "@/components/ui/LoadingModal";
 import FailModal from "@/components/ui/FailModal";
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
 
-type OwnerType = "COMPANY" | "CLIENT" | "EMPLOYEE" | "INDIVIDUAL" | "MAIN" | "PARTNER" | "PROPERTY" | "PROJECT";
-type OwnerStatus = "active" | "inactive" | "archived";
+type OwnerType = "COMPANY" | "EMPLOYEE" | "INDIVIDUAL" | "MAIN" | "PROPERTY" | "PROJECT";
+type OwnerStatus = "active" | "inactive";
 
 type Owner = {
   id: number;
@@ -22,7 +22,7 @@ type Owner = {
   updated_at?: string;
 };
 
-type UnitStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
+type UnitStatus = "ACTIVE" | "INACTIVE";
 
 type Property = {
   id: number;
@@ -263,7 +263,6 @@ export default function OwnersPage() {
   const [detailOwner, setDetailOwner] = useState<Owner | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detailLoadError, setDetailLoadError] = useState<string | null>(null);
-  const [detailEditing, setDetailEditing] = useState(false);
   const [detailFormData, setDetailFormData] = useState<Partial<Owner>>({});
   const [savingOwner, setSavingOwner] = useState(false);
   const [showSaveLoading, setShowSaveLoading] = useState(false);
@@ -350,9 +349,9 @@ export default function OwnersPage() {
     }
   }, [formData.email]);
 
-  // Debounce owner name checking for edit mode
+  // Debounce owner name checking for detail form
   useEffect(() => {
-    if (!detailFormData.name?.trim() || !detailOwner?.id) {
+    if (!detailOwner?.id || !detailFormData.name?.trim()) {
       setNameError(null);
       return;
     }
@@ -363,6 +362,20 @@ export default function OwnersPage() {
 
     return () => clearTimeout(timeoutId);
   }, [detailFormData.name, detailOwner?.id]);
+
+  // Debounce email validation for detail form
+  useEffect(() => {
+    if (!detailOwner?.id || !detailFormData.email?.trim()) {
+      setEmailError(null);
+      return;
+    }
+
+    if (!isValidEmail(detailFormData.email.trim())) {
+      setEmailError("Invalid email format");
+    } else {
+      setEmailError(null);
+    }
+  }, [detailFormData.email, detailOwner?.id]);
 
   // Filtering is now done on the backend, so we just use owners directly
   const paginatedOwners = owners;
@@ -496,7 +509,6 @@ export default function OwnersPage() {
       setDetailDrawerClosing(false);
       setDetailOwner(null);
       setDetailFormData({});
-      setDetailEditing(false);
       setDetailLoadError(null);
       setNameError(null);
       setEmailError(null);
@@ -645,10 +657,12 @@ export default function OwnersPage() {
   const openUnitForm = (unit?: Unit) => {
     if (unit) {
       setEditingUnit(unit);
+      // Convert ARCHIVED status to ACTIVE for editing (only ACTIVE/INACTIVE allowed)
+      const editableStatus = (unit.status === "ACTIVE" || unit.status === "INACTIVE" ? unit.status : "ACTIVE");
       setUnitFormData({
         unit_name: unit.unit_name || "",
         property_id: unit.property_id || null,
-        status: unit.status || "ACTIVE",
+        status: editableStatus as UnitStatus,
         notes: unit.notes || "",
       });
       // Set property search query to show selected property name
@@ -705,6 +719,14 @@ export default function OwnersPage() {
       return;
     }
 
+    // Validate status - only ACTIVE or INACTIVE allowed
+    if (unitFormData.status !== "ACTIVE" && unitFormData.status !== "INACTIVE") {
+      setFailTitle(editingUnit ? "Failed to Update Unit" : "Failed to Create Unit");
+      setCreateFailMessage("Status must be either ACTIVE or INACTIVE");
+      setShowCreateFail(true);
+      return;
+    }
+
     setSavingUnit(true);
     setShowUnitLoading(true);
     try {
@@ -713,6 +735,11 @@ export default function OwnersPage() {
         : `/api/accountant/maintenance/units`;
       const method = editingUnit ? "PUT" : "POST";
 
+      // Ensure status is only ACTIVE or INACTIVE
+      const statusToSend = unitFormData.status === "ACTIVE" || unitFormData.status === "INACTIVE" 
+        ? unitFormData.status 
+        : "ACTIVE";
+
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
@@ -720,7 +747,7 @@ export default function OwnersPage() {
           owner_id: detailOwner.id,
           property_id: unitFormData.property_id || null,
           unit_name: unitFormData.unit_name.trim(),
-          status: unitFormData.status,
+          status: statusToSend,
           notes: unitFormData.notes.trim() || null,
         }),
       });
@@ -787,16 +814,30 @@ export default function OwnersPage() {
       setShowCreateFail(true);
       return;
     }
+
+    // Validate status - only active or inactive allowed
+    if (formData.status && formData.status !== "active" && formData.status !== "inactive") {
+      setFailTitle("Failed to Update Owner");
+      setCreateFailMessage("Status must be either active or inactive");
+      setShowCreateFail(true);
+      return;
+    }
     
     setSavingOwner(true);
     setShowSaveLoading(true);
     try {
+      // Ensure status is only active or inactive
+      const statusToSend = formData.status === "active" || formData.status === "inactive" 
+        ? formData.status 
+        : "active";
+
       const cleanedData: Record<string, any> = {
         owner_type: formData.owner_type,
         name: formData.name.trim(),
         email: formData.email?.trim() || null,
         phone_number: formData.phone_number?.trim() || null,
         address: formData.address?.trim() || null,
+        status: statusToSend,
       };
 
       const res = await fetch(`/api/accountant/maintenance/owners/${detailOwner.id}`, {
@@ -809,7 +850,6 @@ export default function OwnersPage() {
       if (res.ok && data.success) {
         setDetailOwner((prev) => (prev ? { ...prev, ...data.data } : null));
         setDetailFormData((prev) => (prev ? { ...prev, ...data.data } : {}));
-        setDetailEditing(false);
         setNameError(null);
         setEmailError(null);
         await fetchOwners();
@@ -1346,120 +1386,109 @@ export default function OwnersPage() {
                         <label className="block text-sm font-medium text-neutral-900 mb-2">
                           Owner Type <span className="text-red-500">*</span>
                         </label>
-                        {detailEditing ? (
-                          <select
-                            value={detailFormData.owner_type || "INDIVIDUAL"}
-                            onChange={(e) => setDetailFormData({ ...detailFormData, owner_type: e.target.value as OwnerType })}
-                            className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
-                            style={{ borderColor: BORDER }}
-                          >
-                            <option value="COMPANY">Company</option>
-                            <option value="EMPLOYEE">Employee</option>
-                            <option value="INDIVIDUAL">Individual</option>
-                            <option value="MAIN">Main</option>
-                            <option value="PROPERTY">Property</option>
-                            <option value="PROJECT">Project</option>
-                          </select>
-                        ) : (
-                          <div className="text-sm text-neutral-900">{detailOwner.owner_type}</div>
-                        )}
+                        <select
+                          value={detailFormData.owner_type || "INDIVIDUAL"}
+                          onChange={(e) => setDetailFormData({ ...detailFormData, owner_type: e.target.value as OwnerType })}
+                          className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
+                          style={{ borderColor: BORDER }}
+                        >
+                          <option value="COMPANY">Company</option>
+                          <option value="EMPLOYEE">Employee</option>
+                          <option value="INDIVIDUAL">Individual</option>
+                          <option value="MAIN">Main</option>
+                          <option value="PROPERTY">Property</option>
+                          <option value="PROJECT">Project</option>
+                        </select>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-neutral-900 mb-2">
                           Owner Name <span className="text-red-500">*</span>
                         </label>
-                        {detailEditing ? (
-                          <div>
-                            <input
-                              type="text"
-                              value={detailFormData.name || ""}
-                              onChange={(e) => setDetailFormData({ ...detailFormData, name: e.target.value })}
-                              className={`w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20 ${
-                                nameError ? "border-red-500" : ""
-                              }`}
-                              style={nameError ? {} : { borderColor: BORDER }}
-                            />
-                            {checkingName && (
-                              <p className="text-xs text-gray-500 mt-1">Checking availability...</p>
-                            )}
-                            {nameError && !checkingName && (
-                              <p className="text-xs text-red-500 mt-1">{nameError}</p>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="text-sm text-neutral-900">{detailOwner.name}</div>
-                        )}
+                        <div>
+                          <input
+                            type="text"
+                            value={detailFormData.name || ""}
+                            onChange={(e) => setDetailFormData({ ...detailFormData, name: e.target.value })}
+                            className={`w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20 ${
+                              nameError ? "border-red-500" : ""
+                            }`}
+                            style={nameError ? {} : { borderColor: BORDER }}
+                          />
+                          {checkingName && (
+                            <p className="text-xs text-gray-500 mt-1">Checking availability...</p>
+                          )}
+                          {nameError && !checkingName && (
+                            <p className="text-xs text-red-500 mt-1">{nameError}</p>
+                          )}
+                        </div>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-neutral-900 mb-2">
                           Email
                         </label>
-                        {detailEditing ? (
-                          <div>
-                            <input
-                              type="email"
-                              value={detailFormData.email || ""}
-                              onChange={(e) => setDetailFormData({ ...detailFormData, email: e.target.value })}
-                              className={`w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20 ${
-                                emailError ? "border-red-500" : ""
-                              }`}
-                              style={emailError ? {} : { borderColor: BORDER }}
-                            />
-                            {emailError && (
-                              <p className="text-xs text-red-500 mt-1">{emailError}</p>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="text-sm text-neutral-900">{detailOwner.email || "—"}</div>
-                        )}
+                        <div>
+                          <input
+                            type="email"
+                            value={detailFormData.email || ""}
+                            onChange={(e) => setDetailFormData({ ...detailFormData, email: e.target.value })}
+                            className={`w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20 ${
+                              emailError ? "border-red-500" : ""
+                            }`}
+                            style={emailError ? {} : { borderColor: BORDER }}
+                          />
+                          {emailError && (
+                            <p className="text-xs text-red-500 mt-1">{emailError}</p>
+                          )}
+                        </div>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-neutral-900 mb-2">
                           Phone Number
                         </label>
-                        {detailEditing ? (
-                          <input
-                            type="text"
-                            value={detailFormData.phone_number || ""}
-                            onChange={(e) => setDetailFormData({ ...detailFormData, phone_number: formatPhoneNumber(e.target.value) })}
-                            className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
-                            style={{ borderColor: BORDER }}
-                          />
-                        ) : (
-                          <div className="text-sm text-neutral-900">{detailOwner.phone_number || "—"}</div>
-                        )}
+                        <input
+                          type="text"
+                          value={detailFormData.phone_number || ""}
+                          onChange={(e) => setDetailFormData({ ...detailFormData, phone_number: formatPhoneNumber(e.target.value) })}
+                          className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
+                          style={{ borderColor: BORDER }}
+                        />
                       </div>
                       <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-neutral-900 mb-2">
                           Address
                         </label>
-                        {detailEditing ? (
-                          <textarea
-                            value={detailFormData.address || ""}
-                            onChange={(e) => setDetailFormData({ ...detailFormData, address: e.target.value })}
-                            className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
-                            style={{ borderColor: BORDER }}
-                            rows={3}
-                          />
-                        ) : (
-                          <div className="text-sm text-neutral-900">{detailOwner.address || "—"}</div>
-                        )}
+                        <textarea
+                          value={detailFormData.address || ""}
+                          onChange={(e) => setDetailFormData({ ...detailFormData, address: e.target.value })}
+                          className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
+                          style={{ borderColor: BORDER }}
+                          rows={3}
+                        />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-neutral-900 mb-2">
-                          Status
+                          Status <span className="text-red-500">*</span>
                         </label>
-                        {detailEditing ? (
-                          <div className="text-sm text-neutral-500 italic">Status cannot be changed here</div>
-                        ) : (
-                          <div className="text-sm text-neutral-900">{detailOwner.status.toUpperCase()}</div>
-                        )}
+                        <select
+                          value={detailFormData.status || "active"}
+                          onChange={(e) => {
+                            const newStatus = e.target.value as OwnerStatus;
+                            // Ensure only active or inactive can be selected
+                            if (newStatus === "active" || newStatus === "inactive") {
+                              setDetailFormData({ ...detailFormData, status: newStatus });
+                            }
+                          }}
+                          className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
+                          style={{ borderColor: BORDER }}
+                        >
+                          <option value="active">Active</option>
+                          <option value="inactive">Inactive</option>
+                        </select>
                       </div>
                     </div>
 
                     {/* Units Section */}
-                    {!detailEditing && (
-                      <div className="mt-8 pt-8 border-t" style={{ borderColor: BORDER }}>
+                    <div className="mt-8 pt-8 border-t" style={{ borderColor: BORDER }}>
                         <div className="flex items-center justify-between mb-4">
                           <div>
                             <h3 className="text-base font-semibold text-neutral-900">Units</h3>
@@ -1554,49 +1583,19 @@ export default function OwnersPage() {
                           </div>
                         )}
                       </div>
-                    )}
                   </div>
                 )}
               </div>
               {detailOwner && (
                 <div className="flex-shrink-0 flex items-center justify-end gap-3 p-4 border-t" style={{ borderColor: BORDER }}>
-                  {detailEditing ? (
-                    <>
-                      <button
-                        onClick={() => {
-                          setDetailEditing(false);
-                          setDetailFormData(detailOwner);
-                          setNameError(null);
-                          setEmailError(null);
-                        }}
-                        className="px-6 py-2.5 rounded-md font-semibold border-2 hover:bg-slate-50 transition-colors"
-                        style={{ borderColor: BORDER }}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => handleSaveOwner(detailFormData)}
-                        disabled={savingOwner || !!nameError || !!emailError}
-                        className="px-6 py-2.5 rounded-md font-semibold text-white hover:opacity-95 transition-opacity disabled:opacity-60"
-                        style={{ background: "#7a0f1f" }}
-                      >
-                        {savingOwner ? "Saving..." : "Save"}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => {
-                          setDetailFormData({ ...detailOwner });
-                          setDetailEditing(true);
-                        }}
-                        className="px-6 py-2.5 rounded-md font-semibold border-2 hover:bg-slate-50 transition-colors"
-                        style={{ borderColor: "#7a0f1f", color: "#7a0f1f" }}
-                      >
-                        Edit
-                      </button>
-                    </>
-                  )}
+                  <button
+                    onClick={() => handleSaveOwner(detailFormData)}
+                    disabled={savingOwner || !!nameError || !!emailError}
+                    className="px-6 py-2.5 rounded-md font-semibold text-white hover:opacity-95 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
+                    style={{ background: "#7a0f1f" }}
+                  >
+                    {savingOwner ? "Saving..." : "Save"}
+                  </button>
                 </div>
               )}
             </div>
@@ -1825,13 +1824,18 @@ export default function OwnersPage() {
                   </label>
                   <select
                     value={unitFormData.status}
-                    onChange={(e) => setUnitFormData({ ...unitFormData, status: e.target.value as UnitStatus })}
+                    onChange={(e) => {
+                      const newStatus = e.target.value as UnitStatus;
+                      // Ensure only ACTIVE or INACTIVE can be selected
+                      if (newStatus === "ACTIVE" || newStatus === "INACTIVE") {
+                        setUnitFormData({ ...unitFormData, status: newStatus });
+                      }
+                    }}
                     className="w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20"
                     style={{ borderColor: BORDER }}
                   >
                     <option value="ACTIVE">Active</option>
                     <option value="INACTIVE">Inactive</option>
-                    <option value="ARCHIVED">Archived</option>
                   </select>
                 </div>
                 <div>
