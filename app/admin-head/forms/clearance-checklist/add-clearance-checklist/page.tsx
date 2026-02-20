@@ -33,7 +33,7 @@ interface NamedOption {
     name: string
 }
 
-interface CompletedOnboardingRecord {
+interface EmployedEmployeeRecord {
     id: string
     name: string
     startDate: string
@@ -62,7 +62,7 @@ export default function AddClearanceChecklistPage() {
     const router = useRouter()
     const [creatingRecord, setCreatingRecord] = useState(false)
     const [employeePickerOpen, setEmployeePickerOpen] = useState(false)
-    const [completedOnboardingRecords, setCompletedOnboardingRecords] = useState<CompletedOnboardingRecord[]>([])
+    const [employedEmployees, setEmployedEmployees] = useState<EmployedEmployeeRecord[]>([])
     const [positionOptions, setPositionOptions] = useState<string[]>([])
     const [departmentOptions, setDepartmentOptions] = useState<string[]>([])
     const [newRecord, setNewRecord] = useState({
@@ -105,9 +105,9 @@ export default function AddClearanceChecklistPage() {
     }, [])
 
     useEffect(() => {
-        const fetchCompletedOnboarding = async () => {
+        const fetchEmployedEmployees = async () => {
             try {
-                const response = await fetch(`${getApiUrl()}/api/onboarding-checklist`, {
+                const response = await fetch(`${getApiUrl()}/api/employees`, {
                     headers: { Accept: 'application/json' },
                 })
 
@@ -115,23 +115,23 @@ export default function AddClearanceChecklistPage() {
 
                 const result = await response.json()
                 const data = Array.isArray(result?.data) ? result.data : []
-                const doneRecords = data
+                const employedRecords = data
                     .map((record: any) => ({
                         id: String(record?.id ?? ''),
-                        name: String(record?.name ?? ''),
-                        startDate: String(record?.startDate ?? ''),
+                        name: `${String(record?.first_name ?? '').trim()} ${String(record?.last_name ?? '').trim()}`.trim(),
+                        startDate: String(record?.onboarding_date ?? record?.date_hired ?? ''),
                         position: String(record?.position ?? ''),
                         department: String(record?.department ?? ''),
-                        status: String(record?.status ?? '').toUpperCase(),
+                        status: String(record?.status ?? '').toLowerCase(),
                     }))
-                    .filter((record: CompletedOnboardingRecord) => record.status === 'DONE')
+                    .filter((record: EmployedEmployeeRecord) => record.status === 'employed' && record.name.length > 0)
 
-                setCompletedOnboardingRecords(doneRecords)
+                setEmployedEmployees(employedRecords)
             } catch {
             }
         }
 
-        fetchCompletedOnboarding()
+        fetchEmployedEmployees()
     }, [])
 
     const modalPositionOptions = useMemo(() => {
@@ -262,16 +262,16 @@ export default function AddClearanceChecklistPage() {
                         <Popover open={employeePickerOpen} onOpenChange={setEmployeePickerOpen}>
                             <PopoverTrigger asChild>
                                 <Button variant="outline" className="w-full justify-start rounded-xl border-slate-200 h-11 font-normal">
-                                    {newRecord.name || 'Select employee from completed onboarding'}
+                                    {newRecord.name || 'Select employed employee'}
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 rounded-xl border-slate-200 shadow-xl">
                                 <Command>
                                     <CommandInput placeholder="Search records..." />
                                     <CommandList>
-                                        <CommandEmpty>No completed onboarding records found.</CommandEmpty>
+                                        <CommandEmpty>No employed employees found.</CommandEmpty>
                                         <CommandGroup>
-                                            {completedOnboardingRecords.map((record) => (
+                                            {employedEmployees.map((record) => (
                                                 <CommandItem
                                                     key={record.id}
                                                     onSelect={() => {
