@@ -645,8 +645,8 @@ function OnboardPageContent() {
     }
   }
 
-  const handleSaveChecklist = async () => {
-    if (!checklistData) return
+  const handleSaveChecklist = async (redirect = true) => {
+    if (!checklistData) return false
 
     setIsSaving(true)
     try {
@@ -666,7 +666,7 @@ function OnboardPageContent() {
       const isUpdate = checklistRecordId !== null
       if (!normalizedDepartment || !normalizedStartDate) {
         toast.error('Department and Start Date are required before saving checklist')
-        return
+        return false
       }
 
       const response = await fetch(
@@ -695,8 +695,11 @@ function OnboardPageContent() {
           setChecklistRecordId(savedId)
         }
         toast.success('Checklist progress saved successfully')
-        clearStorage()
-        router.push('/admin-head/employee/masterfile')
+        if (redirect) {
+          clearStorage()
+          router.push('/admin-head/employee/masterfile')
+        }
+        return true
       } else {
         if (data?.errors) {
           const errorMessages = Object.values(data.errors).flat().join(' ')
@@ -1213,14 +1216,17 @@ function OnboardPageContent() {
               
               <div className="flex gap-3">
                 <Button
-                  onClick={() => setView('update-info')}
-                  disabled={Object.keys(completedTasks).length < onboardingTasks.length}
+                  onClick={async () => {
+                    const success = await handleSaveChecklist(false)
+                    if (success) setView('update-info')
+                  }}
+                  disabled={Object.keys(completedTasks).length < onboardingTasks.length || isSaving}
                   className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg active:scale-95 transition-all rounded-xl disabled:opacity-50"
                 >
-                  PROCEED TO DATA ENTRY
+                  {isSaving ? 'SAVING...' : 'PROCEED TO DATA ENTRY'}
                 </Button>
                 <Button 
-                  onClick={handleSaveChecklist} 
+                  onClick={() => handleSaveChecklist(true)} 
                   disabled={isSaving}
                   className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-[#A4163A] hover:bg-[#800020] text-white shadow-lg active:scale-95 transition-all rounded-xl"
                 >
