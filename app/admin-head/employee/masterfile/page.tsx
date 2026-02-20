@@ -65,6 +65,7 @@ export default function MasterfilePage() {
   const [activeTab, setActiveTab] = useState<'employed' | 'terminated'>('employed')
   const [isUpdating, setIsUpdating] = useState(false)
   const [isActionLoading, setIsActionLoading] = useState(false)
+  const [isDetailLoading, setIsDetailLoading] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [checklists, setChecklists] = useState<OnboardingChecklist[]>([])
 
@@ -149,7 +150,10 @@ export default function MasterfilePage() {
 
   const fetchEmployeeDetails = async (employeeId: number) => {
     try {
-      setIsActionLoading(true)
+      setIsDetailLoading(true)
+      setViewMode('details')
+      window.scrollTo(0, 0)
+      
       const apiUrl = getApiUrl()
       const fullUrl = `${apiUrl}/api/employees/${employeeId}`
       
@@ -165,17 +169,23 @@ export default function MasterfilePage() {
       
       const data = await response.json()
       if (data.success) {
-        setSelectedEmployee(data.data)
-        setViewMode('details')
-        window.scrollTo(0, 0)
+        // Find existing onboarding tasks from the employees list to preserve state
+        const existingEmp = employees.find(e => e.id === employeeId)
+        const enhancedDetails = {
+          ...data.data,
+          onboarding_tasks: existingEmp?.onboarding_tasks
+        }
+        setSelectedEmployee(enhancedDetails)
       } else {
         toast.error(data.message || 'Failed to load employee details')
+        setViewMode('list')
       }
     } catch (error) {
       console.error('Error fetching employee details:', error)
       toast.error('Network Error: Could not connect to the server.')
+      setViewMode('list')
     } finally {
-      setIsActionLoading(false)
+      setIsDetailLoading(false)
     }
   }
 
@@ -466,6 +476,48 @@ export default function MasterfilePage() {
     )
   )
 
+  const DetailSkeleton = () => (
+    <div className="max-w-5xl mx-auto space-y-8 animate-pulse">
+      <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
+        <div className="bg-slate-50/50 p-8 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+          <div className="flex items-center gap-5">
+            <Skeleton className="w-20 h-20 rounded-full" />
+            <div className="space-y-3">
+              <Skeleton className="h-8 w-64" />
+              <div className="flex gap-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-20" />
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-5 w-16" />
+          </div>
+        </div>
+        <div className="p-8 md:p-10 space-y-12">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="space-y-6">
+              <Skeleton className="h-6 w-48" />
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3, 4, 5, 6].map((j) => (
+                  <div key={j} className="space-y-2">
+                    <Skeleton className="h-3 w-24" />
+                    <Skeleton className="h-5 w-full" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="bg-slate-50 px-8 py-6 border-t border-slate-200 flex justify-end gap-3">
+          <Skeleton className="h-12 w-32 rounded-xl" />
+          <Skeleton className="h-12 w-48 rounded-xl" />
+        </div>
+      </div>
+    </div>
+  )
+
   return (
     <div className="min-h-screen p-8 bg-slate-50 animate-in fade-in duration-500">
       {/* ----- GLOBAL LOADING OVERLAY (For Actions Only) ----- */}
@@ -507,7 +559,6 @@ export default function MasterfilePage() {
                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                 </div>
               </div>
-
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <Select value={sortOrder} onValueChange={(value: any) => setSortOrder(value)}>
                   <SelectTrigger className="w-full sm:w-[180px] bg-white border-slate-200 h-11 rounded-xl shadow-sm focus:ring-[#630C22]">
@@ -787,6 +838,7 @@ export default function MasterfilePage() {
             <Button
               variant="ghost"
               onClick={() => setViewMode('list')}
+              disabled={isDetailLoading}
               className="text-slate-500 hover:text-slate-800 hover:bg-white"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2"><path d="m15 18-6-6 6-6"/></svg>
@@ -794,7 +846,10 @@ export default function MasterfilePage() {
             </Button>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
+          {isDetailLoading ? (
+            <DetailSkeleton />
+          ) : (
+            <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
              {/* Header */}
              <div className="bg-slate-50/50 p-8 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div className="flex items-center gap-5">
@@ -807,9 +862,19 @@ export default function MasterfilePage() {
                       </h1>
                       <div className="flex items-center gap-3">
                         <p className="text-slate-500 font-medium">{selectedEmployee?.position || 'No Position'}</p>
-                        <Badge className={`${statusBadgeColors[selectedEmployee?.status || 'pending']} border shadow-none px-3 py-0.5`}>
-                           {statusLabels[selectedEmployee?.status || 'pending']}
-                        </Badge>
+                        {selectedEmployee?.status === 'pending' ? (
+                          <Badge className={`border shadow-none px-3 py-0.5 ${
+                            checkCompleteness(selectedEmployee).isComplete 
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}>
+                            {checkCompleteness(selectedEmployee).status}
+                          </Badge>
+                        ) : (
+                          <Badge className={`${statusBadgeColors[selectedEmployee?.status || 'pending']} border shadow-none px-3 py-0.5`}>
+                            {statusLabels[selectedEmployee?.status || 'pending']}
+                          </Badge>
+                        )}
                       </div>
                    </div>
                 </div>
@@ -958,8 +1023,9 @@ export default function MasterfilePage() {
                      Back to List
                    </Button>
                 )}
-             </div>
-          </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
