@@ -1,6 +1,7 @@
 "use client"
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table"
@@ -15,6 +16,7 @@ import {
 import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from "@/components/ui/command"
+import { Separator } from '@/components/ui/separator'
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover"
@@ -25,8 +27,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
-  Save, Lock, ChevronLeft, ChevronRight, Check, Trash2, Plus, LayoutDashboard, ClipboardList, TriangleAlert, FolderPlus, Filter, ArrowUpDown, ListFilter, CheckCircle2, CircleDashed, Clock3, History, ArrowUpAZ, ArrowDownAZ
+  Save, Lock, ChevronLeft, ChevronRight, Check, Trash2, Plus, LayoutDashboard, ClipboardList, TriangleAlert, FolderPlus, Filter, ArrowUpDown, ListFilter, CheckCircle2, CircleDashed, Clock3, History, ArrowUpAZ, ArrowDownAZ, ChevronDown, Users, Loader2, X
 } from 'lucide-react'
+import { Label } from '@/components/ui/label'
 import { cn } from "@/lib/utils"
 import { getApiUrl } from '@/lib/api'
 import { toast } from 'sonner'
@@ -110,6 +113,16 @@ const isRecordDone = (record: OnboardingRecord) =>
   String(record.status).toUpperCase() === 'DONE' || getRecordCompletionPercentage(record) === 100
 
 export default function OnboardingChecklistPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen p-8 bg-slate-50"><Loader2 className="animate-spin h-8 w-8 text-[#630C22]" /></div>}>
+      <OnboardingChecklistPageContent />
+    </Suspense>
+  )
+}
+
+function OnboardingChecklistPageContent() {
+  const searchParams = useSearchParams()
+  const targetName = searchParams.get('name')
   const editMode = true
   const [saving, setSaving] = useState(false)
   const [creatingRecord, setCreatingRecord] = useState(false)
@@ -149,9 +162,19 @@ export default function OnboardingChecklistPage() {
         setRecords(data)
 
         if (data.length > 0) {
-          setCurrentIndex(0)
-          setEmployeeInfo(data[0])
-          setTasks(data[0].tasks)
+          let indexToSelect = 0
+          
+          // Auto-select based on search param
+          if (targetName) {
+            const matchingIndex = data.findIndex((r: OnboardingRecord) => r.name.toLowerCase() === targetName.toLowerCase())
+            if (matchingIndex !== -1) {
+              indexToSelect = matchingIndex
+            }
+          }
+          
+          setCurrentIndex(indexToSelect)
+          setEmployeeInfo(data[indexToSelect])
+          setTasks(data[indexToSelect].tasks)
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to load checklists'
@@ -276,6 +299,21 @@ export default function OnboardingChecklistPage() {
       department: '',
       startDate: '',
     })
+  }
+
+  const toggleAllTasks = () => {
+    if (!employeeInfo) return
+    const allCompleted = tasks.every(task => task.status === 'DONE')
+    const updatedTasks: ChecklistTask[] = tasks.map(t => ({
+      ...t,
+      status: (allCompleted ? 'PENDING' : 'DONE') as TaskStatus,
+      date: allCompleted ? '' : new Date().toLocaleDateString('en-CA')
+    }))
+    setTasks(updatedTasks)
+    
+    if (!editMode) {
+      persistTaskStatus(updatedTasks, tasks)
+    }
   }
 
   const addTask = () => {
@@ -449,333 +487,377 @@ export default function OnboardingChecklistPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-12 font-sans">
-      <header className="-mx-8 -mt-8 mb-8 bg-[#a0153e] text-white px-10 py-10 shadow-lg relative overflow-hidden">
-        <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-          <div className="space-y-4">
-            <h1 className="text-4xl font-extrabold tracking-tight italic">Onboarding Checklist</h1>
-
-            <div className="flex flex-wrap items-center gap-3 text-rose-100/80 text-lg">
-              <span className="opacity-80">Onboarding for</span>
-              <Popover open={open} onOpenChange={setOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" className="h-auto p-0 text-white font-bold text-lg hover:bg-transparent underline underline-offset-4 decoration-rose-400">
-                    {employeeInfo?.name || 'No records yet'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[300px] p-0 rounded-xl border-none shadow-2xl">
-                  <Command>
-                    <CommandInput placeholder="Search records..." />
-                    <CommandList>
-                      <CommandEmpty>No records found.</CommandEmpty>
-                      {doneRecords.length > 0 && (
-                        <CommandGroup heading="DONE">
-                          {doneRecords.map(({ record: emp, index }) => (
-                            <CommandItem key={emp.id} onSelect={() => { selectRecordByIndex(index); setOpen(false); }}>
-                              <Check className={cn("mr-2 h-4 w-4", currentIndex === index ? "opacity-100" : "opacity-0")} />
-                              {emp.name} ({getRecordCompletionPercentage(emp)}%)
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      )}
-                      {pendingRecords.length > 0 && (
-                        <CommandGroup heading="PENDING">
-                          {pendingRecords.map(({ record: emp, index }) => (
-                            <CommandItem key={emp.id} onSelect={() => { selectRecordByIndex(index); setOpen(false); }}>
-                              <Check className={cn("mr-2 h-4 w-4", currentIndex === index ? "opacity-100" : "opacity-0")} />
-                              {emp.name} ({getRecordCompletionPercentage(emp)}%)
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      )}
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-
-              <div className="flex items-center gap-2">
-                <Select value={recordStatusFilter} onValueChange={(value) => setRecordStatusFilter(value as RecordStatusFilter)}>
-                  <SelectTrigger className="h-9 w-[130px] rounded-full border border-white/25 bg-white/10 text-white text-xs font-black uppercase tracking-widest">
-                    <div className="flex items-center gap-2">
-                      <Filter className="h-3.5 w-3.5 text-rose-200" />
-                      <SelectValue />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL"><span className="flex items-center gap-2"><ListFilter className="h-3.5 w-3.5" /> All</span></SelectItem>
-                    <SelectItem value="DONE"><span className="flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Done</span></SelectItem>
-                    <SelectItem value="PENDING"><span className="flex items-center gap-2"><CircleDashed className="h-3.5 w-3.5 text-amber-600" /> Pending</span></SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={recordSort} onValueChange={(value) => setRecordSort(value as RecordSort)}>
-                  <SelectTrigger className="h-9 w-[130px] rounded-full border border-white/25 bg-white/10 text-white text-xs font-black uppercase tracking-widest">
-                    <div className="flex items-center gap-2">
-                      <ArrowUpDown className="h-3.5 w-3.5 text-rose-200" />
-                      <SelectValue />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="UPDATED_DESC"><span className="flex items-center gap-2"><Clock3 className="h-3.5 w-3.5" /> Latest</span></SelectItem>
-                    <SelectItem value="UPDATED_ASC"><span className="flex items-center gap-2"><History className="h-3.5 w-3.5" /> Oldest</span></SelectItem>
-                    <SelectItem value="NAME_ASC"><span className="flex items-center gap-2"><ArrowUpAZ className="h-3.5 w-3.5" /> A - Z</span></SelectItem>
-                    <SelectItem value="NAME_DESC"><span className="flex items-center gap-2"><ArrowDownAZ className="h-3.5 w-3.5" /> Z - A</span></SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex items-center gap-2 ml-2 px-4 py-1.5 bg-white/10 rounded-full border border-white/20 backdrop-blur-sm">
-                <LayoutDashboard className="w-4 h-4 text-rose-300" />
-                <span className="text-xs font-black uppercase tracking-widest text-rose-100">Progress:</span>
-                <span className="text-sm font-black text-white">{completionPercentage}% Completed</span>
-                {completionDateText && (
-                  <>
-                    <span className="text-rose-200/70">|</span>
-                    <span className="text-xs font-black uppercase tracking-widest text-rose-100">Date:</span>
-                    <span className="text-sm font-black text-white">{completionDateText}</span>
-                  </>
-                )}
-              </div>
+    <div className="min-h-screen w-full bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-12">
+      {/* ----- INTEGRATED HEADER & TOOLBAR ----- */}
+      <header className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md p-4 md:p-6 mb-8 relative overflow-hidden">
+        <div className="max-w-[1600px] mx-auto flex flex-wrap items-center gap-6 lg:gap-8">
+          {/* Title Section */}
+          <div className="flex flex-col">
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight leading-none mb-1">Onboarding Checklist</h1>
+            <div className="flex items-center gap-1.5 text-white/60">
+              <ClipboardList className="w-3.5 h-3.5" />
+              <p className="text-[10px] md:text-xs font-bold uppercase tracking-widest">ABIC REALTY & CONSULTANCY</p>
             </div>
           </div>
 
+          <div className="h-8 w-px bg-white/10 hidden lg:block" />
+
+          {/* Controls Area */}
+          <div className="flex flex-wrap items-center gap-5 flex-1">
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] flex items-center gap-2">
+                <Filter className="w-3.5 h-3.5" /> Filter Status
+              </span>
+              <Select value={recordStatusFilter} onValueChange={(value) => setRecordStatusFilter(value as RecordStatusFilter)}>
+                <SelectTrigger className="h-9 w-[130px] rounded-lg border-2 border-white/20 bg-white/10 text-white text-xs font-bold hover:bg-white/20 transition-all">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-lg">
+                  <SelectItem value="ALL">All Records</SelectItem>
+                  <SelectItem value="DONE">Completed</SelectItem>
+                  <SelectItem value="PENDING">Pending</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Popover open={open} onOpenChange={setOpen}>
+              <PopoverTrigger asChild>
+                <div className="h-9 px-4 rounded-lg border-2 border-white/20 bg-white/10 text-white text-xs font-bold hover:bg-white/20 transition-all inline-flex items-center justify-center whitespace-nowrap cursor-pointer group min-w-[200px]">
+                  <Users className="w-3.5 h-3.5 mr-2 opacity-70" />
+                  <span className="truncate max-w-[140px]">{employeeInfo?.name || 'Select Record'}</span>
+                  <ChevronDown className="w-4 h-4 ml-2 opacity-50 group-hover:opacity-100 transition-opacity" />
+                </div>
+              </PopoverTrigger>
+              <PopoverContent className="w-[300px] p-0 rounded-xl border-stone-200 shadow-2xl" align="start">
+                <Command>
+                  <CommandInput placeholder="Search records..." className="h-10" />
+                  <CommandList>
+                    <CommandEmpty>No records found.</CommandEmpty>
+                    {doneRecords.length > 0 && (
+                      <CommandGroup heading="DONE">
+                        {doneRecords.map(({ record: emp, index }) => (
+                          <CommandItem key={emp.id} onSelect={() => { selectRecordByIndex(index); setOpen(false); }} className="rounded-lg m-1">
+                            <Check className={cn("mr-2 h-4 w-4", currentIndex === index ? "text-[#A4163A]" : "opacity-0")} />
+                            <span className="font-medium text-slate-700">{emp.name}</span>
+                            <span className="ml-auto text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">{getRecordCompletionPercentage(emp)}%</span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    )}
+                    {pendingRecords.length > 0 && (
+                      <CommandGroup heading="PENDING">
+                        {pendingRecords.map(({ record: emp, index }) => (
+                          <CommandItem key={emp.id} onSelect={() => { selectRecordByIndex(index); setOpen(false); }} className="rounded-lg m-1">
+                            <Check className={cn("mr-2 h-4 w-4", currentIndex === index ? "text-[#A4163A]" : "opacity-0")} />
+                            <span className="font-medium text-slate-700">{emp.name}</span>
+                            <span className="ml-auto text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">{getRecordCompletionPercentage(emp)}%</span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    )}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] flex items-center gap-2">
+                <ArrowUpDown className="w-3.5 h-3.5" /> Sort By
+              </span>
+              <Select value={recordSort} onValueChange={(value) => setRecordSort(value as RecordSort)}>
+                <SelectTrigger className="h-9 w-[150px] rounded-lg border-2 border-white/20 bg-white/10 text-white text-xs font-bold hover:bg-white/20 transition-all">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-lg">
+                  <SelectItem value="UPDATED_DESC">Latest First</SelectItem>
+                  <SelectItem value="UPDATED_ASC">Oldest First</SelectItem>
+                  <SelectItem value="NAME_ASC">Name (A-Z)</SelectItem>
+                  <SelectItem value="NAME_DESC">Name (Z-A)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="ml-auto hidden xl:flex items-center gap-4 bg-white/5 px-6 py-2 rounded-xl border border-white/10 backdrop-blur-sm">
+              <div className="flex flex-col items-end">
+                <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Overall Progress</span>
+                <span className="text-base font-black text-white">{completionPercentage}%</span>
+              </div>
+              <div className="h-6 w-px bg-white/10" />
+              <div className="flex flex-col">
+                <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Last Updated</span>
+                <span className="text-base font-black text-white tracking-tight">{completionDateText || '—'}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </header>
 
-      <main className="max-w-[1600px] mx-auto p-8 relative">
-        <div className="absolute left-0 top-[25%] -translate-x-1/2 z-10">
-          <Button onClick={handlePrev} disabled={records.length === 0 || currentIndex === 0} size="icon" className="rounded-full h-12 w-12 bg-white shadow-xl text-[#a0153e] border-none hover:bg-rose-50">
-            <ChevronLeft className="h-6 w-6" />
+      <main className="max-w-[1600px] mx-auto px-6 md:px-8 relative mb-20 transition-all duration-500 animate-in fade-in slide-in-from-bottom-5">
+        {/* Navigation Overlays */}
+        <div className="absolute left-0 top-[30%] -translate-x-[60%] z-10 hidden xl:block">
+          <Button onClick={handlePrev} disabled={records.length === 0 || currentIndex === 0} size="icon" className="rounded-full h-14 w-14 bg-white shadow-xl text-[#800020] border-2 border-[#FFE5EC] hover:bg-rose-50 transition-all active:scale-95">
+            <ChevronLeft className="h-7 w-7" />
           </Button>
         </div>
-        <div className="absolute right-0 top-[25%] translate-x-1/2 z-10">
-          <Button onClick={handleNext} disabled={records.length === 0 || currentIndex >= records.length - 1} size="icon" className="rounded-full h-12 w-12 bg-white shadow-xl text-[#a0153e] border-none hover:bg-rose-50">
-            <ChevronRight className="h-6 w-6" />
+        <div className="absolute right-0 top-[30%] translate-x-[60%] z-10 hidden xl:block">
+          <Button onClick={handleNext} disabled={records.length === 0 || currentIndex >= records.length - 1} size="icon" className="rounded-full h-14 w-14 bg-white shadow-xl text-[#800020] border-2 border-[#FFE5EC] hover:bg-rose-50 transition-all active:scale-95">
+            <ChevronRight className="h-7 w-7" />
           </Button>
         </div>
 
-        <Card className="rounded-[2rem] border-none shadow-2xl overflow-hidden bg-white mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-slate-100">
-            <div className="p-8 bg-slate-50/30">
-              <div className="flex items-center gap-2 mb-3">
-                <p className="text-lg font-bold text-[#a0153e] uppercase tracking-wide">Employee Name</p>
-                <Lock className="w-3 h-3 text-slate-400" />
+        <Card className="rounded-2xl border-2 border-[#FFE5EC] shadow-lg overflow-hidden bg-white mb-6 transition-all hover:shadow-xl">
+          <div className="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-rose-50">
+            <div className="p-4 bg-rose-50/20">
+              <div className="flex items-center gap-2 mb-1">
+                <Users className="w-3.5 h-3.5 text-[#800020]/60" />
+                <p className="text-[9px] font-black text-[#800020]/60 uppercase tracking-widest">Employee Name</p>
               </div>
-              <p className="text-2xl md:text-3xl font-extrabold text-slate-900 leading-tight">{employeeInfo?.name || '-'}</p>
+              <p className="text-lg font-black text-slate-800 leading-tight">{employeeInfo?.name || '-'}</p>
             </div>
 
-            <div className="p-8">
-              <p className="text-lg font-bold text-[#a0153e] uppercase tracking-wide mb-3">Position</p>
-              {editMode && employeeInfo ? (
-                <Select value={employeeInfo.position || ''} onValueChange={(val) => setEmployeeInfo({ ...employeeInfo, position: val })}>
-                  <SelectTrigger className="rounded-xl border-slate-200 h-11"><SelectValue /></SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    {positionSelectOptions.map((name) => (
-                      <SelectItem key={name} value={name}>{name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (<p className="text-2xl md:text-3xl font-extrabold text-slate-700">{employeeInfo?.position || '-'}</p>)}
+            <div className="p-4">
+              <p className="text-[9px] font-black text-[#800020]/60 uppercase tracking-widest mb-1">Position</p>
+              <p className="text-lg font-bold text-slate-700 leading-tight">{employeeInfo?.position || '-'}</p>
             </div>
 
-            <div className="p-8">
-              <p className="text-lg font-bold text-[#a0153e] uppercase tracking-wide mb-3">Start Date</p>
-              {editMode && employeeInfo ? (
-                <Input type="date" value={employeeInfo.startDate} onChange={(e) => setEmployeeInfo({ ...employeeInfo, startDate: e.target.value })} className="rounded-xl border-slate-200 h-11" />
-              ) : (<p className="text-2xl md:text-3xl font-extrabold text-slate-700">{employeeInfo?.startDate ? new Date(employeeInfo.startDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '-'}</p>)}
+            <div className="p-4">
+              <p className="text-[9px] font-black text-[#800020]/60 uppercase tracking-widest mb-1">Start Date</p>
+              <p className="text-lg font-bold text-slate-700">
+                {employeeInfo?.startDate ? new Date(employeeInfo.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
+              </p>
             </div>
 
-            <div className="p-8">
-              <p className="text-lg font-bold text-[#a0153e] uppercase tracking-wide mb-3">Department</p>
-              {editMode && employeeInfo ? (
-                <Select value={employeeInfo.department || ''} onValueChange={(val) => setEmployeeInfo({ ...employeeInfo, department: val })}>
-                  <SelectTrigger className="rounded-xl border-slate-200 h-11"><SelectValue /></SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    {departmentSelectOptions.map((name) => (
-                      <SelectItem key={name} value={name}>{name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (<p className="text-2xl md:text-3xl font-extrabold text-slate-700">{employeeInfo?.department || '-'}</p>)}
+            <div className="p-4">
+              <p className="text-[9px] font-black text-[#800020]/60 uppercase tracking-widest mb-1">Department</p>
+              <p className="text-lg font-bold text-slate-700 leading-tight">{employeeInfo?.department || '-'}</p>
             </div>
           </div>
         </Card>
 
-        <Card className="rounded-[2rem] border-none shadow-2xl bg-white overflow-hidden">
+        {/* Task List Section */}
+        <Card className="rounded-2xl border-2 border-[#FFE5EC] shadow-2xl bg-white overflow-hidden mb-12">
+          {/* Progress Banner */}
+          <div className="bg-[#FFE5EC]/20 p-4 md:px-8 border-b border-[#FFE5EC]">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-[11px] font-black text-[#800020] uppercase tracking-widest">Process Onboarding Progress</h3>
+              <span className="text-sm font-black text-[#A4163A] bg-white px-3 py-0.5 rounded-full shadow-sm border border-[#FFE5EC]">
+                {tasks.filter(t => t.status === 'DONE').length} / {tasks.length} Completed
+              </span>
+            </div>
+            <div className="w-full bg-white h-2.5 rounded-full overflow-hidden border border-[#FFE5EC] shadow-inner p-0.5">
+              <div
+                className="bg-gradient-to-r from-[#A4163A] to-[#630C22] h-full rounded-full transition-all duration-1000 ease-out shadow-sm"
+                style={{ width: `${completionPercentage}%` }}
+              />
+            </div>
+          </div>
+
           <Table>
-            <TableHeader className="bg-slate-50/50">
-              <TableRow className="border-b border-slate-100">
-                <TableHead className="w-[220px] text-center font-black text-[#a0153e] uppercase tracking-widest text-[11px] py-8">Date</TableHead>
-                <TableHead className="w-[180px] text-center font-black text-[#a0153e] uppercase tracking-widest text-[11px] py-8">Status</TableHead>
-                <TableHead className="font-black text-[#a0153e] uppercase tracking-widest text-[11px] py-8">Onboarding Tasks</TableHead>
-                {editMode && <TableHead className="w-[100px] text-center font-black text-[#a0153e] uppercase tracking-widest text-[11px] py-8">Action</TableHead>}
+            <TableHeader className="bg-[#FFE5EC]/40">
+              <TableRow className="border-b border-[#FFE5EC] hover:bg-transparent">
+                <TableHead className="w-[180px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">Date</TableHead>
+                <TableHead className="w-[80px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">Status</TableHead>
+                <TableHead className="font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">
+                  <div className="flex items-center justify-between">
+                    <span>Required Onboarding Tasks</span>
+                    <button 
+                      onClick={toggleAllTasks}
+                      className="text-[8px] normal-case bg-white/50 hover:bg-rose-50 text-[#800020] px-2 py-1 rounded-md border border-[#FFE5EC] transition-all font-black shadow-sm"
+                    >
+                      {tasks.every(task => task.status === 'DONE') ? 'UNCHECK ALL' : 'CHECK ALL'}
+                    </button>
+                  </div>
+                </TableHead>
+                <TableHead className="w-[80px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {tasks.map((item) => (
-                <TableRow key={item.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/30 transition-colors">
-                  <TableCell className="py-6 text-center font-semibold text-slate-600">
-                    {item.date
-                      ? new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                      : '-'}
+                <TableRow key={item.id} className="border-b border-rose-50/30 last:border-0 hover:bg-[#FFE5EC]/5 transition-colors group">
+                  <TableCell className="text-center py-2.5 font-mono text-[10px] font-bold text-slate-400">
+                    {item.date ? new Date(item.date).toLocaleString('en-US', { 
+                      month: 'short', 
+                      day: 'numeric', 
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: true 
+                    }) : '-'}
                   </TableCell>
-                  <TableCell className="py-6">
-                    <div className="flex justify-center items-center gap-4">
-                      <Checkbox
-                        checked={item.status === 'DONE'}
-                        onCheckedChange={(checked) => toggleTaskStatus(item.id, !!checked)}
-                        className="h-5 w-5 rounded-md border-slate-300 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
-                      />
-                      <Badge className={cn(
-                        "rounded-full px-5 py-1 text-[10px] tracking-widest border-none transition-all",
-                        item.status === 'DONE' ? "bg-emerald-50 text-emerald-600 shadow-sm" : "bg-slate-100 text-slate-400 opacity-60"
-                      )}>
-                        {item.status}
-                      </Badge>
+                  <TableCell className="py-2.5">
+                    <div className="flex justify-center">
+                      <div 
+                        onClick={() => toggleTaskStatus(item.id, item.status !== 'DONE')}
+                        className={cn(
+                          "w-5 h-5 rounded flex items-center justify-center cursor-pointer transition-all border-2",
+                          item.status === 'DONE' 
+                            ? "bg-emerald-500 border-emerald-500 text-white shadow-sm" 
+                            : "border-slate-200 bg-white hover:border-[#A4163A]"
+                        )}
+                      >
+                        {item.status === 'DONE' && <CheckCircle2 className="h-3.5 w-3.5" />}
+                      </div>
                     </div>
                   </TableCell>
-                  <TableCell className="py-6">
+                  <TableCell className="py-2.5">
                     {editMode ? (
-                      <Input value={item.task} onChange={(e) => updateTaskText(item.id, e.target.value)} className="rounded-xl border-slate-200 h-11 bg-slate-50/30" />
+                      <Input 
+                        value={item.task} 
+                        onChange={(e) => updateTaskText(item.id, e.target.value)} 
+                        className={cn(
+                          "h-8 border-transparent bg-transparent hover:border-[#FFE5EC]/50 focus:border-[#A4163A] focus-visible:ring-0 transition-all font-bold px-0 text-sm",
+                          item.status === 'DONE' ? "text-slate-300 line-through" : "text-slate-700"
+                        )} 
+                        placeholder="Define onboarding task..."
+                      />
                     ) : (
-                      <span className={cn("text-[15px] font-medium transition-all duration-300", item.status === 'DONE' && "text-slate-400 line-through decoration-slate-200")}>
+                      <span className={cn(
+                        "text-sm font-bold transition-all duration-300",
+                        item.status === 'DONE' ? "text-slate-300 line-through" : "text-slate-700"
+                      )}>
                         {item.task}
                       </span>
                     )}
                   </TableCell>
-                  {editMode && (
-                    <TableCell className="py-6 text-center">
-                      <Button variant="ghost" size="icon" onClick={() => setTaskIdToDelete(item.id)} className="text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-full">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  )}
+                  <TableCell className="py-2.5 text-center">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => setTaskIdToDelete(item.id)}
+                      className="h-7 w-7 text-slate-300 hover:text-rose-500 transition-colors rounded-lg group-hover:bg-rose-50"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
+
               {tasks.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={emptyTaskColSpan} className="py-16">
-                    <div className="flex flex-col items-center justify-center text-center gap-3">
-                      <div className="h-14 w-14 rounded-full bg-[#a0153e]/10 flex items-center justify-center">
-                        <ClipboardList className="h-7 w-7 text-[#a0153e]" />
-                      </div>
-                      <p className="text-base font-bold text-slate-700">No tasks to display</p>
-                      <p className="text-sm text-slate-500">
-                        {records.length === 0 ? 'No onboarding records found yet. Add a record to begin.' : 'This record has no tasks yet.'}
-                      </p>
-                    </div>
+                  <TableCell colSpan={4} className="py-24 text-center">
+                    <ClipboardList className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+                    <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">No tasks initialized</p>
+                    <Button onClick={addTask} variant="outline" size="sm" className="mt-4 border-[#FFE5EC] text-[#A4163A] font-black h-9 rounded-xl">
+                      <Plus className="w-4 h-4 mr-1" /> START CHECKLIST
+                    </Button>
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
 
-          <div className="bg-slate-50/50 px-10 py-8 flex justify-between items-center border-t border-slate-100">
-            <div className="flex items-center gap-4">
-              <p className="text-[10px] text-slate-400 font-bold tracking-[0.2em] uppercase">ABIC Realty Onboarding System</p>
-              {editMode && (
-                <Button onClick={addTask} size="sm" variant="ghost" className="rounded-full text-[#a0153e] font-bold bg-[#a0153e]/5 hover:bg-[#a0153e]/10 px-6">
-                  <Plus className="mr-2 h-4 w-4" /> Add Task
-                </Button>
-              )}
-            </div>
-            <div className="flex gap-4">
-              <Button variant="outline" className="rounded-full px-8 h-12 shadow-sm border-slate-200 font-bold text-slate-600 hover:bg-slate-100 transition-colors">
-                <FolderPlus className="mr-2 h-4 w-4" /> Add to Masterfile
+          {/* Table Footer */}
+          <div className="p-4 md:px-8 bg-slate-50/50 border-t border-[#FFE5EC] flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex items-center gap-3">
+              <Button onClick={addTask} size="sm" className="bg-[#A4163A] hover:bg-[#800020] text-white font-black text-xs h-9 px-6 rounded-xl shadow-md active:scale-95 transition-all">
+                <Plus className="w-3.5 h-3.5 mr-2" /> ADD ROW
               </Button>
-              <Button
-                onClick={handleSave}
+              <Separator orientation="vertical" className="h-4 bg-slate-200" />
+              <p className="text-[8px] font-black text-slate-300 uppercase tracking-[0.2em] italic">
+                ADMINISTRATION FRAMEWORK • ABIC HR
+              </p>
+            </div>
+            
+            <div className="flex gap-3">
+              <Button 
+                onClick={handleSave} 
                 disabled={saving || !employeeInfo}
-                className="rounded-full px-12 h-12 font-bold shadow-xl transition-all bg-emerald-600 hover:bg-emerald-700 text-white"
+                className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg active:scale-95 transition-all rounded-xl"
               >
-                <><Save className="mr-2 h-4 w-4" /> {saving ? 'Saving...' : 'Save'}</>
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <Save className="w-3.5 h-3.5 mr-2" />}
+                {saving ? 'UPDATING...' : 'FINALIZE SAVE'}
               </Button>
             </div>
           </div>
         </Card>
       </main>
 
+      {/* Modals & Dialogs */}
       <Dialog open={addRecordOpen} onOpenChange={setAddRecordOpen}>
-        <DialogContent className="sm:max-w-[560px] border-2 border-[#C9184A] p-0 overflow-hidden">
-          <DialogHeader className="bg-gradient-to-r from-[#800020] via-[#A0153E] to-[#C9184A] p-6 text-white">
-            <DialogTitle className="text-2xl font-bold">Add Onboarding Record</DialogTitle>
-            <DialogDescription className="text-rose-100">
-              Create a new onboarding checklist record.
+        <DialogContent className="sm:max-w-[560px] border-4 border-[#FFE5EC] p-0 overflow-hidden rounded-3xl shadow-2xl">
+          <DialogHeader className="bg-gradient-to-r from-[#800020] via-[#A0153E] to-[#C9184A] p-8 text-white relative">
+            <div className="absolute top-0 right-0 p-8 opacity-10">
+              <Users className="w-24 h-24" />
+            </div>
+            <DialogTitle className="text-3xl font-black tracking-tight italic">Initiate Record</DialogTitle>
+            <DialogDescription className="text-rose-100 text-lg font-medium">
+              Create a fresh onboarding checklist pathway.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="p-6 space-y-4">
-            <div>
-              <p className="text-[11px] font-bold text-[#a0153e] uppercase tracking-[0.2em] mb-2">Employee Name</p>
+          <div className="p-8 space-y-6 bg-white">
+            <div className="space-y-2">
+              <Label className="text-[11px] font-black text-[#800020] uppercase tracking-[0.2em]">Employee Full Name</Label>
               <Input
                 value={newRecord.name}
                 onChange={(e) => setNewRecord(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Enter employee name"
-                className="rounded-xl border-slate-200 h-11"
+                placeholder="Ex. Juan Dela Cruz"
+                className="rounded-xl border-[#FFE5EC] border-2 h-14 text-lg font-bold focus:ring-[#800020]/10 focus:border-[#800020]"
               />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-[11px] font-bold text-[#a0153e] uppercase tracking-[0.2em] mb-2">Position</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label className="text-[11px] font-black text-[#800020] uppercase tracking-[0.2em]">Official Position</Label>
                 <Input
                   value={newRecord.position}
                   onChange={(e) => setNewRecord(prev => ({ ...prev, position: e.target.value }))}
-                  placeholder="Enter position"
-                  className="rounded-xl border-slate-200 h-11"
+                  placeholder="Ex. Senior Accountant"
+                  className="rounded-xl border-[#FFE5EC] border-2 h-14 text-lg font-bold focus:ring-[#800020]/10 focus:border-[#800020]"
                 />
               </div>
-              <div>
-                <p className="text-[11px] font-bold text-[#a0153e] uppercase tracking-[0.2em] mb-2">Department</p>
+              <div className="space-y-2">
+                <Label className="text-[11px] font-black text-[#800020] uppercase tracking-[0.2em]">Department</Label>
                 <Input
                   value={newRecord.department}
                   onChange={(e) => setNewRecord(prev => ({ ...prev, department: e.target.value }))}
-                  placeholder="Enter department"
-                  className="rounded-xl border-slate-200 h-11"
+                  placeholder="Ex. Finance"
+                  className="rounded-xl border-[#FFE5EC] border-2 h-14 text-lg font-bold focus:ring-[#800020]/10 focus:border-[#800020]"
                 />
               </div>
             </div>
-            <div>
-              <p className="text-[11px] font-bold text-[#a0153e] uppercase tracking-[0.2em] mb-2">Start Date</p>
+            <div className="space-y-2">
+              <Label className="text-[11px] font-black text-[#800020] uppercase tracking-[0.2em]">Onboarding Start Date</Label>
               <Input
                 type="date"
                 value={newRecord.startDate}
                 onChange={(e) => setNewRecord(prev => ({ ...prev, startDate: e.target.value }))}
-                className="rounded-xl border-slate-200 h-11"
+                className="rounded-xl border-[#FFE5EC] border-2 h-14 text-lg font-bold focus:ring-[#800020]/10 focus:border-[#800020]"
               />
             </div>
           </div>
 
-          <DialogFooter className="px-6 pb-6 gap-2">
-            <Button variant="outline" onClick={() => { setAddRecordOpen(false); resetNewRecord(); }} className="rounded-full">
-              Cancel
+          <DialogFooter className="px-8 pb-8 pt-2 bg-white flex flex-row gap-4">
+            <Button variant="ghost" onClick={() => { setAddRecordOpen(false); resetNewRecord(); }} className="flex-1 rounded-xl h-14 font-black text-slate-400 hover:text-slate-600 hover:bg-rose-50 transition-all">
+              DISCARD
             </Button>
-            <Button onClick={handleCreateRecord} disabled={creatingRecord} className="rounded-full bg-[#a0153e] hover:bg-[#801030] text-white">
-              <Plus className="mr-2 h-4 w-4" /> {creatingRecord ? 'Creating...' : 'Create Record'}
+            <Button onClick={handleCreateRecord} disabled={creatingRecord} className="flex-2 px-10 rounded-xl bg-gradient-to-r from-[#A4163A] to-[#630C22] hover:shadow-xl active:scale-95 text-white font-black h-14 transition-all uppercase tracking-widest text-xs">
+              {creatingRecord ? <Loader2 className="animate-spin h-5 w-5" /> : 'Create Record'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <AlertDialog open={taskIdToDelete !== null} onOpenChange={(open) => { if (!open) setTaskIdToDelete(null) }}>
-        <AlertDialogContent className="border-2 border-rose-200">
+        <AlertDialogContent className="border-4 border-[#FFE5EC] rounded-3xl p-8 bg-white shadow-2xl">
           <AlertDialogHeader>
-            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-rose-50 text-rose-600">
-              <TriangleAlert className="h-6 w-6" />
+            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-rose-50 text-[#A4163A] border-4 border-[#FFE5EC]">
+              <TriangleAlert className="h-8 w-8" />
             </div>
-            <AlertDialogTitle>Delete this task?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This task will be removed from the current checklist.
+            <AlertDialogTitle className="text-2xl font-black text-center text-slate-900">Confirm Deletion</AlertDialogTitle>
+            <AlertDialogDescription className="text-center text-lg text-slate-500 font-medium">
+              You are about to remove this task from the checklist. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setTaskIdToDelete(null)}>Cancel</AlertDialogCancel>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-4 mt-8">
+            <AlertDialogCancel onClick={() => setTaskIdToDelete(null)} className="h-12 rounded-xl font-bold border-2 border-[#FFE5EC] hover:bg-rose-50 text-slate-600">Retain Task</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-rose-600 text-white hover:bg-rose-700"
+              className="bg-[#A4163A] text-white hover:bg-[#800020] h-12 rounded-xl font-bold px-8 shadow-lg transition-all active:scale-95 uppercase tracking-widest text-xs"
               onClick={() => {
                 if (taskIdToDelete !== null) removeTask(taskIdToDelete)
                 setTaskIdToDelete(null)
               }}
             >
-              Delete Task
+              Confirm Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
