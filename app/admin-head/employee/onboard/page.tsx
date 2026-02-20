@@ -1,14 +1,10 @@
 ﻿"use client"
 
-import React, { useEffect, useState, Suspense, useMemo } from 'react'
-import { cn } from '@/lib/utils'
-import { useRouter, useSearchParams } from 'next/navigation'
+import React, { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { getApiUrl } from '@/lib/api'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow
-} from "@/components/ui/table"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
@@ -26,14 +22,9 @@ import {
   Trash2,
   ChevronDown,
   ChevronUp,
-  PlusCircle,
-  AlertCircle,
-  ClipboardList,
-  Check,
-  Loader2
+  PlusCircle
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { ConfirmationModal } from '@/components/ConfirmationModal'
 
 interface EmployeeDetails {
   [key: string]: any
@@ -49,53 +40,8 @@ interface Department {
   name: string
 }
 
-const toPlainString = (value: unknown): string => {
-  if (typeof value === 'string') return value.trim()
-  if (value && typeof value === 'object') {
-    const maybeName = (value as any).name
-    if (typeof maybeName === 'string') return maybeName.trim()
-  }
-  if (value === null || value === undefined) return ''
-  return String(value).trim()
-}
-
-const toIsoDate = (value: unknown): string => {
-  if (typeof value === 'string') {
-    const trimmed = value.trim()
-    if (!trimmed) return ''
-    const datePart = trimmed.includes('T') ? trimmed.split('T')[0] : trimmed
-    if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return datePart
-    const parsed = new Date(trimmed)
-    if (!Number.isNaN(parsed.getTime())) {
-      const year = parsed.getFullYear()
-      const month = String(parsed.getMonth() + 1).padStart(2, '0')
-      const day = String(parsed.getDate()).padStart(2, '0')
-      return `${year}-${month}-${day}`
-    }
-    return ''
-  }
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    const year = value.getFullYear()
-    const month = String(value.getMonth() + 1).padStart(2, '0')
-    const day = String(value.getDate()).padStart(2, '0')
-    return `${year}-${month}-${day}`
-  }
-  return ''
-}
-
 export default function OnboardPage() {
-  return (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
-      <OnboardPageContent />
-    </Suspense>
-  )
-}
-
-function OnboardPageContent() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const employeeIdParam = searchParams.get('id')
-  const requestedViewParam = searchParams.get('view')
   const [view, setView] = useState<'onboard' | 'checklist' | 'update-info'>('onboard')
 
   // Form States
@@ -119,9 +65,7 @@ function OnboardPageContent() {
     date: string,
     raw_date: string
   } | null>(null)
-  const [checklistRecordId, setChecklistRecordId] = useState<number | null>(null)
   const [completedTasks, setCompletedTasks] = useState<{ [key: string]: string }>({})
-
 
   // Dropdown Data
   const [positions, setPositions] = useState<Position[]>([])
@@ -140,21 +84,6 @@ function OnboardPageContent() {
   const [loadingProvinces, setLoadingProvinces] = useState(false)
   const [loadingCities, setLoadingCities] = useState(false)
   const [loadingBarangays, setLoadingBarangays] = useState(false)
-
-  // Modal State
-  const [confirmModal, setConfirmModal] = useState<{
-    isOpen: boolean
-    title: string
-    description: string
-    onConfirm: () => void
-    variant: "default" | "destructive" | "success" | "warning"
-  }>({
-    isOpen: false,
-    title: '',
-    description: '',
-    onConfirm: () => { },
-    variant: 'default'
-  })
 
   const batches = [
     { id: 1, title: 'Employee Details', icon: Briefcase, description: 'Basic employment information' },
@@ -184,36 +113,18 @@ function OnboardPageContent() {
     "Collect and Verify Employee Requirements"
   ]
 
-  const completionPercentage = useMemo(() => {
-    if (!onboardingTasks.length) return 0
-    return Math.round((Object.keys(completedTasks).length / onboardingTasks.length) * 100)
-  }, [completedTasks, onboardingTasks])
-
-  const completionDateText = useMemo(() => {
-    const dates = Object.values(completedTasks)
-    if (dates.length === 0) return ''
-    return dates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0]
-  }, [completedTasks])
-
   // Persistence Logic
   useEffect(() => {
     const savedState = localStorage.getItem('employee_onboarding_state')
     if (savedState) {
       try {
         const parsed = JSON.parse(savedState)
-        const sameEmployee = employeeIdParam
-          ? String(parsed.onboardingEmployeeId ?? '') === employeeIdParam
-          : true
-
-        if (sameEmployee) {
-          if (parsed.view) setView(parsed.view)
-          if (parsed.currentBatch) setCurrentBatch(parsed.currentBatch)
-          if (parsed.progressionFormData) setProgressionFormData(parsed.progressionFormData)
-          if (parsed.onboardingEmployeeId) setOnboardingEmployeeId(parsed.onboardingEmployeeId)
-          if (parsed.checklistData) setChecklistData(parsed.checklistData)
-          if (parsed.checklistRecordId) setChecklistRecordId(parsed.checklistRecordId)
-          if (parsed.completedTasks) setCompletedTasks(parsed.completedTasks)
-        }
+        if (parsed.view) setView(parsed.view)
+        if (parsed.currentBatch) setCurrentBatch(parsed.currentBatch)
+        if (parsed.progressionFormData) setProgressionFormData(parsed.progressionFormData)
+        if (parsed.onboardingEmployeeId) setOnboardingEmployeeId(parsed.onboardingEmployeeId)
+        if (parsed.checklistData) setChecklistData(parsed.checklistData)
+        if (parsed.completedTasks) setCompletedTasks(parsed.completedTasks)
       } catch (e) {
         console.error('Failed to restore state', e)
         localStorage.removeItem('employee_onboarding_state')
@@ -222,129 +133,7 @@ function OnboardPageContent() {
     fetchPositions()
     fetchDepartments()
     fetchRegions()
-
-    // Load employee if ID is provided in URL
-    if (employeeIdParam) {
-      const requestedView = requestedViewParam === 'checklist' ? 'checklist' : 'update-info'
-      loadExistingEmployee(parseInt(employeeIdParam), requestedView)
-    }
-  }, [employeeIdParam, requestedViewParam])
-
-  const fetchChecklistProgress = async (employeeName: string) => {
-    try {
-      const response = await fetch(`${getApiUrl()}/api/onboarding-checklist`, {
-        headers: { Accept: 'application/json' },
-        credentials: 'include',
-      })
-      const data = await response.json()
-      const list = Array.isArray(data?.data) ? data.data : []
-      const normalizeName = (value: unknown) =>
-        toPlainString(value)
-          .toLowerCase()
-          .replace(/\s+/g, ' ')
-          .trim()
-      const normalizedName = normalizeName(employeeName)
-      const nameParts = normalizedName.split(' ').filter(Boolean)
-      const firstName = nameParts[0] || ''
-      const lastName = nameParts[nameParts.length - 1] || ''
-      const sortedByLatest = [...list].sort((a: any, b: any) => {
-        const aTime = new Date(a?.updated_at ?? a?.created_at ?? 0).getTime()
-        const bTime = new Date(b?.updated_at ?? b?.created_at ?? 0).getTime()
-        return bTime - aTime
-      })
-
-      let matched = sortedByLatest.find((item: any) => normalizeName(item?.name) === normalizedName)
-      if (!matched && firstName && lastName) {
-        matched = sortedByLatest.find((item: any) => {
-          const candidate = normalizeName(item?.name)
-          return candidate.includes(firstName) && candidate.includes(lastName)
-        })
-      }
-
-      if (!matched) {
-        setChecklistRecordId(null)
-        setCompletedTasks({})
-        return
-      }
-
-      const matchedId = Number(matched.id)
-      setChecklistRecordId(Number.isFinite(matchedId) ? matchedId : null)
-
-      const matchedStartDateRaw = toIsoDate(matched?.startDate ?? matched?.start_date)
-      const matchedStartDateFormatted =
-        matchedStartDateRaw && !Number.isNaN(new Date(matchedStartDateRaw).getTime())
-          ? new Date(matchedStartDateRaw).toLocaleDateString()
-          : null
-
-      setChecklistData((prev) => ({
-        name: toPlainString(matched?.name) || toPlainString(prev?.name) || employeeName,
-        position: toPlainString(matched?.position) || toPlainString(prev?.position),
-        department: toPlainString(matched?.department) || toPlainString(prev?.department),
-        date: matchedStartDateFormatted ?? prev?.date ?? '',
-        raw_date: matchedStartDateRaw || prev?.raw_date || ''
-      }))
-
-      const fallbackDateRaw = matched?.updated_at ?? matched?.created_at
-      const fallbackDate = !Number.isNaN(new Date(fallbackDateRaw).getTime())
-        ? new Date(fallbackDateRaw).toLocaleString('en-US', {
-          month: 'short',
-          day: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true
-        })
-        : 'Completed'
-
-      const tasks = Array.isArray(matched?.tasks) ? matched.tasks : []
-      const restoredTasks = tasks.reduce((acc: { [key: string]: string }, task: any) => {
-        const taskName = String(task?.task ?? '').trim()
-        const taskStatus = String(task?.status ?? '').toUpperCase()
-        if (!taskName || taskStatus !== 'DONE') return acc
-        const taskDate = String(task?.date ?? '').trim()
-        acc[taskName] = taskDate || fallbackDate
-        return acc
-      }, {})
-
-      setCompletedTasks(restoredTasks)
-    } catch (error) {
-      console.error('Error fetching checklist progress:', error)
-      setChecklistRecordId(null)
-      setCompletedTasks({})
-    }
-  }
-
-  const loadExistingEmployee = async (id: number, targetView: 'checklist' | 'update-info' = 'update-info') => {
-    try {
-      setIsActionLoading(true)
-      const response = await fetch(`${getApiUrl()}/api/employees/${id}`)
-      const data = await response.json()
-
-      if (data.success) {
-        const emp = data.data
-        setOnboardingEmployeeId(id)
-        setProgressionFormData(emp)
-        setChecklistData({
-          name: `${emp.first_name} ${emp.last_name}`,
-          position: toPlainString(emp.position),
-          department: toPlainString(emp.department),
-          date: toIsoDate(emp.onboarding_date || emp.date_hired)
-            ? new Date(toIsoDate(emp.onboarding_date || emp.date_hired)).toLocaleDateString()
-            : '',
-          raw_date: toIsoDate(emp.onboarding_date || emp.date_hired)
-        })
-        await fetchChecklistProgress(`${emp.first_name} ${emp.last_name}`)
-        setView(targetView)
-      } else {
-        toast.error('Employee not found')
-      }
-    } catch (error) {
-      console.error('Error loading employee:', error)
-      toast.error('Failed to load employee details')
-    } finally {
-      setIsActionLoading(false)
-    }
-  }
+  }, [])
 
   useEffect(() => {
     if (view !== 'onboard' || Object.values(onboardFormData).some(v => v)) {
@@ -354,11 +143,10 @@ function OnboardPageContent() {
         progressionFormData,
         onboardingEmployeeId,
         checklistData,
-        checklistRecordId,
         completedTasks
       }))
     }
-  }, [view, currentBatch, progressionFormData, onboardingEmployeeId, checklistData, checklistRecordId, completedTasks, onboardFormData])
+  }, [view, currentBatch, progressionFormData, onboardingEmployeeId, checklistData, completedTasks, onboardFormData])
 
   const clearStorage = () => {
     localStorage.removeItem('employee_onboarding_state')
@@ -519,43 +307,35 @@ function OnboardPageContent() {
 
   const handleDeleteItem = async (id: number) => {
     if (!inlineManagerType) return
+    if (!confirm(`Are you sure you want to delete this ${inlineManagerType}?`)) return
 
-    setConfirmModal({
-      isOpen: true,
-      title: `Delete ${inlineManagerType === 'position' ? 'Position' : 'Department'}`,
-      description: `Are you sure you want to delete this ${inlineManagerType}? This action cannot be undone.`,
-      variant: 'destructive',
-      onConfirm: async () => {
-        setIsActionLoading(true)
-        try {
-          const endpoint = inlineManagerType === 'position' ? 'positions' : 'departments'
-          const response = await fetch(`${getApiUrl()}/api/${endpoint}/${id}`, {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-          })
+    setIsActionLoading(true)
+    try {
+      const endpoint = inlineManagerType === 'position' ? 'positions' : 'departments'
+      const response = await fetch(`${getApiUrl()}/api/${endpoint}/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+      })
 
-          const data = await response.json()
-          if (data.success) {
-            if (inlineManagerType === 'position') {
-              await fetchPositions()
-              if (onboardFormData.position === data.name) setOnboardFormData(prev => ({ ...prev, position: '' }))
-            } else {
-              await fetchDepartments()
-              if (onboardFormData.department === data.name) setOnboardFormData(prev => ({ ...prev, department: '' }))
-            }
-            toast.success(`${inlineManagerType === 'position' ? 'Position' : 'Department'} deleted successfully`)
-          } else {
-            toast.error(data.message || 'Error deleting item')
-          }
-        } catch (error) {
-          console.error('Error deleting item:', error)
-          toast.error('Failed to delete item')
-        } finally {
-          setIsActionLoading(false)
-          setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      const data = await response.json()
+      if (data.success) {
+        if (inlineManagerType === 'position') {
+          await fetchPositions()
+          if (onboardFormData.position === data.name) setOnboardFormData(prev => ({ ...prev, position: '' }))
+        } else {
+          await fetchDepartments()
+          if (onboardFormData.department === data.name) setOnboardFormData(prev => ({ ...prev, department: '' }))
         }
+        toast.success(`${inlineManagerType === 'position' ? 'Position' : 'Department'} deleted successfully`)
+      } else {
+        toast.error(data.message || 'Error deleting item')
       }
-    })
+    } catch (error) {
+      console.error('Error deleting item:', error)
+      toast.error('Failed to delete item')
+    } finally {
+      setIsActionLoading(false)
+    }
   }
 
   const handleStartOnboarding = async () => {
@@ -576,11 +356,6 @@ function OnboardPageContent() {
 
       const empData = await empResponse.json()
       if (!empResponse.ok || !empData.success) {
-        // Parse validation errors if present
-        if (empData.errors) {
-          const errorMessages = Object.values(empData.errors).flat().join(' ')
-          throw new Error(errorMessages || empData.message)
-        }
         throw new Error(empData.message || 'Failed to create employee')
       }
 
@@ -611,7 +386,6 @@ function OnboardPageContent() {
           date: new Date(onboarding_date).toLocaleDateString(),
           raw_date: onboarding_date
         })
-        setChecklistRecordId(null)
         setCompletedTasks({})
         setView('checklist')
         setOnboardFormData({
@@ -623,21 +397,11 @@ function OnboardPageContent() {
           department: '',
         })
       } else {
-        // Parse validation errors if present
-        if (onboardData.errors) {
-          const errorMessages = Object.values(onboardData.errors).flat().join(' ')
-          toast.error(errorMessages || onboardData.message)
-        } else {
-          toast.error(onboardData.message || 'Error saving onboarding data')
-        }
+        toast.error('Error saving onboarding data: ' + onboardData.message)
       }
     } catch (error) {
       console.error('Error:', error)
-      if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        toast.error('Could not connect to server. Please ensure the backend is running.')
-      } else {
-        toast.error(error instanceof Error ? error.message : 'Failed to complete onboarding')
-      }
+      toast.error(error instanceof Error ? error.message : 'Failed to complete onboarding')
     } finally {
       setIsSaving(false)
     }
@@ -650,58 +414,31 @@ function OnboardPageContent() {
     try {
       const allTasks = onboardingTasks.map(taskName => ({
         task: taskName,
-        status: completedTasks[taskName] ? 'DONE' : 'PENDING',
-        date: completedTasks[taskName] || null
+        completed: !!completedTasks[taskName],
+        completed_at: completedTasks[taskName] || null
       }))
 
-      const normalizedDepartment =
-        toPlainString(checklistData.department) || toPlainString(progressionFormData.department)
-      const normalizedStartDate =
-        toIsoDate(checklistData.raw_date) ||
-        toIsoDate(progressionFormData.onboarding_date) ||
-        toIsoDate(progressionFormData.date_hired)
-
-      const isUpdate = checklistRecordId !== null
-      if (!normalizedDepartment || !normalizedStartDate) {
-        toast.error('Department and Start Date are required before saving checklist')
-        return
-      }
-
-      const response = await fetch(
-        `${getApiUrl()}/api/onboarding-checklist${isUpdate ? `/${checklistRecordId}` : ''}`,
-        {
-          method: isUpdate ? 'PUT' : 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-          body: JSON.stringify({
-            name: toPlainString(checklistData.name),
-            position: toPlainString(checklistData.position),
-            department: normalizedDepartment,
-            startDate: normalizedStartDate,
-            status: completionPercentage === 100 ? 'DONE' : 'PENDING',
-            tasks: allTasks
-          }),
-        }
-      )
+      const response = await fetch(`${getApiUrl()}/api/onboarding-checklists`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          employee_name: checklistData.name,
+          position: checklistData.position,
+          department: checklistData.department,
+          start_date: checklistData.raw_date,
+          status: `${Object.keys(completedTasks).length}/${onboardingTasks.length} Completed`,
+          tasks: allTasks
+        }),
+      })
 
       const data = await response.json()
       if (data.success) {
-        const savedId = Number(data?.data?.id)
-        if (Number.isFinite(savedId)) {
-          setChecklistRecordId(savedId)
-        }
-        toast.success('Checklist progress saved successfully')
-        clearStorage()
-        router.push('/admin-head/employee/masterfile')
+        toast.success('Checklist progress saved successfully to database')
       } else {
-        if (data?.errors) {
-          const errorMessages = Object.values(data.errors).flat().join(' ')
-          toast.error(errorMessages || data.message || 'Error saving checklist')
-        } else {
-          toast.error(data.message || 'Error saving checklist')
-        }
+        toast.error(data.message || 'Error saving checklist')
       }
     } catch (error) {
       console.error('Error saving checklist:', error)
@@ -717,38 +454,10 @@ function OnboardPageContent() {
       if (newTasks[task]) {
         delete newTasks[task]
       } else {
-        newTasks[task] = new Date().toLocaleString('en-US', {
-          month: 'short',
-          day: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true
-        })
+        newTasks[task] = new Date().toLocaleString()
       }
       return newTasks
     })
-  }
-
-  const toggleAllTasks = () => {
-    const allCompleted = onboardingTasks.every(task => completedTasks[task])
-    if (allCompleted) {
-      setCompletedTasks({})
-    } else {
-      const newTasks: { [key: string]: string } = {}
-      const now = new Date().toLocaleString('en-US', {
-        month: 'short',
-        day: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      })
-      onboardingTasks.forEach(task => {
-        newTasks[task] = now
-      })
-      setCompletedTasks(newTasks)
-    }
   }
 
   const handleProgressionChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -850,39 +559,6 @@ function OnboardPageContent() {
     }
   }
 
-  const handlePartialSave = async () => {
-    if (!onboardingEmployeeId) return
-    setIsSaving(true)
-    try {
-      const cleanedData = Object.entries(progressionFormData).reduce((acc, [key, value]) => {
-        acc[key] = value === '' ? null : value
-        return acc
-      }, {} as any)
-
-      const response = await fetch(`${getApiUrl()}/api/employees/${onboardingEmployeeId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cleanedData),
-      })
-
-      const data = await response.json()
-      if (response.ok && data.success) {
-        toast.success('Progress saved successfully')
-        clearStorage()
-        router.push('/admin-head/employee/masterfile')
-      } else {
-        toast.error(data.message || 'Failed to save progress')
-      }
-    } catch (error) {
-      console.error('Error in partial save:', error)
-      toast.error('Failed to save progress.')
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-
-
   const handleCancelOnboarding = () => {
     clearStorage()
     router.push('/admin-head/employee/masterfile')
@@ -898,7 +574,7 @@ function OnboardPageContent() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-12">
+    <div className="min-h-screen p-8 bg-slate-50">
       {view === 'onboard' && (
         <div className="max-w-3xl mx-auto py-4">
           <div className="flex items-center justify-between mb-8">
@@ -1076,158 +752,106 @@ function OnboardPageContent() {
       )}
 
       {view === 'checklist' && checklistData && (
-        <div className="max-w-[1600px] mx-auto py-4 px-6 md:px-8">
-          {/* ----- INTEGRATED PREMIUM HEADER ----- */}
-          <header className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md p-4 md:p-6 mb-8 relative overflow-hidden">
-            <div className="max-w-[1600px] mx-auto flex flex-wrap items-center gap-6 lg:gap-8 relative z-10">
-              {/* Title Section */}
-              <div className="flex flex-col">
-                <h1 className="text-xl md:text-2xl font-bold tracking-tight leading-none mb-1">Onboarding Process</h1>
-                <div className="flex items-center gap-1.5 text-white/60">
-                  <ClipboardList className="w-3.5 h-3.5" />
-                  <p className="text-[10px] md:text-xs font-bold uppercase tracking-widest">ABIC REALTY & CONSULTANCY</p>
-                </div>
+        <div className="max-w-5xl mx-auto py-4">
+          <div className="bg-[#D1D5DB] border-2 border-slate-400 overflow-hidden shadow-xl">
+            {/* Main Header */}
+            <div className="bg-[#D1D5DB] py-3 text-center border-b-2 border-slate-400">
+              <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-tight">
+                Employee Onboarding Process Checklist
+              </h1>
+            </div>
+
+            {/* Info Grid */}
+            <div className="grid grid-cols-2 border-b-2 border-slate-400 text-sm">
+              <div className="grid grid-cols-[140px_1fr] border-r-2 border-slate-400">
+                <div className="bg-[#D1D5DB] p-2 font-bold border-r-2 border-slate-400">Employee Name:</div>
+                <div className="bg-white p-2">{checklistData.name}</div>
               </div>
-
-              <div className="h-8 w-px bg-white/10 hidden lg:block" />
-
-              {/* Employee Info Cards (Integrated) */}
-              <div className="flex flex-wrap items-center gap-6 flex-1">
-                <div className="flex flex-col">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Employee</span>
-                  <span className="text-sm font-bold text-white leading-none">{checklistData.name}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Position</span>
-                  <span className="text-sm font-bold text-white leading-none">{checklistData.position}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Department</span>
-                  <span className="text-sm font-bold text-white leading-none">{checklistData.department}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Start Date</span>
-                  <span className="text-sm font-bold text-white leading-none">{checklistData.date}</span>
-                </div>
-
-                {/* Progress Stats */}
-                <div className="ml-auto hidden xl:flex items-center gap-4 bg-white/5 px-6 py-2 rounded-xl border border-white/10 backdrop-blur-sm">
-                  <div className="flex flex-col items-end">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Overall Progress</span>
-                    <span className="text-base font-black text-white">{completionPercentage}%</span>
-                  </div>
-                  <div className="h-6 w-px bg-white/10" />
-                  <div className="flex flex-col">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Last Updated</span>
-                    <span className="text-base font-black text-white tracking-tight">{completionDateText || 'â€”'}</span>
-                  </div>
-                </div>
+              <div className="grid grid-cols-[100px_1fr]">
+                <div className="bg-[#D1D5DB] p-2 font-bold border-r-2 border-slate-400">Start Date:</div>
+                <div className="bg-white p-2">{checklistData.date}</div>
               </div>
             </div>
-            {/* Aesthetic Background Pattern */}
-            <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-              <ClipboardList className="w-32 h-32" />
-            </div>
-          </header>
-
-          {/* Task List Section */}
-          <Card className="rounded-2xl border-2 border-[#FFE5EC] shadow-2xl bg-white overflow-hidden mb-12">
-            {/* Progress Banner */}
-            <div className="bg-[#FFE5EC]/20 p-4 md:px-8 border-b border-[#FFE5EC]">
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="text-[11px] font-black text-[#800020] uppercase tracking-widest">Process Onboarding Progress</h3>
-                <span className="text-sm font-black text-[#A4163A] bg-white px-3 py-0.5 rounded-full shadow-sm border border-[#FFE5EC]">
-                  {Object.keys(completedTasks).length} / {onboardingTasks.length} Completed
-                </span>
+            <div className="grid grid-cols-2 border-b-2 border-slate-400 text-sm">
+              <div className="grid grid-cols-[140px_1fr] border-r-2 border-slate-400">
+                <div className="bg-[#D1D5DB] p-2 font-bold border-r-2 border-slate-400">Position:</div>
+                <div className="bg-white p-2">{checklistData.position}</div>
               </div>
-              <div className="w-full bg-white h-2.5 rounded-full overflow-hidden border border-[#FFE5EC] shadow-inner p-0.5">
+              <div className="grid grid-cols-[100px_1fr]">
+                <div className="bg-[#D1D5DB] p-2 font-bold border-r-2 border-slate-400">Department:</div>
+                <div className="bg-white p-2">{checklistData.department}</div>
+              </div>
+            </div>
+
+            {/* Progress Section */}
+            <div className="bg-white border-b-2 border-slate-400 p-4">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-bold text-slate-600 uppercase">Onboarding Progress</span>
+                <span className="text-xs font-bold text-[#630C22]">{Object.keys(completedTasks).length} / {onboardingTasks.length} Tasks Completed</span>
+              </div>
+              <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden border border-slate-200 shadow-inner">
                 <div
-                  className="bg-gradient-to-r from-[#A4163A] to-[#630C22] h-full rounded-full transition-all duration-1000 ease-out shadow-sm"
+                  className="bg-[#630C22] h-full transition-all duration-500 ease-out shadow-[0_0_10px_rgba(99,12,34,0.3)]"
                   style={{ width: `${(Object.keys(completedTasks).length / onboardingTasks.length) * 100}%` }}
                 />
               </div>
             </div>
 
-            <Table>
-              <TableHeader className="bg-[#FFE5EC]/40">
-                <TableRow className="border-b border-[#FFE5EC] hover:bg-transparent">
-                  <TableHead className="w-[200px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">Completed Date</TableHead>
-                  <TableHead className="w-[100px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">Status</TableHead>
-                  <TableHead className="font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">
-                    <div className="flex items-center justify-between">
-                      <span>Tasks</span>
-                      <button
-                        onClick={toggleAllTasks}
-                        className="text-[8px] normal-case bg-white/50 hover:bg-rose-50 text-[#800020] px-2 py-1 rounded-md border border-[#FFE5EC] transition-all font-black shadow-sm"
-                      >
-                        {onboardingTasks.every(task => completedTasks[task]) ? 'UNCHECK ALL' : 'CHECK ALL'}
-                      </button>
-                    </div>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {onboardingTasks.map((task, index) => (
-                  <TableRow
-                    key={index}
-                    className="border-b border-rose-50/30 last:border-0 hover:bg-[#FFE5EC]/5 transition-colors group cursor-pointer"
-                    onClick={() => toggleTask(task)}
-                  >
-                    <TableCell className="text-center py-2.5 font-mono text-[10px] font-bold text-slate-400">
-                      {completedTasks[task] || '-'}
-                    </TableCell>
-                    <TableCell className="py-2.5">
-                      <div className="flex justify-center">
-                        <div className={cn(
-                          "w-5 h-5 rounded flex items-center justify-center transition-all border-2",
-                          completedTasks[task]
-                            ? "bg-emerald-500 border-emerald-500 text-white shadow-sm"
-                            : "border-slate-200 bg-white hover:border-[#A4163A]"
-                        )}>
-                          {completedTasks[task] && <Check className="h-3.5 w-3.5" />}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-2.5">
-                      <span className={cn(
-                        "text-sm font-bold transition-all duration-300",
-                        completedTasks[task] ? "text-slate-300 line-through" : "text-slate-700"
-                      )}>
-                        {task}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-
-            {/* Table Footer */}
-            <div className="p-4 md:px-8 bg-slate-50/50 border-t border-[#FFE5EC] flex flex-col md:flex-row justify-between items-center gap-4">
-              <div className="flex items-center gap-3">
-                <p className="text-[8px] font-black text-slate-300 uppercase tracking-[0.2em] italic">
-                  ADMINISTRATION FRAMEWORK â€¢ ABIC HR
-                </p>
-              </div>
-
-              <div className="flex gap-3">
-                <Button
-                  onClick={() => setView('update-info')}
-                  disabled={Object.keys(completedTasks).length < onboardingTasks.length}
-                  className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg active:scale-95 transition-all rounded-xl disabled:opacity-50"
-                >
-                  PROCEED TO DATA ENTRY
-                </Button>
-                <Button
-                  onClick={handleSaveChecklist}
-                  disabled={isSaving}
-                  className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-[#A4163A] hover:bg-[#800020] text-white shadow-lg active:scale-95 transition-all rounded-xl"
-                >
-                  {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <LucideSave className="w-3.5 h-3.5 mr-2" />}
-                  {isSaving ? 'SAVING...' : 'SAVE PROGRESS'}
-                </Button>
-              </div>
+            {/* Table Header Labels */}
+            <div className="grid grid-cols-[200px_120px_1fr] text-center font-bold bg-[#D1D5DB] text-sm uppercase">
+              <div className="py-2 border-r-2 border-b-2 border-slate-400">Completed Date</div>
+              <div className="py-2 border-r-2 border-b-2 border-slate-400">Status</div>
+              <div className="py-2 border-b-2 border-slate-400">Tasks</div>
             </div>
-          </Card>
+
+            {/* Task List */}
+            <div className="bg-white">
+              {onboardingTasks.map((task, index) => (
+                <div
+                  key={index}
+                  className="grid grid-cols-[200px_120px_1fr] border-b-2 border-slate-400 group cursor-pointer hover:bg-emerald-50/30 transition-colors"
+                  onClick={() => toggleTask(task)}
+                >
+                  <div className="py-2 px-4 flex items-center justify-center text-[10px] font-mono text-slate-500 bg-slate-50/50 border-r-2 border-slate-400">
+                    {completedTasks[task] || '-'}
+                  </div>
+                  <div className="py-2 flex items-center justify-center border-r-2 border-slate-400 font-bold transition-all">
+                    <div className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-all ${completedTasks[task]
+                      ? 'bg-emerald-500 border-emerald-500 text-white'
+                      : 'border-slate-300 bg-white'
+                      }`}>
+                      {completedTasks[task] && (
+                        <CheckCircle2 className="h-4 w-4" />
+                      )}
+                    </div>
+                  </div>
+                  <div className={`py-2 px-4 flex items-center text-sm font-medium transition-all ${completedTasks[task] ? 'text-slate-400 line-through' : 'text-slate-800'
+                    }`}>
+                    {task}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Action Buttons Row */}
+            <div className="grid grid-cols-[1fr_200px_150px] bg-white">
+              <div className="border-r-2 border-slate-400"></div>
+              <button
+                onClick={() => setView('update-info')}
+                disabled={Object.keys(completedTasks).length < onboardingTasks.length}
+                className="py-1 px-4 border-r-2 border-slate-400 bg-[#D1D5DB] hover:bg-slate-300 font-bold text-slate-800 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:text-slate-500"
+              >
+                PROCEED TO DATA ENTRY
+              </button>
+              <button
+                onClick={handleSaveChecklist}
+                disabled={isSaving}
+                className="py-1 px-4 bg-[#D1D5DB] hover:bg-slate-300 font-bold text-slate-800 text-sm transition-colors disabled:opacity-50"
+              >
+                {isSaving ? 'SAVING...' : 'SAVE'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1543,45 +1167,23 @@ function OnboardPageContent() {
                   </div>
 
                   {currentBatch === 6 ? (
-                    <div className="flex gap-3">
-                      <Button
-                        onClick={handlePartialSave}
-                        disabled={isSaving}
-                        variant="outline"
-                        className="h-11 px-6 font-bold border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                      >
-                        {isSaving ? 'Saving...' : 'Save Progress'}
-                        <LucideSave className="h-4 w-4 ml-2" />
-                      </Button>
-                      <Button
-                        onClick={handleProgressionSave}
-                        disabled={isSaving || !isCurrentBatchValid()}
-                        className="bg-green-600 hover:bg-green-700 text-white h-11 px-8 font-bold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isSaving ? 'Saving...' : 'Complete & Finish'}
-                        <LucideSave className="h-4 w-4 ml-2" />
-                      </Button>
-                    </div>
+                    <Button
+                      onClick={handleProgressionSave}
+                      disabled={isSaving || !isCurrentBatchValid()}
+                      className="bg-green-600 hover:bg-green-700 text-white h-11 px-8 font-bold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isSaving ? 'Saving...' : 'Complete & Finish'}
+                      <LucideSave className="h-4 w-4 ml-2" />
+                    </Button>
                   ) : (
-                    <div className="flex gap-3">
-                      <Button
-                        onClick={handlePartialSave}
-                        disabled={isSaving}
-                        variant="outline"
-                        className="h-11 px-6 font-bold border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                      >
-                        {isSaving ? 'Saving...' : 'Save Progress'}
-                        <LucideSave className="h-4 w-4 ml-2" />
-                      </Button>
-                      <Button
-                        onClick={nextBatch}
-                        disabled={!isCurrentBatchValid()}
-                        className="bg-maroon-600 hover:bg-maroon-700 text-white h-11 px-8 font-bold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Next Step
-                        <ChevronRight className="h-4 w-4 ml-2" />
-                      </Button>
-                    </div>
+                    <Button
+                      onClick={nextBatch}
+                      disabled={!isCurrentBatchValid()}
+                      className="bg-maroon-600 hover:bg-maroon-700 text-white h-11 px-8 font-bold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next Step
+                      <ChevronRight className="h-4 w-4 ml-2" />
+                    </Button>
                   )}
                 </div>
               </CardContent>
@@ -1589,16 +1191,6 @@ function OnboardPageContent() {
           </div>
         </div>
       )}
-
-      <ConfirmationModal
-        isOpen={confirmModal.isOpen}
-        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
-        onConfirm={confirmModal.onConfirm}
-        title={confirmModal.title}
-        description={confirmModal.description}
-        variant={confirmModal.variant}
-        isLoading={isActionLoading}
-      />
     </div>
   )
 }
