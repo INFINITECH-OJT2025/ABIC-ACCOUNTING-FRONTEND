@@ -62,7 +62,7 @@ export default function MasterfilePage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeDetails | null>(null)
   const [viewMode, setViewMode] = useState<'list' | 'details'>('list')
-  const [activeTab, setActiveTab] = useState<'employed' | 'terminated'>('employed')
+  const [activeTab, setActiveTab] = useState<'all' | 'employed' | 'terminated'>('all')
   const [isUpdating, setIsUpdating] = useState(false)
   const [isActionLoading, setIsActionLoading] = useState(false)
   const [isDetailLoading, setIsDetailLoading] = useState(false)
@@ -71,6 +71,7 @@ export default function MasterfilePage() {
 
   // Pagination States
   const [pendingPage, setPendingPage] = useState(1)
+  const [allPage, setAllPage] = useState(1)
   const [employedPage, setEmployedPage] = useState(1)
   const [terminatedPage, setTerminatedPage] = useState(1)
   const ITEMS_PER_PAGE_CARDS = 12
@@ -334,8 +335,10 @@ export default function MasterfilePage() {
   const employedList = filterEmployees(employees.filter(e => e.status === 'employed'))
   const terminatedList = filterEmployees(employees.filter(e => e.status === 'terminated'))
   const pendingList = filterEmployees(employees.filter(e => e.status === 'pending'))
+  const allList = filterEmployees(employees)
 
   const paginatedPending = pendingList.slice((pendingPage - 1) * ITEMS_PER_PAGE_CARDS, pendingPage * ITEMS_PER_PAGE_CARDS)
+  const paginatedAll = allList.slice((allPage - 1) * ITEMS_PER_PAGE_TABLE, allPage * ITEMS_PER_PAGE_TABLE)
   const paginatedEmployed = employedList.slice((employedPage - 1) * ITEMS_PER_PAGE_TABLE, employedPage * ITEMS_PER_PAGE_TABLE)
   const paginatedTerminated = terminatedList.slice((terminatedPage - 1) * ITEMS_PER_PAGE_TABLE, terminatedPage * ITEMS_PER_PAGE_TABLE)
 
@@ -801,6 +804,16 @@ export default function MasterfilePage() {
                     </h3>
                     <div className="flex items-center bg-slate-100 p-1.5 rounded-xl">
                       <button
+                        onClick={() => setActiveTab('all')}
+                        className={`px-6 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
+                          activeTab === 'all'
+                            ? 'bg-white text-[#4A081A] shadow-sm'
+                            : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
+                        }`}
+                      >
+                        All <span className="ml-1 opacity-60 text-xs">({employees.length})</span>
+                      </button>
+                      <button
                         onClick={() => setActiveTab('employed')}
                         className={`px-6 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
                           activeTab === 'employed'
@@ -824,7 +837,11 @@ export default function MasterfilePage() {
                   </div>
 
                   <EmployeeTable
-                    list={activeTab === 'employed' ? paginatedEmployed : paginatedTerminated}
+                    list={
+                      activeTab === 'all' ? paginatedAll : 
+                      activeTab === 'employed' ? paginatedEmployed : 
+                      paginatedTerminated
+                    }
                     emptyMessage={
                       searchQuery 
                         ? `No ${activeTab} employees match your search.` 
@@ -832,10 +849,22 @@ export default function MasterfilePage() {
                     }
                   />
                   <PaginationControls 
-                    currentPage={activeTab === 'employed' ? employedPage : terminatedPage}
-                    totalItems={activeTab === 'employed' ? employedList.length : terminatedList.length}
+                    currentPage={
+                      activeTab === 'all' ? allPage : 
+                      activeTab === 'employed' ? employedPage : 
+                      terminatedPage
+                    }
+                    totalItems={
+                      activeTab === 'all' ? allList.length : 
+                      activeTab === 'employed' ? employedList.length : 
+                      terminatedList.length
+                    }
                     itemsPerPage={ITEMS_PER_PAGE_TABLE}
-                    onPageChange={activeTab === 'employed' ? setEmployedPage : setTerminatedPage}
+                    onPageChange={
+                      activeTab === 'all' ? setAllPage : 
+                      activeTab === 'employed' ? setEmployedPage : 
+                      setTerminatedPage
+                    }
                   />
                 </div>
               </div>
