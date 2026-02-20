@@ -636,7 +636,7 @@ function OnboardPageContent() {
     } catch (error) {
       console.error('Error:', error)
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        toast.error('Could not connect to server. Please ensure the backend is running.')
+        toast.error('Network Error: Could not connect to the server.')
       } else {
         toast.error(error instanceof Error ? error.message : 'Failed to complete onboarding')
       }
@@ -645,8 +645,8 @@ function OnboardPageContent() {
     }
   }
 
-  const handleSaveChecklist = async () => {
-    if (!checklistData) return
+  const handleSaveChecklist = async (redirect = true) => {
+    if (!checklistData) return false
 
     setIsSaving(true)
     try {
@@ -666,7 +666,7 @@ function OnboardPageContent() {
       const isUpdate = checklistRecordId !== null
       if (!normalizedDepartment || !normalizedStartDate) {
         toast.error('Department and Start Date are required before saving checklist')
-        return
+        return false
       }
 
       const response = await fetch(
@@ -695,8 +695,11 @@ function OnboardPageContent() {
           setChecklistRecordId(savedId)
         }
         toast.success('Checklist progress saved successfully')
-        clearStorage()
-        router.push('/admin-head/employee/masterfile')
+        if (redirect) {
+          clearStorage()
+          router.push('/admin-head/employee/masterfile')
+        }
+        return true
       } else {
         if (data?.errors) {
           const errorMessages = Object.values(data.errors).flat().join(' ')
@@ -900,178 +903,270 @@ function OnboardPageContent() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-12">
-      {view === 'onboard' && (
-        <div className="max-w-3xl mx-auto py-4">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-4">
+    <div className="min-h-screen w-full bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-12 relative">
+      {/* ----- GLOBAL LOADING OVERLAY (Simplified Minimalist) ----- */}
+      {(isSaving || isActionLoading) && (
+        <div className="fixed inset-0 z-[100] bg-white/40 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-500">
+          <div className="bg-white/80 backdrop-blur-xl w-[400px] h-auto p-12 rounded-[40px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] border border-white/50 flex flex-col items-center gap-10 animate-in zoom-in-95 duration-300">
+            {/* Elegant maroon spinner ring */}
+            <div className="relative">
+              <div className="w-14 h-14 border-[3px] border-slate-100 border-t-[#A4163A] rounded-full animate-spin" />
+            </div>
+
+            <div className="flex flex-col items-center text-center">
+              <h3 className="text-2xl font-bold text-[#1e293b] tracking-tight">
+                Loading...
+              </h3>
+            </div>
+
+            {/* Three dots animation */}
+            <div className="flex gap-2.5">
+              <div className="w-2.5 h-2.5 bg-[#A4163A]/60 rounded-full animate-bounce [animation-delay:-0.3s]" />
+              <div className="w-2.5 h-2.5 bg-[#A4163A]/60 rounded-full animate-bounce [animation-delay:-0.15s]" />
+              <div className="w-2.5 h-2.5 bg-[#A4163A]/60 rounded-full animate-bounce" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ----- INTEGRATED PREMIUM HEADER ----- */}
+      <header className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md p-4 md:p-8 mb-4 md:mb-8 relative overflow-hidden">
+        <div className="max-w-[1600px] mx-auto flex flex-wrap items-center gap-6 lg:gap-8 relative z-10">
+          {/* Title Section */}
+          <div className="flex flex-col">
+            <h1 className="text-2xl md:text-4xl font-bold tracking-tight mb-2">
+              {view === 'onboard' ? 'Onboard New Employee' : 
+               view === 'checklist' ? 'Onboarding Process' : 
+               'Employee Data Entry'}
+            </h1>
+            <div className="flex items-center gap-2 text-white/80 transition-all duration-500">
+              {view === 'onboard' ? <Briefcase className="w-4 h-4 md:w-5 h-5" /> : <ClipboardList className="w-4 h-4 md:w-5 h-5" />}
+              <p className="text-sm md:text-lg font-bold uppercase tracking-widest leading-none">ABIC REALTY & CONSULTANCY</p>
+            </div>
+          </div>
+
+          <div className="h-10 w-px bg-white/10 hidden lg:block" />
+
+          {/* Employee Info Section - Hidden in 'onboard' view */}
+          {checklistData && view !== 'onboard' && (
+            <div className="flex flex-wrap items-center gap-6 flex-1 animate-in slide-in-from-left-4 duration-500">
+              <div className="flex flex-col">
+                <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Employee</span>
+                <span className="text-sm font-bold text-white leading-none">{checklistData.name}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Position</span>
+                <span className="text-sm font-bold text-white leading-none">{checklistData.position}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Department</span>
+                <span className="text-sm font-bold text-white leading-none">{checklistData.department}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Start Date</span>
+                <span className="text-sm font-bold text-white leading-none">{checklistData.date}</span>
+              </div>
+
+              {/* Progress Stats - Shown in 'checklist' or 'update-info' */}
+              <div className="ml-auto hidden xl:flex items-center gap-6 bg-white/5 px-6 py-3 rounded-2xl border border-white/10 backdrop-blur-sm">
+                <div className="flex flex-col items-end">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Overall Progress</span>
+                  <span className="text-xl font-black text-white">{view === 'checklist' ? completionPercentage : calculateProgressionProgress()}%</span>
+                </div>
+                <div className="h-8 w-px bg-white/10" />
+                <div className="flex flex-col">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">
+                    {view === 'checklist' ? 'Last Updated' : `Batch ${currentBatch} of 6`}
+                  </span>
+                  <span className="text-xl font-black text-white tracking-tight">
+                    {view === 'checklist' ? (completionDateText || '—') : batches[currentBatch - 1].title}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Back Action for Initial View */}
+          {view === 'onboard' && (
+            <div className="ml-auto">
               <Button
                 variant="ghost"
                 onClick={handleCancelOnboarding}
-                className="hover:bg-slate-100 text-slate-500 hover:text-slate-800"
+                className="bg-white/10 hover:bg-white/20 text-white border-white/20 h-11 px-6 font-bold"
               >
                 <ChevronLeft className="mr-2 h-4 w-4" />
                 Back to Masterfile
               </Button>
-              <div className="h-6 w-[1px] bg-slate-200" />
-              <h2 className="text-2xl font-bold text-[#4A081A]">Onboard New Employee</h2>
             </div>
-          </div>
+          )}
+        </div>
 
-          <div className="bg-white border border-slate-100 rounded-2xl p-8 shadow-sm space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">First Name <span className="text-red-500">*</span></label>
-                <Input
-                  value={onboardFormData.first_name}
-                  onChange={(e) => setOnboardFormData(prev => ({ ...prev, first_name: e.target.value }))}
-                  placeholder="John"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Last Name <span className="text-red-500">*</span></label>
-                <Input
-                  value={onboardFormData.last_name}
-                  onChange={(e) => setOnboardFormData(prev => ({ ...prev, last_name: e.target.value }))}
-                  placeholder="Doe"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Email Address <span className="text-red-500">*</span></label>
-                <Input
-                  type="email"
-                  value={onboardFormData.email}
-                  onChange={(e) => setOnboardFormData(prev => ({ ...prev, email: e.target.value }))}
-                  placeholder="john@example.com"
-                />
-              </div>
+        {/* Aesthetic Background Decoration */}
+        <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none transition-transform duration-700 ease-in-out transform rotate-12">
+          {view === 'onboard' ? <User className="w-48 h-48" /> : 
+           view === 'checklist' ? <ClipboardList className="w-48 h-48" /> : 
+           <Briefcase className="w-48 h-48" />}
+        </div>
+      </header>
 
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="block text-sm font-semibold text-slate-700">Position <span className="text-red-500">*</span></label>
-                  <button
-                    onClick={() => setInlineManagerType(inlineManagerType === 'position' ? null : 'position')}
-                    className={`text-xs flex items-center gap-1 font-bold transition-colors ${inlineManagerType === 'position' ? 'text-[#630C22]' : 'text-slate-400 hover:text-slate-600'}`}
-                  >
-                    {inlineManagerType === 'position' ? 'CLOSE MANAGER' : 'MANAGE LIST'}
-                    {inlineManagerType === 'position' ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  </button>
+      {view === 'onboard' && (
+        <div className="w-full">
+          <div className="max-w-3xl mx-auto py-4">
+            <div className="bg-white border border-slate-100 rounded-2xl p-8 shadow-sm space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">First Name <span className="text-red-500">*</span></label>
+                  <Input
+                    value={onboardFormData.first_name}
+                    onChange={(e) => setOnboardFormData(prev => ({ ...prev, first_name: e.target.value }))}
+                    placeholder="John"
+                  />
                 </div>
-                <select
-                  value={onboardFormData.position}
-                  onChange={(e) => setOnboardFormData(prev => ({ ...prev, position: e.target.value }))}
-                  className="w-full h-10 px-3 py-2 border border-slate-200 bg-white rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#630C22] transition-all"
-                >
-                  <option value="">Select Position...</option>
-                  {positions.map((pos) => (
-                    <option key={pos.id} value={pos.name}>{pos.name}</option>
-                  ))}
-                </select>
-
-                {inlineManagerType === 'position' && (
-                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mt-2 shadow-inner">
-                    <div className="flex gap-2 mb-3">
-                      <Input
-                        placeholder="Add new position..."
-                        value={newItemName}
-                        onChange={(e) => setNewItemName(e.target.value)}
-                        className="h-9 text-xs"
-                        onKeyDown={(e) => e.key === 'Enter' && handleAddItem()}
-                      />
-                      <Button size="sm" onClick={handleAddItem} disabled={isActionLoading || !newItemName.trim()} className="bg-[#630C22] h-9">
-                        <PlusCircle size={16} />
-                      </Button>
-                    </div>
-                    <div className="max-h-32 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-                      {positions.map(pos => (
-                        <div key={pos.id} className="flex justify-between items-center p-2 bg-white border border-slate-100 rounded text-xs">
-                          <span className="truncate max-w-[150px]">{pos.name}</span>
-                          <button onClick={() => handleDeleteItem(pos.id)} className="text-rose-500 hover:text-rose-700 p-1">
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="block text-sm font-semibold text-slate-700">Department <span className="text-red-500">*</span></label>
-                  <button
-                    onClick={() => setInlineManagerType(inlineManagerType === 'department' ? null : 'department')}
-                    className={`text-xs flex items-center gap-1 font-bold transition-colors ${inlineManagerType === 'department' ? 'text-[#630C22]' : 'text-slate-400 hover:text-slate-600'}`}
-                  >
-                    {inlineManagerType === 'department' ? 'CLOSE MANAGER' : 'MANAGE LIST'}
-                    {inlineManagerType === 'department' ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  </button>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Last Name <span className="text-red-500">*</span></label>
+                  <Input
+                    value={onboardFormData.last_name}
+                    onChange={(e) => setOnboardFormData(prev => ({ ...prev, last_name: e.target.value }))}
+                    placeholder="Doe"
+                  />
                 </div>
-                <select
-                  value={onboardFormData.department}
-                  onChange={(e) => setOnboardFormData(prev => ({ ...prev, department: e.target.value }))}
-                  className="w-full h-10 px-3 py-2 border border-slate-200 bg-white rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#630C22] transition-all"
-                >
-                  <option value="">Select Department...</option>
-                  {departments.map((dept) => (
-                    <option key={dept.id} value={dept.name}>{dept.name}</option>
-                  ))}
-                </select>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Email Address <span className="text-red-500">*</span></label>
+                  <Input
+                    type="email"
+                    value={onboardFormData.email}
+                    onChange={(e) => setOnboardFormData(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="john@example.com"
+                  />
+                </div>
 
-                {inlineManagerType === 'department' && (
-                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mt-2 shadow-inner">
-                    <div className="flex gap-2 mb-3">
-                      <Input
-                        placeholder="Add new department..."
-                        value={newItemName}
-                        onChange={(e) => setNewItemName(e.target.value)}
-                        className="h-9 text-xs"
-                        onKeyDown={(e) => e.key === 'Enter' && handleAddItem()}
-                      />
-                      <Button size="sm" onClick={handleAddItem} disabled={isActionLoading || !newItemName.trim()} className="bg-[#630C22] h-9">
-                        <PlusCircle size={16} />
-                      </Button>
-                    </div>
-                    <div className="max-h-32 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-                      {departments.map(dept => (
-                        <div key={dept.id} className="flex justify-between items-center p-2 bg-white border border-slate-100 rounded text-xs">
-                          <span className="truncate max-w-[150px]">{dept.name}</span>
-                          <button onClick={() => handleDeleteItem(dept.id)} className="text-rose-500 hover:text-rose-700 p-1">
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="block text-sm font-semibold text-slate-700">Position <span className="text-red-500">*</span></label>
+                    <button
+                      onClick={() => setInlineManagerType(inlineManagerType === 'position' ? null : 'position')}
+                      className={`text-xs flex items-center gap-1 font-bold transition-colors ${inlineManagerType === 'position' ? 'text-[#630C22]' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                      {inlineManagerType === 'position' ? 'CLOSE MANAGER' : 'MANAGE LIST'}
+                      {inlineManagerType === 'position' ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </button>
                   </div>
-                )}
+                  <select
+                    value={onboardFormData.position}
+                    onChange={(e) => setOnboardFormData(prev => ({ ...prev, position: e.target.value }))}
+                    className="w-full h-10 px-3 py-2 border border-slate-200 bg-white rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#630C22] transition-all"
+                  >
+                    <option value="">Select Position...</option>
+                    {positions.map((pos) => (
+                      <option key={pos.id} value={pos.name}>{pos.name}</option>
+                    ))}
+                  </select>
+
+                  {inlineManagerType === 'position' && (
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mt-2 shadow-inner">
+                      <div className="flex gap-2 mb-3">
+                        <Input
+                          placeholder="Add new position..."
+                          value={newItemName}
+                          onChange={(e) => setNewItemName(e.target.value)}
+                          className="h-9 text-xs"
+                          onKeyDown={(e) => e.key === 'Enter' && handleAddItem()}
+                        />
+                        <button onClick={handleAddItem} disabled={isActionLoading || !newItemName.trim()} className="bg-[#630C22] h-9 px-3 text-white rounded-md">
+                          <PlusCircle size={16} />
+                        </button>
+                      </div>
+                      <div className="max-h-32 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                        {positions.map(pos => (
+                          <div key={pos.id} className="flex justify-between items-center p-2 bg-white border border-slate-100 rounded text-xs">
+                            <span className="truncate max-w-[150px]">{pos.name}</span>
+                            <button onClick={() => handleDeleteItem(pos.id)} className="text-rose-500 hover:text-rose-700 p-1">
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="block text-sm font-semibold text-slate-700">Department <span className="text-red-500">*</span></label>
+                    <button
+                      onClick={() => setInlineManagerType(inlineManagerType === 'department' ? null : 'department')}
+                      className={`text-xs flex items-center gap-1 font-bold transition-colors ${inlineManagerType === 'department' ? 'text-[#630C22]' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                      {inlineManagerType === 'department' ? 'CLOSE MANAGER' : 'MANAGE LIST'}
+                      {inlineManagerType === 'department' ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </button>
+                  </div>
+                  <select
+                    value={onboardFormData.department}
+                    onChange={(e) => setOnboardFormData(prev => ({ ...prev, department: e.target.value }))}
+                    className="w-full h-10 px-3 py-2 border border-slate-200 bg-white rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#630C22] transition-all"
+                  >
+                    <option value="">Select Department...</option>
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.name}>{dept.name}</option>
+                    ))}
+                  </select>
+
+                  {inlineManagerType === 'department' && (
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mt-2 shadow-inner">
+                      <div className="flex gap-2 mb-3">
+                        <Input
+                          placeholder="Add new department..."
+                          value={newItemName}
+                          onChange={(e) => setNewItemName(e.target.value)}
+                          className="h-9 text-xs"
+                          onKeyDown={(e) => e.key === 'Enter' && handleAddItem()}
+                        />
+                        <button onClick={handleAddItem} disabled={isActionLoading || !newItemName.trim()} className="bg-[#630C22] h-9 px-3 text-white rounded-md">
+                          <PlusCircle size={16} />
+                        </button>
+                      </div>
+                      <div className="max-h-32 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                        {departments.map(dept => (
+                          <div key={dept.id} className="flex justify-between items-center p-2 bg-white border border-slate-100 rounded text-xs">
+                            <span className="truncate max-w-[150px]">{dept.name}</span>
+                            <button onClick={() => handleDeleteItem(dept.id)} className="text-rose-500 hover:text-rose-700 p-1">
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Onboarding Date <span className="text-red-500">*</span></label>
+                  <Input
+                    type="date"
+                    value={onboardFormData.onboarding_date}
+                    onChange={(e) => setOnboardFormData(prev => ({ ...prev, onboarding_date: e.target.value }))}
+                  />
+                </div>
               </div>
 
-              <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Onboarding Date <span className="text-red-500">*</span></label>
-                <Input
-                  type="date"
-                  value={onboardFormData.onboarding_date}
-                  onChange={(e) => setOnboardFormData(prev => ({ ...prev, onboarding_date: e.target.value }))}
-                />
+              <div className="flex gap-4 pt-6 border-t border-slate-100">
+                <Button
+                  onClick={handleStartOnboarding}
+                  disabled={isSaving}
+                  className="flex-1 bg-[#630C22] hover:bg-[#4A081A] text-white font-bold h-12 rounded-xl transition-all shadow-md"
+                >
+                  {isSaving ? 'SAVING...' : 'START ONBOARDING'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleCancelOnboarding}
+                  disabled={isSaving}
+                  className="flex-1 border-slate-200 text-slate-600 font-bold h-12 rounded-xl"
+                >
+                  CANCEL
+                </Button>
               </div>
-            </div>
-
-            <div className="flex gap-4 pt-6 border-t border-slate-100">
-              <Button
-                onClick={handleStartOnboarding}
-                disabled={isSaving}
-                className="flex-1 bg-[#630C22] hover:bg-[#4A081A] text-white font-bold h-12 rounded-xl transition-all shadow-md"
-              >
-                {isSaving ? 'SAVING...' : 'START ONBOARDING'}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleCancelOnboarding}
-                disabled={isSaving}
-                className="flex-1 border-slate-200 text-slate-600 font-bold h-12 rounded-xl"
-              >
-                CANCEL
-              </Button>
             </div>
           </div>
         </div>
@@ -1079,58 +1174,6 @@ function OnboardPageContent() {
 
       {view === 'checklist' && checklistData && (
         <div className="max-w-[1600px] mx-auto py-4 px-6 md:px-8">
-          {/* ----- INTEGRATED PREMIUM HEADER ----- */}
-          <header className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md p-4 md:p-6 mb-8 relative overflow-hidden">
-            <div className="max-w-[1600px] mx-auto flex flex-wrap items-center gap-6 lg:gap-8 relative z-10">
-              {/* Title Section */}
-              <div className="flex flex-col">
-                <h1 className="text-xl md:text-2xl font-bold tracking-tight leading-none mb-1">Onboarding Process</h1>
-                <div className="flex items-center gap-1.5 text-white/60">
-                  <ClipboardList className="w-3.5 h-3.5" />
-                  <p className="text-[10px] md:text-xs font-bold uppercase tracking-widest">ABIC REALTY & CONSULTANCY</p>
-                </div>
-              </div>
-
-              <div className="h-8 w-px bg-white/10 hidden lg:block" />
-
-              {/* Employee Info Cards (Integrated) */}
-              <div className="flex flex-wrap items-center gap-6 flex-1">
-                <div className="flex flex-col">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Employee</span>
-                  <span className="text-sm font-bold text-white leading-none">{checklistData.name}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Position</span>
-                  <span className="text-sm font-bold text-white leading-none">{checklistData.position}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Department</span>
-                  <span className="text-sm font-bold text-white leading-none">{checklistData.department}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Start Date</span>
-                  <span className="text-sm font-bold text-white leading-none">{checklistData.date}</span>
-                </div>
-
-                {/* Progress Stats */}
-                <div className="ml-auto hidden xl:flex items-center gap-4 bg-white/5 px-6 py-2 rounded-xl border border-white/10 backdrop-blur-sm">
-                  <div className="flex flex-col items-end">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Overall Progress</span>
-                    <span className="text-base font-black text-white">{completionPercentage}%</span>
-                  </div>
-                  <div className="h-6 w-px bg-white/10" />
-                  <div className="flex flex-col">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Last Updated</span>
-                    <span className="text-base font-black text-white tracking-tight">{completionDateText || '—'}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            {/* Aesthetic Background Pattern */}
-            <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-              <ClipboardList className="w-32 h-32" />
-            </div>
-          </header>
 
           {/* Task List Section */}
           <Card className="rounded-2xl border-2 border-[#FFE5EC] shadow-2xl bg-white overflow-hidden mb-12">
@@ -1213,14 +1256,17 @@ function OnboardPageContent() {
               
               <div className="flex gap-3">
                 <Button
-                  onClick={() => setView('update-info')}
-                  disabled={Object.keys(completedTasks).length < onboardingTasks.length}
+                  onClick={async () => {
+                    const success = await handleSaveChecklist(false)
+                    if (success) setView('update-info')
+                  }}
+                  disabled={Object.keys(completedTasks).length < onboardingTasks.length || isSaving}
                   className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg active:scale-95 transition-all rounded-xl disabled:opacity-50"
                 >
-                  PROCEED TO DATA ENTRY
+                  {isSaving ? 'SAVING...' : 'PROCEED TO DATA ENTRY'}
                 </Button>
                 <Button 
-                  onClick={handleSaveChecklist} 
+                  onClick={() => handleSaveChecklist(true)} 
                   disabled={isSaving}
                   className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-[#A4163A] hover:bg-[#800020] text-white shadow-lg active:scale-95 transition-all rounded-xl"
                 >
@@ -1238,19 +1284,7 @@ function OnboardPageContent() {
           <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
             {/* Horizontal Stepper Progress Card */}
             <Card className="border-none shadow-lg overflow-hidden">
-              <div className="bg-gradient-to-br from-[#6B1C23] via-[#7B2431] to-[#8B2C3F] px-6 py-6">
-                {/* Header */}
-                <div className="flex justify-between items-start mb-6">
-                  <div>
-                    <h2 className="text-2xl font-bold text-white">Employee Data Entry</h2>
-                    <p className="text-rose-100 text-sm mt-1">Batch {currentBatch} of 7: {batches[currentBatch - 1].title}</p>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-5xl font-bold text-white">{calculateProgressionProgress()}%</div>
-                    <p className="text-rose-200 text-xs">Profile Completion</p>
-                  </div>
-                </div>
-
+              <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] px-6 pt-8 pb-6 font-sans">
                 {/* Horizontal Stepper with Progress Bar */}
                 <div className="relative">
                   {/* Progress Bar Background */}
