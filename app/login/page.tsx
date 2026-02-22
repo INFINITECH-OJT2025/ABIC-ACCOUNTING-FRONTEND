@@ -121,15 +121,24 @@ export default function LoginPage() {
           return
         }
 
-        // Handle first login - show welcome modal (no auto-redirect), user clicks to proceed
+        // Handle first login or password expiration - show welcome modal (no auto-redirect), user clicks to proceed
         const role = data.data?.user?.role
         const isFirstLogin = data.data?.user?.first_login
-        const needsPasswordChange = role === 'admin' || role === 'employee'
-        if (isFirstLogin && needsPasswordChange) {
+        const passwordExpiresAt = data.data?.user?.password_expires_at
+        const needsPasswordChange = role === 'admin' || role === 'employee' || role === 'accountant' || role === 'accountant_head'
+        
+        // Check if password has expired (if password_expires_at exists and is in the past)
+        // OR if password_expires_at exists (for newly promoted users who need to change password)
+        const isPasswordExpired = passwordExpiresAt && new Date(passwordExpiresAt) < new Date()
+        const hasPasswordExpiration = !!passwordExpiresAt // Newly promoted users have password_expires_at set
+        
+        if ((isFirstLogin || isPasswordExpired || hasPasswordExpiration) && needsPasswordChange) {
           setIsFirstLoginModal(true)
           setSuccessModalContent({
             title: 'Welcome to ABIC Realty & Consultancy Corporation',
-            message: "Welcome! Before we proceed to your dashboard, you must set up some things first. Let's get your account secured.",
+            message: isPasswordExpired 
+              ? "Your password has expired. Please change your password to continue."
+              : "Welcome! Before we proceed to your dashboard, you must set up some things first. Let's get your account secured.",
             buttonText: 'Get Started'
           })
           setShowSuccessModal(true)

@@ -259,6 +259,9 @@ export default function SuperAdminSidebar({ user, onLogout }: SuperAdminSidebarP
   const [accountantReportsExpanded, setAccountantReportsExpanded] = useState(isActive(pathname, "/super/accountant/reports"));
   const [accountantMaintenanceExpanded, setAccountantMaintenanceExpanded] = useState(isActive(pathname, "/super/accountant/maintenance"));
   const [accountantSettingsExpanded, setAccountantSettingsExpanded] = useState(isActive(pathname, "/super/accountant/settings"));
+  const [ledgerExpanded, setLedgerExpanded] = useState(isActive(pathname, "/super/accountant/ledger"));
+  const [generalLedgerExpanded, setGeneralLedgerExpanded] = useState(isActive(pathname, "/super/accountant/ledger/general-ledger-book") || isActive(pathname, "/super/accountant/ledger/chart-of-accounts"));
+
 
   const navItem = (
     href: string,
@@ -291,7 +294,7 @@ export default function SuperAdminSidebar({ user, onLogout }: SuperAdminSidebarP
     <aside
       ref={sidebarRef}
       className={cn(
-        "h-full flex flex-col overflow-hidden bg-gradient-to-b from-[#7B0F2B] via-[#8B1535] to-[#A4163A] border-r border-[#6A0D25]/50 shrink-0 shadow-lg shadow-[#7B0F2B]/20 relative",
+        "h-full flex flex-col overflow-hidden bg-gradient-to-r from-[#7B0F2B] to-[#A4163A] shrink-0 shadow-lg shadow-[#7B0F2B]/20 relative",
         !isCollapsed && "transition-[width] duration-200 ease-out"
       )}
       style={{
@@ -344,7 +347,7 @@ export default function SuperAdminSidebar({ user, onLogout }: SuperAdminSidebarP
         </button>
       </div>
 
-      <NavSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <NavSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} onLogout={onLogout} />
 
       {/* Main Navigation */}
       <nav className="flex-1 min-h-0 overflow-y-auto py-4 px-3 space-y-1">
@@ -628,8 +631,7 @@ export default function SuperAdminSidebar({ user, onLogout }: SuperAdminSidebarP
                   <div className="ml-4 mt-1 space-y-0.5 border-l border-white/20 pl-3">
                     {navItem("/super/accountant/transactions/deposit", "New Deposit", <Plus className="w-3.5 h-3.5" />)}
                     {navItem("/super/accountant/transactions/withdrawal", "New Withdrawal", <Minus className="w-3.5 h-3.5" />)}
-                    {navItem("/super/accountant/transactions/transfer", "Bank Transfer", <ArrowRightLeft className="w-3.5 h-3.5" />)}
-                    {navItem("/super/accountant/transactions/journal-entry", "Journal Entry", <Receipt className="w-3.5 h-3.5" />)}
+                    {navItem("/super/accountant/saved-receipts", "Transactions Receipt", <Receipt className="w-3.5 h-3.5" />)}
                   </div>
                 )}
               </div>
@@ -637,112 +639,31 @@ export default function SuperAdminSidebar({ user, onLogout }: SuperAdminSidebarP
               {/* Ledger */}
               <div>
                 <button
-                  onClick={() => setAccountantLedgerExpanded(!accountantLedgerExpanded)}
-                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium text-white/90 hover:bg-white/10"
+                  onClick={() => setLedgerExpanded(!ledgerExpanded)}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-white/80 hover:bg-white/10"
                 >
-                  <span className="flex items-center gap-3">
-                    <BookOpen className="w-5 h-5 text-white/70" />
+                  <span className="flex items-center gap-2">
+                    <BookMarked className="w-4 h-4 text-white/60" />
                     Ledger
                   </span>
                   <ChevronLeft
-                    className={cn("w-4 h-4 transition-transform text-white/70", accountantLedgerExpanded && "rotate-[-90deg]")}
+                    className={cn(
+                      "w-3 h-3 transition-transform text-white/60",
+                      ledgerExpanded && "rotate-[-90deg]"
+                    )}
                   />
                 </button>
-                {accountantLedgerExpanded && (
-                  <div className="ml-4 mt-1 space-y-1 border-l border-white/20 pl-3">
-                    {/* Bank Ledgers */}
-                    <div>
-                      <button
-                        onClick={() => setAccountantBankLedgersExpanded(!accountantBankLedgersExpanded)}
-                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-white/80 hover:bg-white/10"
-                      >
-                        <span className="flex items-center gap-2">
-                          <Banknote className="w-4 h-4 text-white/60" />
-                          Bank Ledgers
-                        </span>
-                        <ChevronLeft
-                          className={cn("w-3 h-3 transition-transform text-white/60", accountantBankLedgersExpanded && "rotate-[-90deg]")}
-                        />
-                      </button>
-                      {accountantBankLedgersExpanded && (
-                        <div className="ml-4 mt-1 space-y-0.5 border-l border-white/15 pl-3">
-                          {navItem("/super/accountant/ledger/bank-account", "Bank Account Ledger", <BookOpen className="w-3.5 h-3.5" />)}
-                          {navItem("/super/accountant/ledger/bank-owner", "Bank Owner Ledger", <User className="w-3.5 h-3.5" />)}
-                          {navItem("/super/accountant/ledger/transfer-register", "Transfer Register", <ArrowRightLeft className="w-3.5 h-3.5" />)}
-                          {navItem("/super/accountant/ledger/bank-reconciliation", "Bank Reconciliation", <CheckCircle2 className="w-3.5 h-3.5" />)}
-                        </div>
-                      )}
-                    </div>
 
-                    {/* Cash Ledger */}
-                    <div>
-                      <button
-                        onClick={() => setAccountantCashLedgerExpanded(!accountantCashLedgerExpanded)}
-                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-white/80 hover:bg-white/10"
-                      >
-                        <span className="flex items-center gap-2">
-                          <Coins className="w-4 h-4 text-white/60" />
-                          Cash Ledger
-                        </span>
-                        <ChevronLeft
-                          className={cn("w-3 h-3 transition-transform text-white/60", accountantCashLedgerExpanded && "rotate-[-90deg]")}
-                        />
-                      </button>
-                      {accountantCashLedgerExpanded && (
-                        <div className="ml-4 mt-1 space-y-0.5 border-l border-white/15 pl-3">
-                          {navItem("/super/accountant/ledger/cash-book", "Cash Book", <BookOpen className="w-3.5 h-3.5" />)}
-                          {navItem("/super/accountant/ledger/petty-cash", "Petty Cash", <Coins className="w-3.5 h-3.5" />)}
-                        </div>
-                      )}
-                    </div>
+                {ledgerExpanded && (
+                  <div className="ml-4 mt-1 space-y-1 border-l border-white/15 pl-3">
+                    {/* Mains Ledger */}
+                    {navItem("/super/accountant/ledger/mains", "Mains Ledger", <BookOpen className="w-3.5 h-3.5" />)}
+                    
+                    {/* Client Ledger */}
+                    {navItem("/super/accountant/ledger/clients", "Client Ledger", <BookOpen className="w-3.5 h-3.5" />)}
 
-                    {/* General Ledger */}
-                    <div>
-                      <button
-                        onClick={() => setAccountantGeneralLedgerExpanded(!accountantGeneralLedgerExpanded)}
-                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-white/80 hover:bg-white/10"
-                      >
-                        <span className="flex items-center gap-2">
-                          <BookMarked className="w-4 h-4 text-white/60" />
-                          General Ledger
-                        </span>
-                        <ChevronLeft
-                          className={cn("w-3 h-3 transition-transform text-white/60", accountantGeneralLedgerExpanded && "rotate-[-90deg]")}
-                        />
-                      </button>
-                      {accountantGeneralLedgerExpanded && (
-                        <div className="ml-4 mt-1 space-y-0.5 border-l border-white/15 pl-3">
-                          {navItem("/super/accountant/ledger/general-ledger-book", "General Ledger Book", <BookOpen className="w-3.5 h-3.5" />)}
-                          {navItem("/super/accountant/ledger/chart-of-accounts", "Chart of Accounts", <BookMarked className="w-3.5 h-3.5" />)}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Reports */}
-              <div>
-                <button
-                  onClick={() => setAccountantReportsExpanded(!accountantReportsExpanded)}
-                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium text-white/90 hover:bg-white/10"
-                >
-                  <span className="flex items-center gap-3">
-                    <BarChart3 className="w-5 h-5 text-white/70" />
-                    Reports
-                  </span>
-                  <ChevronLeft
-                    className={cn("w-4 h-4 transition-transform text-white/70", accountantReportsExpanded && "rotate-[-90deg]")}
-                  />
-                </button>
-                {accountantReportsExpanded && (
-                  <div className="ml-4 mt-1 space-y-0.5 border-l border-white/20 pl-3">
-                    {navItem("/super/accountant/reports/bank-balance", "Bank Balance Summary", <BarChart3 className="w-3.5 h-3.5" />)}
-                    {navItem("/super/accountant/reports/bank-ledger", "Bank Ledger Report", <FileText className="w-3.5 h-3.5" />)}
-                    {navItem("/super/accountant/reports/owner-fund", "Owner Fund Report", <BarChart3 className="w-3.5 h-3.5" />)}
-                    {navItem("/super/accountant/reports/transfer", "Transfer Report", <ArrowRightLeft className="w-3.5 h-3.5" />)}
-                    {navItem("/super/accountant/reports/voucher-register", "Voucher Register", <FileText className="w-3.5 h-3.5" />)}
-                    {navItem("/super/accountant/reports/cash-flow", "Cash Flow Report", <BarChart3 className="w-3.5 h-3.5" />)}
+                    {/* System Ledger */}
+                    {navItem("/super/accountant/ledger/system", "System Ledger", <BookOpen className="w-3.5 h-3.5" />)}
                   </div>
                 )}
               </div>
@@ -767,35 +688,10 @@ export default function SuperAdminSidebar({ user, onLogout }: SuperAdminSidebarP
                     {navItem("/super/accountant/maintenance/owners", "Owners", <Users className="w-3.5 h-3.5" />)}
                     {navItem("/super/accountant/maintenance/properties", "Properties", <Building2 className="w-3.5 h-3.5" />)}
                     {navItem("/super/accountant/maintenance/bank-accounts", "Bank Accounts", <Banknote className="w-3.5 h-3.5" />)}
-                    {navItem("/super/accountant/maintenance/fund-references", "Fund References", <FolderOpen className="w-3.5 h-3.5" />)}
-                    {navItem("/super/accountant/maintenance/voucher-series", "Voucher Series", <FileText className="w-3.5 h-3.5" />)}
-                    {navItem("/super/accountant/maintenance/chart-of-accounts", "Chart of Accounts", <BookMarked className="w-3.5 h-3.5" />)}
                   </div>
                 )}
               </div>
 
-              {/* Settings */}
-              <div>
-                <button
-                  onClick={() => setAccountantSettingsExpanded(!accountantSettingsExpanded)}
-                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium text-white/90 hover:bg-white/10"
-                >
-                  <span className="flex items-center gap-3">
-                    <Settings2 className="w-5 h-5 text-white/70" />
-                    Settings
-                  </span>
-                  <ChevronLeft
-                    className={cn("w-4 h-4 transition-transform text-white/70", accountantSettingsExpanded && "rotate-[-90deg]")}
-                  />
-                </button>
-                {accountantSettingsExpanded && (
-                  <div className="ml-4 mt-1 space-y-0.5 border-l border-white/20 pl-3">
-                    {navItem("/super/accountant/settings/fiscal-year", "Fiscal Year", <CalendarIcon className="w-3.5 h-3.5" />)}
-                    {navItem("/super/accountant/settings/user-roles", "User Roles & Permissions", <UsersRound className="w-3.5 h-3.5" />)}
-                    {navItem("/super/accountant/settings/system-preferences", "System Preferences", <Sliders className="w-3.5 h-3.5" />)}
-                  </div>
-                )}
-              </div>
             </div>
           </div>
         )}
@@ -809,6 +705,7 @@ export default function SuperAdminSidebar({ user, onLogout }: SuperAdminSidebarP
               items={[
                 { href: "/super/accountant/transactions/deposit", label: "New Deposit", icon: <Plus className="w-4 h-4" /> },
                 { href: "/super/accountant/transactions/withdrawal", label: "New Withdrawal", icon: <Minus className="w-4 h-4" /> },
+                { href: "/super/accountant/saved-receipts", label: "Transactions Receipt", icon: <Receipt className="w-4 h-4" /> },
                 { href: "/super/accountant/transactions/transfer", label: "Bank Transfer", icon: <ArrowRightLeft className="w-4 h-4" /> },
                 { href: "/super/accountant/transactions/journal-entry", label: "Journal Entry", icon: <Receipt className="w-4 h-4" /> },
               ]}
@@ -832,19 +729,14 @@ export default function SuperAdminSidebar({ user, onLogout }: SuperAdminSidebarP
             <CollapsedSubmenuPopover
               label="Ledger"
               items={[
-                { href: "/super/accountant/ledger/bank-account", label: "Bank Account Ledger", icon: <BookOpen className="w-4 h-4" /> },
-                { href: "/super/accountant/ledger/bank-owner", label: "Bank Owner Ledger", icon: <BookOpen className="w-4 h-4" /> },
-                { href: "/super/accountant/ledger/transfer-register", label: "Transfer Register", icon: <ArrowRightLeft className="w-4 h-4" /> },
-                { href: "/super/accountant/ledger/bank-reconciliation", label: "Bank Reconciliation", icon: <CheckCircle2 className="w-4 h-4" /> },
-                { href: "/super/accountant/ledger/cash-book", label: "Cash Book", icon: <BookOpen className="w-4 h-4" /> },
-                { href: "/super/accountant/ledger/petty-cash", label: "Petty Cash", icon: <Coins className="w-4 h-4" /> },
-                { href: "/super/accountant/ledger/general-ledger-book", label: "General Ledger Book", icon: <BookOpen className="w-4 h-4" /> },
-                { href: "/super/accountant/ledger/chart-of-accounts", label: "Chart of Accounts", icon: <BookMarked className="w-4 h-4" /> },
+                { href: "/super/accountant/ledger/mains", label: "Mains Ledger", icon: <BookOpen className="w-4 h-4" /> },
+                { href: "/super/accountant/ledger/clients", label: "Client Ledger", icon: <BookOpen className="w-4 h-4" /> },
+                { href: "/super/accountant/ledger/system", label: "System Ledger", icon: <BookOpen className="w-4 h-4" /> },
               ]}
               pathname={pathname}
             >
               <button
-                onClick={() => router.push("/super/accountant/ledger/bank-account")}
+                onClick={() => router.push("/super/accountant/ledger/mains")}
                 className={cn(
                   "w-full flex items-center justify-center p-2.5 rounded-lg",
                   isActive(pathname, "/super/accountant/ledger")
@@ -853,34 +745,29 @@ export default function SuperAdminSidebar({ user, onLogout }: SuperAdminSidebarP
                 )}
                 title="Ledger"
               >
-                <BookOpen className="w-5 h-5" />
+                <BookMarked className="w-5 h-5" />
               </button>
             </CollapsedSubmenuPopover>
 
-            {/* Reports */}
+            {/* Transactions Receipt */}
             <CollapsedSubmenuPopover
-              label="Reports"
+              label="Transactions Receipt"
               items={[
-                { href: "/super/accountant/reports/bank-balance", label: "Bank Balance Summary", icon: <BarChart3 className="w-4 h-4" /> },
-                { href: "/super/accountant/reports/bank-ledger", label: "Bank Ledger Report", icon: <FileText className="w-4 h-4" /> },
-                { href: "/super/accountant/reports/owner-fund", label: "Owner Fund Report", icon: <BarChart3 className="w-4 h-4" /> },
-                { href: "/super/accountant/reports/transfer", label: "Transfer Report", icon: <ArrowRightLeft className="w-4 h-4" /> },
-                { href: "/super/accountant/reports/voucher-register", label: "Voucher Register", icon: <FileText className="w-4 h-4" /> },
-                { href: "/super/accountant/reports/cash-flow", label: "Cash Flow Report", icon: <BarChart3 className="w-4 h-4" /> },
+                { href: "/super/accountant/saved-receipts", label: "Transactions Receipt", icon: <Receipt className="w-4 h-4" /> },
               ]}
               pathname={pathname}
             >
               <button
-                onClick={() => router.push("/super/accountant/reports/bank-balance")}
+                onClick={() => router.push("/super/accountant/saved-receipts")}
                 className={cn(
                   "w-full flex items-center justify-center p-2.5 rounded-lg",
-                  isActive(pathname, "/super/accountant/reports")
+                  isActive(pathname, "/super/accountant/saved-receipts")
                     ? "bg-white/20 text-white"
                     : "text-white/70 hover:bg-white/10"
                 )}
-                title="Reports"
+                title="Transactions Receipt"
               >
-                <BarChart3 className="w-5 h-5" />
+                <Receipt className="w-5 h-5" />
               </button>
             </CollapsedSubmenuPopover>
 
@@ -892,9 +779,6 @@ export default function SuperAdminSidebar({ user, onLogout }: SuperAdminSidebarP
                 { href: "/super/accountant/maintenance/owners", label: "Owners", icon: <Users className="w-4 h-4" /> },
                 { href: "/super/accountant/maintenance/properties", label: "Properties", icon: <Building2 className="w-4 h-4" /> },
                 { href: "/super/accountant/maintenance/bank-accounts", label: "Bank Accounts", icon: <Banknote className="w-4 h-4" /> },
-                { href: "/super/accountant/maintenance/fund-references", label: "Fund References", icon: <FolderOpen className="w-4 h-4" /> },
-                { href: "/super/accountant/maintenance/voucher-series", label: "Voucher Series", icon: <FileText className="w-4 h-4" /> },
-                { href: "/super/accountant/maintenance/chart-of-accounts", label: "Chart of Accounts", icon: <BookMarked className="w-4 h-4" /> },
               ]}
               pathname={pathname}
             >
@@ -912,29 +796,6 @@ export default function SuperAdminSidebar({ user, onLogout }: SuperAdminSidebarP
               </button>
             </CollapsedSubmenuPopover>
 
-            {/* Settings */}
-            <CollapsedSubmenuPopover
-              label="Settings"
-              items={[
-                { href: "/super/accountant/settings/fiscal-year", label: "Fiscal Year", icon: <CalendarIcon className="w-4 h-4" /> },
-                { href: "/super/accountant/settings/user-roles", label: "User Roles & Permissions", icon: <UsersRound className="w-4 h-4" /> },
-                { href: "/super/accountant/settings/system-preferences", label: "System Preferences", icon: <Sliders className="w-4 h-4" /> },
-              ]}
-              pathname={pathname}
-            >
-              <button
-                onClick={() => router.push("/super/accountant/settings/fiscal-year")}
-                className={cn(
-                  "w-full flex items-center justify-center p-2.5 rounded-lg",
-                  isActive(pathname, "/super/accountant/settings")
-                    ? "bg-white/20 text-white"
-                    : "text-white/70 hover:bg-white/10"
-                )}
-                title="Settings"
-              >
-                <Settings2 className="w-5 h-5" />
-              </button>
-            </CollapsedSubmenuPopover>
           </div>
         )}
 

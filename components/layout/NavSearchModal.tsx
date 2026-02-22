@@ -27,6 +27,7 @@ import {
   Calendar as CalendarIcon,
   UsersRound,
   Sliders,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -38,56 +39,64 @@ export type NavItem = {
 };
 
 const ALL_NAV_ITEMS: NavItem[] = [
+  // Dashboard
   { href: "/super", label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" /> },
+
+  // Head
   { href: "/super/head/admins", label: "Admins", icon: <Shield className="w-4 h-4" />, category: "Head" },
   { href: "/super/head/accountants", label: "Accountants", icon: <Calculator className="w-4 h-4" />, category: "Head" },
+
+  // Employee
   { href: "/super/admin/employee/masterfile", label: "Masterfile", icon: <User className="w-4 h-4" />, category: "Employee" },
   { href: "/super/admin/employee/onboard", label: "Onboard Employee", icon: <User className="w-4 h-4" />, category: "Employee" },
   { href: "/super/admin/employee/terminate", label: "Terminate Employee", icon: <User className="w-4 h-4" />, category: "Employee" },
   { href: "/super/admin/employee/evaluation", label: "Evaluation", icon: <FileText className="w-4 h-4" />, category: "Employee" },
+
+  // Forms
   { href: "/super/admin/forms/onboarding-checklist", label: "Onboarding Checklist", icon: <FileText className="w-4 h-4" />, category: "Forms" },
   { href: "/super/admin/forms/clearance-checklist", label: "Clearance Checklist", icon: <FileText className="w-4 h-4" />, category: "Forms" },
+
+  // Directory
   { href: "/super/admin/directory/process", label: "Process", icon: <FileText className="w-4 h-4" />, category: "Directory" },
   { href: "/super/admin/directory/contacts", label: "Contacts", icon: <User className="w-4 h-4" />, category: "Directory" },
+
+  // Attendance
   { href: "/super/admin/attendance/tardiness", label: "Tardiness", icon: <Clock className="w-4 h-4" />, category: "Attendance" },
   { href: "/super/admin/attendance/leave", label: "Leave", icon: <Calendar className="w-4 h-4" />, category: "Attendance" },
   { href: "/super/admin/attendance/leave-credits", label: "Leave Credits", icon: <Calendar className="w-4 h-4" />, category: "Attendance" },
-  { href: "/super/accountant/transactions/deposit", label: "New Deposit", icon: <Plus className="w-4 h-4" />, category: "Accountant" },
-  { href: "/super/accountant/transactions/withdrawal", label: "New Withdrawal", icon: <Minus className="w-4 h-4" />, category: "Accountant" },
-  { href: "/super/accountant/transactions/transfer", label: "Bank Transfer", icon: <ArrowRightLeft className="w-4 h-4" />, category: "Accountant" },
-  { href: "/super/accountant/transactions/journal-entry", label: "Journal Entry", icon: <Receipt className="w-4 h-4" />, category: "Accountant" },
-  { href: "/super/accountant/ledger/bank-account", label: "Bank Account Ledger", icon: <BookOpen className="w-4 h-4" />, category: "Accountant" },
-  { href: "/super/accountant/ledger/bank-owner", label: "Bank Owner Ledger", icon: <BookOpen className="w-4 h-4" />, category: "Accountant" },
-  { href: "/super/accountant/ledger/transfer-register", label: "Transfer Register", icon: <ArrowRightLeft className="w-4 h-4" />, category: "Accountant" },
-  { href: "/super/accountant/ledger/bank-reconciliation", label: "Bank Reconciliation", icon: <CheckCircle2 className="w-4 h-4" />, category: "Accountant" },
-  { href: "/super/accountant/ledger/cash-book", label: "Cash Book", icon: <BookOpen className="w-4 h-4" />, category: "Accountant" },
-  { href: "/super/accountant/ledger/petty-cash", label: "Petty Cash", icon: <Coins className="w-4 h-4" />, category: "Accountant" },
-  { href: "/super/accountant/ledger/general-ledger-book", label: "General Ledger Book", icon: <BookOpen className="w-4 h-4" />, category: "Accountant" },
-  { href: "/super/accountant/ledger/chart-of-accounts", label: "Chart of Accounts", icon: <BookMarked className="w-4 h-4" />, category: "Accountant" },
-  { href: "/super/accountant/reports/bank-balance", label: "Bank Balance Summary", icon: <BarChart3 className="w-4 h-4" />, category: "Accountant" },
-  { href: "/super/accountant/reports/bank-ledger", label: "Bank Ledger Report", icon: <FileText className="w-4 h-4" />, category: "Accountant" },
-  { href: "/super/accountant/reports/owner-fund", label: "Owner Fund Report", icon: <BarChart3 className="w-4 h-4" />, category: "Accountant" },
-  { href: "/super/accountant/reports/transfer", label: "Transfer Report", icon: <ArrowRightLeft className="w-4 h-4" />, category: "Accountant" },
-  { href: "/super/accountant/reports/voucher-register", label: "Voucher Register", icon: <FileText className="w-4 h-4" />, category: "Accountant" },
-  { href: "/super/accountant/reports/cash-flow", label: "Cash Flow Report", icon: <BarChart3 className="w-4 h-4" />, category: "Accountant" },
+
+  // Accountant - Transactions
+  { href: "/super/accountant/transactions/deposit", label: "New Deposit", icon: <Plus className="w-4 h-4" />, category: "Transactions" },
+  { href: "/super/accountant/transactions/withdrawal", label: "New Withdrawal", icon: <Minus className="w-4 h-4" />, category: "Transactions" },
+  { href: "/super/accountant/saved-receipts", label: "Transactions Receipt", icon: <Receipt className="w-4 h-4" />, category: "Transactions" },
+
+  // Accountant - Ledger
+  { href: "/super/accountant/ledger/mains", label: "Mains Ledger", icon: <BookOpen className="w-4 h-4" />, category: "Ledger" },
+  { href: "/super/accountant/ledger/clients", label: "Client Ledger", icon: <BookOpen className="w-4 h-4" />, category: "Ledger" },
+
+  // Accountant - System Ledger
+  { href: "/super/accountant/ledger/system", label: "System Ledger", icon: <BookOpen className="w-4 h-4" />, category: "Ledger" },
+
+  // Accountant - Maintenance
   { href: "/super/accountant/maintenance/banks", label: "Banks", icon: <Banknote className="w-4 h-4" />, category: "Maintenance" },
   { href: "/super/accountant/maintenance/owners", label: "Owners", icon: <User className="w-4 h-4" />, category: "Maintenance" },
   { href: "/super/accountant/maintenance/properties", label: "Properties", icon: <User className="w-4 h-4" />, category: "Maintenance" },
   { href: "/super/accountant/maintenance/bank-accounts", label: "Bank Accounts", icon: <User className="w-4 h-4" />, category: "Maintenance" },
-  { href: "/super/accountant/maintenance/fund-references", label: "Fund References", icon: <FolderOpen className="w-4 h-4" />, category: "Accountant" },
-  { href: "/super/accountant/maintenance/voucher-series", label: "Voucher Series", icon: <FileText className="w-4 h-4" />, category: "Accountant" },
-  { href: "/super/accountant/maintenance/chart-of-accounts", label: "Chart of Accounts", icon: <BookMarked className="w-4 h-4" />, category: "Accountant" },
-  { href: "/super/accountant/settings/fiscal-year", label: "Fiscal Year", icon: <CalendarIcon className="w-4 h-4" />, category: "Accountant" },
-  { href: "/super/accountant/settings/user-roles", label: "User Roles & Permissions", icon: <UsersRound className="w-4 h-4" />, category: "Accountant" },
-  { href: "/super/accountant/settings/system-preferences", label: "System Preferences", icon: <Sliders className="w-4 h-4" />, category: "Accountant" },
+
+  // Accountant - Other Pages
+  { href: "/super/accountant/account-summary", label: "Account Summary", icon: <BarChart3 className="w-4 h-4" />, category: "Accountant" },
+  { href: "/super/accountant/management", label: "Management", icon: <Settings2 className="w-4 h-4" />, category: "Accountant" },
+  { href: "/super/accountant/owner-accounts", label: "Owner Accounts", icon: <User className="w-4 h-4" />, category: "Accountant" },
+  { href: "/super/accountant/unit-owner", label: "Unit Owner", icon: <User className="w-4 h-4" />, category: "Accountant" },
 ];
 
 interface NavSearchModalProps {
   open: boolean;
   onClose: () => void;
+  onLogout?: () => void;
 }
 
-export function NavSearchModal({ open, onClose }: NavSearchModalProps) {
+export function NavSearchModal({ open, onClose, onLogout }: NavSearchModalProps) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -230,6 +239,22 @@ export function NavSearchModal({ open, onClose }: NavSearchModalProps) {
             </div>
           )}
         </div>
+
+        {/* Logout Button */}
+        {onLogout && (
+          <div className="px-4 py-2 border-t border-gray-200/80 dark:border-gray-700/80">
+            <button
+              onClick={() => {
+                onLogout();
+                onClose();
+              }}
+              className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors rounded-lg"
+            >
+              <LogOut className="w-4 h-4 shrink-0" />
+              <span className="font-medium">Logout</span>
+            </button>
+          </div>
+        )}
 
         {/* Footer hint */}
         <div className="px-4 py-2 border-t border-gray-200/80 dark:border-gray-700/80 flex items-center justify-between text-xs text-gray-500">

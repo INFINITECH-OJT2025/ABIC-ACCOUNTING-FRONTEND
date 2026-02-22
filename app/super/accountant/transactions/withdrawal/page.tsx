@@ -56,7 +56,7 @@ type Property = {
   status: string;
 };
 
-export default function DepositPage() {
+export default function WithdrawalPage() {
   const [voucherMode, setVoucherMode] = useState<"WITH_VOUCHER" | "NO_VOUCHER">("WITH_VOUCHER");
   
   const [formData, setFormData] = useState({
@@ -152,12 +152,12 @@ export default function DepositPage() {
   const [createUnitFailTitle, setCreateUnitFailTitle] = useState("");
   const [createUnitFailMessage, setCreateUnitFailMessage] = useState("");
 
-  // Deposit submission states
-  const [showCreateDepositLoading, setShowCreateDepositLoading] = useState(false);
-  const [showCreateDepositSuccess, setShowCreateDepositSuccess] = useState(false);
+  // Withdrawal submission states
+  const [showCreateWithdrawalLoading, setShowCreateWithdrawalLoading] = useState(false);
+  const [showCreateWithdrawalSuccess, setShowCreateWithdrawalSuccess] = useState(false);
   const [successPanelClosing, setSuccessPanelClosing] = useState(false);
-  const [showCreateDepositFail, setShowCreateDepositFail] = useState(false);
-  const [createDepositFailMessage, setCreateDepositFailMessage] = useState("");
+  const [showCreateWithdrawalFail, setShowCreateWithdrawalFail] = useState(false);
+  const [createWithdrawalFailMessage, setCreateWithdrawalFailMessage] = useState("");
   const [successTransactionData, setSuccessTransactionData] = useState<{
     voucherMode: "WITH_VOUCHER" | "NO_VOUCHER";
     voucher_date?: string;
@@ -176,11 +176,11 @@ export default function DepositPage() {
   } | null>(null);
 
   // Constants for labels
-  const title = "Deposit";
-  const typeLabel = "Deposit Type";
-  const recordDescription = "Record a new deposit transaction";
-  const noVoucherLabel = "No Voucher Deposit";
-  const actionLabel = "Create Deposit";
+  const title = "Withdrawal";
+  const typeLabel = "Withdrawal Type";
+  const recordDescription = "Record a new withdrawal transaction";
+  const noVoucherLabel = "No Voucher Withdrawal";
+  const actionLabel = "Create Withdrawal";
 
   /* ================= FUZZY SEARCH FUNCTION ================= */
 
@@ -1038,7 +1038,7 @@ export default function DepositPage() {
     return {
       voucher_no: formData.voucher_no ? formData.voucher_no.toUpperCase().trim() : null,
       voucher_date: formData.voucher_date,
-      trans_method: "DEPOSIT", // Always DEPOSIT for this page
+      trans_method: "WITHDRAWAL", // Always WITHDRAWAL for this page
       trans_type: formData.transaction_type, // CASH | CHEQUE | DEPOSIT_SLIP | INTERNAL
       from_owner_id: formData.from_owner_id,
       to_owner_id: formData.to_owner_id,
@@ -1112,7 +1112,7 @@ export default function DepositPage() {
   };
 
   // Prepare complete payload for API submission
-  const prepareDepositPayload = () => {
+  const prepareWithdrawalPayload = () => {
     return {
       transaction: prepareTransactionPayload(),
       instruments: prepareTransactionInstrumentsPayload(),
@@ -1125,61 +1125,61 @@ export default function DepositPage() {
     };
   };
 
-  const handleCreateDeposit = async () => {
+  const handleCreateWithdrawal = async () => {
     // 🔥 Frontend validation (UX) - Backend will re-validate everything
     // Validate required fields
     if (!formData.from_owner_id) {
-      setCreateDepositFailMessage("From Owner is required");
-      setShowCreateDepositFail(true);
+      setCreateWithdrawalFailMessage("From Owner is required");
+      setShowCreateWithdrawalFail(true);
       return;
     }
 
     if (!formData.to_owner_id) {
-      setCreateDepositFailMessage("To Owner is required");
-      setShowCreateDepositFail(true);
+      setCreateWithdrawalFailMessage("To Owner is required");
+      setShowCreateWithdrawalFail(true);
       return;
     }
 
     if (formData.from_owner_id === formData.to_owner_id) {
-      setCreateDepositFailMessage("From Owner and To Owner cannot be the same");
-      setShowCreateDepositFail(true);
+      setCreateWithdrawalFailMessage("From Owner and To Owner cannot be the same");
+      setShowCreateWithdrawalFail(true);
       return;
     }
 
     if (!formData.amount || parseFloat(formData.amount.replace(/,/g, '')) <= 0) {
-      setCreateDepositFailMessage("Amount must be greater than 0");
-      setShowCreateDepositFail(true);
+      setCreateWithdrawalFailMessage("Amount must be greater than 0");
+      setShowCreateWithdrawalFail(true);
       return;
     }
 
     if (!formData.particulars || !formData.particulars.trim()) {
-      setCreateDepositFailMessage("Particulars is required");
-      setShowCreateDepositFail(true);
+      setCreateWithdrawalFailMessage("Particulars is required");
+      setShowCreateWithdrawalFail(true);
       return;
     }
 
     // 🔥 10️⃣ Enforce voucher mode: if voucher_no exists, voucher_date must exist
     if (voucherMode === "WITH_VOUCHER") {
       if (!formData.voucher_date) {
-        setCreateDepositFailMessage("Voucher Date is required when voucher mode is enabled");
-        setShowCreateDepositFail(true);
+        setCreateWithdrawalFailMessage("Voucher Date is required when voucher mode is enabled");
+        setShowCreateWithdrawalFail(true);
         return;
       }
       if (!formData.voucher_no || !formData.voucher_no.trim()) {
-        setCreateDepositFailMessage("Voucher Number is required when voucher mode is enabled");
-        setShowCreateDepositFail(true);
+        setCreateWithdrawalFailMessage("Voucher Number is required when voucher mode is enabled");
+        setShowCreateWithdrawalFail(true);
         return;
       }
     }
 
     // If voucher_no is provided, voucher_date must be provided
     if (formData.voucher_no && formData.voucher_no.trim() && !formData.voucher_date) {
-      setCreateDepositFailMessage("Voucher Date is required when Voucher Number is provided");
-      setShowCreateDepositFail(true);
+      setCreateWithdrawalFailMessage("Voucher Date is required when Voucher Number is provided");
+      setShowCreateWithdrawalFail(true);
       return;
     }
 
-    const payload = prepareDepositPayload();
+    const payload = prepareWithdrawalPayload();
     const formDataToSend = new FormData();
     
     // 🔥 9️⃣ Do NOT send transaction_category - backend will set it automatically
@@ -1191,9 +1191,9 @@ export default function DepositPage() {
       formDataToSend.append(`file_${index}`, file);
     });
 
-    setShowCreateDepositLoading(true);
+    setShowCreateWithdrawalLoading(true);
     try {
-      const res = await fetch("/api/accountant/transactions/deposit", {
+      const res = await fetch("/api/accountant/transactions/withdrawal", {
         method: "POST",
         body: formDataToSend,
       });
@@ -1241,22 +1241,22 @@ export default function DepositPage() {
         setSuccessTransactionData(transactionDataForSuccess);
 
         // Save receipt as image
-        saveReceiptAsImage(transactionDataForSuccess, data.data?.id || null, "DEPOSIT");
+        saveReceiptAsImage(transactionDataForSuccess, data.data?.id || null, "WITHDRAWAL");
 
-        setShowCreateDepositLoading(false);
+        setShowCreateWithdrawalLoading(false);
         resetForm();
-        setShowCreateDepositSuccess(true);
+        setShowCreateWithdrawalSuccess(true);
       } else {
-        setShowCreateDepositLoading(false);
-        setCreateDepositFailMessage(
-          data.errors ? Object.values(data.errors).flat().join(", ") : data.message || "Failed to create deposit"
+        setShowCreateWithdrawalLoading(false);
+        setCreateWithdrawalFailMessage(
+          data.errors ? Object.values(data.errors).flat().join(", ") : data.message || "Failed to create withdrawal"
         );
-        setShowCreateDepositFail(true);
+        setShowCreateWithdrawalFail(true);
       }
     } catch (err) {
-      setShowCreateDepositLoading(false);
-      setCreateDepositFailMessage("An error occurred while creating the deposit.");
-      setShowCreateDepositFail(true);
+      setShowCreateWithdrawalLoading(false);
+      setCreateWithdrawalFailMessage("An error occurred while creating the withdrawal.");
+      setShowCreateWithdrawalFail(true);
     }
   };
 
@@ -1914,7 +1914,7 @@ export default function DepositPage() {
               <div class="summary-content">
                 <div class="summary-section">
                   <div class="summary-row">
-                    <span class="summary-label">Deposit Type</span>
+                    <span class="summary-label">Withdrawal Type</span>
                     <span class="summary-value">${voucherMode === "WITH_VOUCHER" ? "With Voucher" : "No Voucher"}</span>
                   </div>
                 </div>
@@ -2323,7 +2323,7 @@ export default function DepositPage() {
               <div class="summary-content">
                 <div class="summary-section">
                   <div class="summary-row">
-                    <span class="summary-label">Deposit Type</span>
+                    <span class="summary-label">Withdrawal Type</span>
                     <span class="summary-value">${voucherMode === "WITH_VOUCHER" ? "With Voucher" : "No Voucher"}</span>
                   </div>
                 </div>
@@ -2868,7 +2868,7 @@ export default function DepositPage() {
                           <span className="text-sm font-medium">
                             {formData.transaction_type === "CHEQUE" 
                               ? "Upload Cheque"
-                              : "Upload Deposit Slip"}
+                              : "Upload Slip"}
                           </span>
                           <span className="text-xs text-gray-500">Click to browse or drag and drop</span>
                         </label>
@@ -3476,10 +3476,10 @@ export default function DepositPage() {
                 {/* Content */}
                 <div className="bg-white p-6" data-summary-content>
                   <div className="space-y-4">
-                    {/* Deposit Type */}
+                    {/* Withdrawal Type */}
                     <div className="pb-3 border-b" style={{ borderColor: BORDER }}>
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-gray-700">Deposit Type</span>
+                        <span className="text-xs font-semibold text-gray-700">Withdrawal Type</span>
                         <span className="text-sm font-semibold text-gray-900">
                           {voucherMode === "WITH_VOUCHER" ? "With Voucher" : "No Voucher"}
                         </span>
@@ -3673,7 +3673,7 @@ export default function DepositPage() {
 
               <button
                 disabled={
-                  showCreateDepositLoading ||
+                  showCreateWithdrawalLoading ||
                   (voucherMode === "WITH_VOUCHER" && (!formData.voucher_date || !formData.voucher_no)) ||
                   !formData.amount ||
                   !formData.from_owner_id ||
@@ -3682,9 +3682,9 @@ export default function DepositPage() {
                   (requiresFileUpload && uploadedFiles.length === 0)
                 }
                 className="px-6 py-2 rounded-md text-white bg-[#7a0f1f] hover:bg-[#5f0c18] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow transition-all"
-                onClick={handleCreateDeposit}
+                onClick={handleCreateWithdrawal}
               >
-                Create Deposit
+                Create Withdrawal
               </button>
             </div>
           </div>
@@ -4532,26 +4532,26 @@ export default function DepositPage() {
       />
 
       <LoadingModal
-        isOpen={showCreateDepositLoading}
-        title="Creating Deposit"
-        message="Please wait while we create the deposit..."
+        isOpen={showCreateWithdrawalLoading}
+        title="Creating Withdrawal"
+        message="Please wait while we create the withdrawal..."
       />
 
       {successTransactionData && (
         <TransactionSuccessModal
-          isOpen={showCreateDepositSuccess}
+          isOpen={showCreateWithdrawalSuccess}
           isClosing={successPanelClosing}
           onClose={() => {
             setSuccessPanelClosing(true);
             setTimeout(() => {
-              setShowCreateDepositSuccess(false);
+              setShowCreateWithdrawalSuccess(false);
               setSuccessPanelClosing(false);
               setSuccessTransactionData(null);
             }, 350);
           }}
-          title="Deposit Created Successfully"
-          message="The deposit has been created successfully."
-          voucherTypeLabel="Deposit Type"
+          title="Withdrawal Created Successfully"
+          message="The withdrawal has been created successfully."
+          voucherTypeLabel="Withdrawal Type"
           transactionData={successTransactionData}
           onPrint={handleSuccessPrint}
           onDownload={handleSuccessDownload}
@@ -4559,13 +4559,13 @@ export default function DepositPage() {
       )}
 
       <FailModal
-        isOpen={showCreateDepositFail}
+        isOpen={showCreateWithdrawalFail}
         onClose={() => {
-          setShowCreateDepositFail(false);
-          setCreateDepositFailMessage("");
+          setShowCreateWithdrawalFail(false);
+          setCreateWithdrawalFailMessage("");
         }}
-        title="Failed to Create Deposit"
-        message={createDepositFailMessage || "An error occurred. Please try again."}
+        title="Failed to Create Withdrawal"
+        message={createWithdrawalFailMessage || "An error occurred. Please try again."}
         buttonText="OK"
       />
 

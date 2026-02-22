@@ -731,7 +731,7 @@ export default function ManagementPage() {
 
   return (
     <div className="min-h-full flex flex-col">
-      <div className="bg-gradient-to-r from-[#7B0F2B] via-[#8B1535] to-[#A4163A] text-white px-6 py-5 flex items-center shrink-0 border-b border-[#6A0D25]/30">
+      <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white px-6 py-5 flex items-center shrink-0 border-b border-[#6A0D25]/30">
         <h1 className="text-lg font-semibold tracking-wide">Admins</h1>
       </div>
       <div className="flex-1 px-4 sm:px-6 lg:px-8 py-8">
@@ -1058,7 +1058,7 @@ export default function ManagementPage() {
         title="Confirm Promotion"
         message={
           promoteConfirmEmployee
-            ? `Are you sure you want to promote ${promoteConfirmEmployee.first_name} ${promoteConfirmEmployee.last_name} (${promoteConfirmEmployee.email}) to admin? An email notification will be sent to them.`
+            ? `Are you sure you want to promote ${promoteConfirmEmployee.first_name} ${promoteConfirmEmployee.last_name} (${promoteConfirmEmployee.email}) to admin? Login credentials will be sent to their email address.`
             : ""
         }
         confirmText="Confirm Promote"
@@ -1069,7 +1069,7 @@ export default function ManagementPage() {
       <LoadingModal
         isOpen={showPromoteLoading}
         title="Promoting to Admin"
-        message="Please wait while we promote the employee and send the notification email..."
+        message="Please wait while we promote the employee and send the login credentials..."
       />
 
       {/* Promote Fail Modal */}
@@ -1256,7 +1256,7 @@ export default function ManagementPage() {
           isOpen={showCreateSuccess}
           onClose={() => setShowCreateSuccess(false)}
           title="Employee Promoted to Admin"
-          message="The employee has been promoted to admin successfully. A notification email has been sent to them."
+          message="The employee has been promoted to admin successfully. Login credentials have been sent to their email address."
         />
       )}
 

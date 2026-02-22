@@ -683,7 +683,7 @@ export default function MasterfilePage() {
                     onSuccess={() => {
                       closeRegistrationPanel()
                       setSuccessModalTitle('Employee Created Successfully')
-                      setSuccessModalMessage("Employee has been created successfully. Login credentials have been sent to the employee's email address.")
+                      setSuccessModalMessage("Employee has been created successfully.")
                       setShowCreateSuccess(true)
                     }}
                     onEmployeeCreated={handleEmployeeCreated}
@@ -714,7 +714,7 @@ export default function MasterfilePage() {
           <LoadingModal
             isOpen={showCreateLoading}
             title="Creating Employee"
-            message="Please wait while we create the employee account and send the login credentials..."
+            message="Please wait while we create the employee account..."
           />
         )}
 

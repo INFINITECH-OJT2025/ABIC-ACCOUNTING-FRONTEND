@@ -574,7 +574,8 @@ export default function PropertiesPage() {
   return (
     <div className="min-h-full flex flex-col">
       {/* Compact Properties bar - extension of sidebar */}
-      <div className="bg-gradient-to-r from-[#7B0F2B] via-[#8B1535] to-[#A4163A] text-white px-6 py-5 flex items-center shrink-0 border-b border-[#6A0D25]/30">
+      <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white px-6 py-5 flex items-center shrink-0 border-b border-[#6A0D25]/30">
+
         <h1 className="text-lg font-semibold tracking-wide">Properties</h1>
       </div>
 
