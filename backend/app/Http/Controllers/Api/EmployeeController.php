@@ -31,6 +31,28 @@ class EmployeeController extends Controller
     }
 
     /**
+     * Check if email exists
+     */
+    public function checkEmail(Request $request)
+    {
+        $email = $request->query('email');
+        
+        if (!$email) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Email parameter is required'
+            ], 400);
+        }
+
+        $exists = Employee::where('email', $email)->exists();
+
+        return response()->json([
+            'success' => true,
+            'exists' => $exists
+        ]);
+    }
+
+    /**
      * Store a newly created employee in database.
      */
     public function store(Request $request)

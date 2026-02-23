@@ -15,6 +15,7 @@ Route::get('/user', function (Request $request) {
 })->middleware('auth:sanctum');
 
 // Employee API Routes
+Route::get('/employees/check-email', [EmployeeController::class, 'checkEmail']);
 Route::apiResource('employees', EmployeeController::class);
 
 // Positions API Routes

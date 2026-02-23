@@ -145,6 +145,12 @@ function OnboardPageContent() {
   const [loadingProvinces, setLoadingProvinces] = useState(false)
   const [loadingCities, setLoadingCities] = useState(false)
   const [loadingBarangays, setLoadingBarangays] = useState(false)
+  
+  // Email Check States
+  const [emailChecking, setEmailChecking] = useState(false)
+  const [emailExists, setEmailExists] = useState(false)
+  const [emailValue, setEmailValue] = useState('')
+
 
   // Modal State
   const [confirmModal, setConfirmModal] = useState<{
@@ -291,6 +297,36 @@ function OnboardPageContent() {
       return () => clearTimeout(timer)
     }
   }, [employeeIdParam, requestedViewParam, batchParam])
+
+  // Email Detection Logic
+  useEffect(() => {
+    const checkEmail = async (email: string) => {
+      if (!email || !email.includes('@')) {
+        setEmailExists(false)
+        return
+      }
+
+      setEmailChecking(true)
+      try {
+        const response = await apiFetch(`/api/employees/check-email?email=${encodeURIComponent(email)}`)
+        const data = await response.json()
+        if (data.success) {
+          setEmailExists(data.exists)
+        }
+      } catch (error) {
+        console.error('Error checking email:', error)
+      } finally {
+        setEmailChecking(false)
+      }
+    }
+
+    const timer = setTimeout(() => {
+      checkEmail(onboardFormData.email)
+    }, 600) // 600ms debounce
+
+    return () => clearTimeout(timer)
+  }, [onboardFormData.email])
+
 
   const fetchChecklistProgress = async (employeeName: string) => {
     try {
@@ -971,8 +1007,6 @@ function OnboardPageContent() {
     }
   }
 
-
-
   const handleCancelOnboarding = () => {
     clearStorage()
     router.push('/admin-head/employee/masterfile')
@@ -993,18 +1027,12 @@ function OnboardPageContent() {
       {(isSaving || isActionLoading) && (
         <div className="fixed inset-0 z-[100] bg-white/40 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-500">
           <div className="bg-white/80 backdrop-blur-xl w-[400px] h-auto p-12 rounded-[40px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] border border-white/50 flex flex-col items-center gap-10 animate-in zoom-in-95 duration-300">
-            {/* Elegant maroon spinner ring */}
             <div className="relative">
               <div className="w-14 h-14 border-[3px] border-slate-100 border-t-[#A4163A] rounded-full animate-spin" />
             </div>
-
             <div className="flex flex-col items-center text-center">
-              <h3 className="text-2xl font-bold text-[#1e293b] tracking-tight">
-                Loading...
-              </h3>
+              <h3 className="text-2xl font-bold text-[#1e293b] tracking-tight">Loading...</h3>
             </div>
-
-            {/* Three dots animation */}
             <div className="flex gap-2.5">
               <div className="w-2.5 h-2.5 bg-[#A4163A]/60 rounded-full animate-bounce [animation-delay:-0.3s]" />
               <div className="w-2.5 h-2.5 bg-[#A4163A]/60 rounded-full animate-bounce [animation-delay:-0.15s]" />
@@ -1017,22 +1045,16 @@ function OnboardPageContent() {
       {/* ----- INTEGRATED PREMIUM HEADER ----- */}
       <header className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md p-4 md:p-8 mb-4 md:mb-8 relative overflow-hidden">
         <div className="max-w-[1600px] mx-auto flex flex-wrap items-center gap-6 lg:gap-8 relative z-10">
-          {/* Title Section */}
           <div className="flex flex-col">
             <h1 className="text-2xl md:text-4xl font-bold tracking-tight mb-2">
-              {view === 'onboard' ? 'Onboard New Employee' : 
-               view === 'checklist' ? 'Onboarding Process' : 
-               'Employee Data Entry'}
+              {view === 'onboard' ? 'Onboard New Employee' : view === 'checklist' ? 'Onboarding Process' : 'Employee Data Entry'}
             </h1>
             <div className="flex items-center gap-2 text-white/80 transition-all duration-500">
               {view === 'onboard' ? <Briefcase className="w-4 h-4 md:w-5 h-5" /> : <ClipboardList className="w-4 h-4 md:w-5 h-5" />}
               <p className="text-sm md:text-lg font-bold uppercase tracking-widest leading-none">ABIC REALTY & CONSULTANCY</p>
             </div>
           </div>
-
           <div className="h-10 w-px bg-white/10 hidden lg:block" />
-
-          {/* Employee Info Section - Hidden in 'onboard' view */}
           {checklistData && view !== 'onboard' && (
             <div className="flex flex-wrap items-center gap-6 flex-1 animate-in slide-in-from-left-4 duration-500">
               <div className="flex flex-col">
@@ -1051,8 +1073,6 @@ function OnboardPageContent() {
                 <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Start Date</span>
                 <span className="text-sm font-bold text-white leading-none">{checklistData.date}</span>
               </div>
-
-              {/* Progress Stats - Shown in 'checklist' or 'update-info' */}
               <div className="ml-auto hidden xl:flex items-center gap-6 bg-white/5 px-6 py-3 rounded-2xl border border-white/10 backdrop-blur-sm">
                 <div className="flex flex-col items-end">
                   <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Overall Progress</span>
@@ -1070,720 +1090,596 @@ function OnboardPageContent() {
               </div>
             </div>
           )}
-
-          {/* Back Action for Initial View */}
           {view === 'onboard' && (
             <div className="ml-auto">
-              <Button
-                variant="ghost"
-                onClick={handleCancelOnboarding}
-                className="bg-white/10 hover:bg-white/20 text-white border-white/20 h-11 px-6 font-bold"
-              >
-                <ChevronLeft className="mr-2 h-4 w-4" />
-                Back to Masterfile
+              <Button variant="ghost" onClick={handleCancelOnboarding} className="bg-white/10 hover:bg-white/20 text-white border-white/20 h-11 px-6 font-bold">
+                <ChevronLeft className="mr-2 h-4 w-4" />Back to Masterfile
               </Button>
             </div>
           )}
         </div>
-
-        {/* Aesthetic Background Decoration */}
         <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none transition-transform duration-700 ease-in-out transform rotate-12">
-          {view === 'onboard' ? <User className="w-48 h-48" /> : 
-           view === 'checklist' ? <ClipboardList className="w-48 h-48" /> : 
-           <Briefcase className="w-48 h-48" />}
+          {view === 'onboard' ? <User className="w-48 h-48" /> : view === 'checklist' ? <ClipboardList className="w-48 h-48" /> : <Briefcase className="w-48 h-48" />}
         </div>
       </header>
 
       {loading ? (
         <div className="max-w-7xl mx-auto py-8 px-8 space-y-12">
-           {/* Progress Skeleton (Hidden in initial view) */}
-           {view !== 'onboard' && (
-             <Card className="border-none shadow-lg bg-white/50 p-8 space-y-6">
-                <div className="flex justify-between items-center">
-                   <Skeleton className="h-6 w-48" />
-                   <Skeleton className="h-4 w-32" />
-                </div>
-                <Skeleton className="h-2 w-full rounded-full" />
-                <div className="grid grid-cols-6 gap-2">
-                   {Array(6).fill(0).map((_, i) => (
-                      <Skeleton key={i} className="h-1.5 w-full rounded-full" />
-                   ))}
-                </div>
-             </Card>
-           )}
-
            <div className="bg-white/50 backdrop-blur-sm rounded-3xl p-8 border border-slate-200/60 shadow-xl space-y-12">
               <div className="flex justify-between items-center">
-                 <div className="space-y-4">
-                    <Skeleton className="h-10 w-64" />
-                    <Skeleton className="h-4 w-96" />
-                 </div>
-                 {view === 'onboard' && <Skeleton className="h-12 w-48 rounded-xl" />}
+                 <div className="space-y-4"><Skeleton className="h-10 w-64" /><Skeleton className="h-4 w-96" /></div>
               </div>
-
-              {view === 'onboard' ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                   {Array(4).fill(0).map((_, i) => (
-                      <div key={i} className="space-y-2">
-                         <Skeleton className="h-4 w-32" />
-                         <Skeleton className="h-12 w-full rounded-xl" />
-                      </div>
-                   ))}
-                   <div className="md:col-span-2 pt-6 flex gap-4">
-                      <Skeleton className="h-12 flex-1 rounded-xl" />
-                      <Skeleton className="h-12 flex-1 rounded-xl" />
-                   </div>
-                </div>
-              ) : view === 'checklist' ? (
-                <div className="space-y-4">
-                  <div className="border border-slate-100 rounded-xl overflow-hidden">
-                    <div className="bg-slate-50 p-4 flex gap-4">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-4 w-24" />
-                      <Skeleton className="h-4 flex-1" />
-                    </div>
-                    <div className="p-4 space-y-6">
-                      {Array(8).fill(0).map((_, i) => (
-                        <div key={i} className="flex gap-4 items-center">
-                          <Skeleton className="h-4 w-32" />
-                          <Skeleton className="h-6 w-6 rounded" />
-                          <Skeleton className="h-4 flex-1" />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex justify-end gap-3">
-                    <Skeleton className="h-10 w-48 rounded-xl" />
-                    <Skeleton className="h-10 w-40 rounded-xl" />
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                   {Array(8).fill(0).map((_, i) => (
-                      <div key={i} className="space-y-2">
-                         <Skeleton className="h-4 w-32" />
-                         <Skeleton className="h-12 w-full rounded-xl" />
-                      </div>
-                   ))}
-                </div>
-              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                 {Array(6).fill(0).map((_, i) => (<div key={i} className="space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-12 w-full rounded-xl" /></div>))}
+              </div>
            </div>
         </div>
-      ) : view === 'onboard' && (
-        <div className="w-full">
-          <div className="max-w-3xl mx-auto py-4">
-            <div className="bg-white border border-slate-100 rounded-2xl p-8 shadow-sm space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">First Name <span className="text-red-500">*</span></label>
-                  <Input
-                    value={onboardFormData.first_name}
-                    onChange={(e) => setOnboardFormData(prev => ({ ...prev, first_name: e.target.value }))}
-                    placeholder="John"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Last Name <span className="text-red-500">*</span></label>
-                  <Input
-                    value={onboardFormData.last_name}
-                    onChange={(e) => setOnboardFormData(prev => ({ ...prev, last_name: e.target.value }))}
-                    placeholder="Doe"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Email Address <span className="text-red-500">*</span></label>
-                  <Input
-                    type="email"
-                    value={onboardFormData.email}
-                    onChange={(e) => setOnboardFormData(prev => ({ ...prev, email: e.target.value }))}
-                    placeholder="john@example.com"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="block text-sm font-semibold text-slate-700">Position <span className="text-red-500">*</span></label>
-                    <button
-                      onClick={() => setInlineManagerType(inlineManagerType === 'position' ? null : 'position')}
-                      className={`text-xs flex items-center gap-1 font-bold transition-colors ${inlineManagerType === 'position' ? 'text-[#630C22]' : 'text-slate-400 hover:text-slate-600'}`}
-                    >
-                      {inlineManagerType === 'position' ? 'CLOSE MANAGER' : 'MANAGE LIST'}
-                      {inlineManagerType === 'position' ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                    </button>
-                  </div>
-                  <select
-                    value={onboardFormData.position}
-                    onChange={(e) => setOnboardFormData(prev => ({ ...prev, position: e.target.value }))}
-                    className="w-full h-10 px-3 py-2 border border-slate-200 bg-white rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#630C22] transition-all"
-                  >
-                    <option value="">Select Position...</option>
-                    {positions.map((pos) => (
-                      <option key={pos.id} value={pos.name}>{pos.name}</option>
-                    ))}
-                  </select>
-
-                  {inlineManagerType === 'position' && (
-                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mt-2 shadow-inner">
-                      <div className="flex gap-2 mb-3">
-                        <Input
-                          placeholder="Add new position..."
-                          value={newItemName}
-                          onChange={(e) => setNewItemName(e.target.value)}
-                          className="h-9 text-xs"
-                          onKeyDown={(e) => e.key === 'Enter' && handleAddItem()}
-                        />
-                        <button onClick={handleAddItem} disabled={isActionLoading || !newItemName.trim()} className="bg-[#630C22] h-9 px-3 text-white rounded-md">
-                          <PlusCircle size={16} />
+      ) : (
+        <>
+          {view === 'onboard' && (
+            <div className="w-full">
+              <div className="max-w-3xl mx-auto py-4">
+                <div className="bg-white border border-slate-100 rounded-2xl p-8 shadow-sm space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">First Name <span className="text-red-500">*</span></label>
+                      <Input value={onboardFormData.first_name} onChange={(e) => setOnboardFormData(prev => ({ ...prev, first_name: e.target.value }))} placeholder="John" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">Last Name <span className="text-red-500">*</span></label>
+                      <Input value={onboardFormData.last_name} onChange={(e) => setOnboardFormData(prev => ({ ...prev, last_name: e.target.value }))} placeholder="Doe" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="block text-sm font-semibold text-slate-700">Email Address <span className="text-red-500">*</span></label>
+                        {emailChecking && (<div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium"><Loader2 className="w-3 h-3 animate-spin" />Checking availability...</div>)}
+                        {!emailChecking && onboardFormData.email && onboardFormData.email.includes('@') && (
+                          emailExists ? (<div className="flex items-center gap-1.5 text-xs text-rose-500 font-bold animate-in fade-in slide-in-from-right-2"><AlertCircle className="w-3 h-3" />Email already exists</div>)
+                          : (<div className="flex items-center gap-1.5 text-xs text-emerald-500 font-bold animate-in fade-in slide-in-from-right-2"><CheckCircle2 className="w-3 h-3" />Email available</div>)
+                        )}
+                      </div>
+                      <div className="relative">
+                        <Input type="email" value={onboardFormData.email} onChange={(e) => setOnboardFormData(prev => ({ ...prev, email: e.target.value }))} placeholder="john@example.com" className={cn("transition-all duration-300", emailExists && "border-rose-400 focus-visible:ring-rose-400 bg-rose-50/30", !emailExists && onboardFormData.email && onboardFormData.email.includes('@') && "border-emerald-400 focus-visible:ring-emerald-400 bg-emerald-50/30")} />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <label className="block text-sm font-semibold text-slate-700">Position <span className="text-red-500">*</span></label>
+                        <button onClick={() => setInlineManagerType(inlineManagerType === 'position' ? null : 'position')} className={`text-xs flex items-center gap-1 font-bold transition-colors ${inlineManagerType === 'position' ? 'text-[#630C22]' : 'text-slate-400 hover:text-slate-600'}`}>
+                          {inlineManagerType === 'position' ? 'CLOSE MANAGER' : 'MANAGE LIST'}{inlineManagerType === 'position' ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                         </button>
                       </div>
-                      <div className="max-h-32 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-                        {positions.map(pos => (
-                          <div key={pos.id} className="flex justify-between items-center p-2 bg-white border border-slate-100 rounded text-xs">
-                            <span className="truncate max-w-[150px]">{pos.name}</span>
-                            <button onClick={() => handleDeleteItem(pos.id)} className="text-rose-500 hover:text-rose-700 p-1">
-                              <Trash2 size={12} />
-                            </button>
+                      <select value={onboardFormData.position} onChange={(e) => setOnboardFormData(prev => ({ ...prev, position: e.target.value }))} className="w-full h-10 px-3 py-2 border border-slate-200 bg-white rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#630C22] transition-all">
+                        <option value="">Select Position...</option>
+                        {positions.map((pos) => (<option key={pos.id} value={pos.name}>{pos.name}</option>))}
+                      </select>
+                      {inlineManagerType === 'position' && (
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mt-2 shadow-inner">
+                          <div className="flex gap-2 mb-3">
+                            <Input placeholder="Add new position..." value={newItemName} onChange={(e) => setNewItemName(e.target.value)} className="h-9 text-xs" onKeyDown={(e) => e.key === 'Enter' && handleAddItem()} />
+                            <button onClick={handleAddItem} disabled={isActionLoading || !newItemName.trim()} className="bg-[#630C22] h-9 px-3 text-white rounded-md"><PlusCircle size={16} /></button>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="block text-sm font-semibold text-slate-700">Department <span className="text-red-500">*</span></label>
-                    <button
-                      onClick={() => setInlineManagerType(inlineManagerType === 'department' ? null : 'department')}
-                      className={`text-xs flex items-center gap-1 font-bold transition-colors ${inlineManagerType === 'department' ? 'text-[#630C22]' : 'text-slate-400 hover:text-slate-600'}`}
-                    >
-                      {inlineManagerType === 'department' ? 'CLOSE MANAGER' : 'MANAGE LIST'}
-                      {inlineManagerType === 'department' ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                    </button>
-                  </div>
-                  <select
-                    value={onboardFormData.department}
-                    onChange={(e) => setOnboardFormData(prev => ({ ...prev, department: e.target.value }))}
-                    className="w-full h-10 px-3 py-2 border border-slate-200 bg-white rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#630C22] transition-all"
-                  >
-                    <option value="">Select Department...</option>
-                    {departments.map((dept) => (
-                      <option key={dept.id} value={dept.name}>{dept.name}</option>
-                    ))}
-                  </select>
-
-                  {inlineManagerType === 'department' && (
-                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mt-2 shadow-inner">
-                      <div className="flex gap-2 mb-3">
-                        <Input
-                          placeholder="Add new department..."
-                          value={newItemName}
-                          onChange={(e) => setNewItemName(e.target.value)}
-                          className="h-9 text-xs"
-                          onKeyDown={(e) => e.key === 'Enter' && handleAddItem()}
-                        />
-                        <button onClick={handleAddItem} disabled={isActionLoading || !newItemName.trim()} className="bg-[#630C22] h-9 px-3 text-white rounded-md">
-                          <PlusCircle size={16} />
-                        </button>
-                      </div>
-                      <div className="max-h-32 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-                        {departments.map(dept => (
-                          <div key={dept.id} className="flex justify-between items-center p-2 bg-white border border-slate-100 rounded text-xs">
-                            <span className="truncate max-w-[150px]">{dept.name}</span>
-                            <button onClick={() => handleDeleteItem(dept.id)} className="text-rose-500 hover:text-rose-700 p-1">
-                              <Trash2 size={12} />
-                            </button>
+                          <div className="max-h-32 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                            {positions.map(pos => (
+                              <div key={pos.id} className="flex justify-between items-center p-2 bg-white border border-slate-100 rounded text-xs">
+                                <span className="truncate max-w-[150px]">{pos.name}</span>
+                                <button onClick={() => handleDeleteItem(pos.id)} className="text-rose-500 hover:text-rose-700 p-1"><Trash2 size={12} /></button>
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Onboarding Date <span className="text-red-500">*</span></label>
-                  <Input
-                    type="date"
-                    value={onboardFormData.onboarding_date}
-                    onChange={(e) => setOnboardFormData(prev => ({ ...prev, onboarding_date: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-4 pt-6 border-t border-slate-100">
-                <Button
-                  onClick={handleStartOnboarding}
-                  disabled={isSaving}
-                  className="flex-1 bg-[#630C22] hover:bg-[#4A081A] text-white font-bold h-12 rounded-xl transition-all shadow-md"
-                >
-                  {isSaving ? 'SAVING...' : 'START ONBOARDING'}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleCancelOnboarding}
-                  disabled={isSaving}
-                  className="flex-1 border-slate-200 text-slate-600 font-bold h-12 rounded-xl"
-                >
-                  CANCEL
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {view === 'checklist' && checklistData && (
-        <div className="max-w-[1600px] mx-auto py-4 px-6 md:px-8">
-
-          {/* Task List Section */}
-          <Card className="rounded-2xl border-2 border-[#FFE5EC] shadow-2xl bg-white overflow-hidden mb-12">
-            {/* Progress Banner */}
-            <div className="bg-[#FFE5EC]/20 p-4 md:px-8 border-b border-[#FFE5EC]">
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="text-[11px] font-black text-[#800020] uppercase tracking-widest">Process Onboarding Progress</h3>
-                <span className="text-sm font-black text-[#A4163A] bg-white px-3 py-0.5 rounded-full shadow-sm border border-[#FFE5EC]">
-                  {Object.keys(completedTasks).length} / {onboardingTasks.length} Completed
-                </span>
-              </div>
-              <div className="w-full bg-white h-2.5 rounded-full overflow-hidden border border-[#FFE5EC] shadow-inner p-0.5">
-                <div
-                  className="bg-gradient-to-r from-[#A4163A] to-[#630C22] h-full rounded-full transition-all duration-1000 ease-out shadow-sm"
-                  style={{ width: `${(Object.keys(completedTasks).length / onboardingTasks.length) * 100}%` }}
-                />
-              </div>
-            </div>
-
-            <Table>
-              <TableHeader className="bg-[#FFE5EC]/40">
-                <TableRow className="border-b border-[#FFE5EC] hover:bg-transparent">
-                  <TableHead className="w-[200px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">Completed Date</TableHead>
-                  <TableHead className="w-[100px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">Status</TableHead>
-                  <TableHead className="font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">
-                    <div className="flex items-center justify-between">
-                      <span>Tasks</span>
-                      <button 
-                        onClick={toggleAllTasks}
-                        className="text-[8px] normal-case bg-white/50 hover:bg-rose-50 text-[#800020] px-2 py-1 rounded-md border border-[#FFE5EC] transition-all font-black shadow-sm"
-                      >
-                        {onboardingTasks.every(task => completedTasks[task]) ? 'UNCHECK ALL' : 'CHECK ALL'}
-                      </button>
-                    </div>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {onboardingTasks.map((task, index) => (
-                  <TableRow 
-                    key={index} 
-                    className="border-b border-rose-50/30 last:border-0 hover:bg-[#FFE5EC]/5 transition-colors group cursor-pointer"
-                    onClick={() => toggleTask(task)}
-                  >
-                    <TableCell className="text-center py-2.5 font-mono text-[10px] font-bold text-slate-400">
-                      {completedTasks[task] || '-'}
-                    </TableCell>
-                    <TableCell className="py-2.5">
-                      <div className="flex justify-center">
-                        <div className={cn(
-                          "w-5 h-5 rounded flex items-center justify-center transition-all border-2",
-                          completedTasks[task]
-                            ? "bg-emerald-500 border-emerald-500 text-white shadow-sm" 
-                            : "border-slate-200 bg-white hover:border-[#A4163A]"
-                        )}>
-                          {completedTasks[task] && <Check className="h-3.5 w-3.5" />}
                         </div>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <label className="block text-sm font-semibold text-slate-700">Department <span className="text-red-500">*</span></label>
+                        <button onClick={() => setInlineManagerType(inlineManagerType === 'department' ? null : 'department')} className={`text-xs flex items-center gap-1 font-bold transition-colors ${inlineManagerType === 'department' ? 'text-[#630C22]' : 'text-slate-400 hover:text-slate-600'}`}>
+                          {inlineManagerType === 'department' ? 'CLOSE MANAGER' : 'MANAGE LIST'}{inlineManagerType === 'department' ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </button>
                       </div>
-                    </TableCell>
-                    <TableCell className="py-2.5">
-                      <span className={cn(
-                        "text-sm font-bold transition-all duration-300",
-                        completedTasks[task] ? "text-slate-300 line-through" : "text-slate-700"
-                      )}>
-                        {task}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-
-            {/* Table Footer */}
-            <div className="p-4 md:px-8 bg-slate-50/50 border-t border-[#FFE5EC] flex flex-col md:flex-row justify-between items-center gap-4">
-              <div className="flex items-center gap-3">
-                <p className="text-[8px] font-black text-slate-300 uppercase tracking-[0.2em] italic">
-                  ADMINISTRATION FRAMEWORK • ABIC HR
-                </p>
-              </div>
-              
-              <div className="flex gap-3">
-                <Button
-                  onClick={async () => {
-                    const success = await handleSaveChecklist(false)
-                    if (success) setView('update-info')
-                  }}
-                  disabled={Object.keys(completedTasks).length < onboardingTasks.length || isSaving}
-                  className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg active:scale-95 transition-all rounded-xl disabled:opacity-50"
-                >
-                  {isSaving ? 'SAVING...' : 'PROCEED TO DATA ENTRY'}
-                </Button>
-                <Button 
-                  onClick={() => handleSaveChecklist(true)} 
-                  disabled={isSaving}
-                  className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-[#A4163A] hover:bg-[#800020] text-white shadow-lg active:scale-95 transition-all rounded-xl"
-                >
-                  {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <Save className="w-3.5 h-3.5 mr-2" />}
-                  {isSaving ? 'SAVING...' : 'SAVE PROGRESS'}
-                </Button>
+                      <select value={onboardFormData.department} onChange={(e) => setOnboardFormData(prev => ({ ...prev, department: e.target.value }))} className="w-full h-10 px-3 py-2 border border-slate-200 bg-white rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#630C22] transition-all">
+                        <option value="">Select Department...</option>
+                        {departments.map((dept) => (<option key={dept.id} value={dept.name}>{dept.name}</option>))}
+                      </select>
+                      {inlineManagerType === 'department' && (
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mt-2 shadow-inner">
+                          <div className="flex gap-2 mb-3">
+                            <Input placeholder="Add new department..." value={newItemName} onChange={(e) => setNewItemName(e.target.value)} className="h-9 text-xs" onKeyDown={(e) => e.key === 'Enter' && handleAddItem()} />
+                            <button onClick={handleAddItem} disabled={isActionLoading || !newItemName.trim()} className="bg-[#630C22] h-9 px-3 text-white rounded-md"><PlusCircle size={16} /></button>
+                          </div>
+                          <div className="max-h-32 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                            {departments.map(dept => (
+                              <div key={dept.id} className="flex justify-between items-center p-2 bg-white border border-slate-100 rounded text-xs">
+                                <span className="truncate max-w-[150px]">{dept.name}</span>
+                                <button onClick={() => handleDeleteItem(dept.id)} className="text-rose-500 hover:text-rose-700 p-1"><Trash2 size={12} /></button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">Onboarding Date <span className="text-red-500">*</span></label>
+                      <Input type="date" value={onboardFormData.onboarding_date} onChange={(e) => setOnboardFormData(prev => ({ ...prev, onboarding_date: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div className="flex gap-4 pt-6 border-t border-slate-100">
+                    <Button onClick={handleStartOnboarding} disabled={isSaving || emailExists || emailChecking} className={cn("flex-1 text-white font-bold h-12 rounded-xl transition-all shadow-md", (emailExists || emailChecking) ? "bg-slate-300 hover:bg-slate-300 cursor-not-allowed" : "bg-[#630C22] hover:bg-[#4A081A]")}>
+                      {isSaving ? 'SAVING...' : 'START ONBOARDING'}
+                    </Button>
+                    <Button variant="outline" onClick={handleCancelOnboarding} disabled={isSaving} className="flex-1 border-slate-200 text-slate-600 font-bold h-12 rounded-xl">
+                      CANCEL
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
-          </Card>
-        </div>
-      )}
+          )}
 
-      {view === 'update-info' && (
-        <div className="max-w-7xl mx-auto py-8">
-          <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-            {/* Horizontal Stepper Progress Card */}
-            <Card className="border-none shadow-lg overflow-hidden">
-              <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] px-6 pt-8 pb-6 font-sans">
-                {/* Horizontal Stepper with Progress Bar */}
-                <div className="relative">
-                  {/* Progress Bar Background */}
-                  <div className="w-full bg-white/20 rounded-full h-2 overflow-hidden backdrop-blur-sm">
+          {view === 'checklist' && checklistData && (
+            <div className="max-w-[1600px] mx-auto py-4 px-6 md:px-8 text-stone-900">
+              {/* Task List Section */}
+              <Card className="rounded-2xl border-2 border-[#FFE5EC] shadow-2xl bg-white overflow-hidden mb-12">
+                {/* Progress Banner */}
+                <div className="bg-[#FFE5EC]/20 p-4 md:px-8 border-b border-[#FFE5EC]">
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-[11px] font-black text-[#800020] uppercase tracking-widest">Process Onboarding Progress</h3>
+                    <span className="text-sm font-black text-[#A4163A] bg-white px-3 py-0.5 rounded-full shadow-sm border border-[#FFE5EC]">
+                      {Object.keys(completedTasks).length} / {onboardingTasks.length} Completed
+                    </span>
+                  </div>
+                  <div className="w-full bg-white h-2.5 rounded-full overflow-hidden border border-[#FFE5EC] shadow-inner p-0.5">
                     <div
-                      className="bg-gradient-to-r from-rose-300 to-white h-2 rounded-full transition-all duration-500 ease-out"
-                      style={{ width: `${calculateProgressionProgress()}%` }}
+                      className="bg-gradient-to-r from-[#A4163A] to-[#630C22] h-full rounded-full transition-all duration-1000 ease-out shadow-sm"
+                      style={{ width: `${(Object.keys(completedTasks).length / onboardingTasks.length) * 100}%` }}
                     />
                   </div>
+                </div>
 
-                  {/* Steps with Labels */}
-                  <div className="flex justify-between items-start mt-4">
-                    {batches.map((batch, index) => {
-                      const BatchIcon = batch.icon
-                      const isActive = currentBatch === batch.id
-                      const isCompleted = batch.id < currentBatch
-
-                      return (
-                        <div
-                          key={batch.id}
-                          className={`flex flex-col items-center group ${batch.id <= currentBatch || isCurrentBatchValid() ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
-                          style={{ width: `${100 / batches.length}%` }}
-                          onClick={() => {
-                            if (batch.id < currentBatch) {
-                              setCurrentBatch(batch.id)
-                            } else if (batch.id === currentBatch + 1 && isCurrentBatchValid()) {
-                              setCurrentBatch(batch.id)
-                            }
-                          }}
-                        >
-                          <div className="relative mb-2">
-                            <div
-                              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${isActive
-                                ? 'bg-white text-maroon-700 scale-110 shadow-lg'
-                                : isCompleted
-                                  ? 'bg-emerald-500 text-white'
-                                  : 'bg-white/30 text-white/70 group-hover:bg-white/40'
-                                }`}
-                            >
-                              {isCompleted ? (
-                                <CheckCircle2 className="h-5 w-5" />
-                              ) : (
-                                <BatchIcon className="h-4 w-4" />
-                              )}
+                <Table>
+                  <TableHeader className="bg-[#FFE5EC]/40">
+                    <TableRow className="border-b border-[#FFE5EC] hover:bg-transparent">
+                      <TableHead className="w-[200px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">Completed Date</TableHead>
+                      <TableHead className="w-[100px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">Status</TableHead>
+                      <TableHead className="font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">
+                        <div className="flex items-center justify-between">
+                          <span>Tasks</span>
+                          <button 
+                            onClick={toggleAllTasks}
+                            className="text-[8px] normal-case bg-white/50 hover:bg-rose-50 text-[#800020] px-2 py-1 rounded-md border border-[#FFE5EC] transition-all font-black shadow-sm"
+                          >
+                            {onboardingTasks.every(task => completedTasks[task]) ? 'UNCHECK ALL' : 'CHECK ALL'}
+                          </button>
+                        </div>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {onboardingTasks.map((task, index) => (
+                      <TableRow 
+                        key={index} 
+                        className="border-b border-rose-50/30 last:border-0 hover:bg-[#FFE5EC]/5 transition-colors group cursor-pointer"
+                        onClick={() => toggleTask(task)}
+                      >
+                        <TableCell className="text-center py-2.5 font-mono text-[10px] font-bold text-slate-400">
+                          {completedTasks[task] || '-'}
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          <div className="flex justify-center">
+                            <div className={cn(
+                              "w-5 h-5 rounded flex items-center justify-center transition-all border-2",
+                              completedTasks[task]
+                                ? "bg-emerald-500 border-emerald-500 text-white shadow-sm" 
+                                : "border-slate-200 bg-white hover:border-[#A4163A]"
+                            )}>
+                              {completedTasks[task] && <Check className="h-3.5 w-3.5" />}
                             </div>
                           </div>
-                          <div className="text-center hidden md:block">
-                            <p className={`text-[10px] font-semibold transition-colors ${isActive ? 'text-white' : isCompleted ? 'text-emerald-200' : 'text-rose-100/80 group-hover:text-white'}`}>
-                              {batch.title}
-                            </p>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              </div>
-            </Card>
-
-            {/* Current Batch Form */}
-            <Card className="shadow-xl border-maroon-100">
-              <CardHeader className="bg-gradient-to-br from-[#6B1C23] via-[#7B2431] to-[#8B2C3F] text-white rounded-t-xl py-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
-                    {React.createElement(batches[currentBatch - 1].icon, { className: "h-5 w-5" })}
-                  </div>
-                  <div>
-                    <CardTitle className="text-xl text-white font-bold">Batch {currentBatch}: {batches[currentBatch - 1].title}</CardTitle>
-                    <CardDescription className="text-white/80 text-xs font-medium">{batches[currentBatch - 1].description}</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-
-              <CardContent className="p-6 md:p-10">
-                {/* BATCH 1: Employee Details */}
-                {currentBatch === 1 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="space-y-3">
-                      <Label htmlFor="position" className="text-base font-semibold text-slate-800">
-                        Position <span className="text-red-500">*</span>
-                      </Label>
-                      <select
-                        id="position"
-                        name="position"
-                        value={progressionFormData.position || ''}
-                        onChange={handleProgressionChange}
-                        className="flex h-12 w-full rounded-lg border-2 border-slate-300 bg-white px-4 py-2 text-base focus-visible:ring-2 focus-visible:ring-maroon-500 transition-all font-medium"
-                      >
-                        <option value="">Select Position...</option>
-                        {positions.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
-                      </select>
-                    </div>
-
-                    <div className="space-y-3">
-                      <Label htmlFor="date_hired" className="text-base font-semibold text-slate-800">
-                        Date Hired <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        id="date_hired"
-                        type="date"
-                        name="date_hired"
-                        value={formatDateForInput(progressionFormData.date_hired)}
-                        onChange={handleProgressionChange}
-                        className="h-12 text-base border-2 border-slate-300 rounded-lg font-medium"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* BATCH 2: Personal Information */}
-                {currentBatch === 2 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="last_name" className="text-sm font-semibold">Last Name <span className="text-red-500">*</span></Label>
-                      <Input id="last_name" name="last_name" value={progressionFormData.last_name || ''} onChange={handleProgressionChange} placeholder="e.g., Dela Cruz" className="font-medium" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="first_name" className="text-sm font-semibold">First Name <span className="text-red-500">*</span></Label>
-                      <Input id="first_name" name="first_name" value={progressionFormData.first_name || ''} onChange={handleProgressionChange} placeholder="e.g., Juan" className="font-medium" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="middle_name" className="text-sm font-semibold">Middle Name</Label>
-                      <Input id="middle_name" name="middle_name" value={progressionFormData.middle_name || ''} onChange={handleProgressionChange} placeholder="Optional" className="font-medium" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="suffix" className="text-sm font-semibold">Suffix</Label>
-                      <Input id="suffix" name="suffix" value={progressionFormData.suffix || ''} onChange={handleProgressionChange} placeholder="e.g., Jr." className="font-medium" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="birthday" className="text-sm font-semibold">Birthday <span className="text-red-500">*</span></Label>
-                      <Input id="birthday" type="date" name="birthday" value={formatDateForInput(progressionFormData.birthday)} onChange={handleProgressionChange} className="font-medium" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="birthplace" className="text-sm font-semibold">Birthplace <span className="text-red-500">*</span></Label>
-                      <Input id="birthplace" name="birthplace" value={progressionFormData.birthplace || ''} onChange={handleProgressionChange} placeholder="e.g., Manila" className="font-medium" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="gender" className="text-sm font-semibold">Gender <span className="text-red-500">*</span></Label>
-                      <select id="gender" name="gender" value={progressionFormData.gender || ''} onChange={handleProgressionChange} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
-                        <option value="">Select...</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="civil_status" className="text-sm font-semibold">Civil Status <span className="text-red-500">*</span></Label>
-                      <select id="civil_status" name="civil_status" value={progressionFormData.civil_status || ''} onChange={handleProgressionChange} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
-                        <option value="">Select...</option>
-                        <option value="Single">Single</option>
-                        <option value="Married">Married</option>
-                        <option value="Widowed">Widowed</option>
-                        <option value="Separated">Separated</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
-
-                {/* BATCH 3: Contact Information */}
-                {currentBatch === 3 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="mobile_number" className="text-sm font-semibold">Mobile Number <span className="text-red-500">*</span></Label>
-                      <Input id="mobile_number" name="mobile_number" value={progressionFormData.mobile_number || ''} onChange={handleProgressionChange} placeholder="09XXXXXXXXX" className="font-medium" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="house_number" className="text-sm font-semibold">House number</Label>
-                      <Input id="house_number" name="house_number" value={progressionFormData.house_number || ''} onChange={handleProgressionChange} className="font-medium" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="street" className="text-sm font-semibold">Street <span className="text-red-500">*</span></Label>
-                      <Input id="street" name="street" value={progressionFormData.street || ''} onChange={handleProgressionChange} className="font-medium" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="village" className="text-sm font-semibold">Village</Label>
-                      <Input id="village" name="village" value={progressionFormData.village || ''} onChange={handleProgressionChange} className="font-medium" />
-                    </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="subdivision" className="text-sm font-semibold">Subdivision</Label>
-                      <Input id="subdivision" name="subdivision" value={progressionFormData.subdivision || ''} onChange={handleProgressionChange} className="font-medium" />
-                    </div>
-                  </div>
-                )}
-
-                {/* BATCH 4: Government IDs */}
-                {currentBatch === 4 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="sss_number" className="text-sm font-semibold">SSS Number</Label>
-                      <Input id="sss_number" name="sss_number" value={progressionFormData.sss_number || ''} onChange={handleProgressionChange} className="font-medium" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="philhealth_number" className="text-sm font-semibold">PhilHealth Number</Label>
-                      <Input id="philhealth_number" name="philhealth_number" value={progressionFormData.philhealth_number || ''} onChange={handleProgressionChange} className="font-medium" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="pagibig_number" className="text-sm font-semibold">Pag-IBIG Number</Label>
-                      <Input id="pagibig_number" name="pagibig_number" value={progressionFormData.pagibig_number || ''} onChange={handleProgressionChange} className="font-medium" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="tin_number" className="text-sm font-semibold">TIN Number</Label>
-                      <Input id="tin_number" name="tin_number" value={progressionFormData.tin_number || ''} onChange={handleProgressionChange} className="font-medium" />
-                    </div>
-                  </div>
-                )}
-
-                {/* BATCH 5: Family Information */}
-                {currentBatch === 5 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <Card className="border-rose-100 bg-rose-50/30 p-4">
-                      <h4 className="font-bold text-rose-800 mb-4 flex items-center gap-2"><div className="w-1 h-4 bg-rose-500 rounded-full"></div>Mother's Maiden Name</h4>
-                      <div className="space-y-4">
-                        <Input placeholder="Last Name *" name="mlast_name" value={progressionFormData.mlast_name || ''} onChange={handleProgressionChange} className="font-medium" />
-                        <Input placeholder="First Name *" name="mfirst_name" value={progressionFormData.mfirst_name || ''} onChange={handleProgressionChange} className="font-medium" />
-                        <Input placeholder="Middle Name" name="mmiddle_name" value={progressionFormData.mmiddle_name || ''} onChange={handleProgressionChange} className="font-medium" />
-                        <Input placeholder="Suffix" name="msuffix" value={progressionFormData.msuffix || ''} onChange={handleProgressionChange} className="font-medium" />
-                      </div>
-                    </Card>
-                    <Card className="border-slate-100 bg-slate-50/30 p-4">
-                      <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><div className="w-1 h-4 bg-slate-500 rounded-full"></div>Father's Name (Optional)</h4>
-                      <div className="space-y-4">
-                        <Input placeholder="Last Name" name="flast_name" value={progressionFormData.flast_name || ''} onChange={handleProgressionChange} className="font-medium" />
-                        <Input placeholder="First Name" name="ffirst_name" value={progressionFormData.ffirst_name || ''} onChange={handleProgressionChange} className="font-medium" />
-                        <Input placeholder="Middle Name" name="fmiddle_name" value={progressionFormData.fmiddle_name || ''} onChange={handleProgressionChange} className="font-medium" />
-                        <Input placeholder="Suffix" name="fsuffix" value={progressionFormData.fsuffix || ''} onChange={handleProgressionChange} className="font-medium" />
-                      </div>
-                    </Card>
-                  </div>
-                )}
-
-                {/* BATCH 6: Address Details */}
-                {currentBatch === 6 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="region" className="text-sm font-semibold">Region <span className="text-red-500">*</span></Label>
-                      <select name="region" value={progressionFormData.region || ''} onChange={handleProgressionChange} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
-                        <option value="">Select Region...</option>
-                        {regions.map(r => <option key={r.code} value={r.name}>{r.name}</option>)}
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="province" className="text-sm font-semibold">Province <span className="text-red-500">*</span></Label>
-                      <select name="province" value={progressionFormData.province || ''} onChange={handleProgressionChange} disabled={!progressionFormData.region} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
-                        <option value="">Select Province...</option>
-                        {provinces.map(p => <option key={p.code} value={p.name}>{p.name}</option>)}
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="city_municipality" className="text-sm font-semibold">City/Municipality <span className="text-red-500">*</span></Label>
-                      <select name="city_municipality" value={progressionFormData.city_municipality || ''} onChange={handleProgressionChange} disabled={!progressionFormData.province} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
-                        <option value="">Select City...</option>
-                        {cities.map(c => <option key={c.code} value={c.name}>{c.name}</option>)}
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="barangay" className="text-sm font-semibold">Barangay <span className="text-red-500">*</span></Label>
-                      <select name="barangay" value={progressionFormData.barangay || ''} onChange={handleProgressionChange} disabled={!progressionFormData.city_municipality} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
-                        <option value="">Select Barangay...</option>
-                        {barangays.map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="zip_code" className="text-sm font-semibold">ZIP Code <span className="text-red-500">*</span></Label>
-                      <Input id="zip_code" name="zip_code" value={progressionFormData.zip_code || ''} onChange={handleProgressionChange} className="font-medium" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email_address" className="text-sm font-semibold">Email Address <span className="text-red-500">*</span></Label>
-                      <Input id="email_address" type="email" name="email_address" value={progressionFormData.email_address || ''} onChange={handleProgressionChange} className="font-medium" />
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-
-              <Separator />
-
-              {/* Navigation Footer */}
-              <CardContent className="py-6">
-                <div className="flex justify-between items-center">
-                  <Button
-                    onClick={prevBatch}
-                    disabled={currentBatch === 1}
-                    variant="outline"
-                    className="h-11 px-6 font-semibold"
-                  >
-                    <ChevronLeft className="h-4 w-4 mr-2" />
-                    Previous
-                  </Button>
-
-                  <div className="flex items-center gap-1">
-                    {batches.map((b) => (
-                      <div key={b.id} className={`h-1.5 w-6 rounded-full transition-all ${currentBatch === b.id ? 'bg-maroon-600 w-10' : 'bg-slate-200'}`} />
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          <span className={cn(
+                            "text-sm font-bold transition-all duration-300",
+                            completedTasks[task] ? "text-slate-300 line-through" : "text-slate-700"
+                          )}>
+                            {task}
+                          </span>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </div>
+                  </TableBody>
+                </Table>
 
-                  {currentBatch === 6 ? (
-                    <div className="flex gap-3">
-                      <Button
-                        onClick={handlePartialSave}
-                        disabled={isSaving}
-                        variant="outline"
-                        className="h-11 px-6 font-bold border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                      >
-                        {isSaving ? 'Saving...' : 'Save Progress'}
-                        <LucideSave className="h-4 w-4 ml-2" />
-                      </Button>
-                      <Button
-                        onClick={handleProgressionSave}
-                        disabled={isSaving || !isCurrentBatchValid()}
-                        className="bg-green-600 hover:bg-green-700 text-white h-11 px-8 font-bold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isSaving ? 'Saving...' : 'Complete & Finish'}
-                        <LucideSave className="h-4 w-4 ml-2" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-3">
-                      <Button
-                        onClick={handlePartialSave}
-                        disabled={isSaving}
-                        variant="outline"
-                        className="h-11 px-6 font-bold border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                      >
-                        {isSaving ? 'Saving...' : 'Save Progress'}
-                        <LucideSave className="h-4 w-4 ml-2" />
-                      </Button>
-                      <Button
-                        onClick={nextBatch}
-                        disabled={!isCurrentBatchValid()}
-                        className="bg-maroon-600 hover:bg-maroon-700 text-white h-11 px-8 font-bold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Next Step
-                        <ChevronRight className="h-4 w-4 ml-2" />
-                      </Button>
-                    </div>
-                  )}
+                {/* Table Footer */}
+                <div className="p-4 md:px-8 bg-slate-50/50 border-t border-[#FFE5EC] flex flex-col md:flex-row justify-between items-center gap-4">
+                  <div className="flex items-center gap-3">
+                    <p className="text-[8px] font-black text-slate-300 uppercase tracking-[0.2em] italic">
+                      ADMINISTRATION FRAMEWORK • ABIC HR
+                    </p>
+                  </div>
+                  
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={async () => {
+                        const success = await handleSaveChecklist(false)
+                        if (success) setView('update-info')
+                      }}
+                      disabled={Object.keys(completedTasks).length < onboardingTasks.length || isSaving}
+                      className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg active:scale-95 transition-all rounded-xl disabled:opacity-50"
+                    >
+                      {isSaving ? 'SAVING...' : 'PROCEED TO DATA ENTRY'}
+                    </Button>
+                    <Button 
+                      onClick={() => handleSaveChecklist(true)} 
+                      disabled={isSaving}
+                      className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-[#A4163A] hover:bg-[#800020] text-white shadow-lg active:scale-95 transition-all rounded-xl"
+                    >
+                      {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <Save className="w-3.5 h-3.5 mr-2" />}
+                      {isSaving ? 'SAVING...' : 'SAVE PROGRESS'}
+                    </Button>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+              </Card>
+            </div>
+          )}
+
+          {view === 'update-info' && (
+            <div className="max-w-7xl mx-auto py-8">
+              <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+                {/* Horizontal Stepper Progress Card */}
+                <Card className="border-none shadow-lg overflow-hidden">
+                  <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] px-6 pt-8 pb-6 font-sans">
+                    {/* Horizontal Stepper with Progress Bar */}
+                    <div className="relative">
+                      {/* Progress Bar Background */}
+                      <div className="w-full bg-white/20 rounded-full h-2 overflow-hidden backdrop-blur-sm">
+                        <div
+                          className="bg-gradient-to-r from-rose-300 to-white h-2 rounded-full transition-all duration-500 ease-out"
+                          style={{ width: `${calculateProgressionProgress()}%` }}
+                        />
+                      </div>
+
+                      {/* Steps with Labels */}
+                      <div className="flex justify-between items-start mt-4">
+                        {batches.map((batch, index) => {
+                          const BatchIcon = batch.icon
+                          const isActive = currentBatch === batch.id
+                          const isCompleted = batch.id < currentBatch
+
+                          return (
+                            <div
+                              key={batch.id}
+                              className={`flex flex-col items-center group ${batch.id <= currentBatch || isCurrentBatchValid() ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                              style={{ width: `${100 / batches.length}%` }}
+                              onClick={() => {
+                                if (batch.id < currentBatch) {
+                                  setCurrentBatch(batch.id)
+                                } else if (batch.id === currentBatch + 1 && isCurrentBatchValid()) {
+                                  setCurrentBatch(batch.id)
+                                }
+                              }}
+                            >
+                              <div className="relative mb-2">
+                                <div
+                                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${isActive
+                                    ? 'bg-white text-maroon-700 scale-110 shadow-lg'
+                                    : isCompleted
+                                      ? 'bg-emerald-500 text-white'
+                                      : 'bg-white/30 text-white/70 group-hover:bg-white/40'
+                                    }`}
+                                >
+                                  {isCompleted ? (
+                                    <CheckCircle2 className="h-5 w-5" />
+                                  ) : (
+                                    <BatchIcon className="h-4 w-4" />
+                                  )}
+                                </div>
+                              </div>
+                              <div className="text-center hidden md:block">
+                                <p className={`text-[10px] font-semibold transition-colors ${isActive ? 'text-white' : isCompleted ? 'text-emerald-200' : 'text-rose-100/80 group-hover:text-white'}`}>
+                                  {batch.title}
+                                </p>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Current Batch Form */}
+                <Card className="shadow-xl border-maroon-100">
+                  <CardHeader className="bg-gradient-to-br from-[#6B1C23] via-[#7B2431] to-[#8B2C3F] text-white rounded-t-xl py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                        {React.createElement(batches[currentBatch - 1].icon, { className: "h-5 w-5" })}
+                      </div>
+                      <div>
+                        <CardTitle className="text-xl text-white font-bold">Batch {currentBatch}: {batches[currentBatch - 1].title}</CardTitle>
+                        <CardDescription className="text-white/80 text-xs font-medium">{batches[currentBatch - 1].description}</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="p-6 md:p-10">
+                    {/* BATCH 1: Employee Details */}
+                    {currentBatch === 1 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="space-y-3">
+                          <Label htmlFor="position" className="text-base font-semibold text-slate-800">
+                            Position <span className="text-red-500">*</span>
+                          </Label>
+                          <select
+                            id="position"
+                            name="position"
+                            value={progressionFormData.position || ''}
+                            onChange={handleProgressionChange}
+                            className="flex h-12 w-full rounded-lg border-2 border-slate-300 bg-white px-4 py-2 text-base focus-visible:ring-2 focus-visible:ring-maroon-500 transition-all font-medium"
+                          >
+                            <option value="">Select Position...</option>
+                            {positions.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                          </select>
+                        </div>
+
+                        <div className="space-y-3">
+                          <Label htmlFor="date_hired" className="text-base font-semibold text-slate-800">
+                            Date Hired <span className="text-red-500">*</span>
+                          </Label>
+                          <Input
+                            id="date_hired"
+                            type="date"
+                            name="date_hired"
+                            value={formatDateForInput(progressionFormData.date_hired)}
+                            onChange={handleProgressionChange}
+                            className="h-12 text-base border-2 border-slate-300 rounded-lg font-medium"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* BATCH 2: Personal Information */}
+                    {currentBatch === 2 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <Label htmlFor="last_name" className="text-sm font-semibold">Last Name <span className="text-red-500">*</span></Label>
+                          <Input id="last_name" name="last_name" value={progressionFormData.last_name || ''} onChange={handleProgressionChange} placeholder="e.g., Dela Cruz" className="font-medium" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="first_name" className="text-sm font-semibold">First Name <span className="text-red-500">*</span></Label>
+                          <Input id="first_name" name="first_name" value={progressionFormData.first_name || ''} onChange={handleProgressionChange} placeholder="e.g., Juan" className="font-medium" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="middle_name" className="text-sm font-semibold">Middle Name</Label>
+                          <Input id="middle_name" name="middle_name" value={progressionFormData.middle_name || ''} onChange={handleProgressionChange} placeholder="Optional" className="font-medium" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="suffix" className="text-sm font-semibold">Suffix</Label>
+                          <Input id="suffix" name="suffix" value={progressionFormData.suffix || ''} onChange={handleProgressionChange} placeholder="e.g., Jr." className="font-medium" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="birthday" className="text-sm font-semibold">Birthday <span className="text-red-500">*</span></Label>
+                          <Input id="birthday" type="date" name="birthday" value={formatDateForInput(progressionFormData.birthday)} onChange={handleProgressionChange} className="font-medium" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="birthplace" className="text-sm font-semibold">Birthplace <span className="text-red-500">*</span></Label>
+                          <Input id="birthplace" name="birthplace" value={progressionFormData.birthplace || ''} onChange={handleProgressionChange} placeholder="e.g., Manila" className="font-medium" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="gender" className="text-sm font-semibold">Gender <span className="text-red-500">*</span></Label>
+                          <select id="gender" name="gender" value={progressionFormData.gender || ''} onChange={handleProgressionChange} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
+                            <option value="">Select...</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="civil_status" className="text-sm font-semibold">Civil Status <span className="text-red-500">*</span></Label>
+                          <select id="civil_status" name="civil_status" value={progressionFormData.civil_status || ''} onChange={handleProgressionChange} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
+                            <option value="">Select...</option>
+                            <option value="Single">Single</option>
+                            <option value="Married">Married</option>
+                            <option value="Widowed">Widowed</option>
+                            <option value="Separated">Separated</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* BATCH 3: Contact Information */}
+                    {currentBatch === 3 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <Label htmlFor="mobile_number" className="text-sm font-semibold">Mobile Number <span className="text-red-500">*</span></Label>
+                          <Input id="mobile_number" name="mobile_number" value={progressionFormData.mobile_number || ''} onChange={handleProgressionChange} placeholder="09XXXXXXXXX" className="font-medium" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="house_number" className="text-sm font-semibold">House number</Label>
+                          <Input id="house_number" name="house_number" value={progressionFormData.house_number || ''} onChange={handleProgressionChange} className="font-medium" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="street" className="text-sm font-semibold">Street <span className="text-red-500">*</span></Label>
+                          <Input id="street" name="street" value={progressionFormData.street || ''} onChange={handleProgressionChange} className="font-medium" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="village" className="text-sm font-semibold">Village</Label>
+                          <Input id="village" name="village" value={progressionFormData.village || ''} onChange={handleProgressionChange} className="font-medium" />
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                          <Label htmlFor="subdivision" className="text-sm font-semibold">Subdivision</Label>
+                          <Input id="subdivision" name="subdivision" value={progressionFormData.subdivision || ''} onChange={handleProgressionChange} className="font-medium" />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* BATCH 4: Government IDs */}
+                    {currentBatch === 4 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <Label htmlFor="sss_number" className="text-sm font-semibold">SSS Number</Label>
+                          <Input id="sss_number" name="sss_number" value={progressionFormData.sss_number || ''} onChange={handleProgressionChange} className="font-medium" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="philhealth_number" className="text-sm font-semibold">PhilHealth Number</Label>
+                          <Input id="philhealth_number" name="philhealth_number" value={progressionFormData.philhealth_number || ''} onChange={handleProgressionChange} className="font-medium" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="pagibig_number" className="text-sm font-semibold">Pag-IBIG Number</Label>
+                          <Input id="pagibig_number" name="pagibig_number" value={progressionFormData.pagibig_number || ''} onChange={handleProgressionChange} className="font-medium" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="tin_number" className="text-sm font-semibold">TIN Number</Label>
+                          <Input id="tin_number" name="tin_number" value={progressionFormData.tin_number || ''} onChange={handleProgressionChange} className="font-medium" />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* BATCH 5: Family Information */}
+                    {currentBatch === 5 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <Card className="border-rose-100 bg-rose-50/30 p-4">
+                          <h4 className="font-bold text-rose-800 mb-4 flex items-center gap-2"><div className="w-1 h-4 bg-rose-500 rounded-full"></div>Mother's Maiden Name</h4>
+                          <div className="space-y-4">
+                            <Input placeholder="Last Name *" name="mlast_name" value={progressionFormData.mlast_name || ''} onChange={handleProgressionChange} className="font-medium" />
+                            <Input placeholder="First Name *" name="mfirst_name" value={progressionFormData.mfirst_name || ''} onChange={handleProgressionChange} className="font-medium" />
+                            <Input placeholder="Middle Name" name="mmiddle_name" value={progressionFormData.mmiddle_name || ''} onChange={handleProgressionChange} className="font-medium" />
+                            <Input placeholder="Suffix" name="msuffix" value={progressionFormData.msuffix || ''} onChange={handleProgressionChange} className="font-medium" />
+                          </div>
+                        </Card>
+                        <Card className="border-slate-100 bg-slate-50/30 p-4">
+                          <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><div className="w-1 h-4 bg-slate-500 rounded-full"></div>Father's Name (Optional)</h4>
+                          <div className="space-y-4">
+                            <Input placeholder="Last Name" name="flast_name" value={progressionFormData.flast_name || ''} onChange={handleProgressionChange} className="font-medium" />
+                            <Input placeholder="First Name" name="ffirst_name" value={progressionFormData.ffirst_name || ''} onChange={handleProgressionChange} className="font-medium" />
+                            <Input placeholder="Middle Name" name="fmiddle_name" value={progressionFormData.fmiddle_name || ''} onChange={handleProgressionChange} className="font-medium" />
+                            <Input placeholder="Suffix" name="fsuffix" value={progressionFormData.fsuffix || ''} onChange={handleProgressionChange} className="font-medium" />
+                          </div>
+                        </Card>
+                      </div>
+                    )}
+
+                    {/* BATCH 6: Address Details */}
+                    {currentBatch === 6 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <Label htmlFor="region" className="text-sm font-semibold">Region <span className="text-red-500">*</span></Label>
+                          <select name="region" value={progressionFormData.region || ''} onChange={handleProgressionChange} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
+                            <option value="">Select Region...</option>
+                            {regions.map(r => <option key={r.code} value={r.name}>{r.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="province" className="text-sm font-semibold">Province <span className="text-red-500">*</span></Label>
+                          <select name="province" value={progressionFormData.province || ''} onChange={handleProgressionChange} disabled={!progressionFormData.region} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
+                            <option value="">Select Province...</option>
+                            {provinces.map(p => <option key={p.code} value={p.name}>{p.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="city_municipality" className="text-sm font-semibold">City/Municipality <span className="text-red-500">*</span></Label>
+                          <select name="city_municipality" value={progressionFormData.city_municipality || ''} onChange={handleProgressionChange} disabled={!progressionFormData.province} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
+                            <option value="">Select City...</option>
+                            {cities.map(c => <option key={c.code} value={c.name}>{c.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="barangay" className="text-sm font-semibold">Barangay <span className="text-red-500">*</span></Label>
+                          <select name="barangay" value={progressionFormData.barangay || ''} onChange={handleProgressionChange} disabled={!progressionFormData.city_municipality} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
+                            <option value="">Select Barangay...</option>
+                            {barangays.map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="zip_code" className="text-sm font-semibold">ZIP Code <span className="text-red-500">*</span></Label>
+                          <Input id="zip_code" name="zip_code" value={progressionFormData.zip_code || ''} onChange={handleProgressionChange} className="font-medium" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="email_address" className="text-sm font-semibold">Email Address <span className="text-red-500">*</span></Label>
+                          <Input id="email_address" type="email" name="email_address" value={progressionFormData.email_address || ''} onChange={handleProgressionChange} className="font-medium" />
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+
+                  <Separator />
+
+                  {/* Navigation Footer */}
+                  <CardContent className="py-6 font-sans">
+                    <div className="flex justify-between items-center">
+                      <Button
+                        onClick={prevBatch}
+                        disabled={currentBatch === 1}
+                        variant="outline"
+                        className="h-11 px-6 font-bold uppercase tracking-widest text-[10px] border-slate-200 hover:bg-slate-50 transition-all rounded-xl shadow-sm"
+                      >
+                        <ChevronLeft className="h-4 w-4 mr-2" />
+                        Previous Batch
+                      </Button>
+
+                      <div className="flex items-center gap-1.5 p-1.5 bg-slate-100/50 rounded-2xl border border-slate-200/50">
+                        {batches.map((b) => (
+                          <div 
+                            key={b.id} 
+                            className={`h-2 transition-all duration-300 rounded-full ${currentBatch === b.id ? 'bg-[#A4163A] w-12 shadow-[0_0_10px_rgba(164,22,58,0.3)]' : b.id < currentBatch ? 'bg-emerald-500 w-3' : 'bg-slate-300 w-3'}`} 
+                          />
+                        ))}
+                      </div>
+
+                      {currentBatch === 6 ? (
+                        <div className="flex gap-3">
+                          <Button 
+                            onClick={handlePartialSave}
+                            disabled={isSaving}
+                            variant="outline"
+                            className="h-11 px-6 font-bold uppercase tracking-widest text-[10px] border-emerald-200 text-emerald-700 hover:bg-emerald-50 shadow-sm transition-all active:scale-95 rounded-xl"
+                          >
+                            {isSaving ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              <LucideSave className="h-4 w-4 mr-2" />
+                            )}
+                            Save Progress
+                          </Button>
+                          <Button 
+                            onClick={handleProgressionSave}
+                            disabled={isSaving || !isCurrentBatchValid()}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white h-11 px-8 font-black uppercase tracking-widest text-[10px] shadow-lg shadow-emerald-200/50 active:scale-95 transition-all rounded-xl disabled:opacity-50"
+                          >
+                            {isSaving ? 'COMPLETING...' : 'COMPLETE & FINISH'}
+                            {!isSaving && <LucideSave className="h-4 w-4 ml-2" />}
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-3">
+                          <Button 
+                            onClick={handlePartialSave}
+                            disabled={isSaving}
+                            variant="outline"
+                            className="h-11 px-6 font-bold uppercase tracking-widest text-[10px] border-emerald-200 text-emerald-700 hover:bg-emerald-50 shadow-sm transition-all active:scale-95 rounded-xl"
+                          >
+                            {isSaving ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              <LucideSave className="h-4 w-4 mr-2" />
+                            )}
+                            Save Progress
+                          </Button>
+                          <Button 
+                            onClick={nextBatch}
+                            disabled={!isCurrentBatchValid()}
+                            className="bg-[#A4163A] hover:bg-[#800020] text-white h-11 px-8 font-black uppercase tracking-widest text-[10px] shadow-lg shadow-rose-200/50 active:scale-95 transition-all rounded-xl disabled:opacity-50"
+                          >
+                            Next Batch
+                            <ChevronRight className="h-4 w-4 ml-2" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <ConfirmationModal
