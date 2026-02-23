@@ -233,6 +233,14 @@ export default function MasterfilePage() {
 
   const handleEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
+
+    // Validation for mobile number: only numbers, max 10 digits
+    if (name === 'mobile_number') {
+      const numericValue = value.replace(/\D/g, '').slice(0, 10)
+      setEditFormData(prev => ({ ...prev, [name]: numericValue }))
+      return
+    }
+
     setEditFormData(prev => ({ ...prev, [name]: value }))
 
     // PSGC logic for Current Address
@@ -1295,18 +1303,25 @@ export default function MasterfilePage() {
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-xs font-bold text-slate-500 uppercase">Mobile Number</label>
-                        <Input name="mobile_number" value={editFormData.mobile_number || ''} onChange={handleEditChange} className="h-9" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Tel Number</label>
-                        <Input name="phone_number" value={editFormData.phone_number || ''} onChange={handleEditChange} className="h-9" />
+                        <div className="relative group">
+                          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-[#630C22] pointer-events-none group-focus-within:text-[#800020] transition-colors">
+                            +63
+                          </div>
+                          <Input 
+                            name="mobile_number" 
+                            value={editFormData.mobile_number || ''} 
+                            onChange={handleEditChange} 
+                            className="h-9 pl-11 font-bold" 
+                            placeholder="9XXXXXXXXX"
+                            maxLength={10}
+                          />
+                        </div>
                       </div>
                     </>
                   ) : (
                     <>
                       <DetailItem label="Email Address" value={selectedEmployee.email_address || selectedEmployee.email} required />
-                      <DetailItem label="Mobile Number" value={selectedEmployee.mobile_number} required />
-                      <DetailItem label="Tel Number" value={selectedEmployee.phone_number} />
+                      <DetailItem label="Mobile Number" value={selectedEmployee.mobile_number ? `+63 ${selectedEmployee.mobile_number}` : ''} required />
                     </>
                   )}
                 </div>

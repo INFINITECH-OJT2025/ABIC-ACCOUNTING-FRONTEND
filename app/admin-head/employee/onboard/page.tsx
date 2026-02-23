@@ -945,6 +945,17 @@ function OnboardPageContent() {
 
   const handleProgressionChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
+
+    // Validation for mobile number: only numbers, max 10 digits
+    if (name === 'mobile_number') {
+      const numericValue = value.replace(/\D/g, '').slice(0, 10)
+      setProgressionFormData((prev) => ({
+        ...prev,
+        [name]: numericValue,
+      }))
+      return
+    }
+
     setProgressionFormData((prev) => ({
       ...prev,
       [name]: value,
@@ -1597,7 +1608,20 @@ function OnboardPageContent() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
                           <Label htmlFor="mobile_number" className="text-sm font-semibold">Mobile Number <span className="text-red-500">*</span></Label>
-                          <Input id="mobile_number" name="mobile_number" value={progressionFormData.mobile_number || ''} onChange={handleProgressionChange} placeholder="09XXXXXXXXX" className="font-medium" />
+                          <div className="relative group">
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-[#A4163A] pointer-events-none group-focus-within:text-[#800020] transition-colors">
+                              +63
+                            </div>
+                            <Input 
+                              id="mobile_number" 
+                              name="mobile_number" 
+                              value={progressionFormData.mobile_number || ''} 
+                              onChange={handleProgressionChange} 
+                              placeholder="9XXXXXXXXX" 
+                              className="pl-11 font-bold" 
+                              maxLength={10}
+                            />
+                          </div>
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="house_number" className="text-sm font-semibold">House number</Label>
