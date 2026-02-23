@@ -53,6 +53,31 @@ class EmployeeController extends Controller
     }
 
     /**
+     * Check if name combination exists
+     */
+    public function checkName(Request $request)
+    {
+        $firstName = $request->query('first_name');
+        $lastName = $request->query('last_name');
+
+        if (!$firstName || !$lastName) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Both first_name and last_name are required'
+            ], 400);
+        }
+
+        $exists = Employee::where('first_name', 'like', $firstName)
+            ->where('last_name', 'like', $lastName)
+            ->exists();
+
+        return response()->json([
+            'success' => true,
+            'exists' => $exists
+        ]);
+    }
+
+    /**
      * Store a newly created employee in database.
      */
     public function store(Request $request)

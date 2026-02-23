@@ -161,7 +161,9 @@ function OnboardPageContent() {
   const [emailChecking, setEmailChecking] = useState(false)
   const [emailExists, setEmailExists] = useState(false)
   const [emailValue, setEmailValue] = useState('')
-
+  // Name Check States
+  const [nameChecking, setNameChecking] = useState(false)
+  const [nameExists, setNameExists] = useState(false)
 
   // Modal State
   const [confirmModal, setConfirmModal] = useState<{
@@ -338,6 +340,35 @@ function OnboardPageContent() {
 
     return () => clearTimeout(timer)
   }, [onboardFormData.email])
+
+  // Name Detection Logic
+  useEffect(() => {
+    const checkName = async (firstName: string, lastName: string) => {
+      if (!firstName || !lastName || firstName.length < 2 || lastName.length < 2) {
+        setNameExists(false)
+        return
+      }
+
+      setNameChecking(true)
+      try {
+        const response = await apiFetch(`/api/employees/check-name?first_name=${encodeURIComponent(firstName)}&last_name=${encodeURIComponent(lastName)}`)
+        const data = await response.json()
+        if (data.success) {
+          setNameExists(data.exists)
+        }
+      } catch (error) {
+        console.error('Error checking name:', error)
+      } finally {
+        setNameChecking(false)
+      }
+    }
+
+    const timer = setTimeout(() => {
+      checkName(onboardFormData.first_name, onboardFormData.last_name)
+    }, 600) // 600ms debounce
+
+    return () => clearTimeout(timer)
+  }, [onboardFormData.first_name, onboardFormData.last_name])
 
 
   const fetchChecklistProgress = async (employeeName: string) => {
@@ -1240,12 +1271,28 @@ function OnboardPageContent() {
                 <div className="bg-white border border-slate-100 rounded-2xl p-8 shadow-sm space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">First Name <span className="text-red-500">*</span></label>
-                      <Input value={onboardFormData.first_name} onChange={(e) => setOnboardFormData(prev => ({ ...prev, first_name: e.target.value }))} placeholder="John" />
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="block text-sm font-semibold text-slate-700">First Name <span className="text-red-500">*</span></label>
+                        {nameChecking && (<div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium"><Loader2 className="w-3 h-3 animate-spin" />Checking...</div>)}
+                        {!nameChecking && nameExists && (<div className="flex items-center gap-1.5 text-xs text-rose-500 font-bold animate-in fade-in slide-in-from-right-2"><AlertCircle className="w-3 h-3" />Name already exists</div>)}
+                      </div>
+                      <Input 
+                        value={onboardFormData.first_name} 
+                        onChange={(e) => setOnboardFormData(prev => ({ ...prev, first_name: e.target.value }))} 
+                        placeholder="John" 
+                        className={cn("transition-all duration-300", nameExists && "border-rose-400 focus-visible:ring-rose-400 bg-rose-50/30")}
+                      />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">Last Name <span className="text-red-500">*</span></label>
-                      <Input value={onboardFormData.last_name} onChange={(e) => setOnboardFormData(prev => ({ ...prev, last_name: e.target.value }))} placeholder="Doe" />
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="block text-sm font-semibold text-slate-700">Last Name <span className="text-red-500">*</span></label>
+                      </div>
+                      <Input 
+                        value={onboardFormData.last_name} 
+                        onChange={(e) => setOnboardFormData(prev => ({ ...prev, last_name: e.target.value }))} 
+                        placeholder="Doe" 
+                        className={cn("transition-all duration-300", nameExists && "border-rose-400 focus-visible:ring-rose-400 bg-rose-50/30")}
+                      />
                     </div>
                     <div className="md:col-span-2">
                       <div className="flex justify-between items-center mb-2">
@@ -1322,7 +1369,14 @@ function OnboardPageContent() {
                     </div>
                   </div>
                   <div className="flex gap-4 pt-6 border-t border-slate-100">
-                    <Button onClick={handleStartOnboarding} disabled={isSaving || emailExists || emailChecking} className={cn("flex-1 text-white font-bold h-12 rounded-xl transition-all shadow-md", (emailExists || emailChecking) ? "bg-slate-300 hover:bg-slate-300 cursor-not-allowed" : "bg-[#630C22] hover:bg-[#4A081A]")}>
+                    <Button 
+                      onClick={handleStartOnboarding} 
+                      disabled={isSaving || emailExists || emailChecking || nameExists || nameChecking} 
+                      className={cn(
+                        "flex-1 text-white font-bold h-12 rounded-xl transition-all shadow-md", 
+                        (emailExists || emailChecking || nameExists || nameChecking) ? "bg-slate-300 hover:bg-slate-300 cursor-not-allowed" : "bg-[#630C22] hover:bg-[#4A081A]"
+                      )}
+                    >
                       {isSaving ? 'SAVING...' : 'START ONBOARDING'}
                     </Button>
                     <Button variant="outline" onClick={handleCancelOnboarding} disabled={isSaving} className="flex-1 border-slate-200 text-slate-600 font-bold h-12 rounded-xl">

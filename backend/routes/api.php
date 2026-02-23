@@ -16,6 +16,7 @@ Route::get('/user', function (Request $request) {
 
 // Employee API Routes
 Route::get('/employees/check-email', [EmployeeController::class, 'checkEmail']);
+Route::get('/employees/check-name', [EmployeeController::class, 'checkName']);
 Route::apiResource('employees', EmployeeController::class);
 
 // Positions API Routes
