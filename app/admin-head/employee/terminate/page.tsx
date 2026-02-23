@@ -110,7 +110,24 @@ export default function TerminatePage() {
   const itemsPerPage = 10
   const [sortOrder, setSortOrder] = useState<'recent' | 'oldest' | 'az' | 'za'>('recent')
   const [activeTab, setActiveTab] = useState<'all' | 'terminated' | 'rehired'>('all')
+  const [historyMode, setHistoryMode] = useState<'current' | 'archive'>('current')
   const [exitActionType, setExitActionType] = useState<'terminate' | 'resigned'>('terminate')
+
+  const getLatestPerEmployee = (records: TerminationRecord[]) => {
+    const latestMap = new Map<string, TerminationRecord>()
+    for (const record of records) {
+      const key = String(record.employee_id ?? '')
+      const existing = latestMap.get(key)
+      if (!existing) {
+        latestMap.set(key, record)
+        continue
+      }
+      const currentTs = new Date(record.termination_date ?? 0).getTime()
+      const existingTs = new Date(existing.termination_date ?? 0).getTime()
+      if (currentTs > existingTs) latestMap.set(key, record)
+    }
+    return Array.from(latestMap.values())
+  }
 
   const applyRecordFilters = (records: TerminationRecord[]) => records
     .filter((record) => {
@@ -140,16 +157,19 @@ export default function TerminatePage() {
       }
     })
 
-  const filteredTerminations = applyRecordFilters(terminations)
-  const filteredResigned = applyRecordFilters(resigned)
+  const baseTerminations = historyMode === 'archive' ? terminations : getLatestPerEmployee(terminations)
+  const baseResigned = historyMode === 'archive' ? resigned : getLatestPerEmployee(resigned)
+
+  const filteredTerminations = applyRecordFilters(baseTerminations)
+  const filteredResigned = applyRecordFilters(baseResigned)
   const selectedRecordIsResigned = selectedTermination?.exit_type === 'resigned'
   const approverPositions = ['admin supervisor', 'it supervisor', 'admin head']
   const approverEmployees = employees.filter((emp) =>
     approverPositions.includes(String(emp.position ?? '').toLowerCase().trim())
   )
 
-  const terminatedCount = terminations.filter(r => !r.rehired_at).length
-  const rehiredCount = terminations.filter(r => !!r.rehired_at).length
+  const terminatedCount = baseTerminations.filter(r => !r.rehired_at).length
+  const rehiredCount = baseTerminations.filter(r => !!r.rehired_at).length
 
   // Modal State
   const [confirmModal, setConfirmModal] = useState<{
@@ -617,7 +637,7 @@ export default function TerminatePage() {
                     activeTab === 'all' ? 'bg-white text-[#A4163A] shadow-md' : 'text-white/70 hover:text-white hover:bg-white/5'
                   }`}
                 >
-                  All ({terminations.length})
+                  All ({baseTerminations.length})
                 </button>
                 <button
                   onClick={() => { setActiveTab('terminated'); setCurrentPage(1); setCurrentResignedPage(1) }}
@@ -634,6 +654,24 @@ export default function TerminatePage() {
                   }`}
                 >
                   Rehired ({rehiredCount})
+                </button>
+              </div>
+              <div className="flex items-center bg-white/10 p-1 rounded-lg backdrop-blur-md border border-white/10">
+                <button
+                  onClick={() => { setHistoryMode('current'); setCurrentPage(1); setCurrentResignedPage(1) }}
+                  className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-200 uppercase tracking-wider ${
+                    historyMode === 'current' ? 'bg-white text-[#A4163A] shadow-md' : 'text-white/70 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  Current
+                </button>
+                <button
+                  onClick={() => { setHistoryMode('archive'); setCurrentPage(1); setCurrentResignedPage(1) }}
+                  className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-200 uppercase tracking-wider ${
+                    historyMode === 'archive' ? 'bg-white text-[#A4163A] shadow-md' : 'text-white/70 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  Archive
                 </button>
               </div>
 
@@ -948,13 +986,13 @@ export default function TerminatePage() {
                 <div>
                   <h2 className="text-lg font-bold text-[#4A081A]">Terminated History</h2>
                   <p className="text-slate-400 text-xs mt-0.5">
-                    {filteredTerminations.length} of {terminations.length} records
+                    {filteredTerminations.length} of {baseTerminations.length} records
                   </p>
                 </div>
               </div>
 
               <div className="p-0 bg-white overflow-hidden">
-                {terminations.length === 0 ? (
+                {baseTerminations.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-24 text-slate-400">
                     <FileText className="h-20 w-20 mb-4 opacity-10" />
                     <p className="text-lg">No termination records found.</p>
@@ -1026,22 +1064,24 @@ export default function TerminatePage() {
                                 >
                                   Review
                                 </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-9 border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300 transition-all font-bold px-4 rounded-lg shadow-sm"
-                                  onClick={() => {
-                                    setSelectedTermination(record)
-                                    setFormData((prev) => ({
-                                      ...prev,
-                                      rehire_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
-                                    }))
-                                    setShowDetailDialog(true)
-                                  }}
-                                  disabled={rehireLoading === record.employee_id}
-                                >
-                                  {rehireLoading === record.employee_id ? 'Wait...' : 'Re-hire'}
-                                </Button>
+                                {!record.rehired_at && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-9 border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300 transition-all font-bold px-4 rounded-lg shadow-sm"
+                                    onClick={() => {
+                                      setSelectedTermination(record)
+                                      setFormData((prev) => ({
+                                        ...prev,
+                                        rehire_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
+                                      }))
+                                      setShowDetailDialog(true)
+                                    }}
+                                    disabled={rehireLoading === record.employee_id}
+                                  >
+                                    {rehireLoading === record.employee_id ? 'Wait...' : 'Re-hire'}
+                                  </Button>
+                                )}
                               </div>
                             </TableCell>
                           </TableRow>
@@ -1114,13 +1154,13 @@ export default function TerminatePage() {
                 <div>
                   <h2 className="text-lg font-bold text-[#4A081A]">Resigned History</h2>
                   <p className="text-slate-400 text-xs mt-0.5">
-                    {filteredResigned.length} of {resigned.length} records
+                    {filteredResigned.length} of {baseResigned.length} records
                   </p>
                 </div>
               </div>
 
               <div className="p-0 bg-white overflow-hidden">
-                {resigned.length === 0 ? (
+                {baseResigned.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-24 text-slate-400">
                     <FileText className="h-20 w-20 mb-4 opacity-10" />
                     <p className="text-lg">No resigned records found.</p>
@@ -1192,22 +1232,24 @@ export default function TerminatePage() {
                                   >
                                     Review
                                   </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-9 border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300 transition-all font-bold px-4 rounded-lg shadow-sm"
-                                    onClick={() => {
-                                      setSelectedTermination(record)
-                                      setFormData((prev) => ({
-                                        ...prev,
-                                        rehire_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
-                                      }))
-                                      setShowDetailDialog(true)
-                                    }}
-                                    disabled={rehireLoading === record.employee_id}
-                                  >
-                                    {rehireLoading === record.employee_id ? 'Wait...' : 'Re-hire'}
-                                  </Button>
+                                  {!record.rehired_at && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-9 border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300 transition-all font-bold px-4 rounded-lg shadow-sm"
+                                      onClick={() => {
+                                        setSelectedTermination(record)
+                                        setFormData((prev) => ({
+                                          ...prev,
+                                          rehire_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
+                                        }))
+                                        setShowDetailDialog(true)
+                                      }}
+                                      disabled={rehireLoading === record.employee_id}
+                                    >
+                                      {rehireLoading === record.employee_id ? 'Wait...' : 'Re-hire'}
+                                    </Button>
+                                  )}
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -1332,37 +1374,41 @@ export default function TerminatePage() {
           </div>
 
           <div className="p-6 bg-slate-50 border-t border-slate-100 flex flex-col gap-4">
-            <div className="flex items-center gap-4 bg-white p-3 rounded-lg border border-slate-200">
-              <div className="flex flex-col gap-1 shrink-0">
-                <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Re-hire Date & Time</Label>
-                <Input
-                  type="datetime-local"
-                  name="rehire_date"
-                  value={formData.rehire_date}
-                  onChange={handleInputChange}
-                  className="h-9 px-2 bg-transparent border-0 focus:outline-none focus:ring-0 text-slate-600 font-medium text-sm w-[200px]"
-                  disabled={rehireLoading !== null}
-                />
+            {!selectedTermination?.rehired_at && (
+              <div className="flex items-center gap-4 bg-white p-3 rounded-lg border border-slate-200">
+                <div className="flex flex-col gap-1 shrink-0">
+                  <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Re-hire Date & Time</Label>
+                  <Input
+                    type="datetime-local"
+                    name="rehire_date"
+                    value={formData.rehire_date}
+                    onChange={handleInputChange}
+                    className="h-9 px-2 bg-transparent border-0 focus:outline-none focus:ring-0 text-slate-600 font-medium text-sm w-[200px]"
+                    disabled={rehireLoading !== null}
+                  />
+                </div>
+                <div className="flex-1 text-xs text-slate-400 italic">
+                  Specify the official re-hire date for this employee.
+                </div>
               </div>
-              <div className="flex-1 text-xs text-slate-400 italic">
-                Specify the official re-hire date for this employee.
-              </div>
-            </div>
+            )}
             <div className="flex justify-between items-center">
               <Button variant="ghost" onClick={() => setShowDetailDialog(false)} className="font-bold text-slate-600">
                 Back to List
               </Button>
-              <Button
-                className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all font-bold px-6"
-                onClick={() => {
-                  if (selectedTermination) {
-                    handleRehire(selectedTermination.employee_id)
-                  }
-                }}
-                disabled={rehireLoading === selectedTermination?.employee_id}
-              >
-                {rehireLoading === selectedTermination?.employee_id ? 'Restoring Access...' : 'Re-hire Employee'}
-              </Button>
+              {!selectedTermination?.rehired_at && (
+                <Button
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all font-bold px-6"
+                  onClick={() => {
+                    if (selectedTermination) {
+                      handleRehire(selectedTermination.employee_id)
+                    }
+                  }}
+                  disabled={rehireLoading === selectedTermination?.employee_id}
+                >
+                  {rehireLoading === selectedTermination?.employee_id ? 'Restoring Access...' : 'Re-hire Employee'}
+                </Button>
+              )}
             </div>
           </div>
         </DialogContent>
