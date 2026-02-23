@@ -12,6 +12,9 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import {
+  Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,
+} from '@/components/ui/sheet'
+import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import {
@@ -45,7 +48,8 @@ import {
   Trash2,
   Copy,
   Clock,
-  ArrowRight
+  ArrowRight,
+  Users
 } from 'lucide-react'
 
 
@@ -119,6 +123,21 @@ type EditDraft = {
   processes: EditableProcess[]
 }
 
+type GeneralContact = {
+  id: number
+  type: string
+  label: string | null
+  value: string
+  sort_order: number
+}
+
+type EditableGeneralContact = {
+  type: string
+  label: string
+  value: string
+  sort_order: number
+}
+
 
 type PortalLink = {
   code: string
@@ -185,6 +204,12 @@ export default function GovernmentDirectoryPage() {
   const [loadingCloudinaryImages, setLoadingCloudinaryImages] = useState(false)
   const [deleteCandidate, setDeleteCandidate] = useState<CloudinaryAsset | null>(null)
   const [deletingCloudinaryImage, setDeletingCloudinaryImage] = useState(false)
+  const [generalContactsOpen, setGeneralContactsOpen] = useState(false)
+  const [generalContacts, setGeneralContacts] = useState<GeneralContact[]>([])
+  const [generalContactsDraft, setGeneralContactsDraft] = useState<EditableGeneralContact[]>([])
+  const [loadingGeneralContacts, setLoadingGeneralContacts] = useState(false)
+  const [savingGeneralContacts, setSavingGeneralContacts] = useState(false)
+  const [editingGeneralContacts, setEditingGeneralContacts] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [savingChanges, setSavingChanges] = useState(false)
   const [draft, setDraft] = useState<EditDraft | null>(null)
@@ -624,6 +649,152 @@ export default function GovernmentDirectoryPage() {
     }
   }
 
+  const loadGeneralContacts = async () => {
+    try {
+      setLoadingGeneralContacts(true)
+      const response = await fetch(`${getApiUrl()}/api/directory/general-contacts`, {
+        headers: { Accept: 'application/json' },
+      })
+
+      if (!response.ok) {
+        let backendMessage = `HTTP ${response.status}`
+        try {
+          const errorBody = await response.json()
+          if (errorBody?.message) backendMessage = `${errorBody.message} (HTTP ${response.status})`
+        } catch {
+        }
+        throw new Error(backendMessage)
+      }
+
+      const result = await response.json()
+      const rows = Array.isArray(result?.data) ? result.data : []
+      const sorted = [...rows].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      setGeneralContacts(sorted)
+      if (!editingGeneralContacts) {
+        setGeneralContactsDraft(sorted.map((row) => ({
+          type: row.type || '',
+          label: row.label || '',
+          value: row.value || '',
+          sort_order: row.sort_order || 0,
+        })))
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load general contacts'
+      toast.error('General Contacts Load Failed', { description: message })
+    } finally {
+      setLoadingGeneralContacts(false)
+    }
+  }
+
+  const openGeneralContactsSheet = () => {
+    setGeneralContactsOpen(true)
+    void loadGeneralContacts()
+  }
+
+  const startGeneralContactsEdit = () => {
+    setGeneralContactsDraft(
+      generalContacts.map((row, index) => ({
+        type: row.type || '',
+        label: row.label || '',
+        value: row.value || '',
+        sort_order: row.sort_order || (index + 1),
+      }))
+    )
+    setEditingGeneralContacts(true)
+  }
+
+  const cancelGeneralContactsEdit = () => {
+    setEditingGeneralContacts(false)
+    setGeneralContactsDraft(
+      generalContacts.map((row, index) => ({
+        type: row.type || '',
+        label: row.label || '',
+        value: row.value || '',
+        sort_order: row.sort_order || (index + 1),
+      }))
+    )
+  }
+
+  const addGeneralContactRow = () => {
+    setGeneralContactsDraft((prev) => [
+      ...prev,
+      { type: 'note', label: '', value: '', sort_order: prev.length + 1 },
+    ])
+  }
+
+  const removeGeneralContactRow = (index: number) => {
+    setGeneralContactsDraft((prev) => (
+      prev.filter((_, i) => i !== index).map((row, i) => ({ ...row, sort_order: i + 1 }))
+    ))
+  }
+
+  const updateGeneralContactField = (index: number, field: keyof EditableGeneralContact, value: string) => {
+    setGeneralContactsDraft((prev) => {
+      const next = [...prev]
+      const target = next[index]
+      if (!target) return prev
+      next[index] = { ...target, [field]: value }
+      return next
+    })
+  }
+
+  const saveGeneralContacts = async () => {
+    try {
+      const hasInvalidRows = generalContactsDraft.some((row) => row.type.trim().length === 0 || row.value.trim().length === 0)
+      if (hasInvalidRows) {
+        toast.error('Validation Failed', {
+          description: 'Type and value are required for each general contact row.',
+        })
+        return
+      }
+
+      setSavingGeneralContacts(true)
+      const payload = generalContactsDraft.map((row, index) => ({
+        type: row.type.trim(),
+        label: row.label.trim() || null,
+        value: row.value.trim(),
+        sort_order: index + 1,
+      }))
+
+      const response = await fetch(`${getApiUrl()}/api/directory/general-contacts`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ contacts: payload }),
+      })
+
+      if (!response.ok) {
+        let backendMessage = `HTTP ${response.status}`
+        try {
+          const errorBody = await response.json()
+          if (errorBody?.message) backendMessage = `${errorBody.message} (HTTP ${response.status})`
+        } catch {
+        }
+        throw new Error(backendMessage)
+      }
+
+      const result = await response.json()
+      const rows = Array.isArray(result?.data) ? result.data : []
+      const sorted = [...rows].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      setGeneralContacts(sorted)
+      setGeneralContactsDraft(sorted.map((row, index) => ({
+        type: row.type || '',
+        label: row.label || '',
+        value: row.value || '',
+        sort_order: row.sort_order || (index + 1),
+      })))
+      setEditingGeneralContacts(false)
+      toast.success('General contacts updated successfully!')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to save general contacts'
+      toast.error('Save Failed', { description: message })
+    } finally {
+      setSavingGeneralContacts(false)
+    }
+  }
+
 
   const handleImageUpdate = async (uploadResult: any) => {
     try {
@@ -730,6 +901,14 @@ export default function GovernmentDirectoryPage() {
 
             {/* EDIT MODE TOGGLE */}
             <div className="flex items-center gap-2">
+              <Button
+                onClick={openGeneralContactsSheet}
+                variant="outline"
+                className="border-white/30 rounded-lg text-white hover:bg-white/20 hover:text-white bg-transparent backdrop-blur-sm"
+              >
+                <Users className="w-4 h-4 mr-2" />
+                GENERAL CONTACTS
+              </Button>
               {editMode ? (
                 <>
                   <Button
@@ -1163,6 +1342,161 @@ export default function GovernmentDirectoryPage() {
 
 
       {/* ----- MODALS ----- */}
+      <Sheet
+        open={generalContactsOpen}
+        onOpenChange={(open) => {
+          setGeneralContactsOpen(open)
+          if (!open) {
+            setEditingGeneralContacts(false)
+          }
+        }}
+      >
+        {generalContactsOpen && (
+          <SheetContent className="bg-white w-full sm:max-w-xl overflow-y-auto">
+            <SheetHeader className="px-6 py-5">
+              <SheetTitle className="text-slate-900">General Contacts</SheetTitle>
+              <SheetDescription>
+                Shared contact information not tied to a specific agency.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="px-6 py-5 space-y-5">
+              <div className="flex items-center justify-between gap-2">
+                <Button
+                  variant="outline"
+                  className="rounded-sm"
+                  onClick={() => void loadGeneralContacts()}
+                  disabled={loadingGeneralContacts || savingGeneralContacts}
+                >
+                  {loadingGeneralContacts ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : null}
+                  Refresh
+                </Button>
+                {editingGeneralContacts ? (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      onClick={cancelGeneralContactsEdit}
+                      disabled={savingGeneralContacts}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => void saveGeneralContacts()}
+                      className="bg-[#A4163A] hover:bg-[#8D1332] text-white"
+                      disabled={savingGeneralContacts}
+                    >
+                      {savingGeneralContacts ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4 mr-2" />
+                      )}
+                      Save
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    onClick={startGeneralContactsEdit}
+                    className="bg-[#A4163A] hover:bg-[#8D1332] text-white"
+                    disabled={loadingGeneralContacts}
+                  >
+                    <Edit3 className="w-4 h-4 mr-2" />
+                    Edit Contacts
+                  </Button>
+                )}
+              </div>
+
+              {loadingGeneralContacts ? (
+                <div className="py-8 text-center text-slate-500">
+                  <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
+                  Loading general contacts...
+                </div>
+              ) : editingGeneralContacts ? (
+                <div className="space-y-3">
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-[#A4163A] border-[#A4163A]/30"
+                      onClick={addGeneralContactRow}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Row
+                    </Button>
+                  </div>
+                  {generalContactsDraft.length === 0 ? (
+                    <p className="text-sm text-slate-500">No rows yet. Click Add Row to create one.</p>
+                  ) : (
+                    generalContactsDraft.map((row, index) => (
+                      <div key={`general-contact-draft-${index}`} className="border border-slate-200 rounded-md p-3 space-y-2">
+                        <div className="flex gap-2">
+                          <Input
+                            value={row.type}
+                            onChange={(e) => updateGeneralContactField(index, 'type', e.target.value)}
+                            placeholder="Type (e.g. Hotline)"
+                            className="h-9 rounded-sm"
+                          />
+                          <Input
+                            value={row.label}
+                            onChange={(e) => updateGeneralContactField(index, 'label', e.target.value)}
+                            placeholder="Label"
+                            className="h-9 rounded-sm"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Input
+                            value={row.value}
+                            onChange={(e) => updateGeneralContactField(index, 'value', e.target.value)}
+                            placeholder="Value"
+                            className="h-9 rounded-sm"
+                          />
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => removeGeneralContactRow(index)}
+                            className="text-rose-500 hover:bg-rose-50 hover:text-rose-600 h-9 w-9 rounded-sm"
+                            aria-label="Remove row"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              ) : generalContacts.length === 0 ? (
+                <p className="text-sm text-slate-500">No general contacts yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {generalContacts.map((contact) => {
+                    const Icon = getDetailIcon(contact.type, contact.label ?? '')
+                    return (
+                      <div key={contact.id} className="flex items-start gap-3 rounded-md border border-slate-100 p-3">
+                        <div className="mt-0.5 h-8 w-8 rounded-full bg-slate-100 text-[#A4163A] flex items-center justify-center shrink-0">
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-black text-slate-500 uppercase tracking-wider">{contact.label || contact.type}</p>
+                          <p className="text-sm font-semibold text-slate-800 break-words">{contact.value}</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 px-2 text-slate-500 hover:text-[#A4163A] hover:bg-rose-50"
+                          onClick={() => void handleCopyText(contact.label || contact.type, contact.value)}
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </SheetContent>
+        )}
+      </Sheet>
+
       <Dialog open={cloudinaryPickerOpen} onOpenChange={setCloudinaryPickerOpen}>
         <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-hidden p-0">
           <DialogHeader className="px-6 pt-6">

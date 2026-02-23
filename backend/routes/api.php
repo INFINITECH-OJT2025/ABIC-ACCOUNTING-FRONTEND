@@ -62,6 +62,7 @@ use App\Http\Controllers\Api\DirectoryController;
 Route::get('/directory/agencies', [DirectoryController::class, 'index']);
 Route::put('/directory/agencies/{code}', [DirectoryController::class, 'update']);
 Route::put('/directory/agencies/{code}/image', [DirectoryController::class, 'updateImage']);
+Route::get('/directory/general-contacts', [DirectoryController::class, 'listGeneralContacts']);
+Route::put('/directory/general-contacts', [DirectoryController::class, 'updateGeneralContacts']);
 Route::get('/directory/cloudinary-images', [DirectoryController::class, 'listCloudinaryImages']);
-
-
+Route::delete('/directory/cloudinary-images', [DirectoryController::class, 'deleteCloudinaryImage']);
