@@ -1301,35 +1301,35 @@ export default function MasterfilePage() {
                         <Input name="subdivision" value={editFormData.subdivision || ''} onChange={handleEditChange} className="h-9" />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Region <span className="text-red-500">*</span></label>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Region</label>
                         <select name="region" value={editFormData.region || ''} onChange={handleEditChange} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
                           <option value="">Select Region...</option>
                           {regions.map(r => <option key={r.code} value={r.name}>{r.name}</option>)}
                         </select>
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Province <span className="text-red-500">*</span></label>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Province</label>
                         <select name="province" value={editFormData.province || ''} onChange={handleEditChange} disabled={!editFormData.region || loadingProvinces} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
                           <option value="">Select Province...</option>
                           {provinces.map(p => <option key={p.code} value={p.name}>{p.name}</option>)}
                         </select>
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">City / Municipality <span className="text-red-500">*</span></label>
+                        <label className="text-xs font-bold text-slate-500 uppercase">City / Municipality</label>
                         <select name="city_municipality" value={editFormData.city_municipality || ''} onChange={handleEditChange} disabled={!editFormData.province || loadingCities} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
                           <option value="">Select City...</option>
                           {cities.map(c => <option key={c.code} value={c.name}>{c.name}</option>)}
                         </select>
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Barangay <span className="text-red-500">*</span></label>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Barangay</label>
                         <select name="barangay" value={editFormData.barangay || ''} onChange={handleEditChange} disabled={!editFormData.city_municipality || loadingBarangays} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
                           <option value="">Select Barangay...</option>
                           {barangays.map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
                         </select>
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Zip Code <span className="text-red-500">*</span></label>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Zip Code</label>
                         <Input name="zip_code" value={editFormData.zip_code || ''} onChange={handleEditChange} className="h-9" />
                       </div>
                     </div>
@@ -1381,7 +1381,7 @@ export default function MasterfilePage() {
                         <Input name="perm_house_number" value={editFormData.perm_house_number || ''} onChange={handleEditChange} className="h-9" />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Street <span className="text-red-500">*</span></label>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Street</label>
                         <Input name="perm_street" value={editFormData.perm_street || ''} onChange={handleEditChange} className="h-9" />
                       </div>
                       <div className="space-y-1.5">
@@ -1393,7 +1393,7 @@ export default function MasterfilePage() {
                         <Input name="perm_subdivision" value={editFormData.perm_subdivision || ''} onChange={handleEditChange} className="h-9" />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Region <span className="text-red-500">*</span></label>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Region</label>
                         <select name="perm_region" value={editFormData.perm_region || ''} onChange={handleEditChange} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
                           <option value="">Select Region...</option>
                           {regions.map(r => <option key={r.code} value={r.name}>{r.name}</option>)}
@@ -1587,7 +1587,6 @@ function DetailItem({ label, value, required }: { label: string, value: any, req
     <div className="group">
       <p className="text-xs font-bold text-slate-500 mb-1.5 flex items-center gap-1 group-hover:text-[#630C22] transition-colors">
         {label}
-        {required && <span className="text-rose-500 text-[10px] bg-rose-50 px-1 rounded ml-1">REQUIRED</span>}
       </p>
       <p className={`font-medium text-base ${isEmpty ? 'text-slate-300 italic' : 'text-slate-800'}`}>
         {isEmpty ? 'Not Provided' : value}
