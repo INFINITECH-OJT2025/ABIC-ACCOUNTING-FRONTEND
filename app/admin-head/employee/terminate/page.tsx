@@ -56,6 +56,7 @@ interface TerminationRecord {
   id: number
   employee_id: number
   termination_date: string
+  rehired_at?: string | null
   reason: string
   notes: string
   status: string
@@ -81,7 +82,7 @@ export default function TerminatePage() {
   const [showDetailDialog, setShowDetailDialog] = useState(false)
   const [rehireLoading, setRehireLoading] = useState<number | null>(null)
   const [formData, setFormData] = useState<TerminationFormData>({
-    termination_date: new Date().toISOString().split('T')[0],
+    termination_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
     reason: '',
     notes: '',
   })
@@ -91,14 +92,19 @@ export default function TerminatePage() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
   const [sortOrder, setSortOrder] = useState<'recent' | 'oldest' | 'az' | 'za'>('recent')
+  const [activeTab, setActiveTab] = useState<'all' | 'terminated' | 'rehired'>('all')
 
   const filteredTerminations = terminations
     .filter((record) => {
+      // Tab filter
+      if (activeTab === 'terminated' && record.rehired_at) return false
+      if (activeTab === 'rehired' && !record.rehired_at) return false
+      // Search filter
       const q = searchQuery.toLowerCase().trim()
       if (!q) return true
       const fullName = `${record.employee?.last_name ?? ''}, ${record.employee?.first_name ?? ''}`.toLowerCase()
       const reason = (record.reason ?? '').toLowerCase()
-      const date = record.termination_date ? new Date(record.termination_date).toLocaleDateString() : ''
+      const date = record.termination_date ? new Date(record.termination_date).toLocaleString() : ''
       return fullName.includes(q) || reason.includes(q) || date.includes(q)
     })
     .sort((a, b) => {
@@ -115,6 +121,9 @@ export default function TerminatePage() {
           return 0
       }
     })
+
+  const terminatedCount = terminations.filter(r => !r.rehired_at).length
+  const rehiredCount = terminations.filter(r => !!r.rehired_at).length
 
   // Modal State
   const [confirmModal, setConfirmModal] = useState<{
@@ -231,7 +240,7 @@ export default function TerminatePage() {
             toast.success(data.message || 'Employee terminated successfully')
             setSelectedEmployeeId('')
             setFormData({
-              termination_date: new Date().toISOString().split('T')[0],
+              termination_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
               reason: '',
               notes: '',
             })
@@ -355,9 +364,30 @@ export default function TerminatePage() {
             <div className="flex flex-wrap items-center gap-4 lg:gap-8">
               {/* Status Count Tabs */}
               <div className="flex items-center bg-white/10 p-1 rounded-lg backdrop-blur-md border border-white/10">
-                <div className="px-4 py-1.5 rounded-md text-xs font-bold text-white bg-white/20 uppercase tracking-wider">
+                <button
+                  onClick={() => { setActiveTab('all'); setCurrentPage(1) }}
+                  className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-200 uppercase tracking-wider ${
+                    activeTab === 'all' ? 'bg-white text-[#A4163A] shadow-md' : 'text-white/70 hover:text-white hover:bg-white/5'
+                  }`}
+                >
                   All ({terminations.length})
-                </div>
+                </button>
+                <button
+                  onClick={() => { setActiveTab('terminated'); setCurrentPage(1) }}
+                  className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-200 uppercase tracking-wider ${
+                    activeTab === 'terminated' ? 'bg-white text-[#A4163A] shadow-md' : 'text-white/70 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  Terminated ({terminatedCount})
+                </button>
+                <button
+                  onClick={() => { setActiveTab('rehired'); setCurrentPage(1) }}
+                  className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-200 uppercase tracking-wider ${
+                    activeTab === 'rehired' ? 'bg-white text-[#A4163A] shadow-md' : 'text-white/70 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  Rehired ({rehiredCount})
+                </button>
               </div>
 
               {/* Search and Sort */}
@@ -479,13 +509,14 @@ export default function TerminatePage() {
             <div className="w-px h-8 bg-slate-200 shrink-0" />
 
             {/* Termination Date */}
-            <div className="px-3 shrink-0">
-              <input
-                type="date"
+            <div className="flex flex-col gap-1 pr-3 shrink-0">
+              <Label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest pl-3">Termination Date & Time</Label>
+              <Input
+                type="datetime-local"
                 name="termination_date"
                 value={formData.termination_date}
                 onChange={handleInputChange}
-                className="h-10 px-3 bg-transparent border-0 focus:outline-none focus:ring-0 text-slate-600 font-medium text-sm w-[150px]"
+                className="h-9 px-3 bg-transparent border-0 focus:outline-none focus:ring-0 text-slate-600 font-medium text-sm w-[200px]"
                 disabled={submitting}
               />
             </div>
@@ -588,7 +619,10 @@ export default function TerminatePage() {
                       <TableHeader className="bg-slate-50">
                         <TableRow className="border-b border-slate-100">
                           <TableHead className="py-4 pl-8 text-xs font-bold text-slate-500 uppercase tracking-wider">Employee</TableHead>
-                          <TableHead className="py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Date</TableHead>
+                          <TableHead className="py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Termination Date</TableHead>
+                          {activeTab !== 'terminated' && (
+                            <TableHead className="py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Rehire Date</TableHead>
+                          )}
                           <TableHead className="py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Reason</TableHead>
                           <TableHead className="py-4 pr-8 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Action</TableHead>
                         </TableRow>
@@ -605,8 +639,25 @@ export default function TerminatePage() {
                               </div>
                             </TableCell>
                             <TableCell className="text-slate-600 text-sm font-medium">
-                              {record.termination_date ? new Date(record.termination_date).toLocaleDateString() : 'N/A'}
+                              {record.termination_date ? (
+                                <div className="flex flex-col">
+                                  <span className="font-semibold text-rose-700">{new Date(record.termination_date).toLocaleDateString()}</span>
+                                  <span className="text-xs text-slate-400 mt-0.5">{new Date(record.termination_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                </div>
+                              ) : 'N/A'}
                             </TableCell>
+                            {activeTab !== 'terminated' && (
+                              <TableCell className="text-slate-600 text-sm font-medium">
+                                {record.rehired_at ? (
+                                  <div className="flex flex-col">
+                                    <span className="font-semibold text-emerald-700">{new Date(record.rehired_at).toLocaleDateString()}</span>
+                                    <span className="text-xs text-slate-400 mt-0.5">{new Date(record.rehired_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-300 italic text-xs">—</span>
+                                )}
+                              </TableCell>
+                            )}
                             <TableCell className="max-w-[300px] truncate text-slate-500 text-sm italic">
                               &quot;{record.reason}&quot;
                             </TableCell>
@@ -705,16 +756,36 @@ export default function TerminatePage() {
 
           <div className="p-8 space-y-8">
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 font-sans">
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Position</p>
                 <p className="font-semibold text-slate-800">{selectedTermination?.employee?.position || 'N/A'}</p>
               </div>
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Date</p>
-                <p className="font-semibold text-slate-800">
-                  {selectedTermination?.termination_date ? new Date(selectedTermination.termination_date).toLocaleDateString() : 'N/A'}
-                </p>
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 font-sans">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Termination Date</p>
+                <div className="flex flex-col">
+                  <p className="font-semibold text-rose-700">
+                    {selectedTermination?.termination_date ? new Date(selectedTermination.termination_date).toLocaleDateString() : 'N/A'}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-0.5 font-medium">
+                    {selectedTermination?.termination_date ? new Date(selectedTermination.termination_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                  </p>
+                </div>
               </div>
+              {selectedTermination?.rehired_at && (
+                <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 font-sans col-span-2">
+                  <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1 flex items-center gap-2">
+                    <History className="w-3 h-3" /> Re-hire Date
+                  </p>
+                  <div className="flex flex-col">
+                    <p className="font-semibold text-emerald-700">
+                      {new Date(selectedTermination.rehired_at).toLocaleDateString()}
+                    </p>
+                    <p className="text-xs text-emerald-500/70 mt-0.5 font-medium italic">
+                      Restored at {new Date(selectedTermination.rehired_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>

@@ -36,7 +36,7 @@ class EmployeeController extends Controller
     public function checkEmail(Request $request)
     {
         $email = $request->query('email');
-        
+
         if (!$email) {
             return response()->json([
                 'success' => false,
@@ -329,10 +329,15 @@ class EmployeeController extends Controller
             // Update employee status back to employed
             $employee->update(['status' => 'employed']);
 
-            // Update the termination records for this employee to 'cancelled'
+            // Update the termination records for this employee to 'cancelled' and set rehired_at
             Termination::where('employee_id', $employee->id)
                 ->where('status', 'completed')
-                ->update(['status' => 'cancelled']);
+                ->latest()
+                ->first()
+                    ?->update([
+                    'status' => 'cancelled',
+                    'rehired_at' => now()
+                ]);
 
             // Log activity
             $this->activityLogService->logEmployeeRehired($employee, null, $request);
