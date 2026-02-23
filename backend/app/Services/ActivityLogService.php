@@ -140,6 +140,29 @@ class ActivityLogService
     }
 
     /**
+     * Log employee resignation
+     */
+    public function logEmployeeResigned($employee, $resigned, $performedBy = null, ?Request $request = null)
+    {
+        return $this->log([
+            'activity_type' => 'employee',
+            'action' => 'resigned',
+            'status' => 'error',
+            'title' => 'Employee Resignation',
+            'description' => "{$employee->first_name} {$employee->last_name} has resigned",
+            'user_id' => $performedBy?->id,
+            'user_name' => $performedBy ? "{$performedBy->first_name} {$performedBy->last_name}" : 'Admin',
+            'user_email' => $performedBy?->email ?? 'admin@abic.com',
+            'target_id' => $employee->id,
+            'target_type' => 'Employee',
+            'metadata' => [
+                'resignation_date' => $resigned->resignation_date,
+                'reason' => $resigned->reason,
+            ],
+        ], $request);
+    }
+
+    /**
      * Log employee re-hire
      */
     public function logEmployeeRehired($employee, $performedBy = null, ?Request $request = null)

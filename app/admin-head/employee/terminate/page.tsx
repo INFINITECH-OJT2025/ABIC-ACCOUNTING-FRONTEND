@@ -60,6 +60,7 @@ interface TerminationRecord {
   reason: string
   notes: string
   status: string
+  exit_type?: string
   employee: Employee
   created_at?: string
 }
@@ -74,6 +75,7 @@ interface TerminationFormData {
 export default function TerminatePage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [terminations, setTerminations] = useState<TerminationRecord[]>([])
+  const [resigned, setResigned] = useState<TerminationRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
@@ -92,11 +94,13 @@ export default function TerminatePage() {
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  const [currentResignedPage, setCurrentResignedPage] = useState(1)
   const itemsPerPage = 10
   const [sortOrder, setSortOrder] = useState<'recent' | 'oldest' | 'az' | 'za'>('recent')
   const [activeTab, setActiveTab] = useState<'all' | 'terminated' | 'rehired'>('all')
+  const [exitActionType, setExitActionType] = useState<'terminate' | 'resigned'>('terminate')
 
-  const filteredTerminations = terminations
+  const applyRecordFilters = (records: TerminationRecord[]) => records
     .filter((record) => {
       // Tab filter
       if (activeTab === 'terminated' && record.rehired_at) return false
@@ -123,6 +127,10 @@ export default function TerminatePage() {
           return 0
       }
     })
+
+  const filteredTerminations = applyRecordFilters(terminations)
+  const filteredResigned = applyRecordFilters(resigned)
+  const selectedRecordIsResigned = selectedTermination?.exit_type === 'resigned'
 
   const terminatedCount = terminations.filter(r => !r.rehired_at).length
   const rehiredCount = terminations.filter(r => !!r.rehired_at).length
@@ -152,18 +160,20 @@ export default function TerminatePage() {
     setFetchError(null)
     setLoading(true)
     try {
-      const [empRes, termRes] = await Promise.all([
+      const [empRes, termRes, resignedRes] = await Promise.all([
         fetch(`${getApiUrl()}/api/employees`),
-        fetch(`${getApiUrl()}/api/terminations`)
+        fetch(`${getApiUrl()}/api/terminations`),
+        fetch(`${getApiUrl()}/api/resigned`)
       ])
 
       const empData = await empRes.json()
       const termData = await termRes.json()
+      const resignedData = await resignedRes.json()
 
       if (empData.success && Array.isArray(empData.data)) {
-        // Active employees (not terminated)
+        // Only show currently employed employees in dropdown
         const active = empData.data.filter(
-          (emp: Employee) => emp.status !== 'terminated'
+          (emp: Employee) => String(emp.status).toLowerCase() === 'employed'
         ).sort((a: Employee, b: Employee) => a.last_name.localeCompare(b.last_name))
         setEmployees(active)
       }
@@ -172,6 +182,17 @@ export default function TerminatePage() {
         setTerminations(termData.data)
       } else {
         toast.error('Failed to load termination history')
+      }
+
+      if (resignedData.success && Array.isArray(resignedData.data)) {
+        const normalizedResigned = resignedData.data.map((record: any) => ({
+          ...record,
+          termination_date: record.resignation_date,
+          exit_type: 'resigned',
+        }))
+        setResigned(normalizedResigned)
+      } else {
+        toast.error('Failed to load resigned history')
       }
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -213,10 +234,12 @@ export default function TerminatePage() {
 
     setConfirmModal({
       isOpen: true,
-      title: 'Confirm Termination',
-      description: 'Are you sure you want to proceed with this termination? This action can be reversed via re-hire.',
+      title: exitActionType === 'resigned' ? 'Confirm Resignation' : 'Confirm Termination',
+      description: exitActionType === 'resigned'
+        ? 'Are you sure you want to process this employee as resigned? This action can be reversed via re-hire.'
+        : 'Are you sure you want to proceed with this termination? This action can be reversed via re-hire.',
       variant: 'destructive',
-      confirmText: 'Yes, Terminate',
+      confirmText: exitActionType === 'resigned' ? 'Yes, Mark as Resigned' : 'Yes, Terminate',
       onConfirm: async () => {
         try {
           setSubmitting(true)
@@ -231,7 +254,8 @@ export default function TerminatePage() {
                 termination_date: formData.termination_date,
                 reason: formData.reason,
                 notes: formData.notes,
-                status: 'completed',
+                status: exitActionType === 'resigned' ? 'resigned' : 'completed',
+                exit_type: exitActionType,
               }),
             }
           )
@@ -239,7 +263,12 @@ export default function TerminatePage() {
           const data = await response.json()
 
           if (data.success) {
-            toast.success(data.message || 'Employee terminated successfully')
+            toast.success(
+              data.message ||
+              (exitActionType === 'resigned'
+                ? 'Employee marked as resigned successfully'
+                : 'Employee terminated successfully')
+            )
             setSelectedEmployeeId('')
             setFormData({
               termination_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
@@ -254,7 +283,12 @@ export default function TerminatePage() {
               const errorMessages = Object.values(data.errors).flat().join(' ')
               toast.error(errorMessages || data.message)
             } else {
-              toast.error(data.message || 'Failed to terminate employee')
+              toast.error(
+                data.message ||
+                (exitActionType === 'resigned'
+                  ? 'Failed to mark employee as resigned'
+                  : 'Failed to terminate employee')
+              )
             }
           }
         } catch (error) {
@@ -345,27 +379,44 @@ export default function TerminatePage() {
         <div className="w-full px-4 md:px-8 py-6">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold mb-1">Terminate Employee</h1>
+              <h1 className="text-2xl md:text-3xl font-bold mb-1">Terminate / Resign Employee</h1>
               <p className="text-white/80 text-sm flex items-center gap-2">
                 <Users className="w-4 h-4" />
-                Process employee termination and manage records
+                Process employee exit and manage records
               </p>
             </div>
-            <Button
-              onClick={() => setIsRequestFormOpen(!isRequestFormOpen)}
-              className={cn(
-                "font-bold px-5 py-2.5 rounded-lg transition-all duration-300 shadow-lg flex items-center gap-2 h-auto border text-sm uppercase tracking-wider",
-                isRequestFormOpen
-                  ? "bg-white text-[#A4163A] hover:bg-rose-50 border-white"
-                  : "bg-white/10 text-white hover:bg-white/20 border-white/20 backdrop-blur-sm"
-              )}
-            >
-              {isRequestFormOpen ? (
-                <><X className="h-4 w-4" /><span>Close</span></>
-              ) : (
-                <><Users className="h-4 w-4" /><span>Terminate Employee</span></>
-              )}
-            </Button>
+            {isRequestFormOpen ? (
+              <Button
+                onClick={() => setIsRequestFormOpen(false)}
+                className="font-bold px-5 py-2.5 rounded-lg transition-all duration-300 shadow-lg flex items-center gap-2 h-auto border text-sm uppercase tracking-wider bg-white text-[#A4163A] hover:bg-rose-50 border-white"
+              >
+                <X className="h-4 w-4" />
+                <span>Close</span>
+              </Button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => {
+                    setExitActionType('terminate')
+                    setIsRequestFormOpen(true)
+                  }}
+                  className="font-bold px-5 py-2.5 rounded-lg transition-all duration-300 shadow-lg flex items-center gap-2 h-auto border text-sm uppercase tracking-wider bg-white/10 text-white hover:bg-white/20 border-white/20 backdrop-blur-sm"
+                >
+                  <Users className="h-4 w-4" />
+                  <span>Terminate Employee</span>
+                </Button>
+                <Button
+                  onClick={() => {
+                    setExitActionType('resigned')
+                    setIsRequestFormOpen(true)
+                  }}
+                  className="font-bold px-5 py-2.5 rounded-lg transition-all duration-300 shadow-lg flex items-center gap-2 h-auto border text-sm uppercase tracking-wider bg-white text-[#A4163A] hover:bg-rose-50 border-white"
+                >
+                  <Users className="h-4 w-4" />
+                  <span>Resigned Employee</span>
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -376,7 +427,7 @@ export default function TerminatePage() {
               {/* Status Count Tabs */}
               <div className="flex items-center bg-white/10 p-1 rounded-lg backdrop-blur-md border border-white/10">
                 <button
-                  onClick={() => { setActiveTab('all'); setCurrentPage(1) }}
+                  onClick={() => { setActiveTab('all'); setCurrentPage(1); setCurrentResignedPage(1) }}
                   className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-200 uppercase tracking-wider ${
                     activeTab === 'all' ? 'bg-white text-[#A4163A] shadow-md' : 'text-white/70 hover:text-white hover:bg-white/5'
                   }`}
@@ -384,7 +435,7 @@ export default function TerminatePage() {
                   All ({terminations.length})
                 </button>
                 <button
-                  onClick={() => { setActiveTab('terminated'); setCurrentPage(1) }}
+                  onClick={() => { setActiveTab('terminated'); setCurrentPage(1); setCurrentResignedPage(1) }}
                   className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-200 uppercase tracking-wider ${
                     activeTab === 'terminated' ? 'bg-white text-[#A4163A] shadow-md' : 'text-white/70 hover:text-white hover:bg-white/5'
                   }`}
@@ -392,7 +443,7 @@ export default function TerminatePage() {
                   Terminated ({terminatedCount})
                 </button>
                 <button
-                  onClick={() => { setActiveTab('rehired'); setCurrentPage(1) }}
+                  onClick={() => { setActiveTab('rehired'); setCurrentPage(1); setCurrentResignedPage(1) }}
                   className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-200 uppercase tracking-wider ${
                     activeTab === 'rehired' ? 'bg-white text-[#A4163A] shadow-md' : 'text-white/70 hover:text-white hover:bg-white/5'
                   }`}
@@ -408,12 +459,12 @@ export default function TerminatePage() {
                   <Input
                     placeholder="Search employee..."
                     value={searchQuery}
-                    onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1) }}
+                    onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); setCurrentResignedPage(1) }}
                     className="bg-white border-2 border-[#FFE5EC] text-slate-700 placeholder:text-slate-400 pl-10 h-9 w-full focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A] shadow-sm rounded-lg transition-all"
                   />
                 </div>
 
-                <Select value={sortOrder} onValueChange={(value: any) => { setSortOrder(value); setCurrentPage(1) }}>
+                <Select value={sortOrder} onValueChange={(value: any) => { setSortOrder(value); setCurrentPage(1); setCurrentResignedPage(1) }}>
                   <SelectTrigger className="w-full sm:w-[180px] bg-white border-2 border-[#FFE5EC] h-9 rounded-lg shadow-sm focus:ring-[#A0153E] text-[#800020] font-bold">
                     <div className="flex items-center gap-2 text-xs uppercase tracking-wider">
                       <ArrowUpDown className="h-3.5 w-3.5 opacity-50" />
@@ -453,7 +504,7 @@ export default function TerminatePage() {
             <div className="flex items-center gap-2 px-4 shrink-0">
               <Users className="h-4 w-4 text-[#A4163A]" />
               <span className="text-xs font-bold text-[#A4163A] uppercase tracking-widest whitespace-nowrap">
-                TERMINATE
+                {exitActionType === 'resigned' ? 'RESIGNED' : 'TERMINATE'}
               </span>
             </div>
 
@@ -541,7 +592,7 @@ export default function TerminatePage() {
                 name="reason"
                 value={formData.reason}
                 onChange={(e) => setFormData(prev => ({ ...prev, reason: e.target.value }))}
-                placeholder="Reason for termination..."
+                placeholder={exitActionType === 'resigned' ? 'Reason for resignation...' : 'Reason for termination...'}
                 className="w-full h-10 bg-transparent border-0 focus:outline-none focus:ring-0 text-sm text-slate-700 placeholder:text-slate-400"
                 disabled={submitting}
               />
@@ -561,7 +612,7 @@ export default function TerminatePage() {
                     : "bg-gradient-to-r from-[#800020] to-[#A0153E] text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5"
                 )}
               >
-                {submitting ? "Processing..." : "Proceed"}
+                {submitting ? "Processing..." : (exitActionType === 'resigned' ? 'Proceed Resignation' : 'Proceed Termination')}
               </Button>
               <Button
                 variant="ghost"
@@ -755,6 +806,171 @@ export default function TerminatePage() {
             </>
           )}
         </div>
+
+        <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+          {fetchError ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center text-slate-400">
+              <p>Unable to load resigned history.</p>
+            </div>
+          ) : loading ? (
+            <div className="p-8 md:p-10 space-y-4 animate-pulse">
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : (
+            <>
+              <div className="bg-slate-50 border-b border-slate-100 px-6 py-4 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-[#4A081A]">Resigned History</h2>
+                  <p className="text-slate-400 text-xs mt-0.5">
+                    {filteredResigned.length} of {resigned.length} records
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-0 bg-white overflow-hidden">
+                {resigned.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-24 text-slate-400">
+                    <FileText className="h-20 w-20 mb-4 opacity-10" />
+                    <p className="text-lg">No resigned records found.</p>
+                  </div>
+                ) : filteredResigned.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                    <Search className="h-14 w-14 mb-4 opacity-10" />
+                    <p className="text-base font-medium">No results for &quot;{searchQuery}&quot;</p>
+                    <p className="text-sm mt-1">Try a different name or reason.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader className="bg-slate-50">
+                        <TableRow className="border-b border-slate-100">
+                          <TableHead className="py-4 pl-8 text-xs font-bold text-slate-500 uppercase tracking-wider">Employee</TableHead>
+                          <TableHead className="py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Resignation Date</TableHead>
+                          {activeTab !== 'terminated' && (
+                            <TableHead className="py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Rehire Date</TableHead>
+                          )}
+                          <TableHead className="py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Reason</TableHead>
+                          <TableHead className="py-4 pr-8 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredResigned
+                          .slice((currentResignedPage - 1) * itemsPerPage, currentResignedPage * itemsPerPage)
+                          .map((record) => (
+                            <TableRow key={`resigned-${record.id}`} className="hover:bg-slate-50/80 transition-colors border-b border-slate-50">
+                              <TableCell className="py-4 pl-8 font-medium text-slate-900">
+                                <div className="flex flex-col">
+                                  <span className="text-base">{record.employee?.last_name}, {record.employee?.first_name}</span>
+                                  <span className="text-xs text-slate-500 font-normal mt-0.5">{record.employee?.position}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-slate-600 text-sm font-medium">
+                                {record.termination_date ? (
+                                  <div className="flex flex-col">
+                                    <span className="font-semibold text-rose-700">{new Date(record.termination_date).toLocaleDateString()}</span>
+                                    <span className="text-xs text-slate-400 mt-0.5">{new Date(record.termination_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                  </div>
+                                ) : 'N/A'}
+                              </TableCell>
+                              {activeTab !== 'terminated' && (
+                                <TableCell className="text-slate-600 text-sm font-medium">
+                                  {record.rehired_at ? (
+                                    <div className="flex flex-col">
+                                      <span className="font-semibold text-emerald-700">{new Date(record.rehired_at).toLocaleDateString()}</span>
+                                      <span className="text-xs text-slate-400 mt-0.5">{new Date(record.rehired_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-300 italic text-xs">â€”</span>
+                                  )}
+                                </TableCell>
+                              )}
+                              <TableCell className="max-w-[300px] truncate text-slate-500 text-sm italic">
+                                &quot;{record.reason}&quot;
+                              </TableCell>
+                              <TableCell className="py-4 pr-8 text-right">
+                                <div className="flex items-center justify-end gap-3">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-[#800020] font-bold hover:text-[#A0153E] hover:bg-rose-50 rounded-lg px-4"
+                                    onClick={() => {
+                                      setSelectedTermination(record)
+                                      setShowDetailDialog(true)
+                                    }}
+                                  >
+                                    Review
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-9 border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300 transition-all font-bold px-4 rounded-lg shadow-sm"
+                                    onClick={() => {
+                                      setSelectedTermination(record)
+                                      setFormData((prev) => ({
+                                        ...prev,
+                                        rehire_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
+                                      }))
+                                      setShowDetailDialog(true)
+                                    }}
+                                    disabled={rehireLoading === record.employee_id}
+                                  >
+                                    {rehireLoading === record.employee_id ? 'Wait...' : 'Re-hire'}
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                    {filteredResigned.length > itemsPerPage && (
+                      <div className="px-8 py-3 border-t border-slate-50 flex items-center justify-between bg-slate-50/30">
+                        <div className="text-xs text-slate-500 font-medium">
+                          Showing {(currentResignedPage - 1) * itemsPerPage + 1} to {Math.min(currentResignedPage * itemsPerPage, filteredResigned.length)} of {filteredResigned.length}
+                        </div>
+                        <div className="flex gap-1.5 items-center">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentResignedPage(prev => Math.max(prev - 1, 1))}
+                            disabled={currentResignedPage === 1}
+                            className="h-8 px-3 text-xs font-bold border-slate-200 text-slate-600 hover:bg-white disabled:opacity-40"
+                          >
+                            Previous
+                          </Button>
+                          {Array.from({ length: Math.ceil(filteredResigned.length / itemsPerPage) }, (_, i) => i + 1).map((page) => (
+                            <button
+                              key={`resigned-page-${page}`}
+                              onClick={() => setCurrentResignedPage(page)}
+                              className={cn(
+                                "w-8 h-8 rounded-lg text-xs font-bold transition-all",
+                                currentResignedPage === page
+                                  ? "bg-[#800020] text-white shadow-md scale-105"
+                                  : "text-slate-500 hover:bg-slate-100"
+                              )}
+                            >
+                              {page}
+                            </button>
+                          ))}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentResignedPage(prev => Math.min(prev + 1, Math.ceil(filteredResigned.length / itemsPerPage)))}
+                            disabled={currentResignedPage === Math.ceil(filteredResigned.length / itemsPerPage)}
+                            className="h-8 px-3 text-xs font-bold border-slate-200 text-slate-600 hover:bg-white disabled:opacity-40"
+                          >
+                            Next
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Termination Detail View Modal */}
@@ -766,7 +982,7 @@ export default function TerminatePage() {
       >
         <DialogContent className="sm:max-w-2xl border-0 shadow-2xl p-0 overflow-hidden">
           <DialogHeader className="bg-gradient-to-r from-[#800020] to-[#630C22] p-8 text-white">
-            <DialogTitle className="text-2xl font-bold">Termination Details</DialogTitle>
+            <DialogTitle className="text-2xl font-bold">{selectedRecordIsResigned ? 'Resignation Details' : 'Termination Details'}</DialogTitle>
             <DialogDescription className="text-rose-100/90 mt-1">
               For {selectedTermination?.employee?.first_name} {selectedTermination?.employee?.last_name}
             </DialogDescription>
@@ -779,7 +995,7 @@ export default function TerminatePage() {
                 <p className="font-semibold text-slate-800">{selectedTermination?.employee?.position || 'N/A'}</p>
               </div>
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 font-sans">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Termination Date</p>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{selectedRecordIsResigned ? 'Resignation Date' : 'Termination Date'}</p>
                 <div className="flex flex-col">
                   <p className="font-semibold text-rose-700">
                     {selectedTermination?.termination_date ? new Date(selectedTermination.termination_date).toLocaleDateString() : 'N/A'}
@@ -808,7 +1024,7 @@ export default function TerminatePage() {
 
             <div>
               <p className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-rose-50" /> Reason for Termination
+                <FileText className="w-4 h-4 text-rose-50" /> {selectedRecordIsResigned ? 'Reason for Resignation' : 'Reason for Termination'}
               </p>
               <div className="bg-white border border-slate-200 rounded-xl p-6 text-slate-600 leading-relaxed shadow-sm italic">
                 "{selectedTermination?.reason || 'No specific reason recorded.'}"

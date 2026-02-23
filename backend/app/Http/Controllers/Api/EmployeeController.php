@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
+use App\Models\Resigned;
 use App\Models\Termination;
 use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
@@ -177,7 +178,7 @@ class EmployeeController extends Controller
                 'perm_zip_code' => 'sometimes|nullable|string|max:255',
                 'email_address' => 'sometimes|nullable|string|max:255',
                 'password' => 'sometimes|nullable|string|min:6',
-                'status' => 'sometimes|in:pending,employed,terminated',
+                'status' => 'sometimes|in:pending,employed,terminated,resigned',
             ]);
 
             if (isset($validated['password'])) {
@@ -278,7 +279,8 @@ class EmployeeController extends Controller
                 'termination_date' => 'required|date',
                 'reason' => 'required|string|min:10|max:1000',
                 'notes' => 'sometimes|nullable|string|max:1000',
-                'status' => 'sometimes|in:pending,completed,cancelled',
+                'status' => 'sometimes|in:pending,completed,cancelled,resigned',
+                'exit_type' => 'sometimes|in:terminate,resigned',
             ]);
 
             $employee = Employee::find($id);
@@ -288,6 +290,28 @@ class EmployeeController extends Controller
                     'success' => false,
                     'message' => 'Employee not found'
                 ], 404);
+            }
+
+            $exitType = $validated['exit_type'] ?? 'terminate';
+
+            if ($exitType === 'resigned') {
+                $resigned = Resigned::create([
+                    'employee_id' => $employee->id,
+                    'resignation_date' => $validated['termination_date'],
+                    'reason' => $validated['reason'],
+                    'notes' => $validated['notes'] ?? null,
+                    'status' => 'completed',
+                ]);
+
+                // Keep employee as non-active using existing status semantics.
+                $employee->update(['status' => 'terminated']);
+                $this->activityLogService->logEmployeeResigned($employee, $resigned, null, $request);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Employee resigned successfully',
+                    'data' => $resigned
+                ]);
             }
 
             // Create termination record
@@ -341,6 +365,27 @@ class EmployeeController extends Controller
     }
 
     /**
+     * Get all resigned records
+     */
+    public function getResigned()
+    {
+        try {
+            $resigned = Resigned::with('employee')->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $resigned
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch resigned records',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Re-hire / Restore terminated employee
      */
     public function rehire(Request $request, $id)
@@ -355,10 +400,10 @@ class EmployeeController extends Controller
                 ], 404);
             }
 
-            if ($employee->status !== 'terminated') {
+            if (!in_array($employee->status, ['terminated', 'resigned'], true)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Employee is not terminated'
+                    'message' => 'Employee is not terminated or resigned'
                 ], 400);
             }
 
@@ -387,6 +432,15 @@ class EmployeeController extends Controller
 
             // Update the termination records for this employee to 'cancelled' and set rehired_at
             Termination::where('employee_id', $employee->id)
+                ->where('status', 'completed')
+                ->latest()
+                ->first()
+                    ?->update([
+                    'status' => 'cancelled',
+                    'rehired_at' => $rehiredAt
+                ]);
+
+            Resigned::where('employee_id', $employee->id)
                 ->where('status', 'completed')
                 ->latest()
                 ->first()
