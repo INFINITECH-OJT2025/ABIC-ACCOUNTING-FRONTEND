@@ -38,6 +38,17 @@ import { toast } from 'sonner'
 import { ConfirmationModal } from '@/components/ConfirmationModal'
 import { Skeleton } from '@/components/ui/skeleton'
 
+// PH Address Data
+import regionsDataRaw from '@/ph-json/region.json'
+import provincesDataRaw from '@/ph-json/province.json'
+import citiesDataRaw from '@/ph-json/city.json'
+import barangaysDataRaw from '@/ph-json/barangay.json'
+
+const regionsData = regionsDataRaw as any[]
+const provincesData = provincesDataRaw as any[]
+const citiesData = citiesDataRaw as any[]
+const barangaysData = barangaysDataRaw as any[]
+
 interface EmployeeDetails {
   [key: string]: any
 }
@@ -491,13 +502,14 @@ function OnboardPageContent() {
   const fetchRegions = async () => {
     setLoadingRegions(true)
     try {
-      const response = await fetch('https://psgc.gitlab.io/api/regions/')
-      if (!response.ok) throw new Error(`API error: ${response.status}`)
-      const data = await response.json()
-      const regionsArray = Array.isArray(data) ? data : data.data || []
-      setRegions(regionsArray.map((region: any) => ({ code: region.code, name: region.name })))
+      // Using local JSON data instead of external API
+      const regionsArray = regionsData.map((region: any) => ({
+        code: region.region_code,
+        name: region.region_name
+      }))
+      setRegions(regionsArray)
     } catch (error) {
-      console.error('Error fetching regions:', error)
+      console.error('Error loading regions:', error)
       setRegions([])
     } finally {
       setLoadingRegions(false)
@@ -513,10 +525,16 @@ function OnboardPageContent() {
     }
     setLoadingProvinces(true)
     try {
-      const response = await fetch(`https://psgc.gitlab.io/api/regions/${regionCode}/provinces/`)
-      const data = await response.json()
-      const provincesArray = Array.isArray(data) ? data : data.data || []
-      setProvinces(provincesArray.map((province: any) => ({ code: province.code, name: province.name })))
+      // Using local JSON data: filter provinces by region_code
+      const filteredProvinces = provincesData
+        .filter((prov: any) => prov.region_code === regionCode)
+        .map((prov: any) => ({
+          code: prov.province_code,
+          name: prov.province_name
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name))
+
+      setProvinces(filteredProvinces)
       setCities([])
       setBarangays([])
       if (!preserveValues) {
@@ -527,7 +545,7 @@ function OnboardPageContent() {
         }
       }
     } catch (error) {
-      console.error('Error fetching provinces:', error)
+      console.error('Error filtering provinces:', error)
       setProvinces([])
     } finally {
       setLoadingProvinces(false)
@@ -542,17 +560,16 @@ function OnboardPageContent() {
     }
     setLoadingCities(true)
     try {
-      const citiesResponse = await fetch(`https://psgc.gitlab.io/api/provinces/${provinceCode}/cities/`)
-      const municipalitiesResponse = await fetch(`https://psgc.gitlab.io/api/provinces/${provinceCode}/municipalities/`)
-      const citiesData = citiesResponse.ok ? await citiesResponse.json() : []
-      const municipalitiesData = municipalitiesResponse.ok ? await municipalitiesResponse.json() : []
-      const citiesArray = Array.isArray(citiesData) ? citiesData : citiesData.data || []
-      const municipalitiesArray = Array.isArray(municipalitiesData) ? municipalitiesData : municipalitiesData.data || []
-      const allCities = [...citiesArray, ...municipalitiesArray].map((city: any) => ({
-        code: city.code,
-        name: city.name,
-      }))
-      setCities(allCities)
+      // Using local JSON data: filter cities by province_code
+      const filteredCities = citiesData
+        .filter((city: any) => city.province_code === provinceCode)
+        .map((city: any) => ({
+          code: city.city_code,
+          name: city.city_name
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name))
+
+      setCities(filteredCities)
       setBarangays([])
       if (!preserveValues) {
         if (isPermanent) {
@@ -562,7 +579,7 @@ function OnboardPageContent() {
         }
       }
     } catch (error) {
-      console.error('Error fetching cities:', error)
+      console.error('Error filtering cities:', error)
       setCities([])
     } finally {
       setLoadingCities(false)
@@ -576,10 +593,16 @@ function OnboardPageContent() {
     }
     setLoadingBarangays(true)
     try {
-      const response = await fetch(`https://psgc.gitlab.io/api/cities/${cityCode}/barangays/`)
-      const data = await response.json()
-      const barangaysArray = Array.isArray(data) ? data : data.data || []
-      setBarangays(barangaysArray.map((barangay: any) => ({ code: barangay.code, name: barangay.name })))
+      // Using local JSON data: filter barangays by city_code
+      const filteredBarangays = barangaysData
+        .filter((brgy: any) => brgy.city_code === cityCode)
+        .map((brgy: any) => ({
+          code: brgy.brgy_code,
+          name: brgy.brgy_name
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name))
+
+      setBarangays(filteredBarangays)
       if (!preserveValues) {
         if (isPermanent) {
           setProgressionFormData((prev) => ({ ...prev, perm_barangay: '' }))
@@ -588,7 +611,7 @@ function OnboardPageContent() {
         }
       }
     } catch (error) {
-      console.error('Error fetching barangays:', error)
+      console.error('Error filtering barangays:', error)
       setBarangays([])
     } finally {
       setLoadingBarangays(false)
