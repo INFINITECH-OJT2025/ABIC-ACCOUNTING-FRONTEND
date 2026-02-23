@@ -1007,6 +1007,23 @@ function OnboardPageContent() {
     }
   }
 
+  const confirmSaveProgress = (type: 'checklist' | 'partial') => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Save Progress',
+      description: 'Are you sure you want to save your current progress and return to the masterfile?',
+      variant: 'default',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
+        if (type === 'checklist') {
+          await handleSaveChecklist(true)
+        } else {
+          await handlePartialSave()
+        }
+      }
+    })
+  }
+
   const handleCancelOnboarding = () => {
     clearStorage()
     router.push('/admin-head/employee/masterfile')
@@ -1309,7 +1326,7 @@ function OnboardPageContent() {
                       {isSaving ? 'SAVING...' : 'PROCEED TO DATA ENTRY'}
                     </Button>
                     <Button 
-                      onClick={() => handleSaveChecklist(true)} 
+                      onClick={() => confirmSaveProgress('checklist')} 
                       disabled={isSaving}
                       className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-[#A4163A] hover:bg-[#800020] text-white shadow-lg active:scale-95 transition-all rounded-xl"
                     >
@@ -1627,7 +1644,7 @@ function OnboardPageContent() {
                       {currentBatch === 6 ? (
                         <div className="flex gap-3">
                           <Button 
-                            onClick={handlePartialSave}
+                            onClick={() => confirmSaveProgress('partial')}
                             disabled={isSaving}
                             variant="outline"
                             className="h-11 px-6 font-bold uppercase tracking-widest text-[10px] border-emerald-200 text-emerald-700 hover:bg-emerald-50 shadow-sm transition-all active:scale-95 rounded-xl"
@@ -1651,7 +1668,7 @@ function OnboardPageContent() {
                       ) : (
                         <div className="flex gap-3">
                           <Button 
-                            onClick={handlePartialSave}
+                            onClick={() => confirmSaveProgress('partial')}
                             disabled={isSaving}
                             variant="outline"
                             className="h-11 px-6 font-bold uppercase tracking-widest text-[10px] border-emerald-200 text-emerald-700 hover:bg-emerald-50 shadow-sm transition-all active:scale-95 rounded-xl"
@@ -1689,7 +1706,7 @@ function OnboardPageContent() {
         title={confirmModal.title}
         description={confirmModal.description}
         variant={confirmModal.variant}
-        isLoading={isActionLoading}
+        isLoading={isSaving || isActionLoading}
       />
     </div>
   )
