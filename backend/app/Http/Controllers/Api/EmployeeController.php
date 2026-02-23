@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\TerminationNotice;
 use App\Models\Employee;
 use App\Models\Resigned;
 use App\Models\Termination;
 use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -335,6 +337,22 @@ class EmployeeController extends Controller
                 'status' => $validated['status'] ?? 'completed',
             ]);
 
+            $noticeMode = strtolower((string) ($validated['notice_mode'] ?? ''));
+            $shouldSendEmailNotice = $noticeMode === 'both'
+                || str_contains($noticeMode, 'email');
+            $emailNoticeStatus = 'not_applicable';
+            $emailNoticeError = null;
+
+            if ($shouldSendEmailNotice && !empty($employee->email)) {
+                try {
+                    Mail::to($employee->email)->send(new TerminationNotice($employee, $termination));
+                    $emailNoticeStatus = 'sent';
+                } catch (\Throwable $mailError) {
+                    $emailNoticeStatus = 'failed';
+                    $emailNoticeError = $mailError->getMessage();
+                }
+            }
+
             // Update employee status to terminated
             $employee->update(['status' => 'terminated']);
 
@@ -344,7 +362,9 @@ class EmployeeController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Employee terminated successfully',
-                'data' => $termination
+                'data' => $termination,
+                'email_notice_status' => $emailNoticeStatus,
+                'email_notice_error' => $emailNoticeError,
             ]);
         } catch (ValidationException $e) {
             return response()->json([

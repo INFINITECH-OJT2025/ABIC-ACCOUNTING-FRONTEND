@@ -251,6 +251,86 @@ export default function TerminatePage() {
     })
   }
 
+  const getNoticeModeSummary = (modes: string[]) => {
+    if (modes.includes('both')) return 'Both (Email and Printed Letter)'
+    const labels: Record<string, string> = {
+      email: 'Email',
+      printed_letter: 'Printed Letter',
+    }
+    return modes.map((m) => labels[m] ?? m).join(', ')
+  }
+
+  const openPrintNotice = (employee: Employee, payload: TerminationFormData) => {
+    const printWindow = window.open('', '_blank', 'width=900,height=1000')
+    if (!printWindow) {
+      toast.error('Please allow pop-ups to print the notice letter.')
+      return
+    }
+
+    const formatDate = (value?: string) => value ? new Date(value).toLocaleString() : 'N/A'
+    const letterHtml = `
+      <!doctype html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Notice of Termination</title>
+        <style>
+          @page { size: A4; margin: 20mm; }
+          body { font-family: Arial, sans-serif; color: #111827; }
+          .page { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 12mm; box-sizing: border-box; }
+          .title { text-align: center; font-size: 20px; font-weight: 700; margin-bottom: 24px; }
+          .section { margin-bottom: 14px; line-height: 1.6; }
+          .meta { margin-top: 18px; border: 1px solid #d1d5db; padding: 12px; border-radius: 8px; }
+          .meta p { margin: 6px 0; }
+          .label { font-weight: 700; }
+          .signatures { margin-top: 36px; display: grid; grid-template-columns: 1fr 1fr; gap: 36px; }
+          .sigline { border-top: 1px solid #111827; margin-top: 44px; padding-top: 6px; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="page">
+          <div class="title">NOTICE OF TERMINATION</div>
+          <div class="section">Dear <strong>${employee.first_name} ${employee.last_name}</strong>,</div>
+          <div class="section">
+            This serves as formal notice regarding the termination of your employment with ABIC Accounting.
+          </div>
+          <div class="meta">
+            <p><span class="label">Employee:</span> ${employee.first_name} ${employee.last_name}</p>
+            <p><span class="label">Position:</span> ${employee.position || 'N/A'}</p>
+            <p><span class="label">Termination Date:</span> ${formatDate(payload.termination_date)}</p>
+            <p><span class="label">Reason:</span> ${payload.reason}</p>
+            <p><span class="label">Recommended By:</span> ${payload.recommended_by || 'N/A'}</p>
+            <p><span class="label">Mode of Notice:</span> ${getNoticeModeSummary(payload.notice_modes)}</p>
+            <p><span class="label">Date of Notice:</span> ${formatDate(payload.notice_date)}</p>
+            <p><span class="label">Reviewed By:</span> ${payload.reviewed_by || 'N/A'}</p>
+            <p><span class="label">Approved By:</span> ${payload.approved_by || 'N/A'}</p>
+            <p><span class="label">Date of Approval:</span> ${formatDate(payload.approval_date)}</p>
+          </div>
+          <div class="section" style="margin-top:18px;">
+            For concerns, please coordinate with HR/Admin Office.
+          </div>
+          <div class="signatures">
+            <div>
+              <div class="sigline">Employee Signature</div>
+            </div>
+            <div>
+              <div class="sigline">Authorized Signature</div>
+            </div>
+          </div>
+        </div>
+        <script>
+          window.onload = function () {
+            window.print();
+          };
+        </script>
+      </body>
+      </html>
+    `
+    printWindow.document.open()
+    printWindow.document.write(letterHtml)
+    printWindow.document.close()
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -305,6 +385,8 @@ export default function TerminatePage() {
       onConfirm: async () => {
         try {
           setSubmitting(true)
+          const selectedEmployee = employees.find((emp) => emp.id === selectedEmployeeId) || null
+          const snapshot = { ...formData }
           const response = await fetch(
             `${getApiUrl()}/api/employees/${selectedEmployeeId}/terminate`,
             {
@@ -333,6 +415,17 @@ export default function TerminatePage() {
           const data = await response.json()
 
           if (data.success) {
+            if (exitActionType === 'terminate') {
+              const modes = snapshot.notice_modes
+              const wantsPrinted = modes.includes('both') || modes.includes('printed_letter')
+              if (wantsPrinted && selectedEmployee) {
+                openPrintNotice(selectedEmployee, snapshot)
+              }
+              if (data.email_notice_status === 'failed') {
+                toast.error(data.email_notice_error || 'Termination saved but email notice failed.')
+              }
+            }
+
             toast.success(
               data.message ||
               (exitActionType === 'resigned'
