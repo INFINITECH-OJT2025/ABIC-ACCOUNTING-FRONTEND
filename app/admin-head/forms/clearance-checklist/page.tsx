@@ -5,7 +5,6 @@
 
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table"
@@ -65,6 +64,24 @@ interface NamedOption {
   name: string
 }
 
+interface DepartmentOption {
+  id: number
+  name: string
+}
+
+const buildBlankRecord = (departmentName: string): ClearanceRecord => ({
+  id: '',
+  name: '',
+  startDate: '',
+  position: '',
+  department: departmentName,
+  resignationDate: '',
+  lastDay: '',
+  status: 'PENDING',
+  updatedAt: '',
+  tasks: [],
+})
+
 
 const normalizeTasks = (input: unknown): ChecklistTask[] => {
   const tasks = Array.isArray(input) ? input : []
@@ -115,6 +132,19 @@ const normalizeRecord = (record: any): ClearanceRecord => ({
   tasks: normalizeTasks(record?.tasks),
 })
 
+const normalizeTemplateRecord = (record: any): ClearanceRecord => ({
+  id: String(record?.id ?? ''),
+  name: '',
+  startDate: '',
+  position: '',
+  department: String(record?.department_name ?? ''),
+  resignationDate: '',
+  lastDay: '',
+  status: 'PENDING',
+  updatedAt: String(record?.updated_at ?? ''),
+  tasks: normalizeTasks(record?.tasks),
+})
+
 
 const getRecordCompletionPercentage = (record: ClearanceRecord) => {
   if (!record.tasks.length) return 0
@@ -128,7 +158,6 @@ const isRecordDone = (record: ClearanceRecord) =>
 
 
 export default function ClearanceChecklistPage() {
-  const router = useRouter()
   const editMode = true
   const [saving, setSaving] = useState(false)
   const [tasks, setTasks] = useState<ChecklistTask[]>([])
@@ -137,12 +166,18 @@ export default function ClearanceChecklistPage() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [records, setRecords] = useState<ClearanceRecord[]>([])
   const [employeeInfo, setEmployeeInfo] = useState<ClearanceRecord | null>(null)
+  const [departmentsData, setDepartmentsData] = useState<DepartmentOption[]>([])
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | null>(null)
   const [positionOptions, setPositionOptions] = useState<string[]>([])
   const [departmentOptions, setDepartmentOptions] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [recordStatusFilter, setRecordStatusFilter] = useState<RecordStatusFilter>('ALL')
   const [recordSort, setRecordSort] = useState<RecordSort>('UPDATED_DESC')
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false)
+  const [unsavedPromptOpen, setUnsavedPromptOpen] = useState(false)
+  const [pendingDepartmentSelection, setPendingDepartmentSelection] = useState<string | null>(null)
+  const [pendingNavigationUrl, setPendingNavigationUrl] = useState<string | null>(null)
 
 
   useEffect(() => {
@@ -150,7 +185,7 @@ export default function ClearanceChecklistPage() {
       try {
         setLoading(true)
         setError(null)
-        const response = await fetch(`${getApiUrl()}/api/clearance-checklist`, {
+        const response = await fetch(`${getApiUrl()}/api/department-checklist-templates?checklist_type=CLEARANCE`, {
           headers: { Accept: 'application/json' },
         })
 
@@ -159,14 +194,19 @@ export default function ClearanceChecklistPage() {
 
 
         const result = await response.json()
-        const data = Array.isArray(result?.data) ? result.data.map(normalizeRecord) : []
+        const data = Array.isArray(result?.data) ? result.data.map(normalizeTemplateRecord) : []
         setRecords(data)
 
 
         if (data.length > 0) {
+          const selected = data[0]
           setCurrentIndex(0)
-          setEmployeeInfo(data[0])
-          setTasks(data[0].tasks)
+          setEmployeeInfo(selected)
+          setTasks(selected.tasks)
+          if (selected?.department) {
+            const departmentMatch = departmentsData.find((item) => item.name === selected.department)
+            setSelectedDepartmentId(departmentMatch?.id ?? null)
+          }
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to load checklists'
@@ -201,10 +241,13 @@ export default function ClearanceChecklistPage() {
 
         if (departmentsResponse.ok) {
           const departmentsData = await departmentsResponse.json()
-          const names = Array.isArray(departmentsData?.data)
-            ? (departmentsData.data as NamedOption[]).map((item) => item.name).filter((name): name is string => !!name)
+          const rows = Array.isArray(departmentsData?.data)
+            ? (departmentsData.data as DepartmentOption[])
+              .filter((item): item is DepartmentOption => Number.isFinite(Number(item?.id)) && typeof item?.name === 'string')
             : []
-          setDepartmentOptions([...new Set(names)])
+          const sortedRows = [...rows].sort((a, b) => a.name.localeCompare(b.name))
+          setDepartmentsData(sortedRows)
+          setDepartmentOptions(sortedRows.map((item) => item.name))
         }
       } catch {
       }
@@ -214,22 +257,50 @@ export default function ClearanceChecklistPage() {
     fetchOptions()
   }, [])
 
+  useEffect(() => {
+    if (!employeeInfo?.department) return
+    const departmentMatch = departmentsData.find((item) => item.name === employeeInfo.department)
+    setSelectedDepartmentId(departmentMatch?.id ?? null)
+  }, [employeeInfo?.department, departmentsData])
+
+  useEffect(() => {
+    if (loading) return
+    if (employeeInfo) return
+    const firstDepartment = departmentOptions[0]
+    if (!firstDepartment) return
+    const blank = buildBlankRecord(firstDepartment)
+    setEmployeeInfo(blank)
+    setTasks([])
+    const departmentMatch = departmentsData.find((item) => item.name === firstDepartment)
+    setSelectedDepartmentId(departmentMatch?.id ?? null)
+  }, [loading, employeeInfo, departmentOptions, departmentsData])
+
 
   const completionPercentage = useMemo(() => {
     if (tasks.length === 0) return 0;
     const doneTasks = tasks.filter(t => t.status === 'DONE').length;
     return Math.round((doneTasks / tasks.length) * 100);
   }, [tasks]);
-  const showCompletionDate = completionPercentage === 100 || String(employeeInfo?.status ?? '').toUpperCase() === 'DONE'
   const completionDateText = useMemo(() => {
-    if (!showCompletionDate) return ''
     const value = employeeInfo?.updatedAt
-    if (!value) return ''
+    if (!value) return '-'
     const parsed = new Date(value)
-    if (Number.isNaN(parsed.getTime())) return ''
-    return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  }, [employeeInfo?.updatedAt, showCompletionDate])
-  const emptyTaskColSpan = editMode ? 4 : 3
+    if (Number.isNaN(parsed.getTime())) return '-'
+    return parsed.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }, [employeeInfo?.updatedAt])
+
+  const hasUnsavedChanges = useMemo(() => {
+    const departmentName = String(employeeInfo?.department || '').trim()
+    if (!departmentName) return false
+    const savedRecord = records.find((record) => String(record.department || '').trim() === departmentName)
+    const currentTasks = tasks
+      .map((row) => row.task.trim())
+      .filter((task) => task.length > 0)
+    const savedTasks = (savedRecord?.tasks ?? [])
+      .map((row) => String(row.task || '').trim())
+      .filter((task) => task.length > 0)
+    return JSON.stringify(currentTasks) !== JSON.stringify(savedTasks)
+  }, [employeeInfo?.department, records, tasks])
 
 
   const positionSelectOptions = useMemo(() => {
@@ -242,6 +313,23 @@ export default function ClearanceChecklistPage() {
     const current = employeeInfo?.department?.trim()
     return [...new Set([...(current ? [current] : []), ...departmentOptions])]
   }, [employeeInfo?.department, departmentOptions])
+
+  const departmentTemplateRecords = useMemo(() => {
+    const parseTime = (value: string) => {
+      const timestamp = new Date(value).getTime()
+      return Number.isNaN(timestamp) ? 0 : timestamp
+    }
+    const latestByDepartment = new Map<string, { record: ClearanceRecord; index: number; department: string }>()
+    records.forEach((record, index) => {
+      const department = String(record.department || '').trim() || 'Unassigned'
+      const key = department.toLowerCase()
+      const current = latestByDepartment.get(key)
+      if (!current || parseTime(record.updatedAt) >= parseTime(current.record.updatedAt)) {
+        latestByDepartment.set(key, { record, index, department })
+      }
+    })
+    return Array.from(latestByDepartment.values()).sort((a, b) => a.department.localeCompare(b.department))
+  }, [records])
 
 
   const filteredAndSortedRecords = useMemo(() => {
@@ -284,6 +372,55 @@ export default function ClearanceChecklistPage() {
     setCurrentIndex(index)
     setEmployeeInfo(selected)
     setTasks(normalizeTasks(selected.tasks))
+  }
+
+  const selectRecordByDepartment = (department: string) => {
+    const departmentMeta = departmentsData.find((item) => item.name === department)
+    setSelectedDepartmentId(departmentMeta?.id ?? null)
+
+    const selected = departmentTemplateRecords.find((entry) => entry.department === department)
+    if (!selected) {
+      const blank = buildBlankRecord(department)
+      setCurrentIndex(0)
+      setEmployeeInfo(blank)
+      setTasks([])
+      return
+    }
+
+    setCurrentIndex(selected.index)
+    setEmployeeInfo(selected.record)
+    setTasks(normalizeTasks(selected.record.tasks))
+  }
+
+  const requestDepartmentChange = (department: string) => {
+    const currentDepartment = String(employeeInfo?.department || '').trim()
+    if (hasUnsavedChanges && department !== currentDepartment) {
+      setPendingDepartmentSelection(department)
+      setPendingNavigationUrl(null)
+      setUnsavedPromptOpen(true)
+      return
+    }
+    selectRecordByDepartment(department)
+  }
+
+  const clearUnsavedIntents = () => {
+    setPendingDepartmentSelection(null)
+    setPendingNavigationUrl(null)
+  }
+
+  const proceedWithoutSaving = () => {
+    const department = pendingDepartmentSelection
+    const route = pendingNavigationUrl
+    setUnsavedPromptOpen(false)
+    clearUnsavedIntents()
+
+    if (department) {
+      selectRecordByDepartment(department)
+      return
+    }
+    if (route) {
+      window.location.href = route
+    }
   }
 
 
@@ -364,25 +501,32 @@ export default function ClearanceChecklistPage() {
   };
 
 
-  const handleSave = async () => {
-    if (!employeeInfo) return
+  const handleSave = async (): Promise<boolean> => {
+    if (!employeeInfo) return false
 
 
     try {
       setSaving(true)
+      const departmentName = String(employeeInfo.department || '').trim()
+      const departmentId = selectedDepartmentId ?? departmentsData.find((row) => row.name === departmentName)?.id ?? null
+      if (!departmentId) {
+        throw new Error('Please select a valid department before saving.')
+      }
+
       const payload = {
-        name: employeeInfo.name,
-        position: employeeInfo.position,
-        department: employeeInfo.department,
-        startDate: employeeInfo.startDate,
-        resignationDate: employeeInfo.resignationDate,
-        lastDay: employeeInfo.lastDay,
-        tasks,
-        status: completionPercentage === 100 ? 'DONE' : 'PENDING',
+        department_id: departmentId,
+        checklist_type: 'CLEARANCE',
+        tasks: tasks
+          .map((row, index) => ({
+            task: row.task.trim(),
+            sort_order: index + 1,
+            is_active: true,
+          }))
+          .filter((row) => row.task.length > 0),
       }
 
 
-      const response = await fetch(`${getApiUrl()}/api/clearance-checklist/${employeeInfo.id}`, {
+      const response = await fetch(`${getApiUrl()}/api/department-checklist-templates`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -396,19 +540,81 @@ export default function ClearanceChecklistPage() {
 
 
       const result = await response.json()
-      const updated = normalizeRecord(result?.data)
+      const updated = normalizeTemplateRecord(result?.data)
+      setSelectedDepartmentId(departmentId)
       setEmployeeInfo(updated)
       setTasks(updated.tasks)
-      setRecords(prev => prev.map((record, index) => index === currentIndex ? updated : record))
+      setRecords((prev) => {
+        const remaining = prev.filter((record) => record.department !== updated.department)
+        return [...remaining, updated].sort((a, b) => a.department.localeCompare(b.department))
+      })
+      toast.success('Checklist template saved successfully!', { position: 'top-right' })
+      return true
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save updates'
       toast.error('Save Failed', {
         description: message,
       })
+      return false
     } finally {
       setSaving(false)
     }
   }
+
+  const handleSaveAndContinue = async () => {
+    const success = await handleSave()
+    if (!success) return
+
+    const department = pendingDepartmentSelection
+    const route = pendingNavigationUrl
+    setUnsavedPromptOpen(false)
+    clearUnsavedIntents()
+
+    if (department) {
+      selectRecordByDepartment(department)
+      return
+    }
+    if (route) {
+      window.location.href = route
+    }
+  }
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges) return
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [hasUnsavedChanges])
+
+  useEffect(() => {
+    const handleDocumentClick = (event: MouseEvent) => {
+      if (!hasUnsavedChanges) return
+      const target = event.target as HTMLElement | null
+      const link = target?.closest('a[href]') as HTMLAnchorElement | null
+      if (!link) return
+      if (link.target === '_blank' || link.hasAttribute('download')) return
+
+      const href = link.getAttribute('href')
+      if (!href || href.startsWith('#') || href.startsWith('javascript:')) return
+
+      const url = new URL(href, window.location.origin)
+      if (url.origin !== window.location.origin) return
+      const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
+      const next = `${url.pathname}${url.search}${url.hash}`
+      if (current === next) return
+
+      event.preventDefault()
+      setPendingNavigationUrl(url.toString())
+      setPendingDepartmentSelection(null)
+      setUnsavedPromptOpen(true)
+    }
+
+    document.addEventListener('click', handleDocumentClick, true)
+    return () => document.removeEventListener('click', handleDocumentClick, true)
+  }, [hasUnsavedChanges])
 
 
   if (loading) {
@@ -454,15 +660,7 @@ export default function ClearanceChecklistPage() {
             </div>
 
 
-            <div className="flex items-center gap-3">
-              <Button
-                onClick={() => router.push('/admin-head/forms/clearance-checklist/add-clearance-checklist')}
-                variant="outline"
-                className="border-white/30 text-white hover:bg-white/20 hover:text-white bg-transparent backdrop-blur-sm shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg"
-              >
-                <Plus className="w-4 h-4 mr-2" /> Add Record
-              </Button>
-            </div>
+            <div />
           </div>
         </div>
 
@@ -473,93 +671,38 @@ export default function ClearanceChecklistPage() {
             <div className="flex flex-wrap items-center gap-4">
 
 
-              {/* Filter Status */}
+              
+
+
+              {/* Department Selector */}
               <div className="flex items-center gap-3">
-                <span className="text-sm font-bold text-white/70 uppercase tracking-wider">Filter</span>
-                <Select value={recordStatusFilter} onValueChange={(value) => setRecordStatusFilter(value as RecordStatusFilter)}>
-                  <SelectTrigger className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 w-[140px] shadow-sm font-bold rounded-lg border-2 ring-0 focus:ring-0">
-                    <SelectValue />
+                <span className="text-sm font-bold text-white/70 uppercase tracking-wider">Department</span>
+                <Select
+                  value={String(employeeInfo?.department || '').trim() || undefined}
+                  onValueChange={requestDepartmentChange}
+                >
+                  <SelectTrigger className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 min-w-[240px] shadow-sm font-bold rounded-lg border-2 ring-0 focus:ring-0">
+                    <SelectValue placeholder="Select Department" />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl border-stone-200 shadow-xl">
-                    <SelectItem value="ALL">All Records</SelectItem>
-                    <SelectItem value="DONE">Completed</SelectItem>
-                    <SelectItem value="PENDING">Pending</SelectItem>
+                    {departmentSelectOptions.map((department) => (
+                      <SelectItem key={department} value={department}>
+                        {department}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
 
 
-              {/* Employee Record Selector */}
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-bold text-white/70 uppercase tracking-wider">Employee</span>
-                <Popover open={open} onOpenChange={setOpen}>
-                  <PopoverTrigger asChild>
-                    <div className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 min-w-[220px] justify-between shadow-sm font-bold inline-flex items-center whitespace-nowrap rounded-lg cursor-pointer group border-2">
-                      <span className="truncate max-w-[180px]">{employeeInfo?.name || 'Select Record'}</span>
-                      <ChevronDown className="w-4 h-4 ml-2 opacity-50 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[300px] p-0 rounded-xl border-stone-200 shadow-2xl" align="start">
-                    <Command>
-                      <CommandInput placeholder="Search records..." className="h-10" />
-                      <CommandList>
-                        <CommandEmpty>No records found.</CommandEmpty>
-                        {doneRecords.length > 0 && (
-                          <CommandGroup heading="DONE">
-                            {doneRecords.map(({ record: emp, index }) => (
-                              <CommandItem key={emp.id} onSelect={() => { selectRecordByIndex(index); setOpen(false); }} className="rounded-lg m-1 cursor-pointer">
-                                <Check className={cn("mr-2 h-4 w-4", currentIndex === index ? "text-[#A4163A]" : "opacity-0")} />
-                                <span className="font-medium text-slate-700">{emp.name}</span>
-                                <span className="ml-auto text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">{getRecordCompletionPercentage(emp)}%</span>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        )}
-                        {pendingRecords.length > 0 && (
-                          <CommandGroup heading="PENDING">
-                            {pendingRecords.map(({ record: emp, index }) => (
-                              <CommandItem key={emp.id} onSelect={() => { selectRecordByIndex(index); setOpen(false); }} className="rounded-lg m-1 cursor-pointer">
-                                <Check className={cn("mr-2 h-4 w-4", currentIndex === index ? "text-[#A4163A]" : "opacity-0")} />
-                                <span className="font-medium text-slate-700">{emp.name}</span>
-                                <span className="ml-auto text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">{getRecordCompletionPercentage(emp)}%</span>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        )}
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
+              
 
 
-              {/* Sort By */}
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-bold text-white/70 uppercase tracking-wider">Sort</span>
-                <Select value={recordSort} onValueChange={(value) => setRecordSort(value as RecordSort)}>
-                  <SelectTrigger className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 w-[160px] shadow-sm font-bold rounded-lg border-2 ring-0 focus:ring-0">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-stone-200 shadow-xl">
-                    <SelectItem value="UPDATED_DESC">Latest First</SelectItem>
-                    <SelectItem value="UPDATED_ASC">Oldest First</SelectItem>
-                    <SelectItem value="NAME_ASC">Name (A-Z)</SelectItem>
-                    <SelectItem value="NAME_DESC">Name (Z-A)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-
-              {/* Overall Stats (Right Aligned) */}
+              {/* Updated At */}
               <div className="ml-auto hidden xl:flex items-center gap-4 bg-white/10 px-4 py-1.5 rounded-lg border border-white/10 backdrop-blur-sm">
-                <div className="flex flex-col items-end">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-white/60 leading-none mb-1">Overall</span>
-                  <span className="text-sm font-black text-white">{completionPercentage}%</span>
-                </div>
-                <div className="h-6 w-px bg-white/20" />
                 <div className="flex flex-col">
                   <span className="text-[9px] font-black uppercase tracking-widest text-white/60 leading-none mb-1">Updated</span>
-                  <span className="text-sm font-black text-white tracking-tight">{completionDateText || '—'}</span>
+                  <span className="text-sm font-black text-white tracking-tight">{completionDateText}</span>
                 </div>
               </div>
 
@@ -574,84 +717,27 @@ export default function ClearanceChecklistPage() {
 
 
         <Card className="rounded-2xl border-2 border-[#FFE5EC] shadow-lg overflow-hidden bg-white mb-6 transition-all hover:shadow-xl">
-          <div className="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-rose-50">
-            <div className="p-4 bg-rose-50/20">
-              <div className="flex items-center gap-2 mb-1">
-                <Users className="w-3.5 h-3.5 text-[#800020]/60" />
-                <p className="text-[9px] font-black text-[#800020]/60 uppercase tracking-widest">Employee Name</p>
-              </div>
-              <p className="text-lg font-black text-slate-800 leading-tight">{employeeInfo?.name || '-'}</p>
-            </div>
-
-
-            <div className="p-4">
-              <p className="text-[9px] font-black text-[#800020]/60 uppercase tracking-widest mb-1">Position</p>
-              {editMode && employeeInfo ? (
-                <Select value={employeeInfo.position || ''} onValueChange={(val) => setEmployeeInfo({ ...employeeInfo, position: val })}>
-                  <SelectTrigger className="h-7 text-lg font-bold text-slate-700 border-none p-0 focus:ring-0 shadow-none"><SelectValue /></SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    {positionSelectOptions.map((name) => (
-                      <SelectItem key={name} value={name}>{name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (<p className="text-lg font-bold text-slate-700 leading-tight">{employeeInfo?.position || '-'}</p>)}
-            </div>
-
-
-            <div className="p-4">
-              <p className="text-[9px] font-black text-[#800020]/60 uppercase tracking-widest mb-1">Last Day</p>
-              {editMode && employeeInfo ? (
-                <Input type="date" value={employeeInfo.lastDay} onChange={(e) => setEmployeeInfo({ ...employeeInfo, lastDay: e.target.value })} className="h-7 text-lg font-bold text-slate-700 border-none p-0 focus-visible:ring-0 shadow-none" />
-              ) : (
-                <p className="text-lg font-bold text-slate-700">
-                  {employeeInfo?.lastDay ? new Date(employeeInfo.lastDay).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
-                </p>
+          <div className="p-5 bg-rose-50/20">
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <p className="text-[11px] font-black text-[#800020]/60 uppercase tracking-widest">Selected Department</p>
+              {hasUnsavedChanges && (
+                <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-amber-700">
+                  Unsaved Changes
+                </span>
               )}
             </div>
-
-
-            <div className="p-4">
-              <p className="text-[9px] font-black text-[#800020]/60 uppercase tracking-widest mb-1">Department</p>
-              {editMode && employeeInfo ? (
-                <Select value={employeeInfo.department || ''} onValueChange={(val) => setEmployeeInfo({ ...employeeInfo, department: val })}>
-                  <SelectTrigger className="h-7 text-lg font-bold text-slate-700 border-none p-0 focus:ring-0 shadow-none"><SelectValue /></SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    {departmentSelectOptions.map((name) => (
-                      <SelectItem key={name} value={name}>{name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (<p className="text-lg font-bold text-slate-700 leading-tight">{employeeInfo?.department || '-'}</p>)}
-            </div>
+            <p className="text-2xl font-black text-slate-800 leading-tight">{employeeInfo?.department || '-'}</p>
           </div>
         </Card>
 
 
         {/* Task List Section */}
         <Card className="rounded-2xl border-2 border-[#FFE5EC] shadow-2xl bg-white overflow-hidden mb-12">
-          {/* Progress Banner */}
-          <div className="bg-[#FFE5EC]/20 p-4 md:px-8 border-b border-[#FFE5EC]">
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="text-[11px] font-black text-[#800020] uppercase tracking-widest">Process Clearance Progress</h3>
-              <span className="text-sm font-black text-[#A4163A] bg-white px-3 py-0.5 rounded-full shadow-sm border border-[#FFE5EC]">
-                {tasks.filter(t => t.status === 'DONE').length} / {tasks.length} Completed
-              </span>
-            </div>
-            <div className="w-full bg-white h-2.5 rounded-full overflow-hidden border border-[#FFE5EC] shadow-inner p-0.5">
-              <div
-                className="bg-gradient-to-r from-[#A4163A] to-[#630C22] h-full rounded-full transition-all duration-1000 ease-out shadow-sm"
-                style={{ width: `${completionPercentage}%` }}
-              />
-            </div>
-          </div>
 
 
           <Table>
             <TableHeader className="bg-[#FFE5EC]/40">
               <TableRow className="border-b border-[#FFE5EC] hover:bg-transparent">
-                <TableHead className="w-[180px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">Date</TableHead>
-                <TableHead className="w-[80px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">Status</TableHead>
                 <TableHead className="font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">
                   Required Clearance Tasks
                 </TableHead>
@@ -661,28 +747,6 @@ export default function ClearanceChecklistPage() {
             <TableBody>
               {tasks.map((item) => (
                 <TableRow key={item.id} className="border-b border-rose-50/30 last:border-0 hover:bg-[#FFE5EC]/5 transition-colors group">
-                  <TableCell className="text-center py-2.5 font-mono text-[10px] font-bold text-slate-400">
-                    {item.date ? new Date(item.date).toLocaleString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric'
-                    }) : '-'}
-                  </TableCell>
-                  <TableCell className="py-2.5">
-                    <div className="flex justify-center">
-                      <div
-                        onClick={() => toggleTaskStatus(item.id, item.status !== 'DONE')}
-                        className={cn(
-                          "w-5 h-5 rounded flex items-center justify-center cursor-pointer transition-all border-2",
-                          item.status === 'DONE'
-                            ? "bg-emerald-500 border-emerald-500 text-white shadow-sm"
-                            : "border-slate-200 bg-white hover:border-[#A4163A]"
-                        )}
-                      >
-                        {item.status === 'DONE' && <CheckCircle2 className="h-3.5 w-3.5" />}
-                      </div>
-                    </div>
-                  </TableCell>
                   <TableCell className="py-2.5">
                     {editMode ? (
                       <Input
@@ -719,7 +783,7 @@ export default function ClearanceChecklistPage() {
 
               {tasks.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="py-24 text-center">
+                  <TableCell colSpan={2} className="py-24 text-center">
                     <ClipboardList className="w-12 h-12 text-slate-200 mx-auto mb-4" />
                     <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">No tasks initialized</p>
                     <Button onClick={addTask} variant="outline" size="sm" className="mt-4 border-[#FFE5EC] text-[#A4163A] font-black h-9 rounded-xl">
@@ -747,7 +811,7 @@ export default function ClearanceChecklistPage() {
 
             <div className="flex gap-3">
               <Button
-                onClick={handleSave}
+                onClick={() => setSaveConfirmOpen(true)}
                 disabled={saving || !employeeInfo}
                 className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg active:scale-95 transition-all rounded-xl"
               >
@@ -758,6 +822,65 @@ export default function ClearanceChecklistPage() {
           </div>
         </Card>
       </main>
+
+      <AlertDialog open={saveConfirmOpen} onOpenChange={setSaveConfirmOpen}>
+        <AlertDialogContent className="border-2 border-[#FFE5EC]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Save Department Tasks?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are about to save changes for {employeeInfo?.department || 'the selected department'}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="rounded-lg border border-[#FFE5EC] bg-rose-50/30 p-3 text-sm font-semibold text-slate-700">
+            Tasks to save: {tasks.filter((row) => row.task.trim().length > 0).length}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-emerald-600 text-white hover:bg-emerald-700"
+              onClick={async () => {
+                setSaveConfirmOpen(false)
+                await handleSave()
+              }}
+            >
+              {saving ? 'Saving...' : 'Confirm Save'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={unsavedPromptOpen} onOpenChange={setUnsavedPromptOpen}>
+        <AlertDialogContent className="border-2 border-amber-200">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved Changes Detected</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes. You can save first, or continue without saving.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setUnsavedPromptOpen(false)
+                clearUnsavedIntents()
+              }}
+            >
+              Stay
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-slate-600 text-white hover:bg-slate-700"
+              onClick={proceedWithoutSaving}
+            >
+              Proceed Without Saving
+            </AlertDialogAction>
+            <AlertDialogAction
+              className="bg-emerald-600 text-white hover:bg-emerald-700"
+              onClick={() => void handleSaveAndContinue()}
+            >
+              Save and Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
 
       <AlertDialog open={taskIdToDelete !== null} onOpenChange={(open) => { if (!open) setTaskIdToDelete(null) }}>
@@ -790,4 +913,5 @@ export default function ClearanceChecklistPage() {
     </div>
   )
 }
+
 

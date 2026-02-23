@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\PositionController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\OnboardingChecklistController;
+use App\Http\Controllers\Api\DepartmentChecklistTemplateController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -39,6 +40,10 @@ use App\Http\Controllers\Api\ClearanceChecklistController;
 Route::get('/clearance-checklist', [ClearanceChecklistController::class, 'index']);
 Route::post('/clearance-checklist', [ClearanceChecklistController::class, 'store']);
 Route::put('/clearance-checklist/{id}', [ClearanceChecklistController::class, 'update']);
+
+// Department Checklist Template Routes
+Route::get('/department-checklist-templates', [DepartmentChecklistTemplateController::class, 'index']);
+Route::put('/department-checklist-templates', [DepartmentChecklistTemplateController::class, 'upsert']);
 
 // Termination routes
 Route::post('/employees/{id}/terminate', [EmployeeController::class, 'terminate']);
