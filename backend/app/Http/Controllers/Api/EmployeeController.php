@@ -281,6 +281,12 @@ class EmployeeController extends Controller
                 'notes' => 'sometimes|nullable|string|max:1000',
                 'status' => 'sometimes|in:pending,completed,cancelled,resigned',
                 'exit_type' => 'sometimes|in:terminate,resigned',
+                'recommended_by' => 'sometimes|nullable|string|max:255',
+                'notice_mode' => 'sometimes|nullable|string|max:255',
+                'notice_date' => 'sometimes|nullable|date',
+                'reviewed_by' => 'sometimes|nullable|string|max:255',
+                'approved_by' => 'sometimes|nullable|string|max:255',
+                'approval_date' => 'sometimes|nullable|date',
             ]);
 
             $employee = Employee::find($id);
@@ -319,6 +325,12 @@ class EmployeeController extends Controller
                 'employee_id' => $employee->id,
                 'termination_date' => $validated['termination_date'],
                 'reason' => $validated['reason'],
+                'recommended_by' => $validated['recommended_by'] ?? null,
+                'notice_mode' => $validated['notice_mode'] ?? null,
+                'notice_date' => $validated['notice_date'] ?? null,
+                'reviewed_by' => $validated['reviewed_by'] ?? null,
+                'approved_by' => $validated['approved_by'] ?? null,
+                'approval_date' => $validated['approval_date'] ?? null,
                 'notes' => $validated['notes'] ?? null,
                 'status' => $validated['status'] ?? 'completed',
             ]);

@@ -70,6 +70,12 @@ interface TerminationFormData {
   rehire_date: string
   reason: string
   notes: string
+  recommended_by: string
+  notice_modes: string[]
+  notice_date: string
+  reviewed_by: string
+  approved_by: string
+  approval_date: string
 }
 
 export default function TerminatePage() {
@@ -89,6 +95,12 @@ export default function TerminatePage() {
     rehire_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
     reason: '',
     notes: '',
+    recommended_by: '',
+    notice_modes: [],
+    notice_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
+    reviewed_by: '',
+    approved_by: 'Mr. Angelle S. Sarmiento',
+    approval_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
   })
   const [isActionLoading, setIsActionLoading] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
@@ -131,6 +143,10 @@ export default function TerminatePage() {
   const filteredTerminations = applyRecordFilters(terminations)
   const filteredResigned = applyRecordFilters(resigned)
   const selectedRecordIsResigned = selectedTermination?.exit_type === 'resigned'
+  const approverPositions = ['admin supervisor', 'it supervisor', 'admin head']
+  const approverEmployees = employees.filter((emp) =>
+    approverPositions.includes(String(emp.position ?? '').toLowerCase().trim())
+  )
 
   const terminatedCount = terminations.filter(r => !r.rehired_at).length
   const rehiredCount = terminations.filter(r => !!r.rehired_at).length
@@ -214,6 +230,27 @@ export default function TerminatePage() {
     }))
   }
 
+  const toggleNoticeMode = (mode: 'email' | 'printed_letter' | 'both') => {
+    setFormData((prev) => {
+      const current = prev.notice_modes
+      if (mode === 'both') {
+        return {
+          ...prev,
+          notice_modes: current.includes('both') ? [] : ['both'],
+        }
+      }
+
+      const withoutBoth = current.filter((m) => m !== 'both')
+      const hasMode = withoutBoth.includes(mode)
+      return {
+        ...prev,
+        notice_modes: hasMode
+          ? withoutBoth.filter((m) => m !== mode)
+          : [...withoutBoth, mode],
+      }
+    })
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -229,6 +266,31 @@ export default function TerminatePage() {
 
     if (formData.reason.length < 10) {
       toast.error('Reason must be at least 10 characters')
+      return
+    }
+
+    if (exitActionType === 'terminate') {
+      if (!formData.recommended_by) {
+        toast.error('Please select Recommended By')
+        return
+      }
+      if (formData.notice_modes.length === 0) {
+        toast.error('Please select at least one Mode of Notice')
+        return
+      }
+      if (!formData.notice_date) {
+        toast.error('Date of Notice is required')
+        return
+      }
+    }
+
+    if (!formData.reviewed_by) {
+      toast.error('Please select Reviewed By')
+      return
+    }
+
+    if (!formData.approval_date) {
+      toast.error('Date of Approval is required')
       return
     }
 
@@ -256,6 +318,14 @@ export default function TerminatePage() {
                 notes: formData.notes,
                 status: exitActionType === 'resigned' ? 'resigned' : 'completed',
                 exit_type: exitActionType,
+                recommended_by: formData.recommended_by || null,
+                notice_mode: formData.notice_modes.includes('both')
+                  ? 'both'
+                  : formData.notice_modes.join(','),
+                notice_date: formData.notice_date || null,
+                reviewed_by: formData.reviewed_by || null,
+                approved_by: formData.approved_by,
+                approval_date: formData.approval_date || null,
               }),
             }
           )
@@ -275,6 +345,12 @@ export default function TerminatePage() {
               rehire_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
               reason: '',
               notes: '',
+              recommended_by: '',
+              notice_modes: [],
+              notice_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
+              reviewed_by: '',
+              approved_by: 'Mr. Angelle S. Sarmiento',
+              approval_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
             })
             setIsRequestFormOpen(false)
             fetchData()
@@ -495,119 +571,226 @@ export default function TerminatePage() {
       <div className="w-full px-4 md:px-8 space-y-6">
         <div className={cn(
           "overflow-hidden transition-all duration-500 ease-in-out",
-          isRequestFormOpen ? "max-h-[120px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"
+          isRequestFormOpen ? "max-h-[900px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"
         )}>
-          {/* Single-line toolbar row — matches tardiness NEW LATE ENTRY design */}
-          <div className="w-full bg-white border border-slate-200 rounded-2xl shadow-lg overflow-visible flex items-center gap-0 px-1 h-16">
-
-            {/* Label */}
-            <div className="flex items-center gap-2 px-4 shrink-0">
+          <div className="w-full bg-white border border-slate-200 rounded-2xl shadow-lg p-4 md:p-5 space-y-4">
+            <div className="flex items-center gap-2">
               <Users className="h-4 w-4 text-[#A4163A]" />
               <span className="text-xs font-bold text-[#A4163A] uppercase tracking-widest whitespace-nowrap">
                 {exitActionType === 'resigned' ? 'RESIGNED' : 'TERMINATE'}
               </span>
             </div>
 
-            <div className="w-px h-8 bg-slate-200 shrink-0" />
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Employee</Label>
+                <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={openCombobox}
+                      disabled={loading || submitting}
+                      className={cn(
+                        "w-full justify-between h-10 text-sm font-normal",
+                        !selectedEmployeeId && "text-slate-400"
+                      )}
+                    >
+                      {selectedEmployeeId
+                        ? (() => {
+                          const emp = employees.find((e) => e.id === selectedEmployeeId)
+                          return emp ? `${emp.last_name}, ${emp.first_name}` : "Select employee..."
+                        })()
+                        : "Select employee..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-40" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[320px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search employee..." />
+                      <CommandList>
+                        <CommandEmpty>No employee found.</CommandEmpty>
+                        <CommandGroup>
+                          {employees.map((emp) => (
+                            <CommandItem
+                              key={emp.id}
+                              value={`${emp.last_name}, ${emp.first_name} ${emp.position}`}
+                              onSelect={() => {
+                                setSelectedEmployeeId(emp.id)
+                                setOpenCombobox(false)
+                              }}
+                              className="py-2.5 cursor-pointer"
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  selectedEmployeeId === emp.id ? "opacity-100 text-[#800020]" : "opacity-0"
+                                )}
+                              />
+                              <div className="flex flex-col">
+                                <span className="font-medium text-slate-900">{emp.last_name}, {emp.first_name}</span>
+                                <span className="text-xs text-slate-500">{emp.position}</span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
 
-            {/* Employee Selector */}
-            <div className="flex-1 min-w-[200px] px-2">
-              <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    role="combobox"
-                    aria-expanded={openCombobox}
-                    disabled={loading || submitting}
-                    className={cn(
-                      "w-full justify-between h-10 bg-transparent hover:bg-slate-50 border-0 text-sm font-normal px-3",
-                      !selectedEmployeeId && "text-slate-400"
-                    )}
-                  >
-                    {selectedEmployeeId
-                      ? (() => {
-                        const emp = employees.find((e) => e.id === selectedEmployeeId)
-                        return emp ? `${emp.last_name}, ${emp.first_name}` : "Select employee..."
-                      })()
-                      : "Select employee..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-40" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[320px] p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Search employee..." />
-                    <CommandList>
-                      <CommandEmpty>No employee found.</CommandEmpty>
-                      <CommandGroup>
-                        {employees.map((emp) => (
-                          <CommandItem
-                            key={emp.id}
-                            value={`${emp.last_name}, ${emp.first_name} ${emp.position}`}
-                            onSelect={() => {
-                              setSelectedEmployeeId(emp.id)
-                              setOpenCombobox(false)
-                            }}
-                            className="py-2.5 cursor-pointer"
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                selectedEmployeeId === emp.id ? "opacity-100 text-[#800020]" : "opacity-0"
-                              )}
-                            />
-                            <div className="flex flex-col">
-                              <span className="font-medium text-slate-900">{emp.last_name}, {emp.first_name}</span>
-                              <span className="text-xs text-slate-500">{emp.position}</span>
-                            </div>
-                          </CommandItem>
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Termination Date & Time</Label>
+                <Input
+                  type="datetime-local"
+                  name="termination_date"
+                  value={formData.termination_date}
+                  onChange={handleInputChange}
+                  className="h-10"
+                  disabled={submitting}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Reason</Label>
+                <Input
+                  type="text"
+                  name="reason"
+                  value={formData.reason}
+                  onChange={handleInputChange}
+                  placeholder={exitActionType === 'resigned' ? 'Reason for resignation...' : 'Reason for termination...'}
+                  className="h-10"
+                  disabled={submitting}
+                />
+              </div>
+
+              {exitActionType === 'terminate' && (
+                <>
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Recommended By</Label>
+                    <Select
+                      value={formData.recommended_by}
+                      onValueChange={(value) => setFormData((prev) => ({ ...prev, recommended_by: value }))}
+                    >
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="Select recommender..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {approverEmployees.map((emp) => (
+                          <SelectItem key={`recommended-${emp.id}`} value={`${emp.first_name} ${emp.last_name}`}>
+                            {emp.first_name} {emp.last_name} ({emp.position})
+                          </SelectItem>
                         ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Date of Notice</Label>
+                    <Input
+                      type="datetime-local"
+                      name="notice_date"
+                      value={formData.notice_date}
+                      onChange={handleInputChange}
+                      className="h-10"
+                      disabled={submitting}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Mode of Notice</Label>
+                    <div className="h-10 px-3 border border-slate-200 rounded-md flex items-center gap-4 text-sm">
+                      <label className="flex items-center gap-1.5">
+                        <input
+                          type="checkbox"
+                          checked={formData.notice_modes.includes('email')}
+                          onChange={() => toggleNoticeMode('email')}
+                          disabled={submitting}
+                        />
+                        <span>Email</span>
+                      </label>
+                      <label className="flex items-center gap-1.5">
+                        <input
+                          type="checkbox"
+                          checked={formData.notice_modes.includes('printed_letter')}
+                          onChange={() => toggleNoticeMode('printed_letter')}
+                          disabled={submitting}
+                        />
+                        <span>Printed Letter</span>
+                      </label>
+                      <label className="flex items-center gap-1.5">
+                        <input
+                          type="checkbox"
+                          checked={formData.notice_modes.includes('both')}
+                          onChange={() => toggleNoticeMode('both')}
+                          disabled={submitting}
+                        />
+                        <span>Both</span>
+                      </label>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Reviewed By</Label>
+                <Select
+                  value={formData.reviewed_by}
+                  onValueChange={(value) => setFormData((prev) => ({ ...prev, reviewed_by: value }))}
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="Select reviewer..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {approverEmployees.map((emp) => (
+                      <SelectItem key={`reviewed-${emp.id}`} value={`${emp.first_name} ${emp.last_name}`}>
+                        {emp.first_name} {emp.last_name} ({emp.position})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Approved By</Label>
+                <Input
+                  type="text"
+                  name="approved_by"
+                  value={formData.approved_by}
+                  onChange={handleInputChange}
+                  className="h-10 bg-slate-50"
+                  disabled
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Date of Approval</Label>
+                <Input
+                  type="datetime-local"
+                  name="approval_date"
+                  value={formData.approval_date}
+                  onChange={handleInputChange}
+                  className="h-10"
+                  disabled={submitting}
+                />
+              </div>
             </div>
 
-            <div className="w-px h-8 bg-slate-200 shrink-0" />
-
-            {/* Termination Date */}
-            <div className="flex flex-col gap-1 pr-3 shrink-0">
-              <Label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest pl-3">Termination Date & Time</Label>
-              <Input
-                type="datetime-local"
-                name="termination_date"
-                value={formData.termination_date}
-                onChange={handleInputChange}
-                className="h-9 px-3 bg-transparent border-0 focus:outline-none focus:ring-0 text-slate-600 font-medium text-sm w-[200px]"
-                disabled={submitting}
-              />
-            </div>
-
-            <div className="w-px h-8 bg-slate-200 shrink-0" />
-
-            {/* Reason */}
-            <div className="flex-[2] px-3 min-w-[160px]">
-              <input
-                type="text"
-                name="reason"
-                value={formData.reason}
-                onChange={(e) => setFormData(prev => ({ ...prev, reason: e.target.value }))}
-                placeholder={exitActionType === 'resigned' ? 'Reason for resignation...' : 'Reason for termination...'}
-                className="w-full h-10 bg-transparent border-0 focus:outline-none focus:ring-0 text-sm text-slate-700 placeholder:text-slate-400"
-                disabled={submitting}
-              />
-            </div>
-
-            <div className="w-px h-8 bg-slate-200 shrink-0" />
-
-            {/* Proceed Button */}
-            <div className="px-3 flex items-center gap-2 shrink-0">
+            <div className="flex justify-end items-center gap-2">
               <Button
                 onClick={handleSubmit as any}
-                disabled={submitting || !selectedEmployeeId || formData.reason.trim().length < 10}
+                disabled={
+                  submitting ||
+                  !selectedEmployeeId ||
+                  formData.reason.trim().length < 10 ||
+                  !formData.reviewed_by ||
+                  !formData.approval_date ||
+                  (exitActionType === 'terminate' && (!formData.recommended_by || formData.notice_modes.length === 0 || !formData.notice_date))
+                }
                 className={cn(
                   "h-10 px-6 text-sm font-bold rounded-xl transition-all whitespace-nowrap",
-                  submitting || !selectedEmployeeId || formData.reason.trim().length < 10
+                  submitting
                     ? "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
                     : "bg-gradient-to-r from-[#800020] to-[#A0153E] text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5"
                 )}
@@ -623,10 +806,8 @@ export default function TerminatePage() {
                 <X className="h-4 w-4" />
               </Button>
             </div>
-
           </div>
         </div>
-
         <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
           {fetchError ? (
             <div className="flex flex-col items-center justify-center py-24 text-center animate-in fade-in zoom-in-95 duration-500">
@@ -1091,3 +1272,5 @@ export default function TerminatePage() {
     </div>
   )
 }
+
+
