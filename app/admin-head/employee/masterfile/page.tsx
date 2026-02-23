@@ -62,7 +62,7 @@ export default function MasterfilePage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeDetails | null>(null)
   const [viewMode, setViewMode] = useState<'list' | 'details'>('list')
-  const [activeTab, setActiveTab] = useState<'all' | 'employed' | 'terminated'>('all')
+  const [activeTab, setActiveTab] = useState<'all' | 'employed' | 'terminated' | 'pending'>('all')
   const [isUpdating, setIsUpdating] = useState(false)
   const [isActionLoading, setIsActionLoading] = useState(false)
   const [isDetailLoading, setIsDetailLoading] = useState(false)
@@ -678,6 +678,15 @@ export default function MasterfilePage() {
                     >
                       Terminated ({employees.filter(e => e.status === 'terminated').length})
                     </button>
+                    <button
+                      onClick={() => setActiveTab('pending')}
+                      className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-200 uppercase tracking-wider ${activeTab === 'pending'
+                        ? 'bg-white text-[#A4163A] shadow-md'
+                        : 'text-white/70 hover:text-white hover:bg-white/5'
+                        }`}
+                    >
+                      Pending ({employees.filter(e => e.status === 'pending').length})
+                    </button>
                   </div>
 
                   {/* Search and Sort */}
@@ -913,7 +922,8 @@ export default function MasterfilePage() {
                     list={
                       activeTab === 'all' ? paginatedAll :
                         activeTab === 'employed' ? paginatedEmployed :
-                          paginatedTerminated
+                          activeTab === 'terminated' ? paginatedTerminated :
+                            paginatedPending
                     }
                     emptyMessage={
                       searchQuery
@@ -925,18 +935,21 @@ export default function MasterfilePage() {
                     currentPage={
                       activeTab === 'all' ? allPage :
                         activeTab === 'employed' ? employedPage :
-                          terminatedPage
+                          activeTab === 'terminated' ? terminatedPage :
+                            pendingPage
                     }
                     totalItems={
                       activeTab === 'all' ? allList.length :
                         activeTab === 'employed' ? employedList.length :
-                          terminatedList.length
+                          activeTab === 'terminated' ? terminatedList.length :
+                            pendingList.length
                     }
                     itemsPerPage={ITEMS_PER_PAGE_TABLE}
                     onPageChange={
                       activeTab === 'all' ? setAllPage :
                         activeTab === 'employed' ? setEmployedPage :
-                          setTerminatedPage
+                          activeTab === 'terminated' ? setTerminatedPage :
+                            setPendingPage
                     }
                   />
                 </div>
