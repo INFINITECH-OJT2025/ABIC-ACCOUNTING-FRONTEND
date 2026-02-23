@@ -129,7 +129,13 @@ export default function MasterfilePage() {
         code: region.region_code || region.code,
         name: region.region_name || region.name
       }))
-      setRegions(regionsArray)
+      
+      // Deduplicate by code
+      const uniqueRegions = Array.from(
+        new Map(regionsArray.map(r => [r.code, r])).values()
+      ).sort((a, b) => a.name.localeCompare(b.name))
+
+      setRegions(uniqueRegions)
     } catch (error) {
       console.error('Error loading regions:', error)
       setRegions([])
@@ -153,9 +159,13 @@ export default function MasterfilePage() {
           code: prov.province_code || prov.code,
           name: prov.province_name || prov.name
         }))
-        .sort((a, b) => a.name.localeCompare(b.name))
 
-      setProvinces(filteredProvinces)
+      // Deduplicate by code
+      const uniqueProvinces = Array.from(
+        new Map(filteredProvinces.map(p => [p.code, p])).values()
+      ).sort((a, b) => a.name.localeCompare(b.name))
+
+      setProvinces(uniqueProvinces)
     } catch (error) {
       console.error('Error filtering provinces:', error)
       setProvinces([])
@@ -178,9 +188,13 @@ export default function MasterfilePage() {
           code: city.city_code || city.code,
           name: city.city_name || city.name
         }))
-        .sort((a, b) => a.name.localeCompare(b.name))
 
-      setCities(filteredCities)
+      // Deduplicate by code
+      const uniqueCities = Array.from(
+        new Map(filteredCities.map(c => [c.code, c])).values()
+      ).sort((a, b) => a.name.localeCompare(b.name))
+
+      setCities(uniqueCities)
     } catch (error) {
       console.error('Error filtering cities:', error)
       setCities([])
@@ -202,9 +216,13 @@ export default function MasterfilePage() {
           code: brgy.brgy_code || brgy.code,
           name: brgy.brgy_name || brgy.name
         }))
-        .sort((a, b) => a.name.localeCompare(b.name))
 
-      setBarangays(filteredBarangays)
+      // Deduplicate by code
+      const uniqueBarangays = Array.from(
+        new Map(filteredBarangays.map(b => [b.code, b])).values()
+      ).sort((a, b) => a.name.localeCompare(b.name))
+
+      setBarangays(uniqueBarangays)
     } catch (error) {
       console.error('Error filtering barangays:', error)
       setBarangays([])
