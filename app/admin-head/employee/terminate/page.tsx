@@ -260,15 +260,9 @@ export default function TerminatePage() {
     return modes.map((m) => labels[m] ?? m).join(', ')
   }
 
-  const openPrintNotice = (employee: Employee, payload: TerminationFormData) => {
-    const printWindow = window.open('', '_blank', 'width=900,height=1000')
-    if (!printWindow) {
-      toast.error('Please allow pop-ups to print the notice letter.')
-      return
-    }
-
+  const buildPrintNoticeHtml = (employee: Employee, payload: TerminationFormData) => {
     const formatDate = (value?: string) => value ? new Date(value).toLocaleString() : 'N/A'
-    const letterHtml = `
+    return `
       <!doctype html>
       <html>
       <head>
@@ -326,6 +320,10 @@ export default function TerminatePage() {
       </body>
       </html>
     `
+  }
+
+  const openPrintNotice = (printWindow: Window, employee: Employee, payload: TerminationFormData) => {
+    const letterHtml = buildPrintNoticeHtml(employee, payload)
     printWindow.document.open()
     printWindow.document.write(letterHtml)
     printWindow.document.close()
@@ -383,10 +381,24 @@ export default function TerminatePage() {
       variant: 'destructive',
       confirmText: exitActionType === 'resigned' ? 'Yes, Mark as Resigned' : 'Yes, Terminate',
       onConfirm: async () => {
+        let requestTimeout: ReturnType<typeof setTimeout> | null = null
+        const controller = new AbortController()
         try {
           setSubmitting(true)
           const selectedEmployee = employees.find((emp) => emp.id === selectedEmployeeId) || null
           const snapshot = { ...formData }
+          const isTerminate = exitActionType === 'terminate'
+          const wantsPrinted = isTerminate && (snapshot.notice_modes.includes('both') || snapshot.notice_modes.includes('printed_letter'))
+          let reservedPrintWindow: Window | null = null
+          if (wantsPrinted) {
+            // Open early while still in user gesture context; fill content after success.
+            reservedPrintWindow = window.open('', '_blank', 'width=900,height=1000')
+            if (!reservedPrintWindow) {
+              toast.error('Please allow pop-ups to print the notice letter.')
+            }
+          }
+
+          requestTimeout = setTimeout(() => controller.abort(), 30000)
           const response = await fetch(
             `${getApiUrl()}/api/employees/${selectedEmployeeId}/terminate`,
             {
@@ -394,6 +406,7 @@ export default function TerminatePage() {
               headers: {
                 'Content-Type': 'application/json',
               },
+              signal: controller.signal,
               body: JSON.stringify({
                 termination_date: formData.termination_date,
                 reason: formData.reason,
@@ -416,10 +429,8 @@ export default function TerminatePage() {
 
           if (data.success) {
             if (exitActionType === 'terminate') {
-              const modes = snapshot.notice_modes
-              const wantsPrinted = modes.includes('both') || modes.includes('printed_letter')
-              if (wantsPrinted && selectedEmployee) {
-                openPrintNotice(selectedEmployee, snapshot)
+              if (wantsPrinted && selectedEmployee && reservedPrintWindow) {
+                openPrintNotice(reservedPrintWindow, selectedEmployee, snapshot)
               }
               if (data.email_notice_status === 'failed') {
                 toast.error(data.email_notice_error || 'Termination saved but email notice failed.')
@@ -462,8 +473,13 @@ export default function TerminatePage() {
           }
         } catch (error) {
           console.error('Error:', error)
-          toast.error('Network Error: Could not connect to the server.')
+          if (error instanceof DOMException && error.name === 'AbortError') {
+            toast.error('Request timed out. Please try again.')
+          } else {
+            toast.error('Network Error: Could not connect to the server.')
+          }
         } finally {
+          if (requestTimeout) clearTimeout(requestTimeout)
           setSubmitting(false)
           setIsActionLoading(false)
           setConfirmModal(prev => ({ ...prev, isOpen: false }))

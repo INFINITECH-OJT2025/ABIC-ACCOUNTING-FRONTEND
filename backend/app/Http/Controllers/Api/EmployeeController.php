@@ -10,6 +10,7 @@ use App\Models\Termination;
 use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
@@ -344,13 +345,20 @@ class EmployeeController extends Controller
             $emailNoticeError = null;
 
             if ($shouldSendEmailNotice && !empty($employee->email)) {
-                try {
-                    Mail::to($employee->email)->send(new TerminationNotice($employee, $termination));
-                    $emailNoticeStatus = 'sent';
-                } catch (\Throwable $mailError) {
-                    $emailNoticeStatus = 'failed';
-                    $emailNoticeError = $mailError->getMessage();
-                }
+                $emailNoticeStatus = 'queued';
+
+                // Send mail after API response to avoid blocking UI loading state.
+                dispatch(function () use ($employee, $termination) {
+                    try {
+                        Mail::to($employee->email)->send(new TerminationNotice($employee, $termination));
+                    } catch (\Throwable $mailError) {
+                        Log::error('Failed to send termination notice email', [
+                            'employee_id' => $employee->id,
+                            'employee_email' => $employee->email,
+                            'error' => $mailError->getMessage(),
+                        ]);
+                    }
+                })->afterResponse();
             }
 
             // Update employee status to terminated
