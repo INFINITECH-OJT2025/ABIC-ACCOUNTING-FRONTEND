@@ -947,219 +947,327 @@ export default function MasterfilePage() {
       ) : (
         /* DETAIL VIEW (Replaces Modal) */
         <div className="max-w-5xl mx-auto animate-in slide-in-from-bottom-8 duration-500">
-          <div className="mb-6 flex items-center justify-between">
-            <Button
-              variant="ghost"
-              onClick={() => setViewMode('list')}
-              disabled={isDetailLoading}
-              className="text-slate-500 hover:text-slate-800 hover:bg-white"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2"><path d="m15 18-6-6 6-6" /></svg>
-              Back to Employee List
-            </Button>
-          </div>
+          
 
           {isDetailLoading ? (
             <DetailSkeleton />
           ) : (
-            <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
-              {/* Header */}
-              <div className="bg-slate-50/50 p-8 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                <div className="flex items-center gap-5">
-                  <div className="w-20 h-20 rounded-full bg-[#630C22] text-white flex items-center justify-center text-3xl font-bold shadow-lg">
-                    {selectedEmployee?.first_name.charAt(0)}{selectedEmployee?.last_name.charAt(0)}
-                  </div>
-                  <div>
-                    <h1 className="text-3xl font-extrabold text-[#4A081A] mb-1">
-                      {selectedEmployee?.first_name} {selectedEmployee?.last_name}
-                    </h1>
-                    <div className="flex items-center gap-3">
-                      <p className="text-slate-500 font-medium">{selectedEmployee?.position || 'No Position'}</p>
-                      {selectedEmployee?.status === 'pending' ? (
-                        <Badge className={`border shadow-none px-3 py-0.5 transition-colors duration-300 ${(checkCompleteness(selectedEmployee).status === "READY TO EMPLOY" && selectedEmployee.onboarding_tasks?.isComplete)
-                          ? 'bg-emerald-500 text-white border-emerald-600 shadow-sm'
-                          : 'bg-amber-50 text-amber-700 border-amber-200'
-                          }`}>
-                          {selectedEmployee.onboarding_tasks?.isComplete ? checkCompleteness(selectedEmployee).status : "PENDING: ONBOARDING CHECKLIST"}
-                        </Badge>
-                      ) : (
-                        <Badge className={`${statusBadgeColors[selectedEmployee?.status || 'pending']} border shadow-none px-3 py-0.5`}>
-                          {statusLabels[selectedEmployee?.status || 'pending']}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
+            //employee information REVIEW 
+
+<div className="min-h-screen w-full bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-12">
+  <div className="relative w-full">
+    {/* ----- INTEGRATED HEADER & TOOLBAR ----- */}
+    <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md mb-6">
+      {/* Main Header Row */}
+      <div className="w-full px-4 md:px-8 py-6">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold mb-2">Employee Information</h1>
+            <p className="text-white/80 text-sm md:text-base flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              ABIC REALTY & CONSULTANCY
+            </p>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setViewMode('list')}
+              disabled={isDetailLoading}
+              className="border border-white/30 text-white hover:bg-white/20 hover:text-white bg-transparent backdrop-blur-sm shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg flex items-center gap-2 disabled:opacity-50"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="m15 18-6-6 6-6"/></svg>
+              <span>BACK TO LIST</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Secondary Toolbar - Employee Status Bar */}
+      {selectedEmployee && (
+        <div className="border-t border-white/10 bg-white/5 backdrop-blur-sm">
+          <div className="w-full px-4 md:px-8 py-3">
+            <div className="flex flex-wrap items-center gap-4 md:gap-6">
+              {/* Employee Badge */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center text-lg font-bold">
+                  {selectedEmployee?.first_name?.charAt(0)}{selectedEmployee?.last_name?.charAt(0)}
                 </div>
-                <div className="flex flex-col items-end gap-1">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Employee ID</p>
-                  <p className="font-mono text-slate-700 font-bold">#{selectedEmployee?.id.toString().padStart(4, '0')}</p>
+                <div>
+                  <p className="text-sm font-bold text-white/70 uppercase tracking-wider">Employee</p>
+                  <p className="text-white font-bold text-base">
+                    {selectedEmployee?.first_name} {selectedEmployee?.last_name}
+                  </p>
                 </div>
               </div>
 
-              {/* Content */}
-              <div className="p-8 md:p-10 space-y-12">
-                {selectedEmployee && (
-                  <>
-                    {/* EMPLOYMENT */}
-                    <section>
-                      <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
-                        <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
-                        Employment Information
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                        <DetailItem label="Position" value={selectedEmployee.position} required />
-                        <DetailItem label="Date Hired" value={selectedEmployee.date_hired ? new Date(selectedEmployee.date_hired).toLocaleDateString() : null} required />
-                        <DetailItem label="Department" value={selectedEmployee.department} />
-                        <DetailItem label="Employment Status" value={selectedEmployee.status} />
-                      </div>
-                    </section>
-
-                    {/* PERSONAL */}
-                    <section>
-                      <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
-                        <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
-                        Personal Information
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
-                        <DetailItem label="First Name" value={selectedEmployee.first_name} required />
-                        <DetailItem label="Last Name" value={selectedEmployee.last_name} required />
-                        <DetailItem label="Middle Name" value={selectedEmployee.middle_name} />
-                        <DetailItem label="Suffix" value={selectedEmployee.suffix} />
-                        <DetailItem label="Birthday" value={selectedEmployee.birthday ? new Date(selectedEmployee.birthday).toLocaleDateString() : null} required />
-                        <DetailItem label="Birthplace" value={selectedEmployee.birthplace} required />
-                        <DetailItem label="Gender" value={selectedEmployee.gender} required />
-                        <DetailItem label="Civil Status" value={selectedEmployee.civil_status} required />
-                      </div>
-                    </section>
-
-                    {/* CONTACT */}
-                    <section>
-                      <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
-                        <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
-                        Contact Information
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
-                        <DetailItem label="Email Address" value={selectedEmployee.email || selectedEmployee.email_address} required />
-                        <DetailItem label="Mobile Number" value={selectedEmployee.mobile_number} required />
-                        <DetailItem label="Tel Number" value={selectedEmployee.phone_number} />
-                      </div>
-                    </section>
-
-                    {/* ADDRESS */}
-                    <section>
-                      <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
-                        <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
-                        Address Information
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
-                        <DetailItem label="Street" value={selectedEmployee.street} required />
-                        <DetailItem label="Barangay" value={selectedEmployee.barangay} required />
-                        <DetailItem label="City / Municipality" value={selectedEmployee.city_municipality} required />
-                        <DetailItem label="Province" value={selectedEmployee.province} required />
-                        <DetailItem label="Region" value={selectedEmployee.region} required />
-                        <DetailItem label="Zip Code" value={selectedEmployee.zip_code} required />
-                        <DetailItem label="House No." value={selectedEmployee.house_number} />
-                        <DetailItem label="Village" value={selectedEmployee.village} />
-                        <DetailItem label="Subdivision" value={selectedEmployee.subdivision} />
-                      </div>
-                    </section>
-
-                    {/* TERMINATION DETAILS (If Terminated) */}
-                    {selectedEmployee.status === 'terminated' && (
-                      <section className="bg-rose-50 border border-rose-100 rounded-xl p-6">
-                        <h3 className="text-sm font-bold text-[#A4163A] uppercase tracking-widest mb-4 flex items-center gap-3">
-                          <span className="w-8 h-1 bg-[#A4163A] rounded-full"></span>
-                          Termination Details
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div>
-                            <p className="text-xs font-bold text-rose-400 mb-1.5 uppercase">Termination Date</p>
-                            <p className="font-semibold text-rose-900">
-                              {selectedEmployee.termination_date ? new Date(selectedEmployee.termination_date).toLocaleDateString() : 'N/A'}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs font-bold text-rose-400 mb-1.5 uppercase">Reason</p>
-                            <p className="font-medium text-rose-800 italic">
-                              "{selectedEmployee.termination_reason || 'No reason provided'}"
-                            </p>
-                          </div>
-                        </div>
-                      </section>
-                    )}
-
-                    {/* FAMILY & GOV */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                      <section>
-                        <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
-                          <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
-                          Family Background
-                        </h3>
-                        <div className="space-y-6">
-                          <div>
-                            <p className="text-xs font-bold text-slate-400 mb-2 uppercase">Mother's Maiden Name</p>
-                            <div className="grid grid-cols-2 gap-4 pl-3 border-l-2 border-slate-100">
-                              <DetailItem label="Last Name" value={selectedEmployee.mlast_name} required />
-                              <DetailItem label="First Name" value={selectedEmployee.mfirst_name} required />
-                            </div>
-                          </div>
-                          <div>
-                            <p className="text-xs font-bold text-slate-400 mb-2 uppercase">Father's Name</p>
-                            <div className="grid grid-cols-2 gap-4 pl-3 border-l-2 border-slate-100">
-                              <DetailItem label="Last Name" value={selectedEmployee.flast_name} />
-                              <DetailItem label="First Name" value={selectedEmployee.ffirst_name} />
-                            </div>
-                          </div>
-                        </div>
-                      </section>
-
-                      <section>
-                        <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
-                          <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
-                          Government IDs
-                        </h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
-                          <DetailItem label="SSS No." value={selectedEmployee.sss_number} />
-                          <DetailItem label="PhilHealth No." value={selectedEmployee.philhealth_number} />
-                          <DetailItem label="Pag-IBIG No." value={selectedEmployee.pagibig_number} />
-                          <DetailItem label="TIN" value={selectedEmployee.tin_number} />
-                        </div>
-                      </section>
-                    </div>
-                  </>
-                )}
+              {/* ID Badge */}
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-bold text-white/70 uppercase tracking-wider">ID</span>
+                <div className="bg-white border-2 border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 min-w-[100px] justify-between shadow-sm font-bold inline-flex items-center whitespace-nowrap rounded-lg">
+                  #{selectedEmployee?.id.toString().padStart(4, '0')}
+                </div>
               </div>
 
-              {/* Footer Actions */}
-              <div className="bg-slate-50 px-8 py-6 border-t border-slate-200 flex justify-end gap-3">
-                {selectedEmployee?.status === 'pending' ? (
-                  <>
-                    {selectedEmployee.onboarding_tasks?.isComplete && !checkCompleteness(selectedEmployee).isComplete && (
-                      <Button
-                        onClick={() => router.push(`/admin-head/employee/onboard?id=${selectedEmployee.id}&batch=${checkCompleteness(selectedEmployee).batchId}`)}
-                        className="h-12 px-8 font-bold rounded-xl text-white transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 bg-[#630C22] hover:bg-[#4A081A]"
-                      >
-                        Update Profile
-                      </Button>
-                    )}
-                    <Button
-                      onClick={handleSetAsEmployed}
-                      disabled={!checkCompleteness(selectedEmployee).isComplete || !selectedEmployee.onboarding_tasks?.isComplete || isUpdating}
-                      className={`h-12 px-8 font-bold rounded-xl transition-all ${(!checkCompleteness(selectedEmployee).isComplete || !selectedEmployee.onboarding_tasks?.isComplete)
-                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                        : 'bg-[#630C22] hover:bg-[#4A081A] text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5'
-                        }`}
-                    >
-                      Approve & Set as Employed
-                    </Button>
-                  </>
-                ) : (
-                  <Button variant="outline" onClick={() => setViewMode('list')} className="h-11 px-8">
-                    Back to List
-                  </Button>
-                )}
+              {/* Status Badge */}
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-bold text-white/70 uppercase tracking-wider">Status</span>
+                <div className="bg-white border-2 border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 justify-between shadow-sm font-bold inline-flex items-center whitespace-nowrap rounded-lg">
+                  {selectedEmployee?.status === 'pending' ? (
+                    <div className="flex items-center gap-2">
+                      {selectedEmployee.onboarding_tasks?.isComplete ? 
+                        checkCompleteness(selectedEmployee).status : 
+                        "PENDING: ONBOARDING CHECKLIST"}
+                    </div>
+                  ) : (
+                    statusLabels[selectedEmployee?.status || 'pending']
+                  )}
+                </div>
+              </div>
+
+              {/* Position */}
+              {selectedEmployee?.position && (
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-bold text-white/70 uppercase tracking-wider">Position</span>
+                  <div className="bg-white border-2 border-[#FFE5EC] text-[#800020] text-sm h-10 px-4 shadow-sm font-bold inline-flex items-center whitespace-nowrap rounded-lg">
+                    {selectedEmployee.position}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
+
+  <div className="bg-white p-3 md:p-6 rounded-lg shadow-lg border-b-2 md:border-2 border-[#FFE5EC] max-w-5xl mx-auto">
+    {isDetailLoading ? (
+      <div className="flex items-center justify-center p-12">
+        <svg className="w-8 h-8 animate-spin text-[#A0153E]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span className="ml-3 text-slate-500 font-medium">Loading employee details...</span>
+      </div>
+    ) : (
+      <div className="space-y-6">
+        {/* Header Info Card - using div */}
+        <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
+          <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl text-[#4A081A] font-bold">Employee Profile</h2>
+              <p className="text-sm font-bold text-[#630C22]">
+                {selectedEmployee?.first_name} {selectedEmployee?.last_name}
+              </p>
+            </div>
+            <p className="text-[#630C22]/70 text-xs font-medium mt-1">
+              Complete employee information and records
+            </p>
+          </div>
+        </div>
+
+        {selectedEmployee && (
+          <>
+            {/* EMPLOYMENT */}
+            <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
+              <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4">
+                <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
+                  <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
+                  Employment Information
+                </h3>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                  <DetailItem label="Position" value={selectedEmployee.position} required />
+                  <DetailItem label="Date Hired" value={selectedEmployee.date_hired ? new Date(selectedEmployee.date_hired).toLocaleDateString() : null} required />
+                  <DetailItem label="Department" value={selectedEmployee.department} />
+                  <DetailItem label="Employment Status" value={selectedEmployee.status} />
+                </div>
               </div>
             </div>
+
+            {/* PERSONAL */}
+            <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
+              <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4">
+                <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
+                  <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
+                  Personal Information
+                </h3>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+                  <DetailItem label="First Name" value={selectedEmployee.first_name} required />
+                  <DetailItem label="Last Name" value={selectedEmployee.last_name} required />
+                  <DetailItem label="Middle Name" value={selectedEmployee.middle_name} />
+                  <DetailItem label="Suffix" value={selectedEmployee.suffix} />
+                  <DetailItem label="Birthday" value={selectedEmployee.birthday ? new Date(selectedEmployee.birthday).toLocaleDateString() : null} required />
+                  <DetailItem label="Birthplace" value={selectedEmployee.birthplace} required />
+                  <DetailItem label="Gender" value={selectedEmployee.gender} required />
+                  <DetailItem label="Civil Status" value={selectedEmployee.civil_status} required />
+                </div>
+              </div>
+            </div>
+
+            {/* CONTACT */}
+            <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
+              <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4">
+                <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
+                  <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
+                  Contact Information
+                </h3>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+                  <DetailItem label="Email Address" value={selectedEmployee.email || selectedEmployee.email_address} required />
+                  <DetailItem label="Mobile Number" value={selectedEmployee.mobile_number} required />
+                  <DetailItem label="Tel Number" value={selectedEmployee.phone_number} />
+                </div>
+              </div>
+            </div>
+
+            {/* ADDRESS */}
+            <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
+              <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4">
+                <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
+                  <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
+                  Address Information
+                </h3>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+                  <DetailItem label="Street" value={selectedEmployee.street} required />
+                  <DetailItem label="Barangay" value={selectedEmployee.barangay} required />
+                  <DetailItem label="City / Municipality" value={selectedEmployee.city_municipality} required />
+                  <DetailItem label="Province" value={selectedEmployee.province} required />
+                  <DetailItem label="Region" value={selectedEmployee.region} required />
+                  <DetailItem label="Zip Code" value={selectedEmployee.zip_code} required />
+                  <DetailItem label="House No." value={selectedEmployee.house_number} />
+                  <DetailItem label="Village" value={selectedEmployee.village} />
+                  <DetailItem label="Subdivision" value={selectedEmployee.subdivision} />
+                </div>
+              </div>
+            </div>
+
+            {/* TERMINATION DETAILS (If Terminated) */}
+            {selectedEmployee.status === 'terminated' && (
+              <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
+                <div className="bg-gradient-to-r from-[#A4163A]/10 to-transparent pb-3 border-b-2 border-[#A4163A] p-4">
+                  <h3 className="text-lg text-[#A4163A] font-bold flex items-center gap-2">
+                    <span className="w-1 h-5 bg-[#A4163A] rounded-full"></span>
+                    Termination Details
+                  </h3>
+                </div>
+                <div className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <p className="text-xs font-bold text-slate-400 mb-2 uppercase">Termination Date</p>
+                      <p className="font-semibold text-slate-800">
+                        {selectedEmployee.termination_date ? new Date(selectedEmployee.termination_date).toLocaleDateString() : 'N/A'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-400 mb-2 uppercase">Reason</p>
+                      <p className="font-medium text-slate-700 italic">
+                        "{selectedEmployee.termination_reason || 'No reason provided'}"
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* FAMILY & GOV */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
+                <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4">
+                  <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
+                    <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
+                    Family Background
+                  </h3>
+                </div>
+                <div className="p-6">
+                  <div className="space-y-6">
+                    <div>
+                      <p className="text-xs font-bold text-slate-400 mb-3 uppercase">Mother's Maiden Name</p>
+                      <div className="grid grid-cols-2 gap-4 pl-3 border-l-2 border-[#FFE5EC]">
+                        <DetailItem label="Last Name" value={selectedEmployee.mlast_name} required />
+                        <DetailItem label="First Name" value={selectedEmployee.mfirst_name} required />
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-400 mb-3 uppercase">Father's Name</p>
+                      <div className="grid grid-cols-2 gap-4 pl-3 border-l-2 border-[#FFE5EC]">
+                        <DetailItem label="Last Name" value={selectedEmployee.flast_name} />
+                        <DetailItem label="First Name" value={selectedEmployee.ffirst_name} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
+                <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4">
+                  <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
+                    <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
+                    Government IDs
+                  </h3>
+                </div>
+                <div className="p-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
+                    <DetailItem label="SSS No." value={selectedEmployee.sss_number} />
+                    <DetailItem label="PhilHealth No." value={selectedEmployee.philhealth_number} />
+                    <DetailItem label="Pag-IBIG No." value={selectedEmployee.pagibig_number} />
+                    <DetailItem label="TIN" value={selectedEmployee.tin_number} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Footer Actions */}
+        <div className="bg-slate-50 px-6 py-4 rounded-lg border border-[#FFE5EC] flex justify-end gap-3">
+          {selectedEmployee?.status === 'pending' ? (
+            <>
+              {selectedEmployee.onboarding_tasks?.isComplete && !checkCompleteness(selectedEmployee).isComplete && (
+                <button
+                  onClick={() => router.push(`/admin-head/employee/onboard?id=${selectedEmployee.id}&batch=${checkCompleteness(selectedEmployee).batchId}`)}
+                  className="h-12 px-8 font-bold rounded-xl text-white transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#800020] hover:from-[#630C22] hover:to-[#A0153E]"
+                >
+                  Update Profile
+                </button>
+              )}
+              <button
+                onClick={handleSetAsEmployed}
+                disabled={!checkCompleteness(selectedEmployee).isComplete || !selectedEmployee.onboarding_tasks?.isComplete || isUpdating}
+                className={`h-12 px-8 font-bold rounded-xl transition-all shadow-lg ${
+                  (!checkCompleteness(selectedEmployee).isComplete || !selectedEmployee.onboarding_tasks?.isComplete)
+                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#800020] hover:from-[#630C22] hover:to-[#A0153E] text-white hover:shadow-xl hover:-translate-y-0.5'
+                }`}
+              >
+                Approve & Set as Employed
+              </button>
+            </>
+          ) : (
+            <button 
+              onClick={() => setViewMode('list')} 
+              className="h-11 px-8 border-2 border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] font-bold rounded-xl transition-all"
+            >
+              Back to List
+            </button>
+          )}
+        </div>
+
+        <div className="text-xs text-stone-500 space-y-1 text-right">
+          <p>* Employee ID: #{selectedEmployee?.id.toString().padStart(4, '0')}</p>
+          <p>* Complete profile ensures accurate record keeping</p>
+        </div>
+      </div>
+    )}
+  </div>
+</div>
           )}
         </div>
       )
