@@ -81,6 +81,7 @@ interface LateEntry {
   cutoffPeriod?: string
   month: string
   year: number
+  late_occurrence?: number // 1st late, 2nd late, etc.
 }
 
 
@@ -176,17 +177,16 @@ function formatDate(dateInput: any): string {
 
 // Recalculate warnings for all entries
 function recalculateWarnings(entries: LateEntry[]): LateEntry[] {
-  // We need to process entries by employee and cutoff to count lates correctly
-  // First, group by employee and cutoff
-  const entriesByEmployeeAndCutoff = new Map<string, LateEntry[]>()
+  // First, group by employee ONLY (to allow monthly cumulative counts)
+  const entriesByEmployee = new Map<string | number, LateEntry[]>()
 
 
   entries.forEach(entry => {
-    const key = `${entry.employee_name}-${entry.cutoffPeriod || entry.cutoff_period}`
-    if (!entriesByEmployeeAndCutoff.has(key)) {
-      entriesByEmployeeAndCutoff.set(key, [])
+    const key = entry.employee_id || entry.employee_name
+    if (!entriesByEmployee.has(key)) {
+      entriesByEmployee.set(key, [])
     }
-    entriesByEmployeeAndCutoff.get(key)?.push(entry)
+    entriesByEmployee.get(key)?.push(entry)
   })
 
 
@@ -194,7 +194,7 @@ function recalculateWarnings(entries: LateEntry[]): LateEntry[] {
   const updatedEntries: LateEntry[] = []
 
 
-  entriesByEmployeeAndCutoff.forEach((groupEntries) => {
+  entriesByEmployee.forEach((groupEntries) => {
     // Sort by date/time to ensure order
     groupEntries.sort((a, b) => {
       const dateA = new Date(a.date).getTime()
@@ -217,10 +217,9 @@ function recalculateWarnings(entries: LateEntry[]): LateEntry[] {
       // Check if late (using the same logic as Summary: > 8:05 AM)
       if (actualIn && exceedsGracePeriod(actualIn)) {
         lateCount++
-        // Every 3 lates = 1 warning
-        // We assign the warning level to the entry that triggers it (3rd, 6th, etc.)
-        if (lateCount % 3 === 0) {
-          warningLevel = lateCount / 3
+        // New Rule: 3rd late = 1st warning, 4th = 2nd, 5th = 3rd
+        if (lateCount >= 3) {
+          warningLevel = lateCount - 2
         }
       }
 
@@ -228,7 +227,8 @@ function recalculateWarnings(entries: LateEntry[]): LateEntry[] {
       return {
         ...entry,
         warningLevel: warningLevel,
-        warning_level: warningLevel // Update both for consistency
+        warning_level: warningLevel, // Update both for consistency
+        late_occurrence: actualIn && exceedsGracePeriod(actualIn) ? lateCount : 0
       }
     })
 
@@ -299,7 +299,7 @@ function exportToExcel(summaryArray: { name: string; totalMinutes: number; occur
     [],
     ['* Minutes are counted from 8:00 AM'],
     ['* Total Lates count is based on arrivals after 8:05 AM grace period'],
-    ['* Warnings: Every 3 lates = 1 warning'],
+    ['* Warnings: 3rd late = 1st warning, 4th = 2nd, 5th = 3rd'],
     [`* Report for ${month} ${year} - ${cutoffTitle}`]
   ]
 
@@ -439,7 +439,13 @@ function SummarySheet({ isOpen, onClose, cutoffTitle, entries, selectedYear, sel
   // Convert to array preserving the order of employees
   const summaryArray = employees.map(emp => {
     const data = summaryMap.get(emp.id) || { totalMinutes: 0, occurrences: 0, name: emp.name }
-    const warnings = Math.floor(data.occurrences / 3) // 3 lates = 1 warning
+
+    // Use the highest warning level reached by this employee in the specific entries for this cutoff
+    const empEntriesInRange = entries.filter(e => e.employee_id === emp.id)
+    const warnings = empEntriesInRange.length > 0
+      ? Math.max(...empEntriesInRange.map(e => e.warningLevel || 0))
+      : 0
+
     return {
       name: data.name,
       totalMinutes: data.totalMinutes,
@@ -596,7 +602,7 @@ function SummarySheet({ isOpen, onClose, cutoffTitle, entries, selectedYear, sel
           <div className="text-xs text-stone-500 space-y-1">
             <p>* Minutes are counted from 8:00 AM (no grace period in minutes display)</p>
             <p>* Occurrences are only counted for arrivals after 8:05 AM grace period</p>
-            <p>* Warnings: Every 3 lates = 1 warning</p>
+            <p>* Warnings: 3rd late = 1st warning, 4th = 2nd, 5th = 3rd</p>
             <p>This report includes data only from {cutoffTitle}</p>
           </div>
         </div>
@@ -1516,10 +1522,9 @@ function CutoffTable({
                     {entry.minutesLate > 0 ? (
                       <span className={`
                       inline-block px-4 py-1.5 rounded-full text-base md:text-lg font-bold border
-                      ${entry.minutesLate > 30 ? 'bg-red-50 text-red-700 border-red-200 shadow-sm' :
-                          entry.minutesLate > 15 ? 'bg-orange-50 text-orange-700 border-orange-200' :
-                            entry.minutesLate > 5 ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                              'bg-yellow-50 text-yellow-700 border-yellow-200'}
+                      ${entry.late_occurrence === 2 ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
+                          entry.late_occurrence && entry.late_occurrence >= 3 ? 'bg-red-100 text-red-700 border-red-200 shadow-sm' :
+                            'bg-transparent text-slate-700 border-transparent'}
                     `}>
                         {entry.minutesLate} min
                       </span>
@@ -1531,7 +1536,10 @@ function CutoffTable({
                     {entry.warningLevel && entry.warningLevel > 0 ? (
                       <div className="flex items-center gap-2 text-red-600">
                         <AlertTriangle className="w-5 h-5" />
-                        <span className="text-base md:text-lg font-bold">{entry.warningLevel}{entry.warningLevel === 1 ? 'st' : 'nd'}</span>
+                        <span className="text-base md:text-lg font-bold">
+                          {entry.warningLevel}
+                          {entry.warningLevel === 1 ? 'st' : entry.warningLevel === 2 ? 'nd' : entry.warningLevel === 3 ? 'rd' : 'th'}
+                        </span>
                       </div>
                     ) : (
                       <span className="text-stone-400 font-bold">—</span>
