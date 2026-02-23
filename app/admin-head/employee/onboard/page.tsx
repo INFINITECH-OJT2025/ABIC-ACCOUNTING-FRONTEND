@@ -173,7 +173,8 @@ function OnboardPageContent() {
     { id: 3, title: 'Contact Information', icon: Phone, description: 'How to reach you' },
     { id: 4, title: 'Government IDs', icon: CreditCard, description: 'Official identification numbers' },
     { id: 5, title: 'Family Information', icon: Users, description: 'Parent information' },
-    { id: 6, title: 'Address Details', icon: MapPin, description: 'Complete address information' },
+    { id: 6, title: 'Current Address', icon: MapPin, description: 'Current residence' },
+    { id: 7, title: 'Permanent Address', icon: MapPin, description: 'Permanent residence' },
   ]
 
   const onboardingTasks = [
@@ -503,7 +504,7 @@ function OnboardPageContent() {
     }
   }
 
-  const fetchProvinces = async (regionCode: string, preserveValues = false) => {
+  const fetchProvinces = async (regionCode: string, preserveValues = false, isPermanent = false) => {
     if (!regionCode) {
       setProvinces([])
       setCities([])
@@ -519,7 +520,11 @@ function OnboardPageContent() {
       setCities([])
       setBarangays([])
       if (!preserveValues) {
-        setProgressionFormData((prev) => ({ ...prev, province: '', city_municipality: '', barangay: '' }))
+        if (isPermanent) {
+          setProgressionFormData((prev) => ({ ...prev, perm_province: '', perm_city_municipality: '', perm_barangay: '' }))
+        } else {
+          setProgressionFormData((prev) => ({ ...prev, province: '', city_municipality: '', barangay: '' }))
+        }
       }
     } catch (error) {
       console.error('Error fetching provinces:', error)
@@ -529,7 +534,7 @@ function OnboardPageContent() {
     }
   }
 
-  const fetchCities = async (provinceCode: string, preserveValues = false) => {
+  const fetchCities = async (provinceCode: string, preserveValues = false, isPermanent = false) => {
     if (!provinceCode) {
       setCities([])
       setBarangays([])
@@ -550,7 +555,11 @@ function OnboardPageContent() {
       setCities(allCities)
       setBarangays([])
       if (!preserveValues) {
-        setProgressionFormData((prev) => ({ ...prev, city_municipality: '', barangay: '' }))
+        if (isPermanent) {
+          setProgressionFormData((prev) => ({ ...prev, perm_city_municipality: '', perm_barangay: '' }))
+        } else {
+          setProgressionFormData((prev) => ({ ...prev, city_municipality: '', barangay: '' }))
+        }
       }
     } catch (error) {
       console.error('Error fetching cities:', error)
@@ -560,7 +569,7 @@ function OnboardPageContent() {
     }
   }
 
-  const fetchBarangays = async (cityCode: string, preserveValues = false) => {
+  const fetchBarangays = async (cityCode: string, preserveValues = false, isPermanent = false) => {
     if (!cityCode) {
       setBarangays([])
       return
@@ -572,7 +581,11 @@ function OnboardPageContent() {
       const barangaysArray = Array.isArray(data) ? data : data.data || []
       setBarangays(barangaysArray.map((barangay: any) => ({ code: barangay.code, name: barangay.name })))
       if (!preserveValues) {
-        setProgressionFormData((prev) => ({ ...prev, barangay: '' }))
+        if (isPermanent) {
+          setProgressionFormData((prev) => ({ ...prev, perm_barangay: '' }))
+        } else {
+          setProgressionFormData((prev) => ({ ...prev, barangay: '' }))
+        }
       }
     } catch (error) {
       console.error('Error fetching barangays:', error)
@@ -905,6 +918,15 @@ function OnboardPageContent() {
     } else if (name === 'city_municipality') {
       const selectedCity = cities.find(c => c.name === value)
       if (selectedCity) fetchBarangays(selectedCity.code)
+    } else if (name === 'perm_region') {
+      const selectedRegion = regions.find(r => r.name === value)
+      if (selectedRegion) fetchProvinces(selectedRegion.code, false, true)
+    } else if (name === 'perm_province') {
+      const selectedProvince = provinces.find(p => p.name === value)
+      if (selectedProvince) fetchCities(selectedProvince.code, false, true)
+    } else if (name === 'perm_city_municipality') {
+      const selectedCity = cities.find(c => c.name === value)
+      if (selectedCity) fetchBarangays(selectedCity.code, false, true)
     }
   }
 
@@ -915,7 +937,8 @@ function OnboardPageContent() {
       'mobile_number', 'street',
       'sss_number', 'philhealth_number', 'pagibig_number', 'tin_number',
       'mlast_name', 'mfirst_name', 'flast_name', 'ffirst_name',
-      'region', 'province', 'city_municipality', 'barangay', 'zip_code', 'email_address'
+      'region', 'province', 'city_municipality', 'barangay', 'zip_code', 'email_address',
+      'perm_street', 'perm_region', 'perm_province', 'perm_city_municipality', 'perm_barangay', 'perm_zip_code'
     ]
 
     const filledFields = allFields.filter(field => {
@@ -943,13 +966,16 @@ function OnboardPageContent() {
       case 6:
         return !!data.region && !!data.province && !!data.city_municipality &&
           !!data.barangay && !!data.zip_code && !!data.email_address
+      case 7:
+        return !!data.perm_region && !!data.perm_province && !!data.perm_city_municipality &&
+          !!data.perm_barangay && !!data.perm_zip_code && !!data.perm_street
       default:
         return true
     }
   }
 
   const nextBatch = () => {
-    if (isCurrentBatchValid() && currentBatch < 6) {
+    if (isCurrentBatchValid() && currentBatch < 7) {
       setCurrentBatch(currentBatch + 1)
     } else if (!isCurrentBatchValid()) {
       toast.error('Please fill in all required fields to proceed.')
@@ -1597,7 +1623,7 @@ function OnboardPageContent() {
                       </div>
                     )}
 
-                    {/* BATCH 6: Address Details */}
+                    {/* BATCH 6: Current Address Details */}
                     {currentBatch === 6 && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
@@ -1638,6 +1664,60 @@ function OnboardPageContent() {
                         </div>
                       </div>
                     )}
+
+                    {/* BATCH 7: Permanent Address Details */}
+                    {currentBatch === 7 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <Label htmlFor="perm_house_number" className="text-sm font-semibold">House number</Label>
+                          <Input id="perm_house_number" name="perm_house_number" value={progressionFormData.perm_house_number || ''} onChange={handleProgressionChange} className="font-medium" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="perm_street" className="text-sm font-semibold">Street <span className="text-red-500">*</span></Label>
+                          <Input id="perm_street" name="perm_street" value={progressionFormData.perm_street || ''} onChange={handleProgressionChange} className="font-medium" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="perm_village" className="text-sm font-semibold">Village</Label>
+                          <Input id="perm_village" name="perm_village" value={progressionFormData.perm_village || ''} onChange={handleProgressionChange} className="font-medium" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="perm_subdivision" className="text-sm font-semibold">Subdivision</Label>
+                          <Input id="perm_subdivision" name="perm_subdivision" value={progressionFormData.perm_subdivision || ''} onChange={handleProgressionChange} className="font-medium" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="perm_region" className="text-sm font-semibold">Region <span className="text-red-500">*</span></Label>
+                          <select name="perm_region" value={progressionFormData.perm_region || ''} onChange={handleProgressionChange} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
+                            <option value="">Select Region...</option>
+                            {regions.map(r => <option key={r.code} value={r.name}>{r.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="perm_province" className="text-sm font-semibold">Province <span className="text-red-500">*</span></Label>
+                          <select name="perm_province" value={progressionFormData.perm_province || ''} onChange={handleProgressionChange} disabled={!progressionFormData.perm_region} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
+                            <option value="">Select Province...</option>
+                            {provinces.map(p => <option key={p.code} value={p.name}>{p.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="perm_city_municipality" className="text-sm font-semibold">City/Municipality <span className="text-red-500">*</span></Label>
+                          <select name="perm_city_municipality" value={progressionFormData.perm_city_municipality || ''} onChange={handleProgressionChange} disabled={!progressionFormData.perm_province} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
+                            <option value="">Select City...</option>
+                            {cities.map(c => <option key={c.code} value={c.name}>{c.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="perm_barangay" className="text-sm font-semibold">Barangay <span className="text-red-500">*</span></Label>
+                          <select name="perm_barangay" value={progressionFormData.perm_barangay || ''} onChange={handleProgressionChange} disabled={!progressionFormData.perm_city_municipality} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
+                            <option value="">Select Barangay...</option>
+                            {barangays.map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="perm_zip_code" className="text-sm font-semibold">ZIP Code <span className="text-red-500">*</span></Label>
+                          <Input id="perm_zip_code" name="perm_zip_code" value={progressionFormData.perm_zip_code || ''} onChange={handleProgressionChange} className="font-medium" />
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
 
                   <Separator />
@@ -1664,7 +1744,7 @@ function OnboardPageContent() {
                         ))}
                       </div>
 
-                      {currentBatch === 6 ? (
+                      {currentBatch === 7 ? (
                         <div className="flex gap-3">
                           <Button 
                             onClick={() => confirmSaveProgress('partial')}

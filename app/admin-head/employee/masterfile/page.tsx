@@ -255,11 +255,19 @@ export default function MasterfilePage() {
       return { isComplete: false, status: 'Pending: Family Information', batchId: 5 }
     }
 
-    // Batch 6: Address Information
+    // Batch 6: Current Address Information
     const addressFields = ['street', 'barangay', 'region', 'province', 'city_municipality', 'zip_code']
     for (const field of addressFields) {
       if (!emp[field] || emp[field].toString().trim() === '') {
-        return { isComplete: false, status: 'Pending: Address Information', batchId: 6 }
+        return { isComplete: false, status: 'Pending: Current Address Information', batchId: 6 }
+      }
+    }
+
+    // Batch 7: Permanent Address Information
+    const permAddressFields = ['perm_street', 'perm_barangay', 'perm_region', 'perm_province', 'perm_city_municipality', 'perm_zip_code']
+    for (const field of permAddressFields) {
+      if (!emp[field] || emp[field].toString().trim() === '') {
+        return { isComplete: false, status: 'Pending: Permanent Address Information', batchId: 7 }
       }
     }
 
@@ -1009,25 +1017,51 @@ export default function MasterfilePage() {
               </div>
             </div>
 
-            {/* ADDRESS */}
-            <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
-              <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4">
-                <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
-                  <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
-                  Address Information
-                </h3>
+            {/* ADDRESS INFORMATION */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* CURRENT ADDRESS */}
+              <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
+                <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4">
+                  <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
+                    <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
+                    Current Address
+                  </h3>
+                </div>
+                <div className="p-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
+                    <DetailItem label="House No." value={selectedEmployee.house_number} />
+                    <DetailItem label="Street" value={selectedEmployee.street} required />
+                    <DetailItem label="Village" value={selectedEmployee.village} />
+                    <DetailItem label="Subdivision" value={selectedEmployee.subdivision} />
+                    <DetailItem label="Barangay" value={selectedEmployee.barangay} required />
+                    <DetailItem label="City / Municipality" value={selectedEmployee.city_municipality} required />
+                    <DetailItem label="Province" value={selectedEmployee.province} required />
+                    <DetailItem label="Region" value={selectedEmployee.region} required />
+                    <DetailItem label="Zip Code" value={selectedEmployee.zip_code} required />
+                  </div>
+                </div>
               </div>
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
-                  <DetailItem label="Street" value={selectedEmployee.street} required />
-                  <DetailItem label="Barangay" value={selectedEmployee.barangay} required />
-                  <DetailItem label="City / Municipality" value={selectedEmployee.city_municipality} required />
-                  <DetailItem label="Province" value={selectedEmployee.province} required />
-                  <DetailItem label="Region" value={selectedEmployee.region} required />
-                  <DetailItem label="Zip Code" value={selectedEmployee.zip_code} required />
-                  <DetailItem label="House No." value={selectedEmployee.house_number} />
-                  <DetailItem label="Village" value={selectedEmployee.village} />
-                  <DetailItem label="Subdivision" value={selectedEmployee.subdivision} />
+
+              {/* PERMANENT ADDRESS */}
+              <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
+                <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4">
+                  <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
+                    <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
+                    Permanent Address
+                  </h3>
+                </div>
+                <div className="p-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
+                    <DetailItem label="House No." value={selectedEmployee.perm_house_number} />
+                    <DetailItem label="Street" value={selectedEmployee.perm_street} required />
+                    <DetailItem label="Village" value={selectedEmployee.perm_village} />
+                    <DetailItem label="Subdivision" value={selectedEmployee.perm_subdivision} />
+                    <DetailItem label="Barangay" value={selectedEmployee.perm_barangay} required />
+                    <DetailItem label="City / Municipality" value={selectedEmployee.perm_city_municipality} required />
+                    <DetailItem label="Province" value={selectedEmployee.perm_province} required />
+                    <DetailItem label="Region" value={selectedEmployee.perm_region} required />
+                    <DetailItem label="Zip Code" value={selectedEmployee.perm_zip_code} required />
+                  </div>
                 </div>
               </div>
             </div>
