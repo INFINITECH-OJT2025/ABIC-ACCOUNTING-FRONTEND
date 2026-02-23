@@ -6,14 +6,12 @@ import { getApiUrl } from '@/lib/api'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUpDown, ListFilter, ArrowUpAZ, ArrowDownAZ, Clock3, History, Search, Plus, Users, ChevronDown, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmationModal } from '@/components/ConfirmationModal'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select"
-import { ArrowUpDown, ListFilter, ArrowUpAZ, ArrowDownAZ, Clock3, History } from 'lucide-react'
-
 interface OnboardingChecklist {
   id: number
   name: string
@@ -93,7 +91,7 @@ export default function MasterfilePage() {
     isOpen: false,
     title: '',
     description: '',
-    onConfirm: () => {},
+    onConfirm: () => { },
     variant: 'default',
     confirmText: 'Confirm',
     hideCancel: false
@@ -109,9 +107,9 @@ export default function MasterfilePage() {
       const apiUrl = getApiUrl()
       const employeesUrl = `${apiUrl}/api/employees`
       const checklistsUrl = `${apiUrl}/api/onboarding-checklist`
-      
+
       const terminationsUrl = `${apiUrl}/api/terminations`
-      
+
       const [empRes, checkRes, termRes] = await Promise.all([
         fetch(employeesUrl, { headers: { Accept: 'application/json' } }),
         fetch(checklistsUrl, { headers: { Accept: 'application/json' } }),
@@ -121,11 +119,11 @@ export default function MasterfilePage() {
       if (!empRes.ok || !checkRes.ok || !termRes.ok) {
         throw new Error(`HTTP Error: employees=${empRes.status}, checklists=${checkRes.status}, terminations=${termRes.status}`)
       }
-      
+
       const empData = await empRes.json()
       const checkData = await checkRes.json()
       const termData = await termRes.json()
-      
+
       if (empData.success) {
         const checklistsList = Array.isArray(checkData.data) ? checkData.data : []
         const terminationsList = termData.success && Array.isArray(termData.data) ? termData.data : []
@@ -134,7 +132,7 @@ export default function MasterfilePage() {
             .toLowerCase()
             .replace(/\s+/g, ' ')
             .trim()
-        
+
         setChecklists(checklistsList)
 
         const enhancedEmployees = empData.data.map((emp: Employee) => {
@@ -159,7 +157,7 @@ export default function MasterfilePage() {
             })
           const checklist = checklistMatches[0]
           const termination = terminationsList.find((t: any) => t.employee_id === emp.id)
-          
+
           let enhancedEmp = { ...emp }
 
           if (termination) {
@@ -199,21 +197,21 @@ export default function MasterfilePage() {
       setIsDetailLoading(true)
       setViewMode('details')
       window.scrollTo(0, 0)
-      
+
       const apiUrl = getApiUrl()
       const fullUrl = `${apiUrl}/api/employees/${employeeId}`
-      
+
       const response = await fetch(fullUrl, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       })
-      
+
       if (!response.ok) {
         throw new Error(`HTTP Error: ${response.status}`)
       }
-      
+
       const data = await response.json()
-        if (data.success) {
+      if (data.success) {
         // Find existing onboarding tasks and termination details from the employees list to preserve state
         const existingEmp = employees.find(e => e.id === employeeId)
         const enhancedDetails = {
@@ -238,7 +236,7 @@ export default function MasterfilePage() {
 
   const checkCompleteness = (emp: any) => {
     if (!emp) return { isComplete: false, status: 'Incomplete', batchId: 1 }
-    
+
     // Batch 1: Employment Information
     if (!emp.position || emp.position.toString().trim() === '' || !emp.date_hired) {
       return { isComplete: false, status: 'Pending: Employment Information', batchId: 1 }
@@ -277,7 +275,7 @@ export default function MasterfilePage() {
 
   const handleSetAsEmployed = async () => {
     if (!selectedEmployee) return
-    
+
     const { isComplete } = checkCompleteness(selectedEmployee)
     if (!isComplete) {
       setConfirmModal({
@@ -341,7 +339,7 @@ export default function MasterfilePage() {
 
   const filterEmployees = (list: Employee[]) => {
     let result = [...list]
-    
+
     // Search Filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
@@ -382,16 +380,16 @@ export default function MasterfilePage() {
   const paginatedEmployed = employedList.slice((employedPage - 1) * ITEMS_PER_PAGE_TABLE, employedPage * ITEMS_PER_PAGE_TABLE)
   const paginatedTerminated = terminatedList.slice((terminatedPage - 1) * ITEMS_PER_PAGE_TABLE, terminatedPage * ITEMS_PER_PAGE_TABLE)
 
-  const PaginationControls = ({ 
-    currentPage, 
-    totalItems, 
-    itemsPerPage, 
-    onPageChange 
-  }: { 
-    currentPage: number, 
-    totalItems: number, 
-    itemsPerPage: number, 
-    onPageChange: (page: number) => void 
+  const PaginationControls = ({
+    currentPage,
+    totalItems,
+    itemsPerPage,
+    onPageChange
+  }: {
+    currentPage: number,
+    totalItems: number,
+    itemsPerPage: number,
+    onPageChange: (page: number) => void
   }) => {
     const totalPages = Math.ceil(totalItems / itemsPerPage)
     if (totalPages <= 1) return null
@@ -420,14 +418,14 @@ export default function MasterfilePage() {
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          
+
           <div className="flex items-center gap-1 mx-2">
             {[...Array(totalPages)].map((_, i) => {
               const pageNum = i + 1
               // Show only current, first, last, and pages around current
               if (
-                pageNum === 1 || 
-                pageNum === totalPages || 
+                pageNum === 1 ||
+                pageNum === totalPages ||
                 (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
               ) {
                 return (
@@ -435,18 +433,17 @@ export default function MasterfilePage() {
                     key={pageNum}
                     variant={currentPage === pageNum ? "default" : "outline"}
                     onClick={() => onPageChange(pageNum)}
-                    className={`h-9 w-9 rounded-lg text-sm font-bold transition-all ${
-                      currentPage === pageNum 
-                        ? 'bg-[#630C22] hover:bg-[#4A081A] text-white shadow-sm' 
-                        : 'border-slate-200 text-slate-600 hover:border-[#630C22] hover:text-[#630C22]'
-                    }`}
+                    className={`h-9 w-9 rounded-lg text-sm font-bold transition-all ${currentPage === pageNum
+                      ? 'bg-[#630C22] hover:bg-[#4A081A] text-white shadow-sm'
+                      : 'border-slate-200 text-slate-600 hover:border-[#630C22] hover:text-[#630C22]'
+                      }`}
                   >
                     {pageNum}
                   </Button>
                 )
               }
               if (
-                (pageNum === 2 && currentPage > 3) || 
+                (pageNum === 2 && currentPage > 3) ||
                 (pageNum === totalPages - 1 && currentPage < totalPages - 2)
               ) {
                 return <span key={pageNum} className="text-slate-300 mx-1">...</span>
@@ -479,62 +476,82 @@ export default function MasterfilePage() {
   }
 
   const EmployeeTable = ({ list, emptyMessage }: { list: Employee[], emptyMessage: string }) => (
-    list.length === 0 ? (
-      <div className="text-center py-12 text-slate-400 bg-slate-50/50 rounded-lg border border-dashed border-slate-200">
-        <p>{emptyMessage}</p>
+    <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-xl flex flex-col">
+      <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4 flex justify-between items-center">
+        <h3 className="text-xl text-[#4A081A] font-bold capitalize">
+          {activeTab} Employees Master List
+        </h3>
+        <div className="text-[#A0153E]/70 flex items-center gap-2 text-xs font-medium">
+          <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#C9184A]" />
+          <span>{list.length} records shown</span>
+        </div>
       </div>
-    ) : (
-      <div className="overflow-x-auto rounded-lg border border-slate-200 shadow-sm">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="text-left py-4 px-6 font-semibold text-[#4A081A] text-xs uppercase tracking-wider">Name</th>
-              <th className="text-left py-4 px-6 font-semibold text-[#4A081A] text-xs uppercase tracking-wider">Email</th>
-              <th className="text-left py-4 px-6 font-semibold text-[#4A081A] text-xs uppercase tracking-wider">Position</th>
-              <th className="text-left py-4 px-6 font-semibold text-[#4A081A] text-xs uppercase tracking-wider">Status</th>
-              <th className="text-left py-4 px-6 font-semibold text-[#4A081A] text-xs uppercase tracking-wider">Date</th>
-              <th className="text-right py-4 px-6 font-semibold text-[#4A081A] text-xs uppercase tracking-wider">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 bg-white">
-            {list.map((employee) => (
-              <tr key={employee.id} className="hover:bg-slate-50 transition-colors duration-200">
-                <td className="py-4 px-6">
-                  <div className="font-bold text-slate-800">{employee.first_name} {employee.last_name}</div>
-                </td>
-                <td className="py-4 px-6 text-slate-600 text-sm">{employee.email}</td>
-                <td className="py-4 px-6 text-slate-600 text-sm">{employee.position || '-'}</td>
-                <td className="py-4 px-6">
-                  <Badge className={`${statusBadgeColors[employee.status]} border shadow-none font-medium px-2.5 py-0.5 pointer-events-none`}>
-                    {statusLabels[employee.status]}
-                  </Badge>
-                </td>
-                <td className="py-4 px-6 text-slate-500 text-sm">
-                  {employee.status === 'terminated' && employee.termination_date ? (
-                     <div className="flex flex-col">
-                       <span className="font-semibold text-rose-700">{new Date(employee.termination_date).toLocaleDateString()}</span>
-                       <span className="text-[10px] uppercase font-bold text-rose-300">Terminated</span>
-                     </div>
-                  ) : (
-                     <span>{new Date(employee.created_at).toLocaleDateString()}</span>
-                  )}
-                </td>
-                <td className="py-4 px-6 text-right">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-slate-200 text-slate-600 hover:text-[#630C22] hover:border-[#630C22] hover:bg-red-50 transition-all"
-                    onClick={() => fetchEmployeeDetails(employee.id)}
-                  >
-                    View Details
-                  </Button>
-                </td>
+
+      {list.length === 0 ? (
+        <div className="text-center py-12 text-slate-400 bg-stone-50/30">
+          <p>{emptyMessage}</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-[#FFE5EC]/30 sticky top-0 border-b border-[#FFE5EC]">
+              <tr>
+                <th className="px-6 py-4 text-left font-bold text-[#800020] text-sm uppercase tracking-wider">Name</th>
+                <th className="px-6 py-4 text-left font-bold text-[#800020] text-sm uppercase tracking-wider">Email/Contact</th>
+                <th className="px-6 py-4 text-left font-bold text-[#800020] text-sm uppercase tracking-wider">Position</th>
+                <th className="px-6 py-4 text-left font-bold text-[#800020] text-sm uppercase tracking-wider">Status</th>
+                <th className="px-6 py-4 text-left font-bold text-[#800020] text-sm uppercase tracking-wider">Date</th>
+                <th className="px-6 py-4 text-right font-bold text-[#800020] text-sm uppercase tracking-wider">Action</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    )
+            </thead>
+            <tbody className="divide-y divide-stone-100">
+              {list.map((employee) => (
+                <tr key={employee.id} className="hover:bg-[#FFE5EC] border-b border-rose-50 transition-colors duration-200 group">
+                  <td className="px-6 py-4">
+                    <div className="font-bold text-slate-800 text-base group-hover:text-[#630C22] transition-colors">
+                      {employee.first_name} {employee.last_name}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-slate-600">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium">{employee.email}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-slate-700 font-semibold">{employee.position || '-'}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <Badge className={`${statusBadgeColors[employee.status]} border shadow-none font-bold px-3 py-1 uppercase text-[10px] pointer-events-none rounded-full`}>
+                      {statusLabels[employee.status]}
+                    </Badge>
+                  </td>
+                  <td className="px-6 py-4 text-slate-500">
+                    {employee.status === 'terminated' && employee.termination_date ? (
+                      <div className="flex flex-col">
+                        <span className="font-bold text-rose-700">{new Date(employee.termination_date).toLocaleDateString()}</span>
+                        <span className="text-[10px] uppercase font-bold text-rose-300">Terminated</span>
+                      </div>
+                    ) : (
+                      <span className="font-medium">{new Date(employee.created_at).toLocaleDateString()}</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-[#FFE5EC] text-[#800020] hover:bg-[#A4163A] hover:text-white font-bold transition-all shadow-sm rounded-lg"
+                      onClick={() => fetchEmployeeDetails(employee.id)}
+                    >
+                      View Details
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   )
 
   const DetailSkeleton = () => (
@@ -580,7 +597,7 @@ export default function MasterfilePage() {
   )
 
   return (
-    <div className="min-h-screen p-8 bg-slate-50 animate-in fade-in duration-500">
+    <div className="min-h-screen bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans flex flex-col">
       {/* ----- GLOBAL LOADING OVERLAY (For Actions Only) ----- */}
       {isActionLoading && (
         <div className="fixed inset-0 z-[100] bg-white/40 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-500">
@@ -601,72 +618,121 @@ export default function MasterfilePage() {
       )}
 
       {viewMode === 'list' ? (
-        <>
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6">
-            <div>
-              <h1 className="text-3xl font-extrabold text-[#4A081A] tracking-tight">Employee Records</h1>
-              <p className="text-slate-500 mt-2 text-lg">Manage and monitor employee master data and records.</p>
-            </div>
-            <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-              <div className="relative w-full sm:w-72">
-                <Input
-                  type="text"
-                  placeholder="Search employees..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-white border-slate-200 pl-10 h-11 focus:ring-2 focus:ring-[#630C22] focus:border-transparent rounded-xl shadow-sm transition-all"
-                />
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <div className="flex-1 flex flex-col">
+          {/* ----- INTEGRATED HEADER & TOOLBAR ----- */}
+          <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md mb-6">
+            {/* Main Header Row */}
+            <div className="w-full px-4 md:px-8 py-6">
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                <div>
+                  <h1 className="text-2xl md:text-3xl font-bold mb-2">Employee Records</h1>
+                  <p className="text-white/80 text-sm md:text-base flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Manage and monitor employee master data and records.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Button
+                    onClick={() => router.push('/admin-head/employee/onboard')}
+                    variant="outline"
+                    className="border-white/30 text-white hover:bg-white/20 hover:text-white bg-transparent backdrop-blur-sm shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>ONBOARD NEW EMPLOYEE</span>
+                  </Button>
                 </div>
               </div>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <Select value={sortOrder} onValueChange={(value: any) => setSortOrder(value)}>
-                  <SelectTrigger className="w-full sm:w-[180px] bg-white border-slate-200 h-11 rounded-xl shadow-sm focus:ring-[#630C22]">
-                    <div className="flex items-center gap-2 text-slate-600 font-bold text-xs uppercase tracking-wider">
-                      <ArrowUpDown className="h-4 w-4 text-slate-400" />
-                      <SelectValue placeholder="Sort by" />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-slate-200 shadow-xl overflow-hidden">
-                    <SelectItem value="recent" className="focus:bg-red-50 focus:text-[#630C22] font-bold text-xs py-3 uppercase tracking-wider cursor-pointer border-b border-slate-50 last:border-0 translate-x-1">
-                      <div className="flex items-center gap-3">
-                        <History className="h-4 w-4" />
-                        <span>Recent First</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="oldest" className="focus:bg-red-50 focus:text-[#630C22] font-bold text-xs py-3 uppercase tracking-wider cursor-pointer border-b border-slate-50 last:border-0 translate-x-1">
-                      <div className="flex items-center gap-3">
-                        <Clock3 className="h-4 w-4" />
-                        <span>Oldest First</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="az" className="focus:bg-red-50 focus:text-[#630C22] font-bold text-xs py-3 uppercase tracking-wider cursor-pointer border-b border-slate-50 last:border-0 translate-x-1">
-                      <div className="flex items-center gap-3">
-                        <ArrowUpAZ className="h-4 w-4" />
-                        <span>Alphabet (A-Z)</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="za" className="focus:bg-red-50 focus:text-[#630C22] font-bold text-xs py-3 uppercase tracking-wider cursor-pointer border-b border-slate-50 last:border-0 translate-x-1">
-                      <div className="flex items-center gap-3">
-                        <ArrowDownAZ className="h-4 w-4" />
-                        <span>Alphabet (Z-A)</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            </div>
 
-              <Button
-                onClick={() => router.push('/admin-head/employee/onboard')}
-                className="w-full sm:w-auto bg-[#630C22] hover:bg-[#4A081A] text-white font-bold px-6 h-11 rounded-xl transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-              >
-                + ONBOARD NEW EMPLOYEE
-              </Button>
+            {/* Secondary Toolbar */}
+            <div className="border-t border-white/10 bg-white/5 backdrop-blur-sm">
+              <div className="w-full px-4 md:px-8 py-3">
+                <div className="flex flex-wrap items-center gap-4 lg:gap-8">
+                  {/* Status Tabs */}
+                  <div className="flex items-center bg-white/10 p-1 rounded-lg backdrop-blur-md border border-white/10">
+                    <button
+                      onClick={() => setActiveTab('all')}
+                      className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-200 uppercase tracking-wider ${activeTab === 'all'
+                        ? 'bg-white text-[#A4163A] shadow-md'
+                        : 'text-white/70 hover:text-white hover:bg-white/5'
+                        }`}
+                    >
+                      All ({employees.length})
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('employed')}
+                      className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-200 uppercase tracking-wider ${activeTab === 'employed'
+                        ? 'bg-white text-[#A4163A] shadow-md'
+                        : 'text-white/70 hover:text-white hover:bg-white/5'
+                        }`}
+                    >
+                      Employed ({employees.filter(e => e.status === 'employed').length})
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('terminated')}
+                      className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-200 uppercase tracking-wider ${activeTab === 'terminated'
+                        ? 'bg-white text-[#A4163A] shadow-md'
+                        : 'text-white/70 hover:text-white hover:bg-white/5'
+                        }`}
+                    >
+                      Terminated ({employees.filter(e => e.status === 'terminated').length})
+                    </button>
+                  </div>
+
+                  {/* Search and Sort */}
+                  <div className="flex flex-1 flex-wrap items-center gap-3">
+                    <div className="relative w-full md:w-[350px]">
+                      <Search className="absolute left-3 top-2.5 h-4 w-4 text-[#A0153E]" />
+                      <Input
+                        placeholder="Search employee..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="bg-white border-2 border-[#FFE5EC] text-slate-700 placeholder:text-slate-400 pl-10 h-10 w-full focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A] shadow-sm rounded-lg transition-all"
+                      />
+                    </div>
+
+                    <Select value={sortOrder} onValueChange={(value: any) => setSortOrder(value)}>
+                      <SelectTrigger className="w-full sm:w-[180px] bg-white border-2 border-[#FFE5EC] h-10 rounded-lg shadow-sm focus:ring-[#A0153E] text-[#800020] font-bold">
+                        <div className="flex items-center gap-2 text-xs uppercase tracking-wider">
+                          <ArrowUpDown className="h-3.5 w-3.5 opacity-50" />
+                          <SelectValue placeholder="Sort by" />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-stone-200 shadow-xl overflow-hidden">
+                        <SelectItem value="recent" className="focus:bg-red-50 focus:text-[#630C22] font-bold text-xs py-2 uppercase tracking-wider cursor-pointer border-b border-slate-50 last:border-0">
+                          <div className="flex items-center gap-3">
+                            <History className="h-4 w-4" />
+                            <span>Recent First</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="oldest" className="focus:bg-red-50 focus:text-[#630C22] font-bold text-xs py-2 uppercase tracking-wider cursor-pointer border-b border-slate-50 last:border-0">
+                          <div className="flex items-center gap-3">
+                            <Clock3 className="h-4 w-4" />
+                            <span>Oldest First</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="az" className="focus:bg-red-50 focus:text-[#630C22] font-bold text-xs py-2 uppercase tracking-wider cursor-pointer border-b border-slate-50 last:border-0">
+                          <div className="flex items-center gap-3">
+                            <ArrowUpAZ className="h-4 w-4" />
+                            <span>Alphabet (A-Z)</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="za" className="focus:bg-red-50 focus:text-[#630C22] font-bold text-xs py-2 uppercase tracking-wider cursor-pointer border-b border-slate-50 last:border-0">
+                          <div className="flex items-center gap-3">
+                            <ArrowDownAZ className="h-4 w-4" />
+                            <span>Alphabet (Z-A)</span>
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+          <div className="px-4 md:px-8 pb-12 overflow-y-auto">
             {fetchError ? (
               <div className="flex flex-col items-center justify-center py-24 text-center animate-in fade-in zoom-in-95 duration-500">
                 <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center mb-6 group">
@@ -678,7 +744,7 @@ export default function MasterfilePage() {
                 <p className="text-slate-500 max-w-md mx-auto mb-8">
                   {fetchError} Please ensure the backend server is running and try again.
                 </p>
-                <Button 
+                <Button
                   onClick={fetchEmployees}
                   className="bg-[#A4163A] hover:bg-[#80122D] text-white px-8 h-12 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5"
                 >
@@ -705,8 +771,8 @@ export default function MasterfilePage() {
                           </div>
                         </div>
                         <div className="pt-3 border-t border-slate-50 flex justify-between items-center">
-                           <Skeleton className="h-5 w-20 rounded-full" />
-                           <Skeleton className="h-6 w-6 rounded-full" />
+                          <Skeleton className="h-5 w-20 rounded-full" />
+                          <Skeleton className="h-6 w-6 rounded-full" />
                         </div>
                       </div>
                     ))}
@@ -753,88 +819,86 @@ export default function MasterfilePage() {
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                       {paginatedPending.map((employee) => {
-                         const { isComplete, status } = checkCompleteness(employee as any)
-                         
-                          return (
-                           <div
-                             key={employee.id}
-                             onClick={() => fetchEmployeeDetails(employee.id)}
-                             className={`group relative bg-white border rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer overflow-hidden ${
-                               isComplete 
-                                 ? 'border-emerald-200 hover:border-emerald-400 ring-1 ring-emerald-50' 
-                                 : 'border-slate-200 hover:border-orange-300'
-                             }`}
-                           >
-                              {/* Ready Indicator Strip */}
-                              {isComplete && <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>}
+                        const { isComplete, status } = checkCompleteness(employee as any)
 
-                             <div className="flex items-center gap-4 mb-4">
-                               <div className={`w-14 h-14 min-w-[3.5rem] rounded-full flex items-center justify-center text-xl font-bold transition-colors duration-200 ${
-                                 isComplete 
-                                   ? 'bg-emerald-100 text-emerald-700 group-hover:bg-emerald-500 group-hover:text-white' 
-                                   : 'bg-orange-100 text-orange-700 group-hover:bg-orange-500 group-hover:text-white'
-                               }`}>
-                                 {employee.first_name.charAt(0)}{employee.last_name.charAt(0)}
-                               </div>
-                               <div className="overflow-hidden flex flex-col justify-center">
-                                 <p className="font-semibold text-[#4A081A] text-xs uppercase tracking-wider mb-0.5 truncate">
-                                   {employee.position || 'No Position'}
-                                 </p>
-                                 <h1 className="text-lg md:text-xl font-bold text-slate-800 leading-tight group-hover:text-[#630C22] transition-colors break-words">
-                                   {employee.first_name} {employee.last_name}
-                                 </h1>
-                               </div>
-                             </div>
-                             <div className="flex justify-between items-center pt-3 border-t border-slate-50">
-                               {isComplete ? (
-                                 <Badge variant="outline" className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border-emerald-100">
-                                   {employee.onboarding_tasks?.isComplete ? status : "PENDING: ONBOARDING CHECKLIST"}
-                                 </Badge>
+                        return (
+                          <div
+                            key={employee.id}
+                            onClick={() => fetchEmployeeDetails(employee.id)}
+                            className={`group relative bg-white border rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer overflow-hidden ${isComplete
+                              ? 'border-emerald-200 hover:border-emerald-400 ring-1 ring-emerald-50'
+                              : 'border-slate-200 hover:border-orange-300'
+                              }`}
+                          >
+                            {/* Ready Indicator Strip */}
+                            {isComplete && <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>}
+
+                            <div className="flex items-center gap-4 mb-4">
+                              <div className={`w-14 h-14 min-w-[3.5rem] rounded-full flex items-center justify-center text-xl font-bold transition-colors duration-200 ${isComplete
+                                ? 'bg-emerald-100 text-emerald-700 group-hover:bg-emerald-500 group-hover:text-white'
+                                : 'bg-orange-100 text-orange-700 group-hover:bg-orange-500 group-hover:text-white'
+                                }`}>
+                                {employee.first_name.charAt(0)}{employee.last_name.charAt(0)}
+                              </div>
+                              <div className="overflow-hidden flex flex-col justify-center">
+                                <p className="font-semibold text-[#4A081A] text-xs uppercase tracking-wider mb-0.5 truncate">
+                                  {employee.position || 'No Position'}
+                                </p>
+                                <h1 className="text-lg md:text-xl font-bold text-slate-800 leading-tight group-hover:text-[#630C22] transition-colors break-words">
+                                  {employee.first_name} {employee.last_name}
+                                </h1>
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-center pt-3 border-t border-slate-50">
+                              {isComplete ? (
+                                <Badge variant="outline" className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border-emerald-100">
+                                  {employee.onboarding_tasks?.isComplete ? status : "PENDING: ONBOARDING CHECKLIST"}
+                                </Badge>
                               ) : (
-                                 <div className="flex flex-col gap-1 items-start">
-                                   <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">
-                                     {employee.onboarding_tasks?.isComplete ? status : "PENDING: ONBOARDING CHECKLIST"}
-                                   </span>
-                                   {employee.onboarding_tasks && (
-                                     <span className="text-[9px] font-medium text-slate-400">
-                                       Tasks: {employee.onboarding_tasks.done}/{employee.onboarding_tasks.total}
-                                     </span>
-                                   )}
-                                 </div>
-                               )}
-                               <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                 {employee.status === 'pending' && (!isComplete || !employee.onboarding_tasks?.isComplete) && (
-                                   <Button
-                                     variant="ghost"
-                                     size="sm"
-                                     onClick={() =>
-                                       router.push(
-                                         employee.onboarding_tasks?.isComplete
-                                           ? `/admin-head/employee/onboard?id=${employee.id}&batch=${checkCompleteness(employee as any).batchId}`
-                                           : `/admin-head/employee/onboard?id=${employee.id}&view=checklist&batch=${checkCompleteness(employee as any).batchId}`
-                                       )
-                                     }
-                                     className={`h-7 px-2 text-[10px] font-bold border rounded-lg transition-all ${
-                                       employee.onboarding_tasks?.isComplete
-                                         ? 'text-[#630C22] bg-rose-50 hover:bg-rose-100 border-rose-100'
-                                         : 'text-blue-600 bg-blue-50 hover:bg-blue-100 border-blue-100 animate-pulse hover:animate-none'
-                                     }`}
-                                   >
-                                     {employee.onboarding_tasks?.isComplete ? 'Update Profile' : 'Continue Onboarding'}
-                                   </Button>
-                                 )}
-                                 <button 
-                                   onClick={() => fetchEmployeeDetails(employee.id)}
-                                   className="text-[10px] text-slate-400 font-medium group-hover:text-[#630C22] group-hover:translate-x-1 transition-all flex items-center gap-1 py-1"
-                                 >
-                                   Review <span className="text-xs">→</span>
-                                 </button>
-                               </div>
-                             </div>
-                           </div>
-                       )})}
+                                <div className="flex flex-col gap-1 items-start">
+                                  <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">
+                                    {employee.onboarding_tasks?.isComplete ? status : "PENDING: ONBOARDING CHECKLIST"}
+                                  </span>
+                                  {employee.onboarding_tasks && (
+                                    <span className="text-[9px] font-medium text-slate-400">
+                                      Tasks: {employee.onboarding_tasks.done}/{employee.onboarding_tasks.total}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                {employee.status === 'pending' && (!isComplete || !employee.onboarding_tasks?.isComplete) && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      router.push(
+                                        employee.onboarding_tasks?.isComplete
+                                          ? `/admin-head/employee/onboard?id=${employee.id}&batch=${checkCompleteness(employee as any).batchId}`
+                                          : `/admin-head/employee/onboard?id=${employee.id}&view=checklist&batch=${checkCompleteness(employee as any).batchId}`
+                                      )
+                                    }
+                                    className={`h-7 px-2 text-[10px] font-bold border rounded-lg transition-all ${employee.onboarding_tasks?.isComplete
+                                      ? 'text-[#630C22] bg-rose-50 hover:bg-rose-100 border-rose-100'
+                                      : 'text-blue-600 bg-blue-50 hover:bg-blue-100 border-blue-100 animate-pulse hover:animate-none'
+                                      }`}
+                                  >
+                                    {employee.onboarding_tasks?.isComplete ? 'Update Profile' : 'Continue Onboarding'}
+                                  </Button>
+                                )}
+                                <button
+                                  onClick={() => fetchEmployeeDetails(employee.id)}
+                                  className="text-[10px] text-slate-400 font-medium group-hover:text-[#630C22] group-hover:translate-x-1 transition-all flex items-center gap-1 py-1"
+                                >
+                                  Review <span className="text-xs">→</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
-                    <PaginationControls 
+                    <PaginationControls
                       currentPage={pendingPage}
                       totalItems={pendingList.length}
                       itemsPerPage={ITEMS_PER_PAGE_CARDS}
@@ -844,80 +908,42 @@ export default function MasterfilePage() {
                 )}
 
                 {/* Main Content Area */}
-                <div>
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 border-b border-slate-100 pb-4">
-                    <h3 className="text-lg font-bold text-[#4A081A] flex items-center gap-2">
-                       Master List
-                    </h3>
-                    <div className="flex items-center bg-slate-100 p-1.5 rounded-xl">
-                      <button
-                        onClick={() => setActiveTab('all')}
-                        className={`px-6 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
-                          activeTab === 'all'
-                            ? 'bg-white text-[#4A081A] shadow-sm'
-                            : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
-                        }`}
-                      >
-                        All <span className="ml-1 opacity-60 text-xs">({employees.length})</span>
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('employed')}
-                        className={`px-6 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
-                          activeTab === 'employed'
-                            ? 'bg-white text-[#4A081A] shadow-sm'
-                            : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
-                        }`}
-                      >
-                        Employed <span className="ml-1 opacity-60 text-xs">({employees.filter(e => e.status === 'employed').length})</span>
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('terminated')}
-                        className={`px-6 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
-                          activeTab === 'terminated'
-                            ? 'bg-white text-[#4A081A] shadow-sm'
-                            : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
-                        }`}
-                      >
-                        Terminated <span className="ml-1 opacity-60 text-xs">({employees.filter(e => e.status === 'terminated').length})</span>
-                      </button>
-                    </div>
-                  </div>
-
+                <div className="mt-12">
                   <EmployeeTable
                     list={
-                      activeTab === 'all' ? paginatedAll : 
-                      activeTab === 'employed' ? paginatedEmployed : 
-                      paginatedTerminated
+                      activeTab === 'all' ? paginatedAll :
+                        activeTab === 'employed' ? paginatedEmployed :
+                          paginatedTerminated
                     }
                     emptyMessage={
-                      searchQuery 
-                        ? `No ${activeTab} employees match your search.` 
+                      searchQuery
+                        ? `No ${activeTab} employees match your search.`
                         : `No ${activeTab} employees found.`
                     }
                   />
-                  <PaginationControls 
+                  <PaginationControls
                     currentPage={
-                      activeTab === 'all' ? allPage : 
-                      activeTab === 'employed' ? employedPage : 
-                      terminatedPage
+                      activeTab === 'all' ? allPage :
+                        activeTab === 'employed' ? employedPage :
+                          terminatedPage
                     }
                     totalItems={
-                      activeTab === 'all' ? allList.length : 
-                      activeTab === 'employed' ? employedList.length : 
-                      terminatedList.length
+                      activeTab === 'all' ? allList.length :
+                        activeTab === 'employed' ? employedList.length :
+                          terminatedList.length
                     }
                     itemsPerPage={ITEMS_PER_PAGE_TABLE}
                     onPageChange={
-                      activeTab === 'all' ? setAllPage : 
-                      activeTab === 'employed' ? setEmployedPage : 
-                      setTerminatedPage
+                      activeTab === 'all' ? setAllPage :
+                        activeTab === 'employed' ? setEmployedPage :
+                          setTerminatedPage
                     }
                   />
                 </div>
               </div>
             )}
           </div>
-        </>
+        </div>
       ) : (
         /* DETAIL VIEW (Replaces Modal) */
         <div className="max-w-5xl mx-auto animate-in slide-in-from-bottom-8 duration-500">
@@ -928,7 +954,7 @@ export default function MasterfilePage() {
               disabled={isDetailLoading}
               className="text-slate-500 hover:text-slate-800 hover:bg-white"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2"><path d="m15 18-6-6 6-6"/></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2"><path d="m15 18-6-6 6-6" /></svg>
               Back to Employee List
             </Button>
           </div>
@@ -937,178 +963,177 @@ export default function MasterfilePage() {
             <DetailSkeleton />
           ) : (
             <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
-             {/* Header */}
-             <div className="bg-slate-50/50 p-8 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+              {/* Header */}
+              <div className="bg-slate-50/50 p-8 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div className="flex items-center gap-5">
-                   <div className="w-20 h-20 rounded-full bg-[#630C22] text-white flex items-center justify-center text-3xl font-bold shadow-lg">
-                      {selectedEmployee?.first_name.charAt(0)}{selectedEmployee?.last_name.charAt(0)}
-                   </div>
-                   <div>
-                      <h1 className="text-3xl font-extrabold text-[#4A081A] mb-1">
-                        {selectedEmployee?.first_name} {selectedEmployee?.last_name}
-                      </h1>
-                      <div className="flex items-center gap-3">
-                        <p className="text-slate-500 font-medium">{selectedEmployee?.position || 'No Position'}</p>
-                        {selectedEmployee?.status === 'pending' ? (
-                          <Badge className={`border shadow-none px-3 py-0.5 transition-colors duration-300 ${
-                            (checkCompleteness(selectedEmployee).status === "READY TO EMPLOY" && selectedEmployee.onboarding_tasks?.isComplete)
-                              ? 'bg-emerald-500 text-white border-emerald-600 shadow-sm' 
-                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                  <div className="w-20 h-20 rounded-full bg-[#630C22] text-white flex items-center justify-center text-3xl font-bold shadow-lg">
+                    {selectedEmployee?.first_name.charAt(0)}{selectedEmployee?.last_name.charAt(0)}
+                  </div>
+                  <div>
+                    <h1 className="text-3xl font-extrabold text-[#4A081A] mb-1">
+                      {selectedEmployee?.first_name} {selectedEmployee?.last_name}
+                    </h1>
+                    <div className="flex items-center gap-3">
+                      <p className="text-slate-500 font-medium">{selectedEmployee?.position || 'No Position'}</p>
+                      {selectedEmployee?.status === 'pending' ? (
+                        <Badge className={`border shadow-none px-3 py-0.5 transition-colors duration-300 ${(checkCompleteness(selectedEmployee).status === "READY TO EMPLOY" && selectedEmployee.onboarding_tasks?.isComplete)
+                          ? 'bg-emerald-500 text-white border-emerald-600 shadow-sm'
+                          : 'bg-amber-50 text-amber-700 border-amber-200'
                           }`}>
-                            {selectedEmployee.onboarding_tasks?.isComplete ? checkCompleteness(selectedEmployee).status : "PENDING: ONBOARDING CHECKLIST"}
-                          </Badge>
-                        ) : (
-                          <Badge className={`${statusBadgeColors[selectedEmployee?.status || 'pending']} border shadow-none px-3 py-0.5`}>
-                            {statusLabels[selectedEmployee?.status || 'pending']}
-                          </Badge>
-                        )}
-                      </div>
-                   </div>
+                          {selectedEmployee.onboarding_tasks?.isComplete ? checkCompleteness(selectedEmployee).status : "PENDING: ONBOARDING CHECKLIST"}
+                        </Badge>
+                      ) : (
+                        <Badge className={`${statusBadgeColors[selectedEmployee?.status || 'pending']} border shadow-none px-3 py-0.5`}>
+                          {statusLabels[selectedEmployee?.status || 'pending']}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 <div className="flex flex-col items-end gap-1">
-                   <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Employee ID</p>
-                   <p className="font-mono text-slate-700 font-bold">#{selectedEmployee?.id.toString().padStart(4, '0')}</p>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Employee ID</p>
+                  <p className="font-mono text-slate-700 font-bold">#{selectedEmployee?.id.toString().padStart(4, '0')}</p>
                 </div>
-             </div>
+              </div>
 
-             {/* Content */}
-             <div className="p-8 md:p-10 space-y-12">
-               {selectedEmployee && (
-                 <>
-                  {/* EMPLOYMENT */}
-                  <section>
-                    <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
-                      <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
-                      Employment Information
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                      <DetailItem label="Position" value={selectedEmployee.position} required />
-                      <DetailItem label="Date Hired" value={selectedEmployee.date_hired ? new Date(selectedEmployee.date_hired).toLocaleDateString() : null} required />
-                      <DetailItem label="Department" value={selectedEmployee.department} />
-                      <DetailItem label="Employment Status" value={selectedEmployee.status} />
-                    </div>
-                  </section>
-
-                  {/* PERSONAL */}
-                  <section>
-                     <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
-                      <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
-                      Personal Information
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
-                      <DetailItem label="First Name" value={selectedEmployee.first_name} required />
-                      <DetailItem label="Last Name" value={selectedEmployee.last_name} required />
-                      <DetailItem label="Middle Name" value={selectedEmployee.middle_name} />
-                      <DetailItem label="Suffix" value={selectedEmployee.suffix} />
-                      <DetailItem label="Birthday" value={selectedEmployee.birthday ? new Date(selectedEmployee.birthday).toLocaleDateString() : null} required />
-                      <DetailItem label="Birthplace" value={selectedEmployee.birthplace} required />
-                      <DetailItem label="Gender" value={selectedEmployee.gender} required />
-                      <DetailItem label="Civil Status" value={selectedEmployee.civil_status} required />
-                    </div>
-                  </section>
-
-                  {/* CONTACT */}
-                   <section>
-                     <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
-                      <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
-                      Contact Information
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
-                      <DetailItem label="Email Address" value={selectedEmployee.email || selectedEmployee.email_address} required />
-                      <DetailItem label="Mobile Number" value={selectedEmployee.mobile_number} required />
-                      <DetailItem label="Tel Number" value={selectedEmployee.phone_number} />
-                    </div>
-                  </section>
-
-                  {/* ADDRESS */}
-                   <section>
-                     <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
-                      <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
-                      Address Information
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
-                       <DetailItem label="Street" value={selectedEmployee.street} required />
-                       <DetailItem label="Barangay" value={selectedEmployee.barangay} required />
-                       <DetailItem label="City / Municipality" value={selectedEmployee.city_municipality} required />
-                       <DetailItem label="Province" value={selectedEmployee.province} required />
-                       <DetailItem label="Region" value={selectedEmployee.region} required />
-                       <DetailItem label="Zip Code" value={selectedEmployee.zip_code} required />
-                       <DetailItem label="House No." value={selectedEmployee.house_number} />
-                       <DetailItem label="Village" value={selectedEmployee.village} />
-                       <DetailItem label="Subdivision" value={selectedEmployee.subdivision} />
-                    </div>
-                  </section>
-
-                  {/* TERMINATION DETAILS (If Terminated) */}
-                  {selectedEmployee.status === 'terminated' && (
-                    <section className="bg-rose-50 border border-rose-100 rounded-xl p-6">
-                      <h3 className="text-sm font-bold text-[#A4163A] uppercase tracking-widest mb-4 flex items-center gap-3">
-                        <span className="w-8 h-1 bg-[#A4163A] rounded-full"></span>
-                        Termination Details
+              {/* Content */}
+              <div className="p-8 md:p-10 space-y-12">
+                {selectedEmployee && (
+                  <>
+                    {/* EMPLOYMENT */}
+                    <section>
+                      <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
+                        <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
+                        Employment Information
                       </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                         <div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                        <DetailItem label="Position" value={selectedEmployee.position} required />
+                        <DetailItem label="Date Hired" value={selectedEmployee.date_hired ? new Date(selectedEmployee.date_hired).toLocaleDateString() : null} required />
+                        <DetailItem label="Department" value={selectedEmployee.department} />
+                        <DetailItem label="Employment Status" value={selectedEmployee.status} />
+                      </div>
+                    </section>
+
+                    {/* PERSONAL */}
+                    <section>
+                      <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
+                        <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
+                        Personal Information
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+                        <DetailItem label="First Name" value={selectedEmployee.first_name} required />
+                        <DetailItem label="Last Name" value={selectedEmployee.last_name} required />
+                        <DetailItem label="Middle Name" value={selectedEmployee.middle_name} />
+                        <DetailItem label="Suffix" value={selectedEmployee.suffix} />
+                        <DetailItem label="Birthday" value={selectedEmployee.birthday ? new Date(selectedEmployee.birthday).toLocaleDateString() : null} required />
+                        <DetailItem label="Birthplace" value={selectedEmployee.birthplace} required />
+                        <DetailItem label="Gender" value={selectedEmployee.gender} required />
+                        <DetailItem label="Civil Status" value={selectedEmployee.civil_status} required />
+                      </div>
+                    </section>
+
+                    {/* CONTACT */}
+                    <section>
+                      <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
+                        <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
+                        Contact Information
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+                        <DetailItem label="Email Address" value={selectedEmployee.email || selectedEmployee.email_address} required />
+                        <DetailItem label="Mobile Number" value={selectedEmployee.mobile_number} required />
+                        <DetailItem label="Tel Number" value={selectedEmployee.phone_number} />
+                      </div>
+                    </section>
+
+                    {/* ADDRESS */}
+                    <section>
+                      <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
+                        <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
+                        Address Information
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+                        <DetailItem label="Street" value={selectedEmployee.street} required />
+                        <DetailItem label="Barangay" value={selectedEmployee.barangay} required />
+                        <DetailItem label="City / Municipality" value={selectedEmployee.city_municipality} required />
+                        <DetailItem label="Province" value={selectedEmployee.province} required />
+                        <DetailItem label="Region" value={selectedEmployee.region} required />
+                        <DetailItem label="Zip Code" value={selectedEmployee.zip_code} required />
+                        <DetailItem label="House No." value={selectedEmployee.house_number} />
+                        <DetailItem label="Village" value={selectedEmployee.village} />
+                        <DetailItem label="Subdivision" value={selectedEmployee.subdivision} />
+                      </div>
+                    </section>
+
+                    {/* TERMINATION DETAILS (If Terminated) */}
+                    {selectedEmployee.status === 'terminated' && (
+                      <section className="bg-rose-50 border border-rose-100 rounded-xl p-6">
+                        <h3 className="text-sm font-bold text-[#A4163A] uppercase tracking-widest mb-4 flex items-center gap-3">
+                          <span className="w-8 h-1 bg-[#A4163A] rounded-full"></span>
+                          Termination Details
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div>
                             <p className="text-xs font-bold text-rose-400 mb-1.5 uppercase">Termination Date</p>
                             <p className="font-semibold text-rose-900">
                               {selectedEmployee.termination_date ? new Date(selectedEmployee.termination_date).toLocaleDateString() : 'N/A'}
                             </p>
-                         </div>
-                         <div>
+                          </div>
+                          <div>
                             <p className="text-xs font-bold text-rose-400 mb-1.5 uppercase">Reason</p>
                             <p className="font-medium text-rose-800 italic">
                               "{selectedEmployee.termination_reason || 'No reason provided'}"
                             </p>
-                         </div>
-                      </div>
-                    </section>
-                  )}
-
-                  {/* FAMILY & GOV */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                     <section>
-                       <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
-                        <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
-                        Family Background
-                      </h3>
-                      <div className="space-y-6">
-                        <div>
-                           <p className="text-xs font-bold text-slate-400 mb-2 uppercase">Mother's Maiden Name</p>
-                           <div className="grid grid-cols-2 gap-4 pl-3 border-l-2 border-slate-100">
-                             <DetailItem label="Last Name" value={selectedEmployee.mlast_name} required />
-                             <DetailItem label="First Name" value={selectedEmployee.mfirst_name} required />
-                           </div>
+                          </div>
                         </div>
-                        <div>
-                           <p className="text-xs font-bold text-slate-400 mb-2 uppercase">Father's Name</p>
-                           <div className="grid grid-cols-2 gap-4 pl-3 border-l-2 border-slate-100">
-                             <DetailItem label="Last Name" value={selectedEmployee.flast_name} />
-                             <DetailItem label="First Name" value={selectedEmployee.ffirst_name} />
-                           </div>
-                        </div>
-                      </div>
-                     </section>
+                      </section>
+                    )}
 
-                     <section>
-                       <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
-                        <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
-                        Government IDs
-                      </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
-                        <DetailItem label="SSS No." value={selectedEmployee.sss_number} />
-                        <DetailItem label="PhilHealth No." value={selectedEmployee.philhealth_number} />
-                        <DetailItem label="Pag-IBIG No." value={selectedEmployee.pagibig_number} />
-                        <DetailItem label="TIN" value={selectedEmployee.tin_number} />
-                      </div>
-                     </section>
-                  </div>
-                 </>
-               )}
-             </div>
-             
-             {/* Footer Actions */}
-             <div className="bg-slate-50 px-8 py-6 border-t border-slate-200 flex justify-end gap-3">
+                    {/* FAMILY & GOV */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                      <section>
+                        <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
+                          <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
+                          Family Background
+                        </h3>
+                        <div className="space-y-6">
+                          <div>
+                            <p className="text-xs font-bold text-slate-400 mb-2 uppercase">Mother's Maiden Name</p>
+                            <div className="grid grid-cols-2 gap-4 pl-3 border-l-2 border-slate-100">
+                              <DetailItem label="Last Name" value={selectedEmployee.mlast_name} required />
+                              <DetailItem label="First Name" value={selectedEmployee.mfirst_name} required />
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-slate-400 mb-2 uppercase">Father's Name</p>
+                            <div className="grid grid-cols-2 gap-4 pl-3 border-l-2 border-slate-100">
+                              <DetailItem label="Last Name" value={selectedEmployee.flast_name} />
+                              <DetailItem label="First Name" value={selectedEmployee.ffirst_name} />
+                            </div>
+                          </div>
+                        </div>
+                      </section>
+
+                      <section>
+                        <h3 className="text-sm font-bold text-[#4A081A] uppercase tracking-widest mb-6 flex items-center gap-3 pb-2 border-b border-slate-100">
+                          <span className="w-8 h-1 bg-[#630C22] rounded-full"></span>
+                          Government IDs
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
+                          <DetailItem label="SSS No." value={selectedEmployee.sss_number} />
+                          <DetailItem label="PhilHealth No." value={selectedEmployee.philhealth_number} />
+                          <DetailItem label="Pag-IBIG No." value={selectedEmployee.pagibig_number} />
+                          <DetailItem label="TIN" value={selectedEmployee.tin_number} />
+                        </div>
+                      </section>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Footer Actions */}
+              <div className="bg-slate-50 px-8 py-6 border-t border-slate-200 flex justify-end gap-3">
                 {selectedEmployee?.status === 'pending' ? (
-                   <>
+                  <>
                     {selectedEmployee.onboarding_tasks?.isComplete && !checkCompleteness(selectedEmployee).isComplete && (
                       <Button
                         onClick={() => router.push(`/admin-head/employee/onboard?id=${selectedEmployee.id}&batch=${checkCompleteness(selectedEmployee).batchId}`)}
@@ -1120,25 +1145,25 @@ export default function MasterfilePage() {
                     <Button
                       onClick={handleSetAsEmployed}
                       disabled={!checkCompleteness(selectedEmployee).isComplete || !selectedEmployee.onboarding_tasks?.isComplete || isUpdating}
-                      className={`h-12 px-8 font-bold rounded-xl transition-all ${
-                        (!checkCompleteness(selectedEmployee).isComplete || !selectedEmployee.onboarding_tasks?.isComplete)
+                      className={`h-12 px-8 font-bold rounded-xl transition-all ${(!checkCompleteness(selectedEmployee).isComplete || !selectedEmployee.onboarding_tasks?.isComplete)
                         ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                         : 'bg-[#630C22] hover:bg-[#4A081A] text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5'
-                      }`}
+                        }`}
                     >
                       Approve & Set as Employed
                     </Button>
-                   </>
+                  </>
                 ) : (
-                   <Button variant="outline" onClick={() => setViewMode('list')} className="h-11 px-8">
-                     Back to List
-                   </Button>
+                  <Button variant="outline" onClick={() => setViewMode('list')} className="h-11 px-8">
+                    Back to List
+                  </Button>
                 )}
               </div>
             </div>
           )}
         </div>
-      )}
+      )
+      }
 
       <ConfirmationModal
         isOpen={confirmModal.isOpen}
@@ -1151,7 +1176,7 @@ export default function MasterfilePage() {
         hideCancel={confirmModal.hideCancel}
         isLoading={isUpdating}
       />
-    </div>
+    </div >
   )
 }
 
@@ -1160,7 +1185,7 @@ function DetailItem({ label, value, required }: { label: string, value: any, req
   return (
     <div className="group">
       <p className="text-xs font-bold text-slate-500 mb-1.5 flex items-center gap-1 group-hover:text-[#630C22] transition-colors">
-        {label} 
+        {label}
         {required && <span className="text-rose-500 text-[10px] bg-rose-50 px-1 rounded ml-1">REQUIRED</span>}
       </p>
       <p className={`font-medium text-base ${isEmpty ? 'text-slate-300 italic' : 'text-slate-800'}`}>
