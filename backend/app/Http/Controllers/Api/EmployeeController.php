@@ -9,6 +9,8 @@ use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 use Illuminate\Support\Str;
 
 class EmployeeController extends Controller
@@ -363,6 +365,26 @@ class EmployeeController extends Controller
             // Update employee status back to employed
             $employee->update(['status' => 'employed']);
 
+            $currentId = $employee->id;
+            $rehiredAt = $request->input('rehired_at') ? Carbon::parse($request->input('rehired_at')) : now();
+            $rehireYear = $rehiredAt->format('y');
+            $idParts = explode('-', $currentId);
+
+            if (count($idParts) === 2) {
+                $idYear = $idParts[0];
+                $idSequence = $idParts[1];
+
+                if ($idYear !== $rehireYear) {
+                    $newId = "{$rehireYear}-{$idSequence}";
+
+                    // Update the ID using raw DB to bypass Eloquent PK issues
+                    DB::table('employees')->where('id', $currentId)->update(['id' => $newId]);
+
+                    // Refresh the employee model with the new ID
+                    $employee = Employee::find($newId);
+                }
+            }
+
             // Update the termination records for this employee to 'cancelled' and set rehired_at
             Termination::where('employee_id', $employee->id)
                 ->where('status', 'completed')
@@ -370,7 +392,7 @@ class EmployeeController extends Controller
                 ->first()
                     ?->update([
                     'status' => 'cancelled',
-                    'rehired_at' => now()
+                    'rehired_at' => $rehiredAt
                 ]);
 
             // Log activity

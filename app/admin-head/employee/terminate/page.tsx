@@ -44,7 +44,7 @@ import {
 } from "@/components/ui/select"
 
 interface Employee {
-  id: number
+  id: string
   first_name: string
   last_name: string
   email: string
@@ -54,7 +54,7 @@ interface Employee {
 
 interface TerminationRecord {
   id: number
-  employee_id: number
+  employee_id: string
   termination_date: string
   rehired_at?: string | null
   reason: string
@@ -66,6 +66,7 @@ interface TerminationRecord {
 
 interface TerminationFormData {
   termination_date: string
+  rehire_date: string
   reason: string
   notes: string
 }
@@ -80,9 +81,10 @@ export default function TerminatePage() {
   const [selectedTermination, setSelectedTermination] = useState<TerminationRecord | null>(null)
   const [isRequestFormOpen, setIsRequestFormOpen] = useState(false)
   const [showDetailDialog, setShowDetailDialog] = useState(false)
-  const [rehireLoading, setRehireLoading] = useState<number | null>(null)
+  const [rehireLoading, setRehireLoading] = useState<string | null>(null)
   const [formData, setFormData] = useState<TerminationFormData>({
     termination_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
+    rehire_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
     reason: '',
     notes: '',
   })
@@ -241,6 +243,7 @@ export default function TerminatePage() {
             setSelectedEmployeeId('')
             setFormData({
               termination_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
+              rehire_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
               reason: '',
               notes: '',
             })
@@ -266,7 +269,12 @@ export default function TerminatePage() {
     })
   }
 
-  const handleRehire = async (employeeId: number) => {
+  const handleRehire = async (employeeId: string) => {
+    if (!formData.rehire_date) {
+      toast.error('Please set a re-hire date and time')
+      return
+    }
+
     setConfirmModal({
       isOpen: true,
       title: 'Confirm Re-hire',
@@ -281,6 +289,9 @@ export default function TerminatePage() {
             headers: {
               'Content-Type': 'application/json',
             },
+            body: JSON.stringify({
+              rehired_at: formData.rehire_date
+            })
           })
 
           const data = await response.json()
@@ -464,7 +475,7 @@ export default function TerminatePage() {
                   >
                     {selectedEmployeeId
                       ? (() => {
-                        const emp = employees.find((e) => e.id.toString() === selectedEmployeeId)
+                        const emp = employees.find((e) => e.id === selectedEmployeeId)
                         return emp ? `${emp.last_name}, ${emp.first_name}` : "Select employee..."
                       })()
                       : "Select employee..."}
@@ -482,7 +493,7 @@ export default function TerminatePage() {
                             key={emp.id}
                             value={`${emp.last_name}, ${emp.first_name} ${emp.position}`}
                             onSelect={() => {
-                              setSelectedEmployeeId(emp.id.toString())
+                              setSelectedEmployeeId(emp.id)
                               setOpenCombobox(false)
                             }}
                             className="py-2.5 cursor-pointer"
@@ -490,7 +501,7 @@ export default function TerminatePage() {
                             <Check
                               className={cn(
                                 "mr-2 h-4 w-4",
-                                selectedEmployeeId === emp.id.toString() ? "opacity-100 text-[#800020]" : "opacity-0"
+                                selectedEmployeeId === emp.id ? "opacity-100 text-[#800020]" : "opacity-0"
                               )}
                             />
                             <div className="flex flex-col">
@@ -678,7 +689,14 @@ export default function TerminatePage() {
                                   size="sm"
                                   variant="outline"
                                   className="h-9 border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300 transition-all font-bold px-4 rounded-lg shadow-sm"
-                                  onClick={() => handleRehire(record.employee_id)}
+                                  onClick={() => {
+                                    setSelectedTermination(record)
+                                    setFormData((prev) => ({
+                                      ...prev,
+                                      rehire_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
+                                    }))
+                                    setShowDetailDialog(true)
+                                  }}
                                   disabled={rehireLoading === record.employee_id}
                                 >
                                   {rehireLoading === record.employee_id ? 'Wait...' : 'Re-hire'}
@@ -807,21 +825,39 @@ export default function TerminatePage() {
             )}
           </div>
 
-          <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
-            <Button variant="ghost" onClick={() => setShowDetailDialog(false)} className="font-bold text-slate-600">
-              Back to List
-            </Button>
-            <Button
-              className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all font-bold px-6"
-              onClick={() => {
-                if (selectedTermination) {
-                  handleRehire(selectedTermination.employee_id)
-                }
-              }}
-              disabled={rehireLoading === selectedTermination?.employee_id}
-            >
-              {rehireLoading === selectedTermination?.employee_id ? 'Restoring Access...' : 'Re-hire Employee'}
-            </Button>
+          <div className="p-6 bg-slate-50 border-t border-slate-100 flex flex-col gap-4">
+            <div className="flex items-center gap-4 bg-white p-3 rounded-lg border border-slate-200">
+              <div className="flex flex-col gap-1 shrink-0">
+                <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Re-hire Date & Time</Label>
+                <Input
+                  type="datetime-local"
+                  name="rehire_date"
+                  value={formData.rehire_date}
+                  onChange={handleInputChange}
+                  className="h-9 px-2 bg-transparent border-0 focus:outline-none focus:ring-0 text-slate-600 font-medium text-sm w-[200px]"
+                  disabled={rehireLoading !== null}
+                />
+              </div>
+              <div className="flex-1 text-xs text-slate-400 italic">
+                Specify the official re-hire date for this employee.
+              </div>
+            </div>
+            <div className="flex justify-between items-center">
+              <Button variant="ghost" onClick={() => setShowDetailDialog(false)} className="font-bold text-slate-600">
+                Back to List
+              </Button>
+              <Button
+                className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all font-bold px-6"
+                onClick={() => {
+                  if (selectedTermination) {
+                    handleRehire(selectedTermination.employee_id)
+                  }
+                }}
+                disabled={rehireLoading === selectedTermination?.employee_id}
+              >
+                {rehireLoading === selectedTermination?.employee_id ? 'Restoring Access...' : 'Re-hire Employee'}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
