@@ -535,8 +535,14 @@ export default function OwnersPage() {
       const res = await fetch(`/api/accountant/maintenance/owners/${ownerId}`);
       const data = await res.json();
       if (res.ok && data.success && data.data) {
-        setDetailOwner(data.data);
-        setDetailFormData(data.data);
+        const upperOwner = {
+          ...data.data,
+          name: data.data.name?.toUpperCase() || "",
+        };
+        
+        setDetailOwner(upperOwner);
+        setDetailFormData(upperOwner);
+
         await fetchUnits(ownerId);
       } else {
         setDetailLoadError(data.message || "Failed to load owner details");
@@ -910,7 +916,7 @@ export default function OwnersPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           owner_type: formData.owner_type,
-          name: formData.name.trim(),
+          name: formData.name.trim().toUpperCase(),
           description: formData.description?.trim() || null,
           email: formData.email?.trim() || null,
           phone: formData.phone?.trim() || null,
@@ -1169,7 +1175,7 @@ export default function OwnersPage() {
       
       const cleanedData: Record<string, any> = {
         owner_type: formData.owner_type,
-        name: ownerName.trim(),
+        name: ownerName.trim().toUpperCase(),
         description: formData.description?.trim() || null,
         email: formData.email?.trim() || null,
         phone: formData.phone?.trim() || null,
@@ -1666,8 +1672,8 @@ export default function OwnersPage() {
                     <input
                       type="text"
                       value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className={`w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20 ${
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value.toUpperCase() })}
+                      className={`uppercase w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20 ${
                         nameError ? "border-red-500" : ""
                       }`}
                       style={nameError ? {} : { borderColor: BORDER }}
@@ -1928,7 +1934,12 @@ export default function OwnersPage() {
                           <input
                             type="text"
                             value={detailFormData.name || ""}
-                            onChange={(e) => setDetailFormData({ ...detailFormData, name: e.target.value })}
+                            onChange={(e) =>
+                              setDetailFormData({
+                                ...detailFormData,
+                                name: e.target.value.toUpperCase(),
+                              })
+                            }
                             className={`w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#7a0f1f]/20 ${
                               nameError ? "border-red-500" : ""
                             }`}

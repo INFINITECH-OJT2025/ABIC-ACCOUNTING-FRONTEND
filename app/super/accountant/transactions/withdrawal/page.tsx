@@ -1035,6 +1035,20 @@ export default function WithdrawalPage() {
   
   // Prepare transaction payload according to schema
   const prepareTransactionPayload = () => {
+    // Clean and validate amount
+    let amount = 0;
+    if (formData.amount) {
+      // Remove commas, spaces, and any non-numeric characters except decimal point
+      const cleanedAmount = formData.amount.toString().replace(/[^\d.]/g, '');
+      const parsedAmount = parseFloat(cleanedAmount);
+      
+      // Validate amount is a valid number and within realistic range
+      if (!isNaN(parsedAmount) && parsedAmount >= 0.01 && parsedAmount <= 999999999.99) {
+        // Round to 2 decimal places
+        amount = Math.round(parsedAmount * 100) / 100;
+      }
+    }
+    
     return {
       voucher_no: formData.voucher_no ? formData.voucher_no.toUpperCase().trim() : null,
       voucher_date: formData.voucher_date,
@@ -1043,7 +1057,7 @@ export default function WithdrawalPage() {
       from_owner_id: formData.from_owner_id,
       to_owner_id: formData.to_owner_id,
       unit_id: formData.unit_id || null,
-      amount: parseFloat(formData.amount.replace(/,/g, '')) || 0,
+      amount: amount,
       fund_reference: formData.fund_reference ? formData.fund_reference.toUpperCase().trim() : null,
       particulars: formData.particulars ? formData.particulars.toUpperCase().trim() : null,
       transfer_group_id: null, // Optional, can be set later if needed
@@ -1146,8 +1160,25 @@ export default function WithdrawalPage() {
       return;
     }
 
-    if (!formData.amount || parseFloat(formData.amount.replace(/,/g, '')) <= 0) {
-      setCreateWithdrawalFailMessage("Amount must be greater than 0");
+    // Validate amount
+    if (!formData.amount || !formData.amount.toString().trim()) {
+      setCreateWithdrawalFailMessage("Amount is required");
+      setShowCreateWithdrawalFail(true);
+      return;
+    }
+    
+    // Clean and validate amount
+    const cleanedAmount = formData.amount.toString().replace(/[^\d.]/g, '');
+    const parsedAmount = parseFloat(cleanedAmount);
+    
+    if (isNaN(parsedAmount) || parsedAmount < 0.01) {
+      setCreateWithdrawalFailMessage("Amount must be at least ₱0.01");
+      setShowCreateWithdrawalFail(true);
+      return;
+    }
+    
+    if (parsedAmount > 999999999.99) {
+      setCreateWithdrawalFailMessage("Amount cannot exceed ₱999,999,999.99");
       setShowCreateWithdrawalFail(true);
       return;
     }

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Receipt, Eye, Trash2, Download, Calendar, FileText, Loader2 } from "lucide-react";
+import { Receipt, Eye, Trash2, Download, Calendar, FileText, Loader2, X } from "lucide-react";
 import Image from "next/image";
 
 interface SavedReceipt {
@@ -26,6 +26,7 @@ export default function SavedReceiptsPage() {
   const [receipts, setReceipts] = useState<SavedReceipt[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedReceipt, setSelectedReceipt] = useState<SavedReceipt | null>(null);
+  const [panelClosing, setPanelClosing] = useState(false);
   const [filterType, setFilterType] = useState<"ALL" | "DEPOSIT" | "WITHDRAWAL">("ALL");
 
   useEffect(() => {
@@ -173,7 +174,10 @@ export default function SavedReceiptsPage() {
                 <div
                   key={receipt.id}
                   className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => setSelectedReceipt(receipt)}
+                  onClick={() => {
+                    setPanelClosing(false);
+                    setSelectedReceipt(receipt);
+                  }}
                 >
                   <div className="relative h-48 bg-gray-100">
                     {receipt.file_url ? (
@@ -234,6 +238,7 @@ export default function SavedReceiptsPage() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          setPanelClosing(false);
                           setSelectedReceipt(receipt);
                         }}
                         className="flex-1 px-3 py-1.5 bg-[#4A081A] text-white rounded text-xs font-medium hover:bg-[#5f0c18] transition-colors flex items-center justify-center gap-1"
@@ -272,62 +277,142 @@ export default function SavedReceiptsPage() {
         </section>
       </div>
 
-      {/* View Receipt Modal */}
+      {/* View Receipt Side Panel */}
       {selectedReceipt && (
-        <div
-          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-          onClick={() => setSelectedReceipt(null)}
-        >
+        <>
+          {/* Overlay */}
           <div
-            className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-auto"
+            className={`fixed inset-0 bg-black/50 z-40 transition-opacity duration-[350ms] ${
+              panelClosing ? "opacity-0" : "opacity-100"
+            }`}
+            onClick={() => {
+              setPanelClosing(true);
+              setTimeout(() => {
+                setSelectedReceipt(null);
+                setPanelClosing(false);
+              }, 350);
+            }}
+          />
+
+          {/* Side Panel */}
+          <div
+            className="fixed top-0 right-0 bottom-0 w-full max-w-2xl h-screen bg-white z-50 flex flex-col overflow-hidden shadow-xl"
+            style={{
+              animation: panelClosing
+                ? "slideOut 0.35s cubic-bezier(0.32, 0.72, 0, 1) forwards"
+                : "slideIn 0.4s cubic-bezier(0.32, 0.72, 0, 1)",
+              boxShadow: "-8px 0 24px rgba(0,0,0,0.15)",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">
-                  {selectedReceipt.transaction_type} Receipt
-                </h3>
-                <p className="text-sm text-gray-500">
-                  {selectedReceipt.transaction?.voucher_no || "No Voucher"} • {formatDate(selectedReceipt.created_at)}
-                </p>
+            {/* Header */}
+            <div className="flex-shrink-0 flex items-center justify-between p-6 bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#7B0F2B] text-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                  <Receipt className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">
+                    {selectedReceipt.transaction_type} Receipt
+                  </h2>
+                  <p className="text-white/80 text-sm mt-0.5">
+                    {selectedReceipt.transaction?.voucher_no || "No Voucher"} • {formatDate(selectedReceipt.created_at)}
+                  </p>
+                </div>
               </div>
               <button
-                onClick={() => setSelectedReceipt(null)}
-                className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+                onClick={() => {
+                  setPanelClosing(true);
+                  setTimeout(() => {
+                    setSelectedReceipt(null);
+                    setPanelClosing(false);
+                  }, 350);
+                }}
+                className="p-2 rounded-md hover:bg-white/20 transition-colors"
               >
-                <span className="text-gray-500 text-xl">×</span>
+                <X className="w-5 h-5 text-white" />
               </button>
             </div>
-            <div className="p-6">
-              {selectedReceipt.file_url ? (
-                <img
-                  src={selectedReceipt.file_url}
-                  alt={selectedReceipt.file_name}
-                  className="w-full h-auto rounded-md"
-                  onError={(e) => {
-                    console.error("Modal image load error for receipt", selectedReceipt.id, "URL:", selectedReceipt.file_url, e);
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                    const parent = target.parentElement;
-                    if (parent && !parent.querySelector('.error-fallback-modal')) {
-                      const fallback = document.createElement('div');
-                      fallback.className = 'error-fallback-modal flex items-center justify-center h-64 bg-gray-100 rounded-md';
-                      fallback.innerHTML = '<svg class="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>';
-                      parent.appendChild(fallback);
-                    }
-                  }}
-                  onLoad={() => {
-                    console.log("Modal image loaded successfully for receipt", selectedReceipt.id, "URL:", selectedReceipt.file_url);
-                  }}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-64 bg-gray-100 rounded-md">
-                  <FileText className="w-16 h-16 text-gray-400" />
-                </div>
-              )}
+
+            {/* Content - Scrollable */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-6">
+                {selectedReceipt.file_url ? (
+                  <img
+                    src={selectedReceipt.file_url}
+                    alt={selectedReceipt.file_name}
+                    className="w-full h-auto rounded-md shadow-sm"
+                    onError={(e) => {
+                      console.error("Panel image load error for receipt", selectedReceipt.id, "URL:", selectedReceipt.file_url, e);
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      const parent = target.parentElement;
+                      if (parent && !parent.querySelector('.error-fallback-panel')) {
+                        const fallback = document.createElement('div');
+                        fallback.className = 'error-fallback-panel flex items-center justify-center h-64 bg-gray-100 rounded-md';
+                        fallback.innerHTML = '<svg class="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>';
+                        parent.appendChild(fallback);
+                      }
+                    }}
+                    onLoad={() => {
+                      console.log("Panel image loaded successfully for receipt", selectedReceipt.id, "URL:", selectedReceipt.file_url);
+                    }}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-64 bg-gray-100 rounded-md">
+                    <FileText className="w-16 h-16 text-gray-400" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Actions - Sticky Bottom */}
+            <div className="flex-shrink-0 px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between gap-3">
+              <button
+                onClick={() => {
+                  if (selectedReceipt.file_url) {
+                    window.open(selectedReceipt.file_url, "_blank");
+                  }
+                }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white border-2 border-[#FFE5EC] text-[#4A081A] hover:bg-[#FFE5EC] transition-all font-bold text-sm"
+              >
+                <Download className="w-4 h-4" />
+                Download
+              </button>
+              <button
+                onClick={() => {
+                  setPanelClosing(true);
+                  setTimeout(() => {
+                    setSelectedReceipt(null);
+                    setPanelClosing(false);
+                  }, 350);
+                }}
+                className="px-6 py-2 rounded-lg bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#800020] text-white font-bold shadow-md hover:shadow-lg transition-all"
+              >
+                Close
+              </button>
             </div>
           </div>
-        </div>
+
+          <style jsx>{`
+            @keyframes slideIn {
+              from {
+                transform: translateX(100%);
+              }
+              to {
+                transform: translateX(0);
+              }
+            }
+            @keyframes slideOut {
+              from {
+                transform: translateX(0);
+              }
+              to {
+                transform: translateX(100%);
+              }
+            }
+          `}</style>
+        </>
       )}
     </div>
   );
