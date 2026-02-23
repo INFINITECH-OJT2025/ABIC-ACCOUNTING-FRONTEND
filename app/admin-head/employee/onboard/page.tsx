@@ -126,7 +126,7 @@ function OnboardPageContent() {
   } | null>(null)
   const [checklistRecordId, setChecklistRecordId] = useState<number | null>(null)
   const [completedTasks, setCompletedTasks] = useState<{ [key: string]: string }>({})
-
+  const [savedTasks, setSavedTasks] = useState<Set<string>>(new Set())
 
   // Dropdown Data
   const [positions, setPositions] = useState<Position[]>([])
@@ -404,6 +404,7 @@ function OnboardPageContent() {
       }, {})
 
       setCompletedTasks(restoredTasks)
+      setSavedTasks(new Set(Object.keys(restoredTasks)))
     } catch (error) {
       console.error('Error fetching checklist progress:', error)
       setChecklistRecordId(null)
@@ -801,6 +802,8 @@ function OnboardPageContent() {
         const savedId = Number(data?.data?.id)
         if (Number.isFinite(savedId)) {
           setChecklistRecordId(savedId)
+          // Synchronize savedTasks with currently completed tasks
+          setSavedTasks(new Set(Object.keys(completedTasks)))
         }
         if (showSuccessToast) {
           toast.success('Checklist progress saved successfully')
@@ -827,6 +830,12 @@ function OnboardPageContent() {
   }
 
   const toggleTask = (task: string) => {
+    // Prevent unchecking if already saved
+    if (completedTasks[task] && savedTasks.has(task)) {
+      toast.error("Saved progress cannot be undone")
+      return
+    }
+
     setCompletedTasks(prev => {
       const newTasks = { ...prev }
       if (newTasks[task]) {
@@ -848,7 +857,21 @@ function OnboardPageContent() {
   const toggleAllTasks = () => {
     const allCompleted = onboardingTasks.every(task => completedTasks[task])
     if (allCompleted) {
-      setCompletedTasks({})
+      // Only uncheck what is NOT saved
+      const newTasks = { ...completedTasks }
+      let undoCount = 0
+      onboardingTasks.forEach(task => {
+        if (!savedTasks.has(task)) {
+          delete newTasks[task]
+          undoCount++
+        }
+      })
+      
+      if (undoCount === 0 && onboardingTasks.length > 0) {
+        toast.error("Saved progress cannot be undone")
+      } else {
+        setCompletedTasks(newTasks)
+      }
     } else {
       const newTasks: {[key: string]: string} = {}
       const now = new Date().toLocaleString('en-US', { 
@@ -1285,9 +1308,9 @@ function OnboardPageContent() {
                           <div className="flex justify-center">
                             <div className={cn(
                               "w-5 h-5 rounded flex items-center justify-center transition-all border-2",
-                              completedTasks[task]
-                                ? "bg-emerald-500 border-emerald-500 text-white shadow-sm" 
-                                : "border-slate-200 bg-white hover:border-[#A4163A]"
+                                completedTasks[task]
+                                  ? (savedTasks.has(task) ? "bg-emerald-700 border-emerald-700 opacity-60 cursor-not-allowed" : "bg-emerald-500 border-emerald-500 text-white shadow-sm")
+                                  : "border-slate-200 bg-white hover:border-[#A4163A]"
                             )}>
                               {completedTasks[task] && <Check className="h-3.5 w-3.5" />}
                             </div>
