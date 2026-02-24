@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select"
@@ -647,16 +648,6 @@ function OnboardingChecklistPageContent() {
   }
 
   useEffect(() => {
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (!hasUnsavedChanges) return
-      event.preventDefault()
-      event.returnValue = ''
-    }
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [hasUnsavedChanges])
-
-  useEffect(() => {
     const handleDocumentClick = (event: MouseEvent) => {
       if (!hasUnsavedChanges) return
       const target = event.target as HTMLElement | null
@@ -741,22 +732,43 @@ function OnboardingChecklistPageContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50/50 p-8 font-sans">
-        <Card className="mx-auto mt-16 max-w-3xl rounded-[2rem] border-none shadow-2xl bg-white p-10 text-center">
-          <div className="mx-auto mb-5 h-14 w-14 rounded-full border-4 border-[#a0153e]/20 border-t-[#a0153e] animate-spin" />
-          <p className="text-2xl font-black text-slate-900">Loading Onboarding Checklist</p>
-          <p className="mt-2 text-slate-600">Preparing employee record and onboarding tasks...</p>
-          <div className="mt-6 space-y-3">
-            <div className="h-4 rounded-full bg-slate-200/80 animate-pulse" />
-            <div className="h-4 w-11/12 mx-auto rounded-full bg-slate-200/70 animate-pulse [animation-delay:120ms]" />
-            <div className="h-4 w-9/12 mx-auto rounded-full bg-slate-200/60 animate-pulse [animation-delay:240ms]" />
+      <div className="min-h-screen w-full bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-12">
+        <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md mb-8">
+          <div className="w-full px-4 md:px-8 py-6">
+            <Skeleton className="h-8 w-72 bg-white/25" />
+            <Skeleton className="h-4 w-56 mt-3 bg-white/20" />
           </div>
-          <div className="mt-7 flex items-center justify-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-[#a0153e]/80 animate-bounce" />
-            <span className="h-2.5 w-2.5 rounded-full bg-[#a0153e]/70 animate-bounce [animation-delay:140ms]" />
-            <span className="h-2.5 w-2.5 rounded-full bg-[#a0153e]/60 animate-bounce [animation-delay:280ms]" />
+          <div className="border-t border-white/10 bg-white/5 backdrop-blur-sm">
+            <div className="w-full px-4 md:px-8 py-3">
+              <Skeleton className="h-10 w-[320px] bg-white/20" />
+            </div>
           </div>
-        </Card>
+        </div>
+        <main className="w-full px-4 md:px-8 relative mb-20">
+          <Card className="rounded-2xl border-2 border-[#FFE5EC] shadow-lg overflow-hidden bg-white mb-6">
+            <div className="p-5">
+              <Skeleton className="h-4 w-40 mb-3" />
+              <Skeleton className="h-8 w-72" />
+            </div>
+          </Card>
+          <Card className="rounded-2xl border-2 border-[#FFE5EC] shadow-2xl bg-white overflow-hidden mb-12">
+            <div className="p-5 border-b border-[#FFE5EC]">
+              <Skeleton className="h-4 w-56" />
+            </div>
+            <div className="p-5 space-y-4">
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <div key={`onboarding-task-skeleton-${idx}`} className="flex items-center gap-4">
+                  <Skeleton className="h-8 flex-1" />
+                  <Skeleton className="h-8 w-8" />
+                </div>
+              ))}
+            </div>
+            <div className="p-4 border-t border-[#FFE5EC] flex items-center justify-between">
+              <Skeleton className="h-9 w-28" />
+              <Skeleton className="h-9 w-40" />
+            </div>
+          </Card>
+        </main>
       </div>
     )
   }
@@ -1049,15 +1061,18 @@ function OnboardingChecklistPageContent() {
       </AlertDialog>
 
       <AlertDialog open={unsavedPromptOpen} onOpenChange={setUnsavedPromptOpen}>
-        <AlertDialogContent className="border-4 border-amber-200 rounded-3xl p-8 bg-white shadow-2xl">
+        <AlertDialogContent className="max-w-2xl border-4 border-amber-300 rounded-3xl p-0 bg-white shadow-2xl overflow-hidden">
+          <div className="h-2 w-full bg-gradient-to-r from-amber-300 via-amber-400 to-amber-300" />
+          <div className="p-8">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-2xl font-black text-slate-900">Unsaved Changes Detected</AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-600">
+            <AlertDialogTitle className="text-3xl font-black text-slate-900 tracking-tight">Unsaved Changes Detected</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-600 text-base leading-relaxed mt-2">
               You have unsaved changes. You can save first, or continue without saving.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-3 mt-2">
+          <AlertDialogFooter className="flex-col sm:flex-row gap-3 mt-6">
             <AlertDialogCancel
+              className="h-12 rounded-xl border border-slate-300 text-slate-700 font-semibold hover:bg-slate-100"
               onClick={() => {
                 setUnsavedPromptOpen(false)
                 clearUnsavedIntents()
@@ -1066,18 +1081,19 @@ function OnboardingChecklistPageContent() {
               Stay
             </AlertDialogCancel>
             <AlertDialogAction
-              className="bg-slate-600 text-white hover:bg-slate-700"
+              className="h-12 rounded-xl bg-[#A4163A] text-white hover:bg-[#800020] font-bold shadow-md"
               onClick={proceedWithoutSaving}
             >
               Proceed Without Saving
             </AlertDialogAction>
             <AlertDialogAction
-              className="bg-emerald-600 text-white hover:bg-emerald-700"
+              className="h-12 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 font-bold shadow-md"
               onClick={() => void handleSaveAndContinue()}
             >
               Save and Continue
             </AlertDialogAction>
           </AlertDialogFooter>
+          </div>
         </AlertDialogContent>
       </AlertDialog>
 
