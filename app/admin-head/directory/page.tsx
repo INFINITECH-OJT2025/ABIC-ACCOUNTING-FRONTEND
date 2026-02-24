@@ -142,6 +142,8 @@ type GeneralContact = {
   sort_order: number
   avatar_url: string | null
   avatar_public_id: string | null
+  created_at?: string | null
+  updated_at?: string | null
 }
 
 type EditableGeneralContact = {
@@ -219,6 +221,44 @@ const getLabelInitials = (label: string | null | undefined): string => {
     return parts[0].slice(0, 2).toUpperCase()
   }
   return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase()
+}
+
+const parseBackendDateMs = (value: string | null | undefined): number => {
+  const raw = String(value || '').trim()
+  if (!raw) return NaN
+  const normalized = raw.replace(' ', 'T')
+
+  // Fast path for standard ISO values.
+  const directMs = new Date(normalized).getTime()
+  if (!Number.isNaN(directMs)) return directMs
+
+  // Fallback for MySQL/Laravel timestamp variants (with optional microseconds/timezone).
+  const match = normalized.match(
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(?:Z|([+-]\d{2}:\d{2}))?$/
+  )
+  if (!match) return NaN
+
+  const year = Number(match[1])
+  const month = Number(match[2]) - 1
+  const day = Number(match[3])
+  const hour = Number(match[4])
+  const minute = Number(match[5])
+  const second = Number(match[6])
+  const milli = match[7] ? Number(match[7].slice(0, 3).padEnd(3, '0')) : 0
+
+  // If timezone is explicit (or Z), parse in UTC; otherwise treat as local time.
+  if (normalized.endsWith('Z') || match[8]) {
+    const utcMs = Date.UTC(year, month, day, hour, minute, second, milli)
+    if (match[8]) {
+      const [tzHour, tzMinute] = match[8].slice(1).split(':').map(Number)
+      const offsetMinutes = tzHour * 60 + tzMinute
+      const sign = match[8].startsWith('+') ? 1 : -1
+      return utcMs - sign * offsetMinutes * 60_000
+    }
+    return utcMs
+  }
+
+  return new Date(year, month, day, hour, minute, second, milli).getTime()
 }
 
 
@@ -399,6 +439,20 @@ export default function GovernmentDirectoryPage() {
 
     return { contactsCount, addingStepsCount, removingStepsCount, updatedAtText, activeLink }
   }, [activeBackendAgency, editMode, draft, activeAgency])
+
+  const generalContactsUpdatedAtText = useMemo(() => {
+    const latestMs = generalContacts.reduce<number>((max, row) => {
+      const ms = parseBackendDateMs(row.updated_at || row.created_at || null)
+      if (Number.isNaN(ms)) return max
+      return ms > max ? ms : max
+    }, NaN)
+    if (Number.isNaN(latestMs)) return 'N/A'
+    return new Date(latestMs).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+  }, [generalContacts])
 
 
   const currentProcessDraftRows = useMemo(() => {
@@ -1810,7 +1864,7 @@ export default function GovernmentDirectoryPage() {
 
           <div className="flex items-center gap-2">
             <span className="opacity-70">LAST UPDATED:</span>
-            <span className="text-white/90">{snapshot.updatedAtText}</span>
+            <span className="text-white/90">{isGeneralContactsView ? generalContactsUpdatedAtText : snapshot.updatedAtText}</span>
           </div>
         </div>
       </footer>
