@@ -544,18 +544,24 @@ export default function MasterfilePage() {
       }
     }
 
-    return { isComplete: true, status: 'READY TO EMPLOY', batchId: 1 }
+    return { 
+      isComplete: true, 
+      status: emp.status === 'rehire_pending' ? 'READY TO RE-HIRE' : 'READY TO EMPLOY', 
+      batchId: 1 
+    }
   }
 
   const handleSetAsEmployed = async () => {
     if (!selectedEmployee) return
 
     const { isComplete } = checkCompleteness(selectedEmployee)
+    const isRehire = selectedEmployee.status === 'rehire_pending'
+    
     if (!isComplete) {
       setConfirmModal({
         isOpen: true,
         title: 'Information Incomplete',
-        description: 'Cannot employ: Missing required Information. Please complete the employee profile first.',
+        description: `Cannot ${isRehire ? 're-hire' : 'employ'}: Missing required Information. Please complete the employee profile first.`,
         variant: 'warning',
         confirmText: 'Got it',
         hideCancel: true,
@@ -566,24 +572,26 @@ export default function MasterfilePage() {
 
     setConfirmModal({
       isOpen: true,
-      title: 'Confirm Employment',
-      description: `Are you sure you want to employ ${selectedEmployee.first_name} ${selectedEmployee.last_name}?`,
+      title: isRehire ? 'Confirm Re-hire' : 'Confirm Employment',
+      description: `Are you sure you want to ${isRehire ? 're-hire' : 'employ'} ${selectedEmployee.first_name} ${selectedEmployee.last_name}?`,
       variant: 'default',
-      confirmText: 'Yes, Employ',
+      confirmText: isRehire ? 'Yes, Re-hire' : 'Yes, Employ',
       hideCancel: false,
       onConfirm: async () => {
         setIsUpdating(true)
         try {
           const apiUrl = getApiUrl()
+          const finalStatus = isRehire ? 'rehired_employee' : 'employed'
+          
           const response = await fetch(`${apiUrl}/api/employees/${selectedEmployee.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 'employed' }),
+            body: JSON.stringify({ status: finalStatus }),
           })
 
           const data = await response.json()
           if (data.success) {
-            toast.success(`${selectedEmployee.first_name} set as employed successfully`)
+            toast.success(`${selectedEmployee.first_name} ${isRehire ? 're-hired' : 'set as employed'} successfully`)
             await fetchEmployees()
             setViewMode('list')
             setSelectedEmployee(null)
@@ -1058,7 +1066,7 @@ export default function MasterfilePage() {
                                 </div>
                               )}
                               <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                {employee.status === 'pending' && (!isComplete || !employee.onboarding_tasks?.isComplete) && (
+                                {(employee.status === 'pending' || employee.status === 'rehire_pending') && (!isComplete || !employee.onboarding_tasks?.isComplete) && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -1181,7 +1189,7 @@ export default function MasterfilePage() {
               <div className="flex items-center gap-3">
                 <span className="text-sm font-bold text-white/70 uppercase tracking-wider">Status</span>
                 <div className="bg-white border-2 border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 justify-between shadow-sm font-bold inline-flex items-center whitespace-nowrap rounded-lg">
-                  {selectedEmployee?.status === 'pending' ? (
+                  {(selectedEmployee?.status === 'pending' || selectedEmployee?.status === 'rehire_pending') ? (
                     <div className="flex items-center gap-2">
                       {selectedEmployee.onboarding_tasks?.isComplete ? 
                         checkCompleteness(selectedEmployee).status : 
@@ -1602,7 +1610,7 @@ export default function MasterfilePage() {
 
         {/* Footer Actions */}
         <div className="bg-slate-50 px-6 py-4 rounded-lg border border-[#FFE5EC] flex justify-end gap-3">
-          {selectedEmployee?.status === 'pending' ? (
+          {(selectedEmployee?.status === 'pending' || selectedEmployee?.status === 'rehire_pending') ? (
             <>
               {selectedEmployee.onboarding_tasks?.isComplete && !checkCompleteness(selectedEmployee).isComplete && (
                 <button
@@ -1621,7 +1629,7 @@ export default function MasterfilePage() {
                     : 'bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#800020] hover:from-[#630C22] hover:to-[#A0153E] text-white hover:shadow-xl hover:-translate-y-0.5'
                 }`}
               >
-                Approve & Set as Employed
+                {selectedEmployee.status === 'rehire_pending' ? 'Approve & Re-hire' : 'Approve & Set as Employed'}
               </button>
             </>
           ) : (

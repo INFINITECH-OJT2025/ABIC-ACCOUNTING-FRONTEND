@@ -124,7 +124,7 @@ export default function AddClearanceChecklistPage() {
                         department: String(record?.department ?? ''),
                         status: String(record?.status ?? '').toLowerCase(),
                     }))
-                    .filter((record: EmployedEmployeeRecord) => record.status === 'employed' && record.name.length > 0)
+                    .filter((record: EmployedEmployeeRecord) => ['employed', 'rehired_employee'].includes(record.status) && record.name.length > 0)
 
                 setEmployedEmployees(employedRecords)
             } catch {

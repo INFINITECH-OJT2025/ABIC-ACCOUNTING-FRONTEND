@@ -233,9 +233,9 @@ export default function TerminatePage() {
       const resignedData = await resignedRes.json()
 
       if (empData.success && Array.isArray(empData.data)) {
-        // Only show currently employed employees in dropdown
+        // Only show currently employed or rehired employees in dropdown
         const active = empData.data.filter(
-          (emp: Employee) => String(emp.status).toLowerCase() === 'employed'
+          (emp: Employee) => ['employed', 'rehired_employee'].includes(String(emp.status).toLowerCase())
         ).sort((a: Employee, b: Employee) => a.last_name.localeCompare(b.last_name))
         setEmployees(active)
       }

@@ -1363,7 +1363,7 @@ function OnboardPageContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
           isRehireFlow
-            ? { ...cleanedData, status: 'rehired_employee', rehire_process: true }
+            ? { ...cleanedData, rehire_process: true }
             : cleanedData
         ),
       })
