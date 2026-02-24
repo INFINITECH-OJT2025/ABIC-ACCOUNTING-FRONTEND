@@ -13,8 +13,9 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { ChevronDown, Clock, Plus, Search, Users, ChevronLeft, ChevronRight, FileDown, FileText, Check, AlertTriangle, Loader2, RotateCcw, X, Calendar } from 'lucide-react'
-import * as XLSX from 'xlsx'
+import * as XLSX from "xlsx-js-style";
 import { toast } from 'sonner'
+
 
 
 
@@ -276,60 +277,256 @@ function usePagination<T>(items: T[], itemsPerPage: number = 15) {
 
 
 // ---------- EXCEL EXPORT UTILITY ----------
-function exportToExcel(summaryArray: { name: string; totalMinutes: number; occurrences: number; warnings: number }[], cutoffTitle: string, month: string, year: number) {
-  // Prepare data for Excel
-  const worksheetData = [
-    [`Tardiness Summary Report - ${cutoffTitle}`],
-    [`Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`],
-    [],
-    ['Employee Name', 'Total Lates (minutes)', 'Total Lates (count > 8:05AM)', 'Warnings'],
-    ...summaryArray.map(emp => [emp.name, emp.totalMinutes, emp.occurrences, emp.warnings]),
-    [],
-    ['Summary Statistics'],
-    ['Total Employees with Lates', summaryArray.length],
-    ['Total Late Minutes', summaryArray.reduce((sum, emp) => sum + emp.totalMinutes, 0)],
-    ['Total Lates', summaryArray.reduce((sum, emp) => sum + emp.occurrences, 0)],
-    ['Total Warnings', summaryArray.reduce((sum, emp) => sum + emp.warnings, 0)],
-    ['Average Minutes per Late',
-      summaryArray.length ?
-        (summaryArray.reduce((sum, emp) => sum + emp.totalMinutes, 0) /
-          summaryArray.reduce((sum, emp) => sum + emp.occurrences, 0) || 0).toFixed(1)
-        : 0
-    ],
-    [],
-    ['* Minutes are counted from 8:00 AM'],
-    ['* Total Lates count is based on arrivals after 8:05 AM grace period'],
-    ['* Warnings: 3rd late = 1st warning, 4th = 2nd, 5th = 3rd'],
-    [`* Report for ${month} ${year} - ${cutoffTitle}`]
+function exportToExcel(
+  summaryArray: { name: string; totalMinutes: number; occurrences: number; warnings: number }[],
+  cutoffTitle: string,
+  month: string,
+  year: number
+) {
+  const now = new Date()
+  const generatedLabel = `Generated on: ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`
+  const periodLabel = `Period: ${month} ${year} – ${cutoffTitle}`
+
+  const totalEmployeesWithLates = summaryArray.filter(e => e.occurrences > 0).length
+  const totalLateMinutes = summaryArray.reduce((sum, e) => sum + e.totalMinutes, 0)
+  const totalOccurrences = summaryArray.reduce((sum, e) => sum + e.occurrences, 0)
+  const totalWarnings = summaryArray.reduce((sum, e) => sum + e.warnings, 0)
+
+  // ── Maroon Gradient Palette ────────────────────────────────────────────────
+  // Deep maroon for main header band
+  const NAVY = '4A081A'
+  // Mid maroon for table column header
+  const INDIGO = '7B0F2B'
+  // Soft rose tint for section header / metadata rows
+  const INDIGO_LIGHT = 'FCE8ED'
+  // Light rose for alternating data rows
+  const SLATE_ALT = 'FDF4F6'
+  // Accent for thin borders
+  const BORDER_CLR = 'E2A0B0'
+  const WHITE = 'FFFFFF'
+  const BLACK = '1A0008'
+  const GRAY = '6B2033'
+  const GRAY_LIGHT = '9B4D63'
+
+  const thin = (c = BORDER_CLR) => ({ style: 'thin' as const, color: { rgb: c } })
+  const border = (c = BORDER_CLR) => ({ top: thin(c), bottom: thin(c), left: thin(c), right: thin(c) })
+
+  // ── AOA construction ───────────────────────────────────────────────────────
+  const AOA: any[][] = []
+
+  // R0 – Company banner
+  AOA.push(['ABIC REALTY AND CONSULTANCY', '', '', ''])
+  // R1 – Report type
+  AOA.push(['Tardiness Report', '', '', ''])
+  // R2 – Period | Generated on
+  AOA.push([periodLabel, '', generatedLabel, ''])
+  // R3 – blank spacer
+  AOA.push(['', '', '', ''])
+  // R4 – Table column headings
+  AOA.push(['EMPLOYEE NAME', 'TOTAL LATE (minutes)', 'TOTAL LATES (count > 8:05AM)', 'WARNINGS'])
+
+  // R5… – Employee data rows
+  summaryArray.forEach(emp => {
+    AOA.push([emp.name, emp.totalMinutes, emp.occurrences, emp.warnings])
+  })
+
+  // blank separator
+  AOA.push(['', '', '', ''])
+
+  // Summary Statistics section
+  const summaryHeaderRow = AOA.length
+  AOA.push(['Summary Statistics', '', '', ''])
+
+  const summaryData = [
+    ['Total Employees with Lates', totalEmployeesWithLates],
+    ['Total Late Minutes', totalLateMinutes],
+    ['Total Lates', totalOccurrences],
+    ['Total Warnings', totalWarnings],
   ]
+  summaryData.forEach(([label, val]) => {
+    AOA.push([label, '', val, ''])
+  })
 
+  // Notes block
+  AOA.push(['', '', '', ''])
+  const notesStartRow = AOA.length
+  AOA.push(['Notes:', '', '', ''])
+  AOA.push(['* Minutes are counted from 8:00 AM', '', '', ''])
+  AOA.push(['* Total Lates count is based on arrivals after 8:05 AM grace period', '', '', ''])
+  AOA.push(['* Warnings: 3rd late = 1st warning, 4th = 2nd, 5th = 3rd', '', '', ''])
 
-  // Create workbook and worksheet
+  // Signatory
+  AOA.push(['', '', '', ''])
+  AOA.push(['', '', 'Reviewed by:', ''])
+  AOA.push(['', '', '', ''])
+  AOA.push(['', '', '________________________________', ''])
+  AOA.push(['', '', 'Admin Head', ''])
+
+  // ── Sheet creation ─────────────────────────────────────────────────────────
   const wb = XLSX.utils.book_new()
-  const ws = XLSX.utils.aoa_to_sheet(worksheetData)
+  const ws = XLSX.utils.aoa_to_sheet(AOA)
 
-
-  // Style the worksheet
+  // Column widths
   ws['!cols'] = [
-    { wch: 30 }, // Employee Name
-    { wch: 25 }, // Total Minutes
-    { wch: 25 }, // Occurrences
-    { wch: 15 }, // Warnings
+    { wch: 34 },
+    { wch: 22 },
+    { wch: 30 },
+    { wch: 14 },
   ]
 
+  // Row heights
+  ws['!rows'] = AOA.map((_, i) => {
+    if (i === 0) return { hpt: 28 }              // company banner
+    if (i === 1) return { hpt: 20 }              // report title
+    if (i === 4) return { hpt: 30 }              // table header
+    if (i > 4 && i < summaryHeaderRow) return { hpt: 18 }
+    if (i === summaryHeaderRow) return { hpt: 22 }
+    return { hpt: 17 }
+  })
 
-  // Create a safe sheet name (max 31 chars, no special chars)
-  let sheetName = `Tardiness_${cutoffTitle.replace(/[^a-zA-Z0-9]/g, '_')}`
-  if (sheetName.length > 31) {
-    sheetName = sheetName.substring(0, 31);
+  // Merges
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } },   // company name full width
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 3 } },   // report title full width
+    { s: { r: 2, c: 0 }, e: { r: 2, c: 1 } },   // period label A–B
+    { s: { r: 2, c: 2 }, e: { r: 2, c: 3 } },   // generated label C–D
+    { s: { r: summaryHeaderRow, c: 0 }, e: { r: summaryHeaderRow, c: 3 } }, // section header
+    ...summaryData.map((_, idx) => ({
+      s: { r: summaryHeaderRow + 1 + idx, c: 0 },
+      e: { r: summaryHeaderRow + 1 + idx, c: 1 }
+    })),
+    ...summaryData.map((_, idx) => ({
+      s: { r: summaryHeaderRow + 1 + idx, c: 2 },
+      e: { r: summaryHeaderRow + 1 + idx, c: 3 }
+    })),
+    // Notes rows: full width merges
+    { s: { r: notesStartRow, c: 0 }, e: { r: notesStartRow, c: 3 } },
+    { s: { r: notesStartRow + 1, c: 0 }, e: { r: notesStartRow + 1, c: 3 } },
+    { s: { r: notesStartRow + 2, c: 0 }, e: { r: notesStartRow + 2, c: 3 } },
+    { s: { r: notesStartRow + 3, c: 0 }, e: { r: notesStartRow + 3, c: 3 } },
+  ]
+
+  // ── Style applier ──────────────────────────────────────────────────────────
+  const S = (r: number, c: number, style: object) => {
+    const addr = XLSX.utils.encode_cell({ r, c })
+    if (!ws[addr]) ws[addr] = { t: 's', v: '' }
+    ws[addr].s = style
   }
 
+  // R0 – Deep navy company banner
+  S(0, 0, {
+    font: { bold: true, sz: 14, color: { rgb: WHITE }, name: 'Calibri' },
+    fill: { patternType: 'solid', fgColor: { rgb: NAVY } },
+    alignment: { horizontal: 'center', vertical: 'center' },
+  })
 
-  // Add the worksheet to workbook
+  // R1 – Slightly lighter navy subtitle band
+  S(1, 0, {
+    font: { bold: false, sz: 11, color: { rgb: WHITE }, name: 'Calibri', italic: true },
+    fill: { patternType: 'solid', fgColor: { rgb: '630C22' } },
+    alignment: { horizontal: 'center', vertical: 'center' },
+  })
+
+  // R2 – Soft indigo tint for metadata row (period / generated)
+  S(2, 0, {
+    font: { sz: 9, bold: true, color: { rgb: INDIGO }, name: 'Calibri' },
+    fill: { patternType: 'solid', fgColor: { rgb: INDIGO_LIGHT } },
+    alignment: { horizontal: 'left', vertical: 'center' },
+    border: { bottom: thin(BORDER_CLR) },
+  })
+  S(2, 2, {
+    font: { sz: 9, bold: false, color: { rgb: GRAY }, name: 'Calibri' },
+    fill: { patternType: 'solid', fgColor: { rgb: INDIGO_LIGHT } },
+    alignment: { horizontal: 'right', vertical: 'center' },
+    border: { bottom: thin(BORDER_CLR) },
+  })
+
+    // R4 – Indigo table column header
+    ;[0, 1, 2, 3].forEach(c => {
+      S(4, c, {
+        font: { bold: true, sz: 10, color: { rgb: WHITE }, name: 'Calibri' },
+        fill: { patternType: 'solid', fgColor: { rgb: INDIGO } },
+        alignment: { horizontal: c === 0 ? 'left' : 'center', vertical: 'center', wrapText: true },
+        border: border('9B1535'),
+      })
+    })
+
+  // Data rows – alternating slate / white with thin borders
+  summaryArray.forEach((_, i) => {
+    const r = 5 + i
+    const rowFill = i % 2 === 0 ? WHITE : SLATE_ALT
+      ;[0, 1, 2, 3].forEach(c => {
+        S(r, c, {
+          font: { sz: 10, color: { rgb: BLACK }, name: 'Calibri', bold: c === 0 },
+          fill: { patternType: 'solid', fgColor: { rgb: rowFill } },
+          alignment: { horizontal: c === 0 ? 'left' : 'center', vertical: 'center' },
+          border: border(),
+        })
+      })
+  })
+
+  // Summary Statistics section header — indigo-tinted, no heavy fill
+  S(summaryHeaderRow, 0, {
+    font: { bold: true, sz: 11, color: { rgb: INDIGO }, name: 'Calibri' },
+    fill: { patternType: 'solid', fgColor: { rgb: INDIGO_LIGHT } },
+    alignment: { horizontal: 'left', vertical: 'center' },
+    border: { top: thin(INDIGO), bottom: thin(BORDER_CLR), left: thin(INDIGO), right: thin(BORDER_CLR) },
+  })
+
+  // Summary data rows — clean white, text-only label, value in col C
+  summaryData.forEach((row, idx) => {
+    const r = summaryHeaderRow + 1 + idx
+    const isEven = idx % 2 === 0
+    // Label cell (A–B merged)
+    S(r, 0, {
+      font: { sz: 10, bold: true, color: { rgb: GRAY }, name: 'Calibri' },
+      fill: { patternType: 'solid', fgColor: { rgb: isEven ? WHITE : SLATE_ALT } },
+      alignment: { horizontal: 'left', vertical: 'center' },
+      border: border(),
+    })
+    // Value cell (C–D merged)
+    S(r, 2, {
+      font: { sz: 10, bold: true, color: { rgb: INDIGO }, name: 'Calibri' },
+      fill: { patternType: 'solid', fgColor: { rgb: isEven ? WHITE : SLATE_ALT } },
+      alignment: { horizontal: 'left', vertical: 'center' },
+      border: border(),
+    })
+  })
+
+  // Notes block — plain white, caption font
+  const noteStyles = [
+    { bold: true, color: GRAY, sz: 9 },
+    { bold: false, color: GRAY_LIGHT, sz: 9 },
+    { bold: false, color: GRAY_LIGHT, sz: 9 },
+    { bold: false, color: GRAY_LIGHT, sz: 9 },
+  ]
+  noteStyles.forEach((ns, i) => {
+    S(notesStartRow + i, 0, {
+      font: { sz: ns.sz, bold: ns.bold, italic: i > 0, color: { rgb: ns.color }, name: 'Calibri' },
+      fill: { patternType: 'solid', fgColor: { rgb: 'F9FAFB' } },
+      alignment: { horizontal: 'left', vertical: 'center' },
+    })
+  })
+
+  // Signatory rows — centered in C–D
+  const sigBase = notesStartRow + 4 + 1
+    ;[0, 1, 2, 3, 4].forEach(offset => {
+      S(sigBase + offset, 2, {
+        font: {
+          sz: offset === 1 ? 9 : 10,
+          bold: offset === 0 || offset === 4,
+          color: { rgb: offset === 4 ? INDIGO : GRAY },
+          name: 'Calibri',
+        },
+        alignment: { horizontal: 'center', vertical: 'center' },
+      })
+    })
+
+  // ── Write file ─────────────────────────────────────────────────────────────
+  let sheetName = `Tardiness_${cutoffTitle.replace(/[^a-zA-Z0-9]/g, '_')}`
+  if (sheetName.length > 31) sheetName = sheetName.substring(0, 31)
+
   XLSX.utils.book_append_sheet(wb, ws, sheetName)
-
-
-  // Export the file
   XLSX.writeFile(wb, `Tardiness_Summary_${cutoffTitle.replace(/[^a-zA-Z0-9]/g, '_')}_${month}_${year}.xlsx`)
 }
 
