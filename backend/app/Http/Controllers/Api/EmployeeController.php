@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Mail\TerminationNotice;
 use App\Models\Employee;
+use App\Models\Rehired;
 use App\Models\Resigned;
 use App\Models\Termination;
 use App\Services\ActivityLogService;
@@ -24,6 +25,56 @@ class EmployeeController extends Controller
     public function __construct(ActivityLogService $activityLogService)
     {
         $this->activityLogService = $activityLogService;
+    }
+
+    private function syncLatestRehireProfile(Employee $employee): void
+    {
+        $latestRehire = Rehired::where('employee_id', $employee->id)
+            ->latest('rehired_at')
+            ->first();
+
+        if (!$latestRehire) {
+            return;
+        }
+
+        $latestRehire->update([
+            'profile_snapshot' => $employee->fresh()->toArray(),
+            'profile_updated_at' => now(),
+        ]);
+    }
+
+    private function saveRehireProfileOnly(Employee $employee, array $changes): Rehired
+    {
+        $latestRehire = Rehired::where('employee_id', $employee->id)
+            ->latest('rehired_at')
+            ->first();
+
+        if (!$latestRehire) {
+            $latestRehire = Rehired::create([
+                'employee_id' => $employee->id,
+                'previous_employee_id' => null,
+                'rehired_at' => now(),
+                'source_type' => null,
+                'profile_snapshot' => $employee->fresh()->toArray(),
+                'profile_updated_at' => now(),
+            ]);
+        }
+
+        $snapshot = $latestRehire->profile_snapshot;
+        if (!is_array($snapshot)) {
+            $snapshot = $employee->fresh()->toArray();
+        }
+
+        foreach ($changes as $key => $value) {
+            $snapshot[$key] = $value;
+        }
+
+        $latestRehire->update([
+            'profile_snapshot' => $snapshot,
+            'profile_updated_at' => now(),
+        ]);
+
+        return $latestRehire;
     }
     /**
      * Display a listing of all employees.
@@ -141,6 +192,7 @@ class EmployeeController extends Controller
                 'last_name' => 'sometimes|nullable|string|max:255',
                 'email' => 'sometimes|nullable|string|email|max:255|unique:employees,email,' . $employee->id,
                 'position' => 'sometimes|nullable|string|max:255',
+                'department' => 'sometimes|nullable|string|max:255',
                 'date_hired' => 'sometimes|nullable|date',
                 'middle_name' => 'sometimes|nullable|string|max:255',
                 'suffix' => 'sometimes|nullable|string|max:255',
@@ -181,8 +233,12 @@ class EmployeeController extends Controller
                 'perm_zip_code' => 'sometimes|nullable|string|max:255',
                 'email_address' => 'sometimes|nullable|string|max:255',
                 'password' => 'sometimes|nullable|string|min:6',
-                'status' => 'sometimes|in:pending,employed,terminated,resigned',
+                'status' => 'sometimes|in:pending,employed,terminated,resigned,rehire_pending,rehired_employee',
+                'rehire_process' => 'sometimes|boolean',
             ]);
+
+            $isRehireProcess = $request->boolean('rehire_process');
+            unset($validated['rehire_process']);
 
             if (isset($validated['password'])) {
                 $validated['password'] = Hash::make($validated['password']);
@@ -191,7 +247,21 @@ class EmployeeController extends Controller
             // Track changes for activity log
             $changes = array_diff_key($validated, array_flip(['password']));
 
+            if ($isRehireProcess) {
+                if (array_key_exists('status', $validated)) {
+                    $employee->update(['status' => $validated['status']]);
+                }
+                $rehiredRecord = $this->saveRehireProfileOnly($employee, $validated);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Rehire profile updated successfully',
+                    'data' => $rehiredRecord,
+                ]);
+            }
+
             $employee->update($validated);
+            $this->syncLatestRehireProfile($employee);
 
             // Log activity
             $this->activityLogService->logEmployeeUpdated($employee, $changes, null, $request);
@@ -242,6 +312,7 @@ class EmployeeController extends Controller
                 'equipment_issued' => 'sometimes|nullable|string',
                 'training_completed' => 'sometimes|boolean',
                 'onboarding_notes' => 'sometimes|nullable|string',
+                'rehire_process' => 'sometimes|boolean',
             ]);
 
             $employee = Employee::find($id);
@@ -253,7 +324,21 @@ class EmployeeController extends Controller
                 ], 404);
             }
 
+            $isRehireProcess = $request->boolean('rehire_process');
+            unset($validated['rehire_process']);
+
+            if ($isRehireProcess) {
+                $rehiredRecord = $this->saveRehireProfileOnly($employee, $validated);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Rehire onboarding information saved successfully',
+                    'data' => $rehiredRecord,
+                ]);
+            }
+
             $employee->update($validated);
+            $this->syncLatestRehireProfile($employee);
 
             // Log activity
             $this->activityLogService->logEmployeeOnboarded($employee, null, $request);
@@ -432,6 +517,7 @@ class EmployeeController extends Controller
     {
         try {
             $employee = Employee::find($id);
+            $sourceType = $employee?->status;
 
             if (!$employee) {
                 return response()->json([
@@ -447,8 +533,8 @@ class EmployeeController extends Controller
                 ], 400);
             }
 
-            // Update employee status back to employed
-            $employee->update(['status' => 'employed']);
+            // Put employee in re-hire setup pending status first.
+            $employee->update(['status' => 'rehire_pending']);
 
             $currentId = $employee->id;
             $rehiredAt = $request->input('rehired_at') ? Carbon::parse($request->input('rehired_at')) : now();
@@ -489,19 +575,50 @@ class EmployeeController extends Controller
                     'rehired_at' => $rehiredAt
                 ]);
 
+            $rehiredRecord = Rehired::create([
+                'employee_id' => $employee->id,
+                'previous_employee_id' => $currentId !== $employee->id ? $currentId : null,
+                'rehired_at' => $rehiredAt,
+                'source_type' => in_array($sourceType, ['terminated', 'resigned'], true) ? $sourceType : null,
+                'profile_snapshot' => $employee->fresh()->toArray(),
+                'profile_updated_at' => now(),
+            ]);
+
             // Log activity
             $this->activityLogService->logEmployeeRehired($employee, null, $request);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Employee re-hired successfully',
-                'data' => $employee
+                'data' => $employee,
+                'rehired' => $rehiredRecord,
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to re-hire employee',
                 'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get all rehired records
+     */
+    public function getRehired()
+    {
+        try {
+            $rehired = Rehired::with('employee')->orderByDesc('rehired_at')->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $rehired,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch rehired records',
+                'error' => $e->getMessage(),
             ], 500);
         }
     }

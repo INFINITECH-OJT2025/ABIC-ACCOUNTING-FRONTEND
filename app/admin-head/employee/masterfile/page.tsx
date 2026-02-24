@@ -39,7 +39,7 @@ interface Employee {
   last_name: string
   email: string
   position: string
-  status: 'pending' | 'employed' | 'terminated'
+  status: 'pending' | 'employed' | 'terminated' | 'rehire_pending' | 'rehired_employee'
   created_at: string
   onboarding_tasks?: {
     done: number
@@ -58,12 +58,16 @@ const statusBadgeColors = {
   pending: 'bg-amber-50 text-amber-700 border-amber-200',
   employed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   terminated: 'bg-rose-50 text-rose-700 border-rose-200',
+  rehire_pending: 'bg-orange-50 text-orange-700 border-orange-200',
+  rehired_employee: 'bg-blue-50 text-blue-700 border-blue-200',
 }
 
 const statusLabels = {
   pending: 'Pending',
   employed: 'Employed',
   terminated: 'Terminated',
+  rehire_pending: 'Rehire Pending',
+  rehired_employee: 'Rehired Employee',
 }
 
 export default function MasterfilePage() {
@@ -640,9 +644,13 @@ export default function MasterfilePage() {
     return result
   }
 
-  const employedList = filterEmployees(employees.filter(e => e.status === 'employed'))
+  const employedList = filterEmployees(
+    employees.filter(e => e.status === 'employed' || e.status === 'rehired_employee')
+  )
   const terminatedList = filterEmployees(employees.filter(e => e.status === 'terminated'))
-  const pendingList = filterEmployees(employees.filter(e => e.status === 'pending'))
+  const pendingList = filterEmployees(
+    employees.filter(e => e.status === 'pending' || e.status === 'rehire_pending')
+  )
   const allList = filterEmployees(employees)
 
   // End filter derivation
@@ -841,7 +849,7 @@ export default function MasterfilePage() {
                         : 'text-white/70 hover:text-white hover:bg-white/5'
                         }`}
                     >
-                      Employed ({employees.filter(e => e.status === 'employed').length})
+                      Employed ({employees.filter(e => e.status === 'employed' || e.status === 'rehired_employee').length})
                     </button>
                     <button
                       onClick={() => setActiveTab('terminated')}
@@ -859,7 +867,7 @@ export default function MasterfilePage() {
                         : 'text-white/70 hover:text-white hover:bg-white/5'
                         }`}
                     >
-                      Pending ({employees.filter(e => e.status === 'pending').length})
+                      Pending ({employees.filter(e => e.status === 'pending' || e.status === 'rehire_pending').length})
                     </button>
                   </div>
 

@@ -109,8 +109,11 @@ function OnboardPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const employeeIdParam = searchParams.get('id')
+  const employeeEmailParam = searchParams.get('email')
   const requestedViewParam = searchParams.get('view')
+  const rehireParam = searchParams.get('rehire')
   const batchParam = searchParams.get('batch')
+  const isRehireFlow = rehireParam === '1'
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<'onboard' | 'checklist' | 'update-info'>('onboard')
 
@@ -124,7 +127,7 @@ function OnboardPageContent() {
     department: '',
   })
   const [currentBatch, setCurrentBatch] = useState(1)
-  const [onboardingEmployeeId, setOnboardingEmployeeId] = useState<number | null>(null)
+  const [onboardingEmployeeId, setOnboardingEmployeeId] = useState<string | null>(null)
   const [progressionFormData, setProgressionFormData] = useState<Partial<EmployeeDetails>>({})
 
   // Checklist States
@@ -143,9 +146,12 @@ function OnboardPageContent() {
   const [positions, setPositions] = useState<Position[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
   const [regions, setRegions] = useState<{ code: string; name: string }[]>([])
-  const [provinces, setProvinces] = useState<{ code: string; name: string }[]>([])
-  const [cities, setCities] = useState<{ code: string; name: string }[]>([])
-  const [barangays, setBarangays] = useState<{ code: string; name: string }[]>([])
+  const [currentProvinces, setCurrentProvinces] = useState<{ code: string; name: string }[]>([])
+  const [currentCities, setCurrentCities] = useState<{ code: string; name: string }[]>([])
+  const [currentBarangays, setCurrentBarangays] = useState<{ code: string; name: string }[]>([])
+  const [permanentProvinces, setPermanentProvinces] = useState<{ code: string; name: string }[]>([])
+  const [permanentCities, setPermanentCities] = useState<{ code: string; name: string }[]>([])
+  const [permanentBarangays, setPermanentBarangays] = useState<{ code: string; name: string }[]>([])
 
   // UI States
   const [isSaving, setIsSaving] = useState(false)
@@ -263,10 +269,102 @@ function OnboardPageContent() {
     throw lastError ?? new Error('Failed to fetch')
   }
 
+  const parseJsonFromResponse = async (response: Response) => {
+    const raw = await response.text()
+    try {
+      return JSON.parse(raw)
+    } catch {
+      return null
+    }
+  }
+
+  const fetchEmployeeByIdentifier = async (identifier: string, fallbackEmail?: string) => {
+    const normalizedId = String(identifier ?? '').trim().toLowerCase()
+    const normalizedEmail = String(fallbackEmail ?? '').trim().toLowerCase()
+
+    // If email is available, resolve via employee list first.
+    // This avoids direct-ID 404s when re-hire rotated the employee code.
+    if (normalizedEmail) {
+      const listResponse = await apiFetch('/api/employees', { headers: { Accept: 'application/json' } })
+      const listData = await parseJsonFromResponse(listResponse)
+      const employees = Array.isArray(listData?.data) ? listData.data : []
+
+      const matchedByEmail = employees
+        .filter((emp: any) => {
+          const emailCandidates = [
+            emp?.email,
+            emp?.email_address,
+          ].map((value) => String(value ?? '').trim().toLowerCase()).filter(Boolean)
+          return emailCandidates.includes(normalizedEmail)
+        })
+        .sort((a: any, b: any) => {
+          const aTs = new Date(a?.updated_at ?? a?.created_at ?? 0).getTime()
+          const bTs = new Date(b?.updated_at ?? b?.created_at ?? 0).getTime()
+          return bTs - aTs
+        })[0]
+
+      if (matchedByEmail) {
+        const canonicalId = String(matchedByEmail?.id ?? matchedByEmail?.employee_id ?? identifier)
+        for (const path of [`/api/employees/${encodeURIComponent(canonicalId)}`, `/api/employees/${canonicalId}`]) {
+          const response = await apiFetch(path, { headers: { Accept: 'application/json' } })
+          const data = await parseJsonFromResponse(response)
+          if (data?.success && data?.data) return data.data
+        }
+        return matchedByEmail
+      }
+    }
+
+    const directPaths = [
+      `/api/employees/${encodeURIComponent(identifier)}`,
+      `/api/employees/${identifier}`,
+    ]
+
+    for (const path of directPaths) {
+      const response = await apiFetch(path, { headers: { Accept: 'application/json' } })
+      const data = await parseJsonFromResponse(response)
+      if (data?.success && data?.data) return data.data
+    }
+
+    const listResponse = await apiFetch('/api/employees', { headers: { Accept: 'application/json' } })
+    const listData = await parseJsonFromResponse(listResponse)
+    const employees = Array.isArray(listData?.data) ? listData.data : []
+
+    const matched = employees.find((emp: any) => {
+      const candidates = [
+        emp?.id,
+        emp?.employee_id,
+        emp?.employee_code,
+        emp?.code,
+      ].map((value) => String(value ?? '').trim().toLowerCase()).filter(Boolean)
+
+      if (normalizedId && candidates.includes(normalizedId)) return true
+
+      const emailCandidates = [
+        emp?.email,
+        emp?.email_address,
+      ].map((value) => String(value ?? '').trim().toLowerCase()).filter(Boolean)
+
+      return normalizedEmail ? emailCandidates.includes(normalizedEmail) : false
+    })
+
+    if (!matched) return null
+
+    const canonicalId = String(matched?.id ?? matched?.employee_id ?? identifier)
+    if (!canonicalId) return matched
+
+    for (const path of [`/api/employees/${encodeURIComponent(canonicalId)}`, `/api/employees/${canonicalId}`]) {
+      const response = await apiFetch(path, { headers: { Accept: 'application/json' } })
+      const data = await parseJsonFromResponse(response)
+      if (data?.success && data?.data) return data.data
+    }
+
+    return matched
+  }
+
   // Persistence Logic
   useEffect(() => {
     const savedState = localStorage.getItem('employee_onboarding_state')
-    if (savedState) {
+    if (savedState && !isRehireFlow) {
       try {
         const parsed = JSON.parse(savedState)
         const hasExplicitEmployee = Boolean(employeeIdParam)
@@ -277,7 +375,7 @@ function OnboardPageContent() {
           if (parsed.view) setView(parsed.view)
           if (parsed.currentBatch) setCurrentBatch(parsed.currentBatch)
           if (parsed.progressionFormData) setProgressionFormData(parsed.progressionFormData)
-          if (parsed.onboardingEmployeeId) setOnboardingEmployeeId(parsed.onboardingEmployeeId)
+          if (parsed.onboardingEmployeeId) setOnboardingEmployeeId(String(parsed.onboardingEmployeeId))
           if (parsed.checklistData) setChecklistData(parsed.checklistData)
           if (parsed.checklistRecordId) setChecklistRecordId(parsed.checklistRecordId)
           if (parsed.completedTasks) setCompletedTasks(parsed.completedTasks)
@@ -304,17 +402,90 @@ function OnboardPageContent() {
 
     // Load employee if ID is provided in URL
     if (employeeIdParam) {
-      const requestedView = requestedViewParam === 'checklist' ? 'checklist' : 'update-info'
-      loadExistingEmployee(parseInt(employeeIdParam), requestedView)
+      const requestedView: 'onboard' | 'checklist' | 'update-info' = isRehireFlow
+        ? 'onboard'
+        : requestedViewParam === 'checklist'
+          ? 'checklist'
+          : requestedViewParam === 'onboard'
+            ? 'onboard'
+            : 'update-info'
+      loadExistingEmployee(employeeIdParam, requestedView)
     } else {
       const timer = setTimeout(() => setLoading(false), 1200)
       return () => clearTimeout(timer)
     }
-  }, [employeeIdParam, requestedViewParam, batchParam])
+  }, [employeeIdParam, employeeEmailParam, requestedViewParam, rehireParam, batchParam])
+
+  useEffect(() => {
+    if (!regions.length) return
+
+    const hydrateAddressDropdowns = async () => {
+      // Current address chain
+      const currentRegionName = toPlainString(progressionFormData.region)
+      if (currentRegionName) {
+        const region = regions.find((r) => r.name === currentRegionName)
+        if (region) {
+          await fetchProvinces(region.code, true, false)
+          const provinceName = toPlainString(progressionFormData.province)
+          const province = provincesData.find(
+            (p: any) => p.region_code === region.code && p.province_name === provinceName
+          )
+          if (province) {
+            await fetchCities(province.province_code, true, false)
+            const cityName = toPlainString(progressionFormData.city_municipality)
+            const city = citiesData.find(
+              (c: any) => c.province_code === province.province_code && c.city_name === cityName
+            )
+            if (city) {
+              await fetchBarangays(city.city_code, true, false)
+            }
+          }
+        }
+      }
+
+      // Permanent address chain
+      const permanentRegionName = toPlainString(progressionFormData.perm_region)
+      if (permanentRegionName) {
+        const region = regions.find((r) => r.name === permanentRegionName)
+        if (region) {
+          await fetchProvinces(region.code, true, true)
+          const provinceName = toPlainString(progressionFormData.perm_province)
+          const province = provincesData.find(
+            (p: any) => p.region_code === region.code && p.province_name === provinceName
+          )
+          if (province) {
+            await fetchCities(province.province_code, true, true)
+            const cityName = toPlainString(progressionFormData.perm_city_municipality)
+            const city = citiesData.find(
+              (c: any) => c.province_code === province.province_code && c.city_name === cityName
+            )
+            if (city) {
+              await fetchBarangays(city.city_code, true, true)
+            }
+          }
+        }
+      }
+    }
+
+    hydrateAddressDropdowns()
+  }, [
+    regions,
+    progressionFormData.region,
+    progressionFormData.province,
+    progressionFormData.city_municipality,
+    progressionFormData.perm_region,
+    progressionFormData.perm_province,
+    progressionFormData.perm_city_municipality,
+  ])
 
   // Email Detection Logic
   useEffect(() => {
     const checkEmail = async (email: string) => {
+      if (isRehireFlow) {
+        setEmailExists(false)
+        setEmailChecking(false)
+        return
+      }
       if (!email || !email.includes('@')) {
         setEmailExists(false)
         return
@@ -339,11 +510,16 @@ function OnboardPageContent() {
     }, 600) // 600ms debounce
 
     return () => clearTimeout(timer)
-  }, [onboardFormData.email])
+  }, [onboardFormData.email, isRehireFlow])
 
   // Name Detection Logic
   useEffect(() => {
     const checkName = async (firstName: string, lastName: string) => {
+      if (isRehireFlow) {
+        setNameExists(false)
+        setNameChecking(false)
+        return
+      }
       if (!firstName || !lastName || firstName.length < 2 || lastName.length < 2) {
         setNameExists(false)
         return
@@ -368,7 +544,7 @@ function OnboardPageContent() {
     }, 600) // 600ms debounce
 
     return () => clearTimeout(timer)
-  }, [onboardFormData.first_name, onboardFormData.last_name])
+  }, [onboardFormData.first_name, onboardFormData.last_name, isRehireFlow])
 
 
   const fetchChecklistProgress = async (employeeName: string) => {
@@ -455,16 +631,22 @@ function OnboardPageContent() {
     }
   }
 
-  const loadExistingEmployee = async (id: number, targetView: 'checklist' | 'update-info' = 'update-info') => {
+  const loadExistingEmployee = async (id: string, targetView: 'onboard' | 'checklist' | 'update-info' = 'update-info') => {
     try {
       setLoading(true)
-      const response = await fetch(`${getApiUrl()}/api/employees/${id}`)
-      const data = await response.json()
-      
-      if (data.success) {
-        const emp = data.data
-        setOnboardingEmployeeId(id)
+      const emp = await fetchEmployeeByIdentifier(id, employeeEmailParam ?? undefined)
+
+      if (emp) {
+        setOnboardingEmployeeId(String(emp?.id ?? id))
         setProgressionFormData(emp)
+        setOnboardFormData({
+          first_name: toPlainString(emp.first_name),
+          last_name: toPlainString(emp.last_name),
+          email: toPlainString(emp.email || emp.email_address),
+          position: toPlainString(emp.position),
+          onboarding_date: toIsoDate(emp.onboarding_date || emp.date_hired),
+          department: toPlainString(emp.department),
+        })
         setChecklistData({
           name: `${emp.first_name} ${emp.last_name}`,
           position: toPlainString(emp.position),
@@ -474,7 +656,13 @@ function OnboardPageContent() {
             : '',
           raw_date: toIsoDate(emp.onboarding_date || emp.date_hired)
         })
-        await fetchChecklistProgress(`${emp.first_name} ${emp.last_name}`)
+        if (!isRehireFlow) {
+          await fetchChecklistProgress(`${emp.first_name} ${emp.last_name}`)
+        } else {
+          setChecklistRecordId(null)
+          setCompletedTasks({})
+          setSavedTasks(new Set())
+        }
         setView(targetView)
       } else {
         toast.error('Employee not found')
@@ -555,9 +743,15 @@ function OnboardPageContent() {
 
   const fetchProvinces = async (regionCode: string, preserveValues = false, isPermanent = false) => {
     if (!regionCode) {
-      setProvinces([])
-      setCities([])
-      setBarangays([])
+      if (isPermanent) {
+        setPermanentProvinces([])
+        setPermanentCities([])
+        setPermanentBarangays([])
+      } else {
+        setCurrentProvinces([])
+        setCurrentCities([])
+        setCurrentBarangays([])
+      }
       return
     }
     setLoadingProvinces(true)
@@ -575,9 +769,15 @@ function OnboardPageContent() {
         new Map(filteredProvinces.map(p => [p.code, p])).values()
       ).sort((a, b) => a.name.localeCompare(b.name))
 
-      setProvinces(uniqueProvinces)
-      setCities([])
-      setBarangays([])
+      if (isPermanent) {
+        setPermanentProvinces(uniqueProvinces)
+        setPermanentCities([])
+        setPermanentBarangays([])
+      } else {
+        setCurrentProvinces(uniqueProvinces)
+        setCurrentCities([])
+        setCurrentBarangays([])
+      }
       if (!preserveValues) {
         if (isPermanent) {
           setProgressionFormData((prev) => ({ ...prev, perm_province: '', perm_city_municipality: '', perm_barangay: '' }))
@@ -587,7 +787,11 @@ function OnboardPageContent() {
       }
     } catch (error) {
       console.error('Error filtering provinces:', error)
-      setProvinces([])
+      if (isPermanent) {
+        setPermanentProvinces([])
+      } else {
+        setCurrentProvinces([])
+      }
     } finally {
       setLoadingProvinces(false)
     }
@@ -595,8 +799,13 @@ function OnboardPageContent() {
 
   const fetchCities = async (provinceCode: string, preserveValues = false, isPermanent = false) => {
     if (!provinceCode) {
-      setCities([])
-      setBarangays([])
+      if (isPermanent) {
+        setPermanentCities([])
+        setPermanentBarangays([])
+      } else {
+        setCurrentCities([])
+        setCurrentBarangays([])
+      }
       return
     }
     setLoadingCities(true)
@@ -614,8 +823,13 @@ function OnboardPageContent() {
         new Map(filteredCities.map(c => [c.code, c])).values()
       ).sort((a, b) => a.name.localeCompare(b.name))
 
-      setCities(uniqueCities)
-      setBarangays([])
+      if (isPermanent) {
+        setPermanentCities(uniqueCities)
+        setPermanentBarangays([])
+      } else {
+        setCurrentCities(uniqueCities)
+        setCurrentBarangays([])
+      }
       if (!preserveValues) {
         if (isPermanent) {
           setProgressionFormData((prev) => ({ ...prev, perm_city_municipality: '', perm_barangay: '' }))
@@ -625,7 +839,11 @@ function OnboardPageContent() {
       }
     } catch (error) {
       console.error('Error filtering cities:', error)
-      setCities([])
+      if (isPermanent) {
+        setPermanentCities([])
+      } else {
+        setCurrentCities([])
+      }
     } finally {
       setLoadingCities(false)
     }
@@ -633,7 +851,11 @@ function OnboardPageContent() {
 
   const fetchBarangays = async (cityCode: string, preserveValues = false, isPermanent = false) => {
     if (!cityCode) {
-      setBarangays([])
+      if (isPermanent) {
+        setPermanentBarangays([])
+      } else {
+        setCurrentBarangays([])
+      }
       return
     }
     setLoadingBarangays(true)
@@ -651,7 +873,11 @@ function OnboardPageContent() {
         new Map(filteredBarangays.map(b => [b.code, b])).values()
       ).sort((a, b) => a.name.localeCompare(b.name))
 
-      setBarangays(uniqueBarangays)
+      if (isPermanent) {
+        setPermanentBarangays(uniqueBarangays)
+      } else {
+        setCurrentBarangays(uniqueBarangays)
+      }
       if (!preserveValues) {
         if (isPermanent) {
           setProgressionFormData((prev) => ({ ...prev, perm_barangay: '' }))
@@ -661,7 +887,11 @@ function OnboardPageContent() {
       }
     } catch (error) {
       console.error('Error filtering barangays:', error)
-      setBarangays([])
+      if (isPermanent) {
+        setPermanentBarangays([])
+      } else {
+        setCurrentBarangays([])
+      }
     } finally {
       setLoadingBarangays(false)
     }
@@ -750,6 +980,48 @@ function OnboardPageContent() {
 
     setIsSaving(true)
     try {
+      if (isRehireFlow && onboardingEmployeeId) {
+        const onboardResponse = await fetch(`${getApiUrl()}/api/employees/${encodeURIComponent(onboardingEmployeeId)}/onboard`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ position, department, onboarding_date, rehire_process: true }),
+        })
+
+        const onboardData = await onboardResponse.json()
+        if (!onboardResponse.ok || !onboardData.success) {
+          if (onboardData?.errors) {
+            const errorMessages = Object.values(onboardData.errors).flat().join(' ')
+            throw new Error(errorMessages || onboardData.message)
+          }
+          throw new Error(onboardData?.message || 'Failed to start re-hire onboarding')
+        }
+
+        toast.success('Re-hire onboarding started')
+        setProgressionFormData((prev) => ({
+          ...prev,
+          first_name,
+          last_name,
+          email: email,
+          email_address: email,
+          position,
+          department,
+          date_hired: onboarding_date,
+          onboarding_date,
+        }))
+        setChecklistData({
+          name: `${first_name} ${last_name}`,
+          position,
+          department,
+          date: new Date(onboarding_date).toLocaleDateString(),
+          raw_date: onboarding_date,
+        })
+        setChecklistRecordId(null)
+        setCompletedTasks({})
+        setSavedTasks(new Set())
+        setView('checklist')
+        return
+      }
+
       // Step 1: Create Employee
       const empResponse = await fetch(`${getApiUrl()}/api/employees`, {
         method: 'POST',
@@ -779,7 +1051,7 @@ function OnboardPageContent() {
       const onboardData = await onboardResponse.json()
       if (onboardData.success) {
         toast.success('Employee created and onboarding started')
-        setOnboardingEmployeeId(employeeId)
+        setOnboardingEmployeeId(String(employeeId))
         setProgressionFormData({
           first_name,
           last_name,
@@ -996,19 +1268,19 @@ function OnboardPageContent() {
       const selectedRegion = regions.find(r => r.name === value)
       if (selectedRegion) fetchProvinces(selectedRegion.code)
     } else if (name === 'province') {
-      const selectedProvince = provinces.find(p => p.name === value)
+      const selectedProvince = currentProvinces.find(p => p.name === value)
       if (selectedProvince) fetchCities(selectedProvince.code)
     } else if (name === 'city_municipality') {
-      const selectedCity = cities.find(c => c.name === value)
+      const selectedCity = currentCities.find(c => c.name === value)
       if (selectedCity) fetchBarangays(selectedCity.code)
     } else if (name === 'perm_region') {
       const selectedRegion = regions.find(r => r.name === value)
       if (selectedRegion) fetchProvinces(selectedRegion.code, false, true)
     } else if (name === 'perm_province') {
-      const selectedProvince = provinces.find(p => p.name === value)
+      const selectedProvince = permanentProvinces.find(p => p.name === value)
       if (selectedProvince) fetchCities(selectedProvince.code, false, true)
     } else if (name === 'perm_city_municipality') {
-      const selectedCity = cities.find(c => c.name === value)
+      const selectedCity = permanentCities.find(c => c.name === value)
       if (selectedCity) fetchBarangays(selectedCity.code, false, true)
     }
   }
@@ -1089,7 +1361,11 @@ function OnboardPageContent() {
       const response = await apiFetch(`/api/employees/${onboardingEmployeeId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cleanedData),
+        body: JSON.stringify(
+          isRehireFlow
+            ? { ...cleanedData, status: 'rehired_employee', rehire_process: true }
+            : cleanedData
+        ),
       })
 
       const data = await response.json()
@@ -1120,7 +1396,7 @@ function OnboardPageContent() {
       const response = await apiFetch(`/api/employees/${onboardingEmployeeId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cleanedData),
+        body: JSON.stringify(isRehireFlow ? { ...cleanedData, rehire_process: true } : cleanedData),
       })
 
       const data = await response.json()
@@ -1157,6 +1433,10 @@ function OnboardPageContent() {
   }
 
   const handleCancelOnboarding = () => {
+    if (hasUnsavedProgress) {
+      const shouldLeave = window.confirm('You have unsaved onboarding progress. Leave this page without saving?')
+      if (!shouldLeave) return
+    }
     clearStorage()
     router.push('/admin-head/employee/masterfile')
   }
@@ -1169,6 +1449,66 @@ function OnboardPageContent() {
       return date.toISOString().split('T')[0]
     } catch { return '' }
   }
+
+  const hasUnsavedProgress = useMemo(() => {
+    if (isSaving) return false
+
+    const hasOnboardDraft = Object.values(onboardFormData).some(
+      (value) => String(value ?? '').trim() !== ''
+    )
+    const hasChecklistDraft = Object.keys(completedTasks).length > 0
+    const hasProfileDraft = Object.values(progressionFormData).some(
+      (value) => String(value ?? '').trim() !== ''
+    )
+
+    return hasOnboardDraft || hasChecklistDraft || hasProfileDraft
+  }, [isSaving, onboardFormData, completedTasks, progressionFormData])
+
+  useEffect(() => {
+    const warningMessage = 'You have unsaved onboarding progress. Leave this page without saving?'
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedProgress) return
+      event.preventDefault()
+      event.returnValue = warningMessage
+      return warningMessage
+    }
+
+    const handleLinkNavigation = (event: MouseEvent) => {
+      if (!hasUnsavedProgress) return
+      const target = event.target as HTMLElement | null
+      const anchor = target?.closest('a[href]') as HTMLAnchorElement | null
+      if (!anchor) return
+      if (anchor.target === '_blank') return
+      if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
+
+      const href = anchor.getAttribute('href')
+      if (!href || href.startsWith('#') || href.startsWith('javascript:')) return
+
+      const currentUrl = new URL(window.location.href)
+      const nextUrl = new URL(anchor.href, window.location.href)
+      const isSamePage =
+        currentUrl.pathname === nextUrl.pathname &&
+        currentUrl.search === nextUrl.search &&
+        currentUrl.hash === nextUrl.hash
+
+      if (isSamePage) return
+
+      const shouldLeave = window.confirm(warningMessage)
+      if (!shouldLeave) {
+        event.preventDefault()
+        event.stopPropagation()
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    document.addEventListener('click', handleLinkNavigation, true)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      document.removeEventListener('click', handleLinkNavigation, true)
+    }
+  }, [hasUnsavedProgress])
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-12 relative">
@@ -1202,6 +1542,12 @@ function OnboardPageContent() {
               {view === 'onboard' ? <Briefcase className="w-4 h-4 md:w-5 h-5" /> : <ClipboardList className="w-4 h-4 md:w-5 h-5" />}
               <p className="text-sm md:text-lg font-bold uppercase tracking-widest leading-none">ABIC REALTY & CONSULTANCY</p>
             </div>
+            {isRehireFlow && (
+              <div className="mt-2 inline-flex items-center gap-2 rounded-md border border-amber-300/70 bg-amber-100/20 px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-amber-100">
+                <AlertCircle className="h-3.5 w-3.5" />
+                Rehire Employee Process
+              </div>
+            )}
           </div>
           <div className="h-10 w-px bg-white/10 hidden lg:block" />
           {checklistData && view !== 'onboard' && (
@@ -1273,14 +1619,14 @@ function OnboardPageContent() {
                     <div>
                       <div className="flex justify-between items-center mb-2">
                         <label className="block text-sm font-semibold text-slate-700">First Name <span className="text-red-500">*</span></label>
-                        {nameChecking && (<div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium"><Loader2 className="w-3 h-3 animate-spin" />Checking...</div>)}
-                        {!nameChecking && nameExists && (<div className="flex items-center gap-1.5 text-xs text-rose-500 font-bold animate-in fade-in slide-in-from-right-2"><AlertCircle className="w-3 h-3" />Name already exists</div>)}
+                        {!isRehireFlow && nameChecking && (<div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium"><Loader2 className="w-3 h-3 animate-spin" />Checking...</div>)}
+                        {!isRehireFlow && !nameChecking && nameExists && (<div className="flex items-center gap-1.5 text-xs text-rose-500 font-bold animate-in fade-in slide-in-from-right-2"><AlertCircle className="w-3 h-3" />Name already exists</div>)}
                       </div>
                       <Input 
                         value={onboardFormData.first_name} 
                         onChange={(e) => setOnboardFormData(prev => ({ ...prev, first_name: e.target.value }))} 
                         placeholder="John" 
-                        className={cn("transition-all duration-300", nameExists && "border-rose-400 focus-visible:ring-rose-400 bg-rose-50/30")}
+                        className={cn("transition-all duration-300", !isRehireFlow && nameExists && "border-rose-400 focus-visible:ring-rose-400 bg-rose-50/30")}
                       />
                     </div>
                     <div>
@@ -1291,20 +1637,20 @@ function OnboardPageContent() {
                         value={onboardFormData.last_name} 
                         onChange={(e) => setOnboardFormData(prev => ({ ...prev, last_name: e.target.value }))} 
                         placeholder="Doe" 
-                        className={cn("transition-all duration-300", nameExists && "border-rose-400 focus-visible:ring-rose-400 bg-rose-50/30")}
+                        className={cn("transition-all duration-300", !isRehireFlow && nameExists && "border-rose-400 focus-visible:ring-rose-400 bg-rose-50/30")}
                       />
                     </div>
                     <div className="md:col-span-2">
                       <div className="flex justify-between items-center mb-2">
                         <label className="block text-sm font-semibold text-slate-700">Email Address <span className="text-red-500">*</span></label>
-                        {emailChecking && (<div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium"><Loader2 className="w-3 h-3 animate-spin" />Checking availability...</div>)}
-                        {!emailChecking && onboardFormData.email && onboardFormData.email.includes('@') && (
+                        {!isRehireFlow && emailChecking && (<div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium"><Loader2 className="w-3 h-3 animate-spin" />Checking availability...</div>)}
+                        {!isRehireFlow && !emailChecking && onboardFormData.email && onboardFormData.email.includes('@') && (
                           emailExists ? (<div className="flex items-center gap-1.5 text-xs text-rose-500 font-bold animate-in fade-in slide-in-from-right-2"><AlertCircle className="w-3 h-3" />Email already exists</div>)
                           : (<div className="flex items-center gap-1.5 text-xs text-emerald-500 font-bold animate-in fade-in slide-in-from-right-2"><CheckCircle2 className="w-3 h-3" />Email available</div>)
                         )}
                       </div>
                       <div className="relative">
-                        <Input type="email" value={onboardFormData.email} onChange={(e) => setOnboardFormData(prev => ({ ...prev, email: e.target.value }))} placeholder="john@example.com" className={cn("transition-all duration-300", emailExists && "border-rose-400 focus-visible:ring-rose-400 bg-rose-50/30", !emailExists && onboardFormData.email && onboardFormData.email.includes('@') && "border-emerald-400 focus-visible:ring-emerald-400 bg-emerald-50/30")} />
+                        <Input type="email" value={onboardFormData.email} onChange={(e) => setOnboardFormData(prev => ({ ...prev, email: e.target.value }))} placeholder="john@example.com" className={cn("transition-all duration-300", !isRehireFlow && emailExists && "border-rose-400 focus-visible:ring-rose-400 bg-rose-50/30", !isRehireFlow && !emailExists && onboardFormData.email && onboardFormData.email.includes('@') && "border-emerald-400 focus-visible:ring-emerald-400 bg-emerald-50/30")} />
                       </div>
                     </div>
                     <div className="space-y-2">
@@ -1371,10 +1717,10 @@ function OnboardPageContent() {
                   <div className="flex gap-4 pt-6 border-t border-slate-100">
                     <Button 
                       onClick={handleStartOnboarding} 
-                      disabled={isSaving || emailExists || emailChecking || nameExists || nameChecking} 
+                      disabled={isSaving || (!isRehireFlow && (emailExists || emailChecking || nameExists || nameChecking))} 
                       className={cn(
                         "flex-1 text-white font-bold h-12 rounded-xl transition-all shadow-md", 
-                        (emailExists || emailChecking || nameExists || nameChecking) ? "bg-slate-300 hover:bg-slate-300 cursor-not-allowed" : "bg-[#630C22] hover:bg-[#4A081A]"
+                        (!isRehireFlow && (emailExists || emailChecking || nameExists || nameChecking)) ? "bg-slate-300 hover:bg-slate-300 cursor-not-allowed" : "bg-[#630C22] hover:bg-[#4A081A]"
                       )}
                     >
                       {isSaving ? 'SAVING...' : 'START ONBOARDING'}
@@ -1756,21 +2102,21 @@ function OnboardPageContent() {
                           <Label htmlFor="province" className="text-sm font-semibold">Province <span className="text-red-500">*</span></Label>
                           <select name="province" value={progressionFormData.province || ''} onChange={handleProgressionChange} disabled={!progressionFormData.region} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
                             <option value="">Select Province...</option>
-                            {provinces.map(p => <option key={p.code} value={p.name}>{p.name}</option>)}
+                            {currentProvinces.map(p => <option key={p.code} value={p.name}>{p.name}</option>)}
                           </select>
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="city_municipality" className="text-sm font-semibold">City/Municipality <span className="text-red-500">*</span></Label>
                           <select name="city_municipality" value={progressionFormData.city_municipality || ''} onChange={handleProgressionChange} disabled={!progressionFormData.province} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
                             <option value="">Select City...</option>
-                            {cities.map(c => <option key={c.code} value={c.name}>{c.name}</option>)}
+                            {currentCities.map(c => <option key={c.code} value={c.name}>{c.name}</option>)}
                           </select>
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="barangay" className="text-sm font-semibold">Barangay <span className="text-red-500">*</span></Label>
                           <select name="barangay" value={progressionFormData.barangay || ''} onChange={handleProgressionChange} disabled={!progressionFormData.city_municipality} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
                             <option value="">Select Barangay...</option>
-                            {barangays.map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
+                            {currentBarangays.map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
                           </select>
                         </div>
                         <div className="space-y-2">
@@ -1814,21 +2160,21 @@ function OnboardPageContent() {
                           <Label htmlFor="perm_province" className="text-sm font-semibold">Province <span className="text-red-500">*</span></Label>
                           <select name="perm_province" value={progressionFormData.perm_province || ''} onChange={handleProgressionChange} disabled={!progressionFormData.perm_region} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
                             <option value="">Select Province...</option>
-                            {provinces.map(p => <option key={p.code} value={p.name}>{p.name}</option>)}
+                            {permanentProvinces.map(p => <option key={p.code} value={p.name}>{p.name}</option>)}
                           </select>
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="perm_city_municipality" className="text-sm font-semibold">City/Municipality <span className="text-red-500">*</span></Label>
                           <select name="perm_city_municipality" value={progressionFormData.perm_city_municipality || ''} onChange={handleProgressionChange} disabled={!progressionFormData.perm_province} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
                             <option value="">Select City...</option>
-                            {cities.map(c => <option key={c.code} value={c.name}>{c.name}</option>)}
+                            {permanentCities.map(c => <option key={c.code} value={c.name}>{c.name}</option>)}
                           </select>
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="perm_barangay" className="text-sm font-semibold">Barangay <span className="text-red-500">*</span></Label>
                           <select name="perm_barangay" value={progressionFormData.perm_barangay || ''} onChange={handleProgressionChange} disabled={!progressionFormData.perm_city_municipality} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
                             <option value="">Select Barangay...</option>
-                            {barangays.map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
+                            {permanentBarangays.map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
                           </select>
                         </div>
                         <div className="space-y-2">
