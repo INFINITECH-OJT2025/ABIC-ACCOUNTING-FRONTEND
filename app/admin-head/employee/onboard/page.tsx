@@ -38,6 +38,17 @@ import { toast } from 'sonner'
 import { ConfirmationModal } from '@/components/ConfirmationModal'
 import { Skeleton } from '@/components/ui/skeleton'
 
+// PH Address Data
+import regionsDataRaw from '@/ph-json/region.json'
+import provincesDataRaw from '@/ph-json/province.json'
+import citiesDataRaw from '@/ph-json/city.json'
+import barangaysDataRaw from '@/ph-json/barangay.json'
+
+const regionsData = regionsDataRaw as any[]
+const provincesData = provincesDataRaw as any[]
+const citiesData = citiesDataRaw as any[]
+const barangaysData = barangaysDataRaw as any[]
+
 interface EmployeeDetails {
   [key: string]: any
 }
@@ -150,7 +161,9 @@ function OnboardPageContent() {
   const [emailChecking, setEmailChecking] = useState(false)
   const [emailExists, setEmailExists] = useState(false)
   const [emailValue, setEmailValue] = useState('')
-
+  // Name Check States
+  const [nameChecking, setNameChecking] = useState(false)
+  const [nameExists, setNameExists] = useState(false)
 
   // Modal State
   const [confirmModal, setConfirmModal] = useState<{
@@ -173,7 +186,8 @@ function OnboardPageContent() {
     { id: 3, title: 'Contact Information', icon: Phone, description: 'How to reach you' },
     { id: 4, title: 'Government IDs', icon: CreditCard, description: 'Official identification numbers' },
     { id: 5, title: 'Family Information', icon: Users, description: 'Parent information' },
-    { id: 6, title: 'Address Details', icon: MapPin, description: 'Complete address information' },
+    { id: 6, title: 'Current Address', icon: MapPin, description: 'Current residence' },
+    { id: 7, title: 'Permanent Address', icon: MapPin, description: 'Permanent residence' },
   ]
 
   const onboardingTasks = [
@@ -326,6 +340,35 @@ function OnboardPageContent() {
 
     return () => clearTimeout(timer)
   }, [onboardFormData.email])
+
+  // Name Detection Logic
+  useEffect(() => {
+    const checkName = async (firstName: string, lastName: string) => {
+      if (!firstName || !lastName || firstName.length < 2 || lastName.length < 2) {
+        setNameExists(false)
+        return
+      }
+
+      setNameChecking(true)
+      try {
+        const response = await apiFetch(`/api/employees/check-name?first_name=${encodeURIComponent(firstName)}&last_name=${encodeURIComponent(lastName)}`)
+        const data = await response.json()
+        if (data.success) {
+          setNameExists(data.exists)
+        }
+      } catch (error) {
+        console.error('Error checking name:', error)
+      } finally {
+        setNameChecking(false)
+      }
+    }
+
+    const timer = setTimeout(() => {
+      checkName(onboardFormData.first_name, onboardFormData.last_name)
+    }, 600) // 600ms debounce
+
+    return () => clearTimeout(timer)
+  }, [onboardFormData.first_name, onboardFormData.last_name])
 
 
   const fetchChecklistProgress = async (employeeName: string) => {
@@ -490,20 +533,27 @@ function OnboardPageContent() {
   const fetchRegions = async () => {
     setLoadingRegions(true)
     try {
-      const response = await fetch('https://psgc.gitlab.io/api/regions/')
-      if (!response.ok) throw new Error(`API error: ${response.status}`)
-      const data = await response.json()
-      const regionsArray = Array.isArray(data) ? data : data.data || []
-      setRegions(regionsArray.map((region: any) => ({ code: region.code, name: region.name })))
+      // Using local JSON data instead of external API
+      const regionsArray = regionsData.map((region: any) => ({
+        code: region.region_code,
+        name: region.region_name
+      }))
+
+      // Deduplicate by code
+      const uniqueRegions = Array.from(
+        new Map(regionsArray.map(r => [r.code, r])).values()
+      ).sort((a, b) => a.name.localeCompare(b.name))
+
+      setRegions(uniqueRegions)
     } catch (error) {
-      console.error('Error fetching regions:', error)
+      console.error('Error loading regions:', error)
       setRegions([])
     } finally {
       setLoadingRegions(false)
     }
   }
 
-  const fetchProvinces = async (regionCode: string, preserveValues = false) => {
+  const fetchProvinces = async (regionCode: string, preserveValues = false, isPermanent = false) => {
     if (!regionCode) {
       setProvinces([])
       setCities([])
@@ -512,24 +562,38 @@ function OnboardPageContent() {
     }
     setLoadingProvinces(true)
     try {
-      const response = await fetch(`https://psgc.gitlab.io/api/regions/${regionCode}/provinces/`)
-      const data = await response.json()
-      const provincesArray = Array.isArray(data) ? data : data.data || []
-      setProvinces(provincesArray.map((province: any) => ({ code: province.code, name: province.name })))
+      // Using local JSON data: filter provinces by region_code
+      const filteredProvinces = provincesData
+        .filter((prov: any) => prov.region_code === regionCode)
+        .map((prov: any) => ({
+          code: prov.province_code,
+          name: prov.province_name
+        }))
+
+      // Deduplicate by code
+      const uniqueProvinces = Array.from(
+        new Map(filteredProvinces.map(p => [p.code, p])).values()
+      ).sort((a, b) => a.name.localeCompare(b.name))
+
+      setProvinces(uniqueProvinces)
       setCities([])
       setBarangays([])
       if (!preserveValues) {
-        setProgressionFormData((prev) => ({ ...prev, province: '', city_municipality: '', barangay: '' }))
+        if (isPermanent) {
+          setProgressionFormData((prev) => ({ ...prev, perm_province: '', perm_city_municipality: '', perm_barangay: '' }))
+        } else {
+          setProgressionFormData((prev) => ({ ...prev, province: '', city_municipality: '', barangay: '' }))
+        }
       }
     } catch (error) {
-      console.error('Error fetching provinces:', error)
+      console.error('Error filtering provinces:', error)
       setProvinces([])
     } finally {
       setLoadingProvinces(false)
     }
   }
 
-  const fetchCities = async (provinceCode: string, preserveValues = false) => {
+  const fetchCities = async (provinceCode: string, preserveValues = false, isPermanent = false) => {
     if (!provinceCode) {
       setCities([])
       setBarangays([])
@@ -537,45 +601,66 @@ function OnboardPageContent() {
     }
     setLoadingCities(true)
     try {
-      const citiesResponse = await fetch(`https://psgc.gitlab.io/api/provinces/${provinceCode}/cities/`)
-      const municipalitiesResponse = await fetch(`https://psgc.gitlab.io/api/provinces/${provinceCode}/municipalities/`)
-      const citiesData = citiesResponse.ok ? await citiesResponse.json() : []
-      const municipalitiesData = municipalitiesResponse.ok ? await municipalitiesResponse.json() : []
-      const citiesArray = Array.isArray(citiesData) ? citiesData : citiesData.data || []
-      const municipalitiesArray = Array.isArray(municipalitiesData) ? municipalitiesData : municipalitiesData.data || []
-      const allCities = [...citiesArray, ...municipalitiesArray].map((city: any) => ({
-        code: city.code,
-        name: city.name,
-      }))
-      setCities(allCities)
+      // Using local JSON data: filter cities by province_code
+      const filteredCities = citiesData
+        .filter((city: any) => city.province_code === provinceCode)
+        .map((city: any) => ({
+          code: city.city_code,
+          name: city.city_name
+        }))
+
+      // Deduplicate by code
+      const uniqueCities = Array.from(
+        new Map(filteredCities.map(c => [c.code, c])).values()
+      ).sort((a, b) => a.name.localeCompare(b.name))
+
+      setCities(uniqueCities)
       setBarangays([])
       if (!preserveValues) {
-        setProgressionFormData((prev) => ({ ...prev, city_municipality: '', barangay: '' }))
+        if (isPermanent) {
+          setProgressionFormData((prev) => ({ ...prev, perm_city_municipality: '', perm_barangay: '' }))
+        } else {
+          setProgressionFormData((prev) => ({ ...prev, city_municipality: '', barangay: '' }))
+        }
       }
     } catch (error) {
-      console.error('Error fetching cities:', error)
+      console.error('Error filtering cities:', error)
       setCities([])
     } finally {
       setLoadingCities(false)
     }
   }
 
-  const fetchBarangays = async (cityCode: string, preserveValues = false) => {
+  const fetchBarangays = async (cityCode: string, preserveValues = false, isPermanent = false) => {
     if (!cityCode) {
       setBarangays([])
       return
     }
     setLoadingBarangays(true)
     try {
-      const response = await fetch(`https://psgc.gitlab.io/api/cities/${cityCode}/barangays/`)
-      const data = await response.json()
-      const barangaysArray = Array.isArray(data) ? data : data.data || []
-      setBarangays(barangaysArray.map((barangay: any) => ({ code: barangay.code, name: barangay.name })))
+      // Using local JSON data: filter barangays by city_code
+      const filteredBarangays = barangaysData
+        .filter((brgy: any) => brgy.city_code === cityCode)
+        .map((brgy: any) => ({
+          code: brgy.brgy_code,
+          name: brgy.brgy_name
+        }))
+
+      // Deduplicate by code
+      const uniqueBarangays = Array.from(
+        new Map(filteredBarangays.map(b => [b.code, b])).values()
+      ).sort((a, b) => a.name.localeCompare(b.name))
+
+      setBarangays(uniqueBarangays)
       if (!preserveValues) {
-        setProgressionFormData((prev) => ({ ...prev, barangay: '' }))
+        if (isPermanent) {
+          setProgressionFormData((prev) => ({ ...prev, perm_barangay: '' }))
+        } else {
+          setProgressionFormData((prev) => ({ ...prev, barangay: '' }))
+        }
       }
     } catch (error) {
-      console.error('Error fetching barangays:', error)
+      console.error('Error filtering barangays:', error)
       setBarangays([])
     } finally {
       setLoadingBarangays(false)
@@ -891,6 +976,17 @@ function OnboardPageContent() {
 
   const handleProgressionChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
+
+    // Validation for mobile number: only numbers, max 10 digits
+    if (name === 'mobile_number') {
+      const numericValue = value.replace(/\D/g, '').slice(0, 10)
+      setProgressionFormData((prev) => ({
+        ...prev,
+        [name]: numericValue,
+      }))
+      return
+    }
+
     setProgressionFormData((prev) => ({
       ...prev,
       [name]: value,
@@ -905,6 +1001,15 @@ function OnboardPageContent() {
     } else if (name === 'city_municipality') {
       const selectedCity = cities.find(c => c.name === value)
       if (selectedCity) fetchBarangays(selectedCity.code)
+    } else if (name === 'perm_region') {
+      const selectedRegion = regions.find(r => r.name === value)
+      if (selectedRegion) fetchProvinces(selectedRegion.code, false, true)
+    } else if (name === 'perm_province') {
+      const selectedProvince = provinces.find(p => p.name === value)
+      if (selectedProvince) fetchCities(selectedProvince.code, false, true)
+    } else if (name === 'perm_city_municipality') {
+      const selectedCity = cities.find(c => c.name === value)
+      if (selectedCity) fetchBarangays(selectedCity.code, false, true)
     }
   }
 
@@ -915,7 +1020,8 @@ function OnboardPageContent() {
       'mobile_number', 'street',
       'sss_number', 'philhealth_number', 'pagibig_number', 'tin_number',
       'mlast_name', 'mfirst_name', 'flast_name', 'ffirst_name',
-      'region', 'province', 'city_municipality', 'barangay', 'zip_code', 'email_address'
+      'region', 'province', 'city_municipality', 'barangay', 'zip_code', 'email_address',
+      'perm_street', 'perm_region', 'perm_province', 'perm_city_municipality', 'perm_barangay', 'perm_zip_code'
     ]
 
     const filledFields = allFields.filter(field => {
@@ -943,13 +1049,16 @@ function OnboardPageContent() {
       case 6:
         return !!data.region && !!data.province && !!data.city_municipality &&
           !!data.barangay && !!data.zip_code && !!data.email_address
+      case 7:
+        return !!data.perm_region && !!data.perm_province && !!data.perm_city_municipality &&
+          !!data.perm_barangay && !!data.perm_zip_code && !!data.perm_street
       default:
         return true
     }
   }
 
   const nextBatch = () => {
-    if (isCurrentBatchValid() && currentBatch < 6) {
+    if (isCurrentBatchValid() && currentBatch < 7) {
       setCurrentBatch(currentBatch + 1)
     } else if (!isCurrentBatchValid()) {
       toast.error('Please fill in all required fields to proceed.')
@@ -1162,12 +1271,28 @@ function OnboardPageContent() {
                 <div className="bg-white border border-slate-100 rounded-2xl p-8 shadow-sm space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">First Name <span className="text-red-500">*</span></label>
-                      <Input value={onboardFormData.first_name} onChange={(e) => setOnboardFormData(prev => ({ ...prev, first_name: e.target.value }))} placeholder="John" />
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="block text-sm font-semibold text-slate-700">First Name <span className="text-red-500">*</span></label>
+                        {nameChecking && (<div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium"><Loader2 className="w-3 h-3 animate-spin" />Checking...</div>)}
+                        {!nameChecking && nameExists && (<div className="flex items-center gap-1.5 text-xs text-rose-500 font-bold animate-in fade-in slide-in-from-right-2"><AlertCircle className="w-3 h-3" />Name already exists</div>)}
+                      </div>
+                      <Input 
+                        value={onboardFormData.first_name} 
+                        onChange={(e) => setOnboardFormData(prev => ({ ...prev, first_name: e.target.value }))} 
+                        placeholder="John" 
+                        className={cn("transition-all duration-300", nameExists && "border-rose-400 focus-visible:ring-rose-400 bg-rose-50/30")}
+                      />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">Last Name <span className="text-red-500">*</span></label>
-                      <Input value={onboardFormData.last_name} onChange={(e) => setOnboardFormData(prev => ({ ...prev, last_name: e.target.value }))} placeholder="Doe" />
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="block text-sm font-semibold text-slate-700">Last Name <span className="text-red-500">*</span></label>
+                      </div>
+                      <Input 
+                        value={onboardFormData.last_name} 
+                        onChange={(e) => setOnboardFormData(prev => ({ ...prev, last_name: e.target.value }))} 
+                        placeholder="Doe" 
+                        className={cn("transition-all duration-300", nameExists && "border-rose-400 focus-visible:ring-rose-400 bg-rose-50/30")}
+                      />
                     </div>
                     <div className="md:col-span-2">
                       <div className="flex justify-between items-center mb-2">
@@ -1244,7 +1369,14 @@ function OnboardPageContent() {
                     </div>
                   </div>
                   <div className="flex gap-4 pt-6 border-t border-slate-100">
-                    <Button onClick={handleStartOnboarding} disabled={isSaving || emailExists || emailChecking} className={cn("flex-1 text-white font-bold h-12 rounded-xl transition-all shadow-md", (emailExists || emailChecking) ? "bg-slate-300 hover:bg-slate-300 cursor-not-allowed" : "bg-[#630C22] hover:bg-[#4A081A]")}>
+                    <Button 
+                      onClick={handleStartOnboarding} 
+                      disabled={isSaving || emailExists || emailChecking || nameExists || nameChecking} 
+                      className={cn(
+                        "flex-1 text-white font-bold h-12 rounded-xl transition-all shadow-md", 
+                        (emailExists || emailChecking || nameExists || nameChecking) ? "bg-slate-300 hover:bg-slate-300 cursor-not-allowed" : "bg-[#630C22] hover:bg-[#4A081A]"
+                      )}
+                    >
                       {isSaving ? 'SAVING...' : 'START ONBOARDING'}
                     </Button>
                     <Button variant="outline" onClick={handleCancelOnboarding} disabled={isSaving} className="flex-1 border-slate-200 text-slate-600 font-bold h-12 rounded-xl">
@@ -1530,7 +1662,20 @@ function OnboardPageContent() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
                           <Label htmlFor="mobile_number" className="text-sm font-semibold">Mobile Number <span className="text-red-500">*</span></Label>
-                          <Input id="mobile_number" name="mobile_number" value={progressionFormData.mobile_number || ''} onChange={handleProgressionChange} placeholder="09XXXXXXXXX" className="font-medium" />
+                          <div className="relative group">
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-[#A4163A] pointer-events-none group-focus-within:text-[#800020] transition-colors">
+                              +63
+                            </div>
+                            <Input 
+                              id="mobile_number" 
+                              name="mobile_number" 
+                              value={progressionFormData.mobile_number || ''} 
+                              onChange={handleProgressionChange} 
+                              placeholder="9XXXXXXXXX" 
+                              className="pl-11 font-bold" 
+                              maxLength={10}
+                            />
+                          </div>
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="house_number" className="text-sm font-semibold">House number</Label>
@@ -1597,7 +1742,7 @@ function OnboardPageContent() {
                       </div>
                     )}
 
-                    {/* BATCH 6: Address Details */}
+                    {/* BATCH 6: Current Address Details */}
                     {currentBatch === 6 && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
@@ -1638,6 +1783,60 @@ function OnboardPageContent() {
                         </div>
                       </div>
                     )}
+
+                    {/* BATCH 7: Permanent Address Details */}
+                    {currentBatch === 7 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <Label htmlFor="perm_house_number" className="text-sm font-semibold">House number</Label>
+                          <Input id="perm_house_number" name="perm_house_number" value={progressionFormData.perm_house_number || ''} onChange={handleProgressionChange} className="font-medium" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="perm_street" className="text-sm font-semibold">Street <span className="text-red-500">*</span></Label>
+                          <Input id="perm_street" name="perm_street" value={progressionFormData.perm_street || ''} onChange={handleProgressionChange} className="font-medium" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="perm_village" className="text-sm font-semibold">Village</Label>
+                          <Input id="perm_village" name="perm_village" value={progressionFormData.perm_village || ''} onChange={handleProgressionChange} className="font-medium" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="perm_subdivision" className="text-sm font-semibold">Subdivision</Label>
+                          <Input id="perm_subdivision" name="perm_subdivision" value={progressionFormData.perm_subdivision || ''} onChange={handleProgressionChange} className="font-medium" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="perm_region" className="text-sm font-semibold">Region <span className="text-red-500">*</span></Label>
+                          <select name="perm_region" value={progressionFormData.perm_region || ''} onChange={handleProgressionChange} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
+                            <option value="">Select Region...</option>
+                            {regions.map(r => <option key={r.code} value={r.name}>{r.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="perm_province" className="text-sm font-semibold">Province <span className="text-red-500">*</span></Label>
+                          <select name="perm_province" value={progressionFormData.perm_province || ''} onChange={handleProgressionChange} disabled={!progressionFormData.perm_region} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
+                            <option value="">Select Province...</option>
+                            {provinces.map(p => <option key={p.code} value={p.name}>{p.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="perm_city_municipality" className="text-sm font-semibold">City/Municipality <span className="text-red-500">*</span></Label>
+                          <select name="perm_city_municipality" value={progressionFormData.perm_city_municipality || ''} onChange={handleProgressionChange} disabled={!progressionFormData.perm_province} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
+                            <option value="">Select City...</option>
+                            {cities.map(c => <option key={c.code} value={c.name}>{c.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="perm_barangay" className="text-sm font-semibold">Barangay <span className="text-red-500">*</span></Label>
+                          <select name="perm_barangay" value={progressionFormData.perm_barangay || ''} onChange={handleProgressionChange} disabled={!progressionFormData.perm_city_municipality} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
+                            <option value="">Select Barangay...</option>
+                            {barangays.map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="perm_zip_code" className="text-sm font-semibold">ZIP Code <span className="text-red-500">*</span></Label>
+                          <Input id="perm_zip_code" name="perm_zip_code" value={progressionFormData.perm_zip_code || ''} onChange={handleProgressionChange} className="font-medium" />
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
 
                   <Separator />
@@ -1664,7 +1863,7 @@ function OnboardPageContent() {
                         ))}
                       </div>
 
-                      {currentBatch === 6 ? (
+                      {currentBatch === 7 ? (
                         <div className="flex gap-3">
                           <Button 
                             onClick={() => confirmSaveProgress('partial')}

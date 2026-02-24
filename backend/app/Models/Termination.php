@@ -11,6 +11,12 @@ class Termination extends Model
         'termination_date',
         'rehired_at',
         'reason',
+        'recommended_by',
+        'notice_mode',
+        'notice_date',
+        'reviewed_by',
+        'approved_by',
+        'approval_date',
         'status',
         'notes',
     ];
@@ -18,6 +24,8 @@ class Termination extends Model
     protected $casts = [
         'termination_date' => 'datetime',
         'rehired_at' => 'datetime',
+        'notice_date' => 'datetime',
+        'approval_date' => 'datetime',
     ];
 
     /**

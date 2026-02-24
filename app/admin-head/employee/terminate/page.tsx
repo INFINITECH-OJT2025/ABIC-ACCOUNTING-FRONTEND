@@ -44,7 +44,7 @@ import {
 } from "@/components/ui/select"
 
 interface Employee {
-  id: number
+  id: string
   first_name: string
   last_name: string
   email: string
@@ -54,25 +54,34 @@ interface Employee {
 
 interface TerminationRecord {
   id: number
-  employee_id: number
+  employee_id: string
   termination_date: string
   rehired_at?: string | null
   reason: string
   notes: string
   status: string
+  exit_type?: string
   employee: Employee
   created_at?: string
 }
 
 interface TerminationFormData {
   termination_date: string
+  rehire_date: string
   reason: string
   notes: string
+  recommended_by: string
+  notice_modes: string[]
+  notice_date: string
+  reviewed_by: string
+  approved_by: string
+  approval_date: string
 }
 
 export default function TerminatePage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [terminations, setTerminations] = useState<TerminationRecord[]>([])
+  const [resigned, setResigned] = useState<TerminationRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
@@ -80,21 +89,47 @@ export default function TerminatePage() {
   const [selectedTermination, setSelectedTermination] = useState<TerminationRecord | null>(null)
   const [isRequestFormOpen, setIsRequestFormOpen] = useState(false)
   const [showDetailDialog, setShowDetailDialog] = useState(false)
-  const [rehireLoading, setRehireLoading] = useState<number | null>(null)
+  const [rehireLoading, setRehireLoading] = useState<string | null>(null)
   const [formData, setFormData] = useState<TerminationFormData>({
     termination_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
+    rehire_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
     reason: '',
     notes: '',
+    recommended_by: '',
+    notice_modes: [],
+    notice_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
+    reviewed_by: '',
+    approved_by: 'Mr. Angelle S. Sarmiento',
+    approval_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
   })
   const [isActionLoading, setIsActionLoading] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  const [currentResignedPage, setCurrentResignedPage] = useState(1)
   const itemsPerPage = 10
   const [sortOrder, setSortOrder] = useState<'recent' | 'oldest' | 'az' | 'za'>('recent')
   const [activeTab, setActiveTab] = useState<'all' | 'terminated' | 'rehired'>('all')
+  const [historyMode, setHistoryMode] = useState<'current' | 'archive'>('current')
+  const [exitActionType, setExitActionType] = useState<'terminate' | 'resigned'>('terminate')
 
-  const filteredTerminations = terminations
+  const getLatestPerEmployee = (records: TerminationRecord[]) => {
+    const latestMap = new Map<string, TerminationRecord>()
+    for (const record of records) {
+      const key = String(record.employee_id ?? '')
+      const existing = latestMap.get(key)
+      if (!existing) {
+        latestMap.set(key, record)
+        continue
+      }
+      const currentTs = new Date(record.termination_date ?? 0).getTime()
+      const existingTs = new Date(existing.termination_date ?? 0).getTime()
+      if (currentTs > existingTs) latestMap.set(key, record)
+    }
+    return Array.from(latestMap.values())
+  }
+
+  const applyRecordFilters = (records: TerminationRecord[]) => records
     .filter((record) => {
       // Tab filter
       if (activeTab === 'terminated' && record.rehired_at) return false
@@ -122,8 +157,19 @@ export default function TerminatePage() {
       }
     })
 
-  const terminatedCount = terminations.filter(r => !r.rehired_at).length
-  const rehiredCount = terminations.filter(r => !!r.rehired_at).length
+  const baseTerminations = historyMode === 'archive' ? terminations : getLatestPerEmployee(terminations)
+  const baseResigned = historyMode === 'archive' ? resigned : getLatestPerEmployee(resigned)
+
+  const filteredTerminations = applyRecordFilters(baseTerminations)
+  const filteredResigned = applyRecordFilters(baseResigned)
+  const selectedRecordIsResigned = selectedTermination?.exit_type === 'resigned'
+  const approverPositions = ['admin supervisor', 'it supervisor', 'admin head']
+  const approverEmployees = employees.filter((emp) =>
+    approverPositions.includes(String(emp.position ?? '').toLowerCase().trim())
+  )
+
+  const terminatedCount = baseTerminations.filter(r => !r.rehired_at).length
+  const rehiredCount = baseTerminations.filter(r => !!r.rehired_at).length
 
   // Modal State
   const [confirmModal, setConfirmModal] = useState<{
@@ -150,18 +196,20 @@ export default function TerminatePage() {
     setFetchError(null)
     setLoading(true)
     try {
-      const [empRes, termRes] = await Promise.all([
+      const [empRes, termRes, resignedRes] = await Promise.all([
         fetch(`${getApiUrl()}/api/employees`),
-        fetch(`${getApiUrl()}/api/terminations`)
+        fetch(`${getApiUrl()}/api/terminations`),
+        fetch(`${getApiUrl()}/api/resigned`)
       ])
 
       const empData = await empRes.json()
       const termData = await termRes.json()
+      const resignedData = await resignedRes.json()
 
       if (empData.success && Array.isArray(empData.data)) {
-        // Active employees (not terminated)
+        // Only show currently employed employees in dropdown
         const active = empData.data.filter(
-          (emp: Employee) => emp.status !== 'terminated'
+          (emp: Employee) => String(emp.status).toLowerCase() === 'employed'
         ).sort((a: Employee, b: Employee) => a.last_name.localeCompare(b.last_name))
         setEmployees(active)
       }
@@ -170,6 +218,17 @@ export default function TerminatePage() {
         setTerminations(termData.data)
       } else {
         toast.error('Failed to load termination history')
+      }
+
+      if (resignedData.success && Array.isArray(resignedData.data)) {
+        const normalizedResigned = resignedData.data.map((record: any) => ({
+          ...record,
+          termination_date: record.resignation_date,
+          exit_type: 'resigned',
+        }))
+        setResigned(normalizedResigned)
+      } else {
+        toast.error('Failed to load resigned history')
       }
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -191,6 +250,105 @@ export default function TerminatePage() {
     }))
   }
 
+  const toggleNoticeMode = (mode: 'email' | 'printed_letter' | 'both') => {
+    setFormData((prev) => {
+      const current = prev.notice_modes
+      if (mode === 'both') {
+        return {
+          ...prev,
+          notice_modes: current.includes('both') ? [] : ['both'],
+        }
+      }
+
+      const withoutBoth = current.filter((m) => m !== 'both')
+      const hasMode = withoutBoth.includes(mode)
+      return {
+        ...prev,
+        notice_modes: hasMode
+          ? withoutBoth.filter((m) => m !== mode)
+          : [...withoutBoth, mode],
+      }
+    })
+  }
+
+  const getNoticeModeSummary = (modes: string[]) => {
+    if (modes.includes('both')) return 'Both (Email and Printed Letter)'
+    const labels: Record<string, string> = {
+      email: 'Email',
+      printed_letter: 'Printed Letter',
+    }
+    return modes.map((m) => labels[m] ?? m).join(', ')
+  }
+
+  const buildPrintNoticeHtml = (employee: Employee, payload: TerminationFormData) => {
+    const formatDate = (value?: string) => value ? new Date(value).toLocaleString() : 'N/A'
+    return `
+      <!doctype html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Notice of Termination</title>
+        <style>
+          @page { size: A4; margin: 20mm; }
+          body { font-family: Arial, sans-serif; color: #111827; }
+          .page { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 12mm; box-sizing: border-box; }
+          .title { text-align: center; font-size: 20px; font-weight: 700; margin-bottom: 24px; }
+          .section { margin-bottom: 14px; line-height: 1.6; }
+          .meta { margin-top: 18px; border: 1px solid #d1d5db; padding: 12px; border-radius: 8px; }
+          .meta p { margin: 6px 0; }
+          .label { font-weight: 700; }
+          .signatures { margin-top: 36px; display: grid; grid-template-columns: 1fr 1fr; gap: 36px; }
+          .sigline { border-top: 1px solid #111827; margin-top: 44px; padding-top: 6px; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="page">
+          <div class="title">NOTICE OF TERMINATION</div>
+          <div class="section">Dear <strong>${employee.first_name} ${employee.last_name}</strong>,</div>
+          <div class="section">
+            This serves as formal notice regarding the termination of your employment with ABIC Accounting.
+          </div>
+          <div class="meta">
+            <p><span class="label">Employee:</span> ${employee.first_name} ${employee.last_name}</p>
+            <p><span class="label">Position:</span> ${employee.position || 'N/A'}</p>
+            <p><span class="label">Termination Date:</span> ${formatDate(payload.termination_date)}</p>
+            <p><span class="label">Reason:</span> ${payload.reason}</p>
+            <p><span class="label">Recommended By:</span> ${payload.recommended_by || 'N/A'}</p>
+            <p><span class="label">Mode of Notice:</span> ${getNoticeModeSummary(payload.notice_modes)}</p>
+            <p><span class="label">Date of Notice:</span> ${formatDate(payload.notice_date)}</p>
+            <p><span class="label">Reviewed By:</span> ${payload.reviewed_by || 'N/A'}</p>
+            <p><span class="label">Approved By:</span> ${payload.approved_by || 'N/A'}</p>
+            <p><span class="label">Date of Approval:</span> ${formatDate(payload.approval_date)}</p>
+          </div>
+          <div class="section" style="margin-top:18px;">
+            For concerns, please coordinate with HR/Admin Office.
+          </div>
+          <div class="signatures">
+            <div>
+              <div class="sigline">Employee Signature</div>
+            </div>
+            <div>
+              <div class="sigline">Authorized Signature</div>
+            </div>
+          </div>
+        </div>
+        <script>
+          window.onload = function () {
+            window.print();
+          };
+        </script>
+      </body>
+      </html>
+    `
+  }
+
+  const openPrintNotice = (printWindow: Window, employee: Employee, payload: TerminationFormData) => {
+    const letterHtml = buildPrintNoticeHtml(employee, payload)
+    printWindow.document.open()
+    printWindow.document.write(letterHtml)
+    printWindow.document.close()
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -209,15 +367,58 @@ export default function TerminatePage() {
       return
     }
 
+    if (exitActionType === 'terminate') {
+      if (!formData.recommended_by) {
+        toast.error('Please select Recommended By')
+        return
+      }
+      if (formData.notice_modes.length === 0) {
+        toast.error('Please select at least one Mode of Notice')
+        return
+      }
+      if (!formData.notice_date) {
+        toast.error('Date of Notice is required')
+        return
+      }
+    }
+
+    if (!formData.reviewed_by) {
+      toast.error('Please select Reviewed By')
+      return
+    }
+
+    if (!formData.approval_date) {
+      toast.error('Date of Approval is required')
+      return
+    }
+
     setConfirmModal({
       isOpen: true,
-      title: 'Confirm Termination',
-      description: 'Are you sure you want to proceed with this termination? This action can be reversed via re-hire.',
+      title: exitActionType === 'resigned' ? 'Confirm Resignation' : 'Confirm Termination',
+      description: exitActionType === 'resigned'
+        ? 'Are you sure you want to process this employee as resigned? This action can be reversed via re-hire.'
+        : 'Are you sure you want to proceed with this termination? This action can be reversed via re-hire.',
       variant: 'destructive',
-      confirmText: 'Yes, Terminate',
+      confirmText: exitActionType === 'resigned' ? 'Yes, Mark as Resigned' : 'Yes, Terminate',
       onConfirm: async () => {
+        let requestTimeout: ReturnType<typeof setTimeout> | null = null
+        const controller = new AbortController()
         try {
           setSubmitting(true)
+          const selectedEmployee = employees.find((emp) => emp.id === selectedEmployeeId) || null
+          const snapshot = { ...formData }
+          const isTerminate = exitActionType === 'terminate'
+          const wantsPrinted = isTerminate && (snapshot.notice_modes.includes('both') || snapshot.notice_modes.includes('printed_letter'))
+          let reservedPrintWindow: Window | null = null
+          if (wantsPrinted) {
+            // Open early while still in user gesture context; fill content after success.
+            reservedPrintWindow = window.open('', '_blank', 'width=900,height=1000')
+            if (!reservedPrintWindow) {
+              toast.error('Please allow pop-ups to print the notice letter.')
+            }
+          }
+
+          requestTimeout = setTimeout(() => controller.abort(), 30000)
           const response = await fetch(
             `${getApiUrl()}/api/employees/${selectedEmployeeId}/terminate`,
             {
@@ -225,11 +426,21 @@ export default function TerminatePage() {
               headers: {
                 'Content-Type': 'application/json',
               },
+              signal: controller.signal,
               body: JSON.stringify({
                 termination_date: formData.termination_date,
                 reason: formData.reason,
                 notes: formData.notes,
-                status: 'completed',
+                status: exitActionType === 'resigned' ? 'resigned' : 'completed',
+                exit_type: exitActionType,
+                recommended_by: formData.recommended_by || null,
+                notice_mode: formData.notice_modes.includes('both')
+                  ? 'both'
+                  : formData.notice_modes.join(','),
+                notice_date: formData.notice_date || null,
+                reviewed_by: formData.reviewed_by || null,
+                approved_by: formData.approved_by,
+                approval_date: formData.approval_date || null,
               }),
             }
           )
@@ -237,12 +448,33 @@ export default function TerminatePage() {
           const data = await response.json()
 
           if (data.success) {
-            toast.success(data.message || 'Employee terminated successfully')
+            if (exitActionType === 'terminate') {
+              if (wantsPrinted && selectedEmployee && reservedPrintWindow) {
+                openPrintNotice(reservedPrintWindow, selectedEmployee, snapshot)
+              }
+              if (data.email_notice_status === 'failed') {
+                toast.error(data.email_notice_error || 'Termination saved but email notice failed.')
+              }
+            }
+
+            toast.success(
+              data.message ||
+              (exitActionType === 'resigned'
+                ? 'Employee marked as resigned successfully'
+                : 'Employee terminated successfully')
+            )
             setSelectedEmployeeId('')
             setFormData({
               termination_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
+              rehire_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
               reason: '',
               notes: '',
+              recommended_by: '',
+              notice_modes: [],
+              notice_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
+              reviewed_by: '',
+              approved_by: 'Mr. Angelle S. Sarmiento',
+              approval_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
             })
             setIsRequestFormOpen(false)
             fetchData()
@@ -251,13 +483,23 @@ export default function TerminatePage() {
               const errorMessages = Object.values(data.errors).flat().join(' ')
               toast.error(errorMessages || data.message)
             } else {
-              toast.error(data.message || 'Failed to terminate employee')
+              toast.error(
+                data.message ||
+                (exitActionType === 'resigned'
+                  ? 'Failed to mark employee as resigned'
+                  : 'Failed to terminate employee')
+              )
             }
           }
         } catch (error) {
           console.error('Error:', error)
-          toast.error('Network Error: Could not connect to the server.')
+          if (error instanceof DOMException && error.name === 'AbortError') {
+            toast.error('Request timed out. Please try again.')
+          } else {
+            toast.error('Network Error: Could not connect to the server.')
+          }
         } finally {
+          if (requestTimeout) clearTimeout(requestTimeout)
           setSubmitting(false)
           setIsActionLoading(false)
           setConfirmModal(prev => ({ ...prev, isOpen: false }))
@@ -266,7 +508,12 @@ export default function TerminatePage() {
     })
   }
 
-  const handleRehire = async (employeeId: number) => {
+  const handleRehire = async (employeeId: string) => {
+    if (!formData.rehire_date) {
+      toast.error('Please set a re-hire date and time')
+      return
+    }
+
     setConfirmModal({
       isOpen: true,
       title: 'Confirm Re-hire',
@@ -281,6 +528,9 @@ export default function TerminatePage() {
             headers: {
               'Content-Type': 'application/json',
             },
+            body: JSON.stringify({
+              rehired_at: formData.rehire_date
+            })
           })
 
           const data = await response.json()
@@ -334,27 +584,44 @@ export default function TerminatePage() {
         <div className="w-full px-4 md:px-8 py-6">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold mb-1">Terminate Employee</h1>
+              <h1 className="text-2xl md:text-3xl font-bold mb-1">Terminate / Resign Employee</h1>
               <p className="text-white/80 text-sm flex items-center gap-2">
                 <Users className="w-4 h-4" />
-                Process employee termination and manage records
+                Process employee exit and manage records
               </p>
             </div>
-            <Button
-              onClick={() => setIsRequestFormOpen(!isRequestFormOpen)}
-              className={cn(
-                "font-bold px-5 py-2.5 rounded-lg transition-all duration-300 shadow-lg flex items-center gap-2 h-auto border text-sm uppercase tracking-wider",
-                isRequestFormOpen
-                  ? "bg-white text-[#A4163A] hover:bg-rose-50 border-white"
-                  : "bg-white/10 text-white hover:bg-white/20 border-white/20 backdrop-blur-sm"
-              )}
-            >
-              {isRequestFormOpen ? (
-                <><X className="h-4 w-4" /><span>Close</span></>
-              ) : (
-                <><Users className="h-4 w-4" /><span>Terminate Employee</span></>
-              )}
-            </Button>
+            {isRequestFormOpen ? (
+              <Button
+                onClick={() => setIsRequestFormOpen(false)}
+                className="font-bold px-5 py-2.5 rounded-lg transition-all duration-300 shadow-lg flex items-center gap-2 h-auto border text-sm uppercase tracking-wider bg-white text-[#A4163A] hover:bg-rose-50 border-white"
+              >
+                <X className="h-4 w-4" />
+                <span>Close</span>
+              </Button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => {
+                    setExitActionType('terminate')
+                    setIsRequestFormOpen(true)
+                  }}
+                  className="font-bold px-5 py-2.5 rounded-lg transition-all duration-300 shadow-lg flex items-center gap-2 h-auto border text-sm uppercase tracking-wider bg-white/10 text-white hover:bg-white/20 border-white/20 backdrop-blur-sm"
+                >
+                  <Users className="h-4 w-4" />
+                  <span>Terminate Employee</span>
+                </Button>
+                <Button
+                  onClick={() => {
+                    setExitActionType('resigned')
+                    setIsRequestFormOpen(true)
+                  }}
+                  className="font-bold px-5 py-2.5 rounded-lg transition-all duration-300 shadow-lg flex items-center gap-2 h-auto border text-sm uppercase tracking-wider bg-white text-[#A4163A] hover:bg-rose-50 border-white"
+                >
+                  <Users className="h-4 w-4" />
+                  <span>Resigned Employee</span>
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -365,15 +632,15 @@ export default function TerminatePage() {
               {/* Status Count Tabs */}
               <div className="flex items-center bg-white/10 p-1 rounded-lg backdrop-blur-md border border-white/10">
                 <button
-                  onClick={() => { setActiveTab('all'); setCurrentPage(1) }}
+                  onClick={() => { setActiveTab('all'); setCurrentPage(1); setCurrentResignedPage(1) }}
                   className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-200 uppercase tracking-wider ${
                     activeTab === 'all' ? 'bg-white text-[#A4163A] shadow-md' : 'text-white/70 hover:text-white hover:bg-white/5'
                   }`}
                 >
-                  All ({terminations.length})
+                  All ({baseTerminations.length})
                 </button>
                 <button
-                  onClick={() => { setActiveTab('terminated'); setCurrentPage(1) }}
+                  onClick={() => { setActiveTab('terminated'); setCurrentPage(1); setCurrentResignedPage(1) }}
                   className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-200 uppercase tracking-wider ${
                     activeTab === 'terminated' ? 'bg-white text-[#A4163A] shadow-md' : 'text-white/70 hover:text-white hover:bg-white/5'
                   }`}
@@ -381,12 +648,30 @@ export default function TerminatePage() {
                   Terminated ({terminatedCount})
                 </button>
                 <button
-                  onClick={() => { setActiveTab('rehired'); setCurrentPage(1) }}
+                  onClick={() => { setActiveTab('rehired'); setCurrentPage(1); setCurrentResignedPage(1) }}
                   className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-200 uppercase tracking-wider ${
                     activeTab === 'rehired' ? 'bg-white text-[#A4163A] shadow-md' : 'text-white/70 hover:text-white hover:bg-white/5'
                   }`}
                 >
                   Rehired ({rehiredCount})
+                </button>
+              </div>
+              <div className="flex items-center bg-white/10 p-1 rounded-lg backdrop-blur-md border border-white/10">
+                <button
+                  onClick={() => { setHistoryMode('current'); setCurrentPage(1); setCurrentResignedPage(1) }}
+                  className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-200 uppercase tracking-wider ${
+                    historyMode === 'current' ? 'bg-white text-[#A4163A] shadow-md' : 'text-white/70 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  Current
+                </button>
+                <button
+                  onClick={() => { setHistoryMode('archive'); setCurrentPage(1); setCurrentResignedPage(1) }}
+                  className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-200 uppercase tracking-wider ${
+                    historyMode === 'archive' ? 'bg-white text-[#A4163A] shadow-md' : 'text-white/70 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  Archive
                 </button>
               </div>
 
@@ -397,12 +682,12 @@ export default function TerminatePage() {
                   <Input
                     placeholder="Search employee..."
                     value={searchQuery}
-                    onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1) }}
+                    onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); setCurrentResignedPage(1) }}
                     className="bg-white border-2 border-[#FFE5EC] text-slate-700 placeholder:text-slate-400 pl-10 h-9 w-full focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A] shadow-sm rounded-lg transition-all"
                   />
                 </div>
 
-                <Select value={sortOrder} onValueChange={(value: any) => { setSortOrder(value); setCurrentPage(1) }}>
+                <Select value={sortOrder} onValueChange={(value: any) => { setSortOrder(value); setCurrentPage(1); setCurrentResignedPage(1) }}>
                   <SelectTrigger className="w-full sm:w-[180px] bg-white border-2 border-[#FFE5EC] h-9 rounded-lg shadow-sm focus:ring-[#A0153E] text-[#800020] font-bold">
                     <div className="flex items-center gap-2 text-xs uppercase tracking-wider">
                       <ArrowUpDown className="h-3.5 w-3.5 opacity-50" />
@@ -433,124 +718,231 @@ export default function TerminatePage() {
       <div className="w-full px-4 md:px-8 space-y-6">
         <div className={cn(
           "overflow-hidden transition-all duration-500 ease-in-out",
-          isRequestFormOpen ? "max-h-[120px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"
+          isRequestFormOpen ? "max-h-[900px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"
         )}>
-          {/* Single-line toolbar row — matches tardiness NEW LATE ENTRY design */}
-          <div className="w-full bg-white border border-slate-200 rounded-2xl shadow-lg overflow-visible flex items-center gap-0 px-1 h-16">
-
-            {/* Label */}
-            <div className="flex items-center gap-2 px-4 shrink-0">
+          <div className="w-full bg-white border border-slate-200 rounded-2xl shadow-lg p-4 md:p-5 space-y-4">
+            <div className="flex items-center gap-2">
               <Users className="h-4 w-4 text-[#A4163A]" />
               <span className="text-xs font-bold text-[#A4163A] uppercase tracking-widest whitespace-nowrap">
-                TERMINATE
+                {exitActionType === 'resigned' ? 'RESIGNED' : 'TERMINATE'}
               </span>
             </div>
 
-            <div className="w-px h-8 bg-slate-200 shrink-0" />
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Employee</Label>
+                <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={openCombobox}
+                      disabled={loading || submitting}
+                      className={cn(
+                        "w-full justify-between h-10 text-sm font-normal",
+                        !selectedEmployeeId && "text-slate-400"
+                      )}
+                    >
+                      {selectedEmployeeId
+                        ? (() => {
+                          const emp = employees.find((e) => e.id === selectedEmployeeId)
+                          return emp ? `${emp.last_name}, ${emp.first_name}` : "Select employee..."
+                        })()
+                        : "Select employee..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-40" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[320px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search employee..." />
+                      <CommandList>
+                        <CommandEmpty>No employee found.</CommandEmpty>
+                        <CommandGroup>
+                          {employees.map((emp) => (
+                            <CommandItem
+                              key={emp.id}
+                              value={`${emp.last_name}, ${emp.first_name} ${emp.position}`}
+                              onSelect={() => {
+                                setSelectedEmployeeId(emp.id)
+                                setOpenCombobox(false)
+                              }}
+                              className="py-2.5 cursor-pointer"
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  selectedEmployeeId === emp.id ? "opacity-100 text-[#800020]" : "opacity-0"
+                                )}
+                              />
+                              <div className="flex flex-col">
+                                <span className="font-medium text-slate-900">{emp.last_name}, {emp.first_name}</span>
+                                <span className="text-xs text-slate-500">{emp.position}</span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
 
-            {/* Employee Selector */}
-            <div className="flex-1 min-w-[200px] px-2">
-              <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    role="combobox"
-                    aria-expanded={openCombobox}
-                    disabled={loading || submitting}
-                    className={cn(
-                      "w-full justify-between h-10 bg-transparent hover:bg-slate-50 border-0 text-sm font-normal px-3",
-                      !selectedEmployeeId && "text-slate-400"
-                    )}
-                  >
-                    {selectedEmployeeId
-                      ? (() => {
-                        const emp = employees.find((e) => e.id.toString() === selectedEmployeeId)
-                        return emp ? `${emp.last_name}, ${emp.first_name}` : "Select employee..."
-                      })()
-                      : "Select employee..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-40" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[320px] p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Search employee..." />
-                    <CommandList>
-                      <CommandEmpty>No employee found.</CommandEmpty>
-                      <CommandGroup>
-                        {employees.map((emp) => (
-                          <CommandItem
-                            key={emp.id}
-                            value={`${emp.last_name}, ${emp.first_name} ${emp.position}`}
-                            onSelect={() => {
-                              setSelectedEmployeeId(emp.id.toString())
-                              setOpenCombobox(false)
-                            }}
-                            className="py-2.5 cursor-pointer"
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                selectedEmployeeId === emp.id.toString() ? "opacity-100 text-[#800020]" : "opacity-0"
-                              )}
-                            />
-                            <div className="flex flex-col">
-                              <span className="font-medium text-slate-900">{emp.last_name}, {emp.first_name}</span>
-                              <span className="text-xs text-slate-500">{emp.position}</span>
-                            </div>
-                          </CommandItem>
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Termination Date & Time</Label>
+                <Input
+                  type="datetime-local"
+                  name="termination_date"
+                  value={formData.termination_date}
+                  onChange={handleInputChange}
+                  className="h-10"
+                  disabled={submitting}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Reason</Label>
+                <Input
+                  type="text"
+                  name="reason"
+                  value={formData.reason}
+                  onChange={handleInputChange}
+                  placeholder={exitActionType === 'resigned' ? 'Reason for resignation...' : 'Reason for termination...'}
+                  className="h-10"
+                  disabled={submitting}
+                />
+              </div>
+
+              {exitActionType === 'terminate' && (
+                <>
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Recommended By</Label>
+                    <Select
+                      value={formData.recommended_by}
+                      onValueChange={(value) => setFormData((prev) => ({ ...prev, recommended_by: value }))}
+                    >
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="Select recommender..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {approverEmployees.map((emp) => (
+                          <SelectItem key={`recommended-${emp.id}`} value={`${emp.first_name} ${emp.last_name}`}>
+                            {emp.first_name} {emp.last_name} ({emp.position})
+                          </SelectItem>
                         ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Date of Notice</Label>
+                    <Input
+                      type="datetime-local"
+                      name="notice_date"
+                      value={formData.notice_date}
+                      onChange={handleInputChange}
+                      className="h-10"
+                      disabled={submitting}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Mode of Notice</Label>
+                    <div className="h-10 px-3 border border-slate-200 rounded-md flex items-center gap-4 text-sm">
+                      <label className="flex items-center gap-1.5">
+                        <input
+                          type="checkbox"
+                          checked={formData.notice_modes.includes('email')}
+                          onChange={() => toggleNoticeMode('email')}
+                          disabled={submitting}
+                        />
+                        <span>Email</span>
+                      </label>
+                      <label className="flex items-center gap-1.5">
+                        <input
+                          type="checkbox"
+                          checked={formData.notice_modes.includes('printed_letter')}
+                          onChange={() => toggleNoticeMode('printed_letter')}
+                          disabled={submitting}
+                        />
+                        <span>Printed Letter</span>
+                      </label>
+                      <label className="flex items-center gap-1.5">
+                        <input
+                          type="checkbox"
+                          checked={formData.notice_modes.includes('both')}
+                          onChange={() => toggleNoticeMode('both')}
+                          disabled={submitting}
+                        />
+                        <span>Both</span>
+                      </label>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Reviewed By</Label>
+                <Select
+                  value={formData.reviewed_by}
+                  onValueChange={(value) => setFormData((prev) => ({ ...prev, reviewed_by: value }))}
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="Select reviewer..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {approverEmployees.map((emp) => (
+                      <SelectItem key={`reviewed-${emp.id}`} value={`${emp.first_name} ${emp.last_name}`}>
+                        {emp.first_name} {emp.last_name} ({emp.position})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Approved By</Label>
+                <Input
+                  type="text"
+                  name="approved_by"
+                  value={formData.approved_by}
+                  onChange={handleInputChange}
+                  className="h-10 bg-slate-50"
+                  disabled
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Date of Approval</Label>
+                <Input
+                  type="datetime-local"
+                  name="approval_date"
+                  value={formData.approval_date}
+                  onChange={handleInputChange}
+                  className="h-10"
+                  disabled={submitting}
+                />
+              </div>
             </div>
 
-            <div className="w-px h-8 bg-slate-200 shrink-0" />
-
-            {/* Termination Date */}
-            <div className="flex flex-col gap-1 pr-3 shrink-0">
-              <Label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest pl-3">Termination Date & Time</Label>
-              <Input
-                type="datetime-local"
-                name="termination_date"
-                value={formData.termination_date}
-                onChange={handleInputChange}
-                className="h-9 px-3 bg-transparent border-0 focus:outline-none focus:ring-0 text-slate-600 font-medium text-sm w-[200px]"
-                disabled={submitting}
-              />
-            </div>
-
-            <div className="w-px h-8 bg-slate-200 shrink-0" />
-
-            {/* Reason */}
-            <div className="flex-[2] px-3 min-w-[160px]">
-              <input
-                type="text"
-                name="reason"
-                value={formData.reason}
-                onChange={(e) => setFormData(prev => ({ ...prev, reason: e.target.value }))}
-                placeholder="Reason for termination..."
-                className="w-full h-10 bg-transparent border-0 focus:outline-none focus:ring-0 text-sm text-slate-700 placeholder:text-slate-400"
-                disabled={submitting}
-              />
-            </div>
-
-            <div className="w-px h-8 bg-slate-200 shrink-0" />
-
-            {/* Proceed Button */}
-            <div className="px-3 flex items-center gap-2 shrink-0">
+            <div className="flex justify-end items-center gap-2">
               <Button
                 onClick={handleSubmit as any}
-                disabled={submitting || !selectedEmployeeId || formData.reason.trim().length < 10}
+                disabled={
+                  submitting ||
+                  !selectedEmployeeId ||
+                  formData.reason.trim().length < 10 ||
+                  !formData.reviewed_by ||
+                  !formData.approval_date ||
+                  (exitActionType === 'terminate' && (!formData.recommended_by || formData.notice_modes.length === 0 || !formData.notice_date))
+                }
                 className={cn(
                   "h-10 px-6 text-sm font-bold rounded-xl transition-all whitespace-nowrap",
-                  submitting || !selectedEmployeeId || formData.reason.trim().length < 10
+                  submitting
                     ? "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
                     : "bg-gradient-to-r from-[#800020] to-[#A0153E] text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5"
                 )}
               >
-                {submitting ? "Processing..." : "Proceed"}
+                {submitting ? "Processing..." : (exitActionType === 'resigned' ? 'Proceed Resignation' : 'Proceed Termination')}
               </Button>
               <Button
                 variant="ghost"
@@ -561,10 +953,8 @@ export default function TerminatePage() {
                 <X className="h-4 w-4" />
               </Button>
             </div>
-
           </div>
         </div>
-
         <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
           {fetchError ? (
             <div className="flex flex-col items-center justify-center py-24 text-center animate-in fade-in zoom-in-95 duration-500">
@@ -596,13 +986,13 @@ export default function TerminatePage() {
                 <div>
                   <h2 className="text-lg font-bold text-[#4A081A]">Terminated History</h2>
                   <p className="text-slate-400 text-xs mt-0.5">
-                    {filteredTerminations.length} of {terminations.length} records
+                    {filteredTerminations.length} of {baseTerminations.length} records
                   </p>
                 </div>
               </div>
 
               <div className="p-0 bg-white overflow-hidden">
-                {terminations.length === 0 ? (
+                {baseTerminations.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-24 text-slate-400">
                     <FileText className="h-20 w-20 mb-4 opacity-10" />
                     <p className="text-lg">No termination records found.</p>
@@ -674,15 +1064,24 @@ export default function TerminatePage() {
                                 >
                                   Review
                                 </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-9 border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300 transition-all font-bold px-4 rounded-lg shadow-sm"
-                                  onClick={() => handleRehire(record.employee_id)}
-                                  disabled={rehireLoading === record.employee_id}
-                                >
-                                  {rehireLoading === record.employee_id ? 'Wait...' : 'Re-hire'}
-                                </Button>
+                                {!record.rehired_at && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-9 border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300 transition-all font-bold px-4 rounded-lg shadow-sm"
+                                    onClick={() => {
+                                      setSelectedTermination(record)
+                                      setFormData((prev) => ({
+                                        ...prev,
+                                        rehire_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
+                                      }))
+                                      setShowDetailDialog(true)
+                                    }}
+                                    disabled={rehireLoading === record.employee_id}
+                                  >
+                                    {rehireLoading === record.employee_id ? 'Wait...' : 'Re-hire'}
+                                  </Button>
+                                )}
                               </div>
                             </TableCell>
                           </TableRow>
@@ -737,6 +1136,173 @@ export default function TerminatePage() {
             </>
           )}
         </div>
+
+        <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+          {fetchError ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center text-slate-400">
+              <p>Unable to load resigned history.</p>
+            </div>
+          ) : loading ? (
+            <div className="p-8 md:p-10 space-y-4 animate-pulse">
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : (
+            <>
+              <div className="bg-slate-50 border-b border-slate-100 px-6 py-4 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-[#4A081A]">Resigned History</h2>
+                  <p className="text-slate-400 text-xs mt-0.5">
+                    {filteredResigned.length} of {baseResigned.length} records
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-0 bg-white overflow-hidden">
+                {baseResigned.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-24 text-slate-400">
+                    <FileText className="h-20 w-20 mb-4 opacity-10" />
+                    <p className="text-lg">No resigned records found.</p>
+                  </div>
+                ) : filteredResigned.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                    <Search className="h-14 w-14 mb-4 opacity-10" />
+                    <p className="text-base font-medium">No results for &quot;{searchQuery}&quot;</p>
+                    <p className="text-sm mt-1">Try a different name or reason.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader className="bg-slate-50">
+                        <TableRow className="border-b border-slate-100">
+                          <TableHead className="py-4 pl-8 text-xs font-bold text-slate-500 uppercase tracking-wider">Employee</TableHead>
+                          <TableHead className="py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Resignation Date</TableHead>
+                          {activeTab !== 'terminated' && (
+                            <TableHead className="py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Rehire Date</TableHead>
+                          )}
+                          <TableHead className="py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Reason</TableHead>
+                          <TableHead className="py-4 pr-8 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredResigned
+                          .slice((currentResignedPage - 1) * itemsPerPage, currentResignedPage * itemsPerPage)
+                          .map((record) => (
+                            <TableRow key={`resigned-${record.id}`} className="hover:bg-slate-50/80 transition-colors border-b border-slate-50">
+                              <TableCell className="py-4 pl-8 font-medium text-slate-900">
+                                <div className="flex flex-col">
+                                  <span className="text-base">{record.employee?.last_name}, {record.employee?.first_name}</span>
+                                  <span className="text-xs text-slate-500 font-normal mt-0.5">{record.employee?.position}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-slate-600 text-sm font-medium">
+                                {record.termination_date ? (
+                                  <div className="flex flex-col">
+                                    <span className="font-semibold text-rose-700">{new Date(record.termination_date).toLocaleDateString()}</span>
+                                    <span className="text-xs text-slate-400 mt-0.5">{new Date(record.termination_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                  </div>
+                                ) : 'N/A'}
+                              </TableCell>
+                              {activeTab !== 'terminated' && (
+                                <TableCell className="text-slate-600 text-sm font-medium">
+                                  {record.rehired_at ? (
+                                    <div className="flex flex-col">
+                                      <span className="font-semibold text-emerald-700">{new Date(record.rehired_at).toLocaleDateString()}</span>
+                                      <span className="text-xs text-slate-400 mt-0.5">{new Date(record.rehired_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-300 italic text-xs">â€”</span>
+                                  )}
+                                </TableCell>
+                              )}
+                              <TableCell className="max-w-[300px] truncate text-slate-500 text-sm italic">
+                                &quot;{record.reason}&quot;
+                              </TableCell>
+                              <TableCell className="py-4 pr-8 text-right">
+                                <div className="flex items-center justify-end gap-3">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-[#800020] font-bold hover:text-[#A0153E] hover:bg-rose-50 rounded-lg px-4"
+                                    onClick={() => {
+                                      setSelectedTermination(record)
+                                      setShowDetailDialog(true)
+                                    }}
+                                  >
+                                    Review
+                                  </Button>
+                                  {!record.rehired_at && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-9 border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300 transition-all font-bold px-4 rounded-lg shadow-sm"
+                                      onClick={() => {
+                                        setSelectedTermination(record)
+                                        setFormData((prev) => ({
+                                          ...prev,
+                                          rehire_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
+                                        }))
+                                        setShowDetailDialog(true)
+                                      }}
+                                      disabled={rehireLoading === record.employee_id}
+                                    >
+                                      {rehireLoading === record.employee_id ? 'Wait...' : 'Re-hire'}
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                    {filteredResigned.length > itemsPerPage && (
+                      <div className="px-8 py-3 border-t border-slate-50 flex items-center justify-between bg-slate-50/30">
+                        <div className="text-xs text-slate-500 font-medium">
+                          Showing {(currentResignedPage - 1) * itemsPerPage + 1} to {Math.min(currentResignedPage * itemsPerPage, filteredResigned.length)} of {filteredResigned.length}
+                        </div>
+                        <div className="flex gap-1.5 items-center">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentResignedPage(prev => Math.max(prev - 1, 1))}
+                            disabled={currentResignedPage === 1}
+                            className="h-8 px-3 text-xs font-bold border-slate-200 text-slate-600 hover:bg-white disabled:opacity-40"
+                          >
+                            Previous
+                          </Button>
+                          {Array.from({ length: Math.ceil(filteredResigned.length / itemsPerPage) }, (_, i) => i + 1).map((page) => (
+                            <button
+                              key={`resigned-page-${page}`}
+                              onClick={() => setCurrentResignedPage(page)}
+                              className={cn(
+                                "w-8 h-8 rounded-lg text-xs font-bold transition-all",
+                                currentResignedPage === page
+                                  ? "bg-[#800020] text-white shadow-md scale-105"
+                                  : "text-slate-500 hover:bg-slate-100"
+                              )}
+                            >
+                              {page}
+                            </button>
+                          ))}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentResignedPage(prev => Math.min(prev + 1, Math.ceil(filteredResigned.length / itemsPerPage)))}
+                            disabled={currentResignedPage === Math.ceil(filteredResigned.length / itemsPerPage)}
+                            className="h-8 px-3 text-xs font-bold border-slate-200 text-slate-600 hover:bg-white disabled:opacity-40"
+                          >
+                            Next
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Termination Detail View Modal */}
@@ -748,7 +1314,7 @@ export default function TerminatePage() {
       >
         <DialogContent className="sm:max-w-2xl border-0 shadow-2xl p-0 overflow-hidden">
           <DialogHeader className="bg-gradient-to-r from-[#800020] to-[#630C22] p-8 text-white">
-            <DialogTitle className="text-2xl font-bold">Termination Details</DialogTitle>
+            <DialogTitle className="text-2xl font-bold">{selectedRecordIsResigned ? 'Resignation Details' : 'Termination Details'}</DialogTitle>
             <DialogDescription className="text-rose-100/90 mt-1">
               For {selectedTermination?.employee?.first_name} {selectedTermination?.employee?.last_name}
             </DialogDescription>
@@ -761,7 +1327,7 @@ export default function TerminatePage() {
                 <p className="font-semibold text-slate-800">{selectedTermination?.employee?.position || 'N/A'}</p>
               </div>
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 font-sans">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Termination Date</p>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{selectedRecordIsResigned ? 'Resignation Date' : 'Termination Date'}</p>
                 <div className="flex flex-col">
                   <p className="font-semibold text-rose-700">
                     {selectedTermination?.termination_date ? new Date(selectedTermination.termination_date).toLocaleDateString() : 'N/A'}
@@ -790,7 +1356,7 @@ export default function TerminatePage() {
 
             <div>
               <p className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-rose-50" /> Reason for Termination
+                <FileText className="w-4 h-4 text-rose-50" /> {selectedRecordIsResigned ? 'Reason for Resignation' : 'Reason for Termination'}
               </p>
               <div className="bg-white border border-slate-200 rounded-xl p-6 text-slate-600 leading-relaxed shadow-sm italic">
                 "{selectedTermination?.reason || 'No specific reason recorded.'}"
@@ -807,21 +1373,43 @@ export default function TerminatePage() {
             )}
           </div>
 
-          <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
-            <Button variant="ghost" onClick={() => setShowDetailDialog(false)} className="font-bold text-slate-600">
-              Back to List
-            </Button>
-            <Button
-              className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all font-bold px-6"
-              onClick={() => {
-                if (selectedTermination) {
-                  handleRehire(selectedTermination.employee_id)
-                }
-              }}
-              disabled={rehireLoading === selectedTermination?.employee_id}
-            >
-              {rehireLoading === selectedTermination?.employee_id ? 'Restoring Access...' : 'Re-hire Employee'}
-            </Button>
+          <div className="p-6 bg-slate-50 border-t border-slate-100 flex flex-col gap-4">
+            {!selectedTermination?.rehired_at && (
+              <div className="flex items-center gap-4 bg-white p-3 rounded-lg border border-slate-200">
+                <div className="flex flex-col gap-1 shrink-0">
+                  <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Re-hire Date & Time</Label>
+                  <Input
+                    type="datetime-local"
+                    name="rehire_date"
+                    value={formData.rehire_date}
+                    onChange={handleInputChange}
+                    className="h-9 px-2 bg-transparent border-0 focus:outline-none focus:ring-0 text-slate-600 font-medium text-sm w-[200px]"
+                    disabled={rehireLoading !== null}
+                  />
+                </div>
+                <div className="flex-1 text-xs text-slate-400 italic">
+                  Specify the official re-hire date for this employee.
+                </div>
+              </div>
+            )}
+            <div className="flex justify-between items-center">
+              <Button variant="ghost" onClick={() => setShowDetailDialog(false)} className="font-bold text-slate-600">
+                Back to List
+              </Button>
+              {!selectedTermination?.rehired_at && (
+                <Button
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all font-bold px-6"
+                  onClick={() => {
+                    if (selectedTermination) {
+                      handleRehire(selectedTermination.employee_id)
+                    }
+                  }}
+                  disabled={rehireLoading === selectedTermination?.employee_id}
+                >
+                  {rehireLoading === selectedTermination?.employee_id ? 'Restoring Access...' : 'Re-hire Employee'}
+                </Button>
+              )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -839,3 +1427,5 @@ export default function TerminatePage() {
     </div>
   )
 }
+
+
