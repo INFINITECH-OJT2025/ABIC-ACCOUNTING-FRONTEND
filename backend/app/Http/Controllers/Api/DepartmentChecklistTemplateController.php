@@ -39,11 +39,25 @@ class DepartmentChecklistTemplateController extends Controller
 
     public function upsert(Request $request)
     {
+        $forbiddenTextRule = function (string $fieldLabel) {
+            return function ($attribute, $value, $fail) use ($fieldLabel): void {
+                if (preg_match(AppLimits::FORBIDDEN_TEXT_REGEX, (string) $value)) {
+                    $fail($fieldLabel . ' contains unsupported special characters (' . AppLimits::FORBIDDEN_TEXT_LABEL . ').');
+                }
+            };
+        };
+
         $validated = $request->validate([
             'department_id' => 'required|integer|exists:departments,id',
             'checklist_type' => 'required|string|in:ONBOARDING,CLEARANCE',
             'tasks' => 'required|array|min:1|max:' . AppLimits::CHECKLIST_TASK_ROWS_APP_MAX,
-            'tasks.*.task' => 'required|string|min:' . AppLimits::CHECKLIST_TASK_APP_MIN . '|max:' . AppLimits::CHECKLIST_TASK_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
+            'tasks.*.task' => [
+                'required',
+                'string',
+                'min:' . AppLimits::CHECKLIST_TASK_APP_MIN,
+                'max:' . AppLimits::CHECKLIST_TASK_APP_MAX,
+                $forbiddenTextRule('Task text'),
+            ],
             'tasks.*.sort_order' => 'nullable|integer|min:' . AppLimits::CHECKLIST_SORT_ORDER_APP_MIN . '|max:' . AppLimits::CHECKLIST_SORT_ORDER_APP_MAX,
             'tasks.*.is_active' => 'nullable|boolean',
         ], [
@@ -58,7 +72,6 @@ class DepartmentChecklistTemplateController extends Controller
             'tasks.*.task.required' => 'Each task row must include a task description.',
             'tasks.*.task.min' => 'Each task must be at least ' . AppLimits::CHECKLIST_TASK_APP_MIN . ' characters long.',
             'tasks.*.task.max' => 'Each task must be ' . AppLimits::CHECKLIST_TASK_APP_MAX . ' characters or less.',
-            'tasks.*.task.not_regex' => 'Task text contains unsupported special characters (' . AppLimits::FORBIDDEN_TEXT_LABEL . ').',
             'tasks.*.sort_order.integer' => 'Task order values must be whole numbers.',
             'tasks.*.sort_order.min' => 'Task order must start at ' . AppLimits::CHECKLIST_SORT_ORDER_APP_MIN . '.',
             'tasks.*.sort_order.max' => 'Task order is too large.',

@@ -88,18 +88,64 @@ class DirectoryController extends Controller
             return response()->json(['message' => 'Agency record not found.'], 404);
         }
 
+        $forbiddenTextRule = function (string $fieldLabel) {
+            return function ($attribute, $value, $fail) use ($fieldLabel): void {
+                if (preg_match(AppLimits::FORBIDDEN_TEXT_REGEX, (string) $value)) {
+                    $fail($fieldLabel . ' contains unsupported special characters (' . AppLimits::FORBIDDEN_TEXT_LABEL . ').');
+                }
+            };
+        };
+
         $validated = $request->validate([
-            'name' => 'required|string|min:' . AppLimits::DIRECTORY_AGENCY_NAME_APP_MIN . '|max:' . AppLimits::DIRECTORY_AGENCY_NAME_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
-            'full_name' => 'nullable|string|max:' . AppLimits::DIRECTORY_FULL_NAME_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
-            'summary' => 'nullable|string|max:' . AppLimits::DIRECTORY_SUMMARY_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
+            'name' => [
+                'required',
+                'string',
+                'min:' . AppLimits::DIRECTORY_AGENCY_NAME_APP_MIN,
+                'max:' . AppLimits::DIRECTORY_AGENCY_NAME_APP_MAX,
+                $forbiddenTextRule('Agency name'),
+            ],
+            'full_name' => [
+                'nullable',
+                'string',
+                'max:' . AppLimits::DIRECTORY_FULL_NAME_APP_MAX,
+                $forbiddenTextRule('Full name'),
+            ],
+            'summary' => [
+                'nullable',
+                'string',
+                'max:' . AppLimits::DIRECTORY_SUMMARY_APP_MAX,
+                $forbiddenTextRule('Summary'),
+            ],
             'contacts' => 'nullable|array|max:200',
-            'contacts.*.type' => 'required|string|max:' . AppLimits::DIRECTORY_CONTACT_TYPE_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
-            'contacts.*.label' => 'nullable|string|max:' . AppLimits::DIRECTORY_CONTACT_LABEL_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
-            'contacts.*.value' => 'required|string|min:' . AppLimits::DIRECTORY_CONTACT_VALUE_APP_MIN . '|max:' . AppLimits::DIRECTORY_CONTACT_VALUE_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
+            'contacts.*.type' => [
+                'required',
+                'string',
+                'max:' . AppLimits::DIRECTORY_CONTACT_TYPE_APP_MAX,
+                $forbiddenTextRule('Contact type'),
+            ],
+            'contacts.*.label' => [
+                'nullable',
+                'string',
+                'max:' . AppLimits::DIRECTORY_CONTACT_LABEL_APP_MAX,
+                $forbiddenTextRule('Contact label'),
+            ],
+            'contacts.*.value' => [
+                'required',
+                'string',
+                'min:' . AppLimits::DIRECTORY_CONTACT_VALUE_APP_MIN,
+                'max:' . AppLimits::DIRECTORY_CONTACT_VALUE_APP_MAX,
+                $forbiddenTextRule('Contact value'),
+            ],
             'contacts.*.sort_order' => 'nullable|integer|min:1|max:10000',
             'processes' => 'nullable|array|max:500',
             'processes.*.process_type' => 'required|string|in:Adding,Removing',
-            'processes.*.process' => 'required|string|min:' . AppLimits::DIRECTORY_PROCESS_TEXT_APP_MIN . '|max:' . AppLimits::DIRECTORY_PROCESS_TEXT_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
+            'processes.*.process' => [
+                'required',
+                'string',
+                'min:' . AppLimits::DIRECTORY_PROCESS_TEXT_APP_MIN,
+                'max:' . AppLimits::DIRECTORY_PROCESS_TEXT_APP_MAX,
+                $forbiddenTextRule('Process text'),
+            ],
             'processes.*.step_number' => 'nullable|integer|min:1|max:10000',
         ], [
             'name.required' => 'Agency name is required.',
@@ -191,15 +237,55 @@ class DirectoryController extends Controller
 
     public function updateGeneralContacts(Request $request)
     {
+        $forbiddenTextRule = function (string $fieldLabel) {
+            return function ($attribute, $value, $fail) use ($fieldLabel): void {
+                if (preg_match(AppLimits::FORBIDDEN_TEXT_REGEX, (string) $value)) {
+                    $fail($fieldLabel . ' contains unsupported special characters (' . AppLimits::FORBIDDEN_TEXT_LABEL . ').');
+                }
+            };
+        };
+
         $validated = $request->validate([
             'contacts' => 'required|array|min:1|max:500',
             'contacts.*.id' => 'nullable|integer|exists:general_contacts,id',
-            'contacts.*.type' => 'nullable|string|max:' . AppLimits::DIRECTORY_CONTACT_TYPE_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
-            'contacts.*.label' => 'nullable|string|max:' . AppLimits::DIRECTORY_CONTACT_LABEL_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
-            'contacts.*.value' => 'required|string|min:' . AppLimits::DIRECTORY_GENERAL_VALUE_APP_MIN . '|max:' . AppLimits::DIRECTORY_GENERAL_VALUE_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
-            'contacts.*.establishment_name' => 'required|string|min:' . AppLimits::DIRECTORY_GENERAL_ESTABLISHMENT_APP_MIN . '|max:' . AppLimits::DIRECTORY_GENERAL_ESTABLISHMENT_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
-            'contacts.*.services' => 'nullable|string|max:' . AppLimits::DIRECTORY_GENERAL_SERVICES_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
-            'contacts.*.contact_person' => 'nullable|string|max:' . AppLimits::DIRECTORY_GENERAL_CONTACT_PERSON_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
+            'contacts.*.type' => [
+                'nullable',
+                'string',
+                'max:' . AppLimits::DIRECTORY_CONTACT_TYPE_APP_MAX,
+                $forbiddenTextRule('Contact type'),
+            ],
+            'contacts.*.label' => [
+                'nullable',
+                'string',
+                'max:' . AppLimits::DIRECTORY_CONTACT_LABEL_APP_MAX,
+                $forbiddenTextRule('Contact label'),
+            ],
+            'contacts.*.value' => [
+                'required',
+                'string',
+                'min:' . AppLimits::DIRECTORY_GENERAL_VALUE_APP_MIN,
+                'max:' . AppLimits::DIRECTORY_GENERAL_VALUE_APP_MAX,
+                $forbiddenTextRule('Contact value'),
+            ],
+            'contacts.*.establishment_name' => [
+                'required',
+                'string',
+                'min:' . AppLimits::DIRECTORY_GENERAL_ESTABLISHMENT_APP_MIN,
+                'max:' . AppLimits::DIRECTORY_GENERAL_ESTABLISHMENT_APP_MAX,
+                $forbiddenTextRule('Establishment name'),
+            ],
+            'contacts.*.services' => [
+                'nullable',
+                'string',
+                'max:' . AppLimits::DIRECTORY_GENERAL_SERVICES_APP_MAX,
+                $forbiddenTextRule('Services'),
+            ],
+            'contacts.*.contact_person' => [
+                'nullable',
+                'string',
+                'max:' . AppLimits::DIRECTORY_GENERAL_CONTACT_PERSON_APP_MAX,
+                $forbiddenTextRule('Contact person'),
+            ],
             'contacts.*.sort_order' => 'nullable|integer|min:1|max:10000',
             'contacts.*.avatar_url' => 'nullable|url|max:2048',
             'contacts.*.avatar_public_id' => 'nullable|string|max:255',
@@ -209,10 +295,6 @@ class DirectoryController extends Controller
             'contacts.*.establishment_name.required' => 'Each row needs an establishment name.',
             'contacts.*.value.required' => 'Each row needs a contact value.',
             'contacts.*.avatar_url.url' => 'Avatar URL must be a valid link.',
-            'contacts.*.establishment_name.not_regex' => 'Establishment name contains unsupported special characters (' . AppLimits::FORBIDDEN_TEXT_LABEL . ').',
-            'contacts.*.services.not_regex' => 'Services contains unsupported special characters (' . AppLimits::FORBIDDEN_TEXT_LABEL . ').',
-            'contacts.*.contact_person.not_regex' => 'Contact person contains unsupported special characters (' . AppLimits::FORBIDDEN_TEXT_LABEL . ').',
-            'contacts.*.value.not_regex' => 'Contact value contains unsupported special characters (' . AppLimits::FORBIDDEN_TEXT_LABEL . ').',
         ]);
 
         $contacts = $validated['contacts'] ?? [];
