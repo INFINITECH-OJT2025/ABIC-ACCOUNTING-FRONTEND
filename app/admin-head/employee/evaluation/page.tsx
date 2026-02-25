@@ -20,16 +20,45 @@ interface Employee {
   position: string
 }
 
+interface Evaluation {
+  employee_id: string
+  score_1: number | null
+  remarks_1: string | null
+  score_2: number | null
+  remarks_2: string | null
+}
+
 export default function EvaluationPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
+  const [evaluations, setEvaluations] = useState<Record<string, Evaluation>>({})
   const [loading, setLoading] = useState(true)
   const [isActionLoading, setIsActionLoading] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
-    fetchEmployees()
+    fetchData()
   }, [])
+
+  const fetchData = async () => {
+    await Promise.all([fetchEmployees(), fetchEvaluations()])
+  }
+
+  const fetchEvaluations = async () => {
+    try {
+      const response = await fetch(`${getApiUrl()}/api/evaluations`)
+      const data = await response.json()
+      if (data.success) {
+        const evalMap: Record<string, Evaluation> = {}
+        data.data.forEach((evalItem: Evaluation) => {
+          evalMap[evalItem.employee_id] = evalItem
+        })
+        setEvaluations(evalMap)
+      }
+    } catch (error) {
+      console.error('Error fetching evaluations:', error)
+    }
+  }
 
   const fetchEmployees = async () => {
     setLoading(true)
@@ -70,6 +99,45 @@ export default function EvaluationPage() {
       secondEval: format(secondEval, 'MMMM d, yyyy'),
       regularization: format(regularization, 'MMMM d, yyyy'),
       status
+    }
+  }
+
+  const handleScoreChange = (employeeId: string, scoreType: 'score_1' | 'score_2', value: string) => {
+    const score = value === '' ? null : parseInt(value)
+    const remarks = score === null ? null : (score >= 31 ? 'Passed' : 'Failed')
+    
+    setEvaluations(prev => ({
+      ...prev,
+      [employeeId]: {
+        ...(prev[employeeId] || { employee_id: employeeId, score_1: null, remarks_1: null, score_2: null, remarks_2: null }),
+        [scoreType]: score,
+        [scoreType === 'score_1' ? 'remarks_1' : 'remarks_2']: remarks
+      }
+    }))
+  }
+
+  const saveEvaluation = async (employeeId: string) => {
+    const evalData = evaluations[employeeId]
+    if (!evalData) return
+
+    setIsActionLoading(true)
+    try {
+      const response = await fetch(`${getApiUrl()}/api/evaluations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(evalData)
+      })
+      const data = await response.json()
+      if (data.success) {
+        toast.success('Evaluation saved successfully')
+      } else {
+        toast.error(data.message || 'Failed to save evaluation')
+      }
+    } catch (error) {
+      console.error('Error saving evaluation:', error)
+      toast.error('Connection failed')
+    } finally {
+      setIsActionLoading(false)
     }
   }
 
@@ -204,11 +272,14 @@ export default function EvaluationPage() {
                   <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap">Name</th>
                   <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap">Date Hired</th>
                   <th className="px-6 py-4 text-center font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap">Status</th>
-                  <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap">1st Evaluation</th>
-                  <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap">Remarks</th>
-                  <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap">2nd Evaluation</th>
-                  <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap">Remarks</th>
-                  <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider whitespace-nowrap">Regularization</th>
+                  <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap text-center">1st Evaluation</th>
+                  <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap text-center">Score</th>
+                  <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap text-center">Remarks</th>
+                  <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap text-center">2nd Evaluation</th>
+                  <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap text-center">Score</th>
+                  <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap text-center">Remarks</th>
+                  <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider whitespace-nowrap text-center">Regularization</th>
+                  <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider whitespace-nowrap text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100">
@@ -245,13 +316,59 @@ export default function EvaluationPage() {
                         <td className="px-6 py-4 text-slate-500 font-semibold text-[13px] border-r border-rose-50/30 italic whitespace-nowrap">
                           {dates?.firstEval || '-'}
                         </td>
-                        <td className="px-6 py-4 border-r border-rose-50/30 text-xs font-bold text-slate-300">N/A</td>
-                        <td className="px-6 py-4 text-slate-500 font-semibold text-[13px] border-r border-rose-50/30 italic whitespace-nowrap">
+                        <td className="px-4 py-4 border-r border-rose-50/30">
+                          <Input 
+                            type="number" 
+                            className="w-20 mx-auto text-center h-9 border-rose-100"
+                            value={evaluations[emp.id]?.score_1 ?? ''}
+                            onChange={(e) => handleScoreChange(emp.id, 'score_1', e.target.value)}
+                          />
+                        </td>
+                        <td className="px-6 py-4 border-r border-rose-50/30 text-center">
+                          {evaluations[emp.id]?.remarks_1 ? (
+                            <Badge className={`${
+                              evaluations[emp.id]?.remarks_1 === 'Passed' 
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                : 'bg-rose-50 text-rose-700 border-rose-200'
+                            } border shadow-none font-bold px-3 py-1 uppercase text-[10px] rounded-full`}>
+                              {evaluations[emp.id]?.remarks_1}
+                            </Badge>
+                          ) : <span className="text-slate-300 italic text-xs">Pending</span>}
+                        </td>
+                        <td className="px-6 py-4 text-slate-500 font-semibold text-[13px] border-r border-rose-50/30 italic whitespace-nowrap text-center">
                           {dates?.secondEval || '-'}
                         </td>
-                        <td className="px-6 py-4 border-r border-rose-50/30 text-xs font-bold text-slate-300">N/A</td>
-                        <td className="px-6 py-4 font-bold text-[#A4163A] text-sm whitespace-nowrap">
+                        <td className="px-4 py-4 border-r border-rose-50/30">
+                          <Input 
+                            type="number" 
+                            className="w-20 mx-auto text-center h-9 border-rose-100"
+                            value={evaluations[emp.id]?.score_2 ?? ''}
+                            onChange={(e) => handleScoreChange(emp.id, 'score_2', e.target.value)}
+                          />
+                        </td>
+                        <td className="px-6 py-4 border-r border-rose-50/30 text-center">
+                          {evaluations[emp.id]?.remarks_2 ? (
+                            <Badge className={`${
+                              evaluations[emp.id]?.remarks_2 === 'Passed' 
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                : 'bg-rose-50 text-rose-700 border-rose-200'
+                            } border shadow-none font-bold px-3 py-1 uppercase text-[10px] rounded-full`}>
+                              {evaluations[emp.id]?.remarks_2}
+                            </Badge>
+                          ) : <span className="text-slate-300 italic text-xs">Pending</span>}
+                        </td>
+                        <td className="px-6 py-4 font-bold text-[#A4163A] text-sm whitespace-nowrap text-center border-r border-rose-50/30">
                           {dates?.regularization || '-'}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="text-[#630C22] border-[#630C22] hover:bg-[#630C22] hover:text-white rounded-lg font-bold"
+                            onClick={() => saveEvaluation(emp.id)}
+                          >
+                            Save
+                          </Button>
                         </td>
                       </tr>
                     )
