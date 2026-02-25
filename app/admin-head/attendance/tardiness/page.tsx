@@ -522,6 +522,24 @@ function exportToExcel(
       })
     })
 
+  // ── Page setup — Folio 8½" × 13" with 1-inch margins ──────────────────────
+  // paperSize 14 = US Folio (8.5 × 13 in) in the OOXML spec
+  ws['!pageSetup'] = {
+    paperSize: 14,
+    orientation: 'portrait',
+    fitToPage: false,
+    scale: 100,
+  }
+  // All margins in inches (1 inch each side; header/footer 0.5 in)
+  ws['!margins'] = {
+    left: 1,
+    right: 1,
+    top: 1,
+    bottom: 1,
+    header: 0.5,
+    footer: 0.5,
+  }
+
   // ── Write file ─────────────────────────────────────────────────────────────
   let sheetName = `Tardiness_${cutoffTitle.replace(/[^a-zA-Z0-9]/g, '_')}`
   if (sheetName.length > 31) sheetName = sheetName.substring(0, 31)
@@ -727,7 +745,9 @@ function SummarySheet({ isOpen, onClose, cutoffTitle, entries, selectedYear, sel
               <div className="flex justify-between items-center">
                 <CardTitle className="text-xl text-[#4A081A] font-bold">Employee Lates Summary</CardTitle>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-[#630C22]">{totalLateMinutes} mins / {totalOccurrences} occ / {totalWarnings} warnings</p>
+                  <p className="text-sm font-bold text-[#630C22]">
+                    {totalLateMinutes} mins / {totalOccurrences} occ / <span className="text-red-600">{totalWarnings} warnings</span>
+                  </p>
                 </div>
               </div>
               <CardDescription className="text-[#630C22]/70 text-xs font-medium">
@@ -752,25 +772,17 @@ function SummarySheet({ isOpen, onClose, cutoffTitle, entries, selectedYear, sel
                       summaryPagination.paginatedItems.map((emp, idx) => (
                         <tr key={idx} className="hover:bg-[#FFE5EC] transition-colors duration-200">
                           <td className="px-4 py-3 text-slate-700 font-semibold">{emp.name}</td>
-                          <td className="px-4 py-3">
-                            <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-[#FFE5EC] text-[#800020] border border-[#C9184A]">
-                              {emp.totalMinutes}
-                            </span>
+                          <td className="px-4 py-3 text-center font-semibold text-slate-700">
+                            {emp.totalMinutes}
                           </td>
-                          <td className="px-4 py-3">
-                            {emp.occurrences > 0 ? (
-                              <span className="px-3 py-1 bg-rose-100 text-[#C9184A] rounded-full text-xs font-bold border border-rose-200">
-                                {emp.occurrences}
-                              </span>
-                            ) : (
-                              <span className="text-slate-300">—</span>
-                            )}
+                          <td className="px-4 py-3 text-center font-semibold text-slate-700">
+                            {emp.occurrences > 0 ? emp.occurrences : <span className="text-slate-300">—</span>}
                           </td>
                           <td className="px-4 py-3">
                             {emp.warnings > 0 ? (
                               <div className="flex items-center gap-1.5">
-                                <AlertTriangle className="w-4 h-4 text-amber-600" />
-                                <span className="px-3 py-1 bg-amber-50 text-amber-700 rounded-full text-xs font-bold border border-amber-200">
+                                <AlertTriangle className="w-4 h-4 text-red-600" />
+                                <span className="px-3 py-1 bg-red-50 text-red-700 rounded-full text-xs font-bold border border-red-200">
                                   {emp.warnings}
                                 </span>
                               </div>
