@@ -37,6 +37,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { cn } from "@/lib/utils"
 import { getApiUrl } from '@/lib/api'
+import { ensureOkResponse } from '@/lib/api/error-message'
 import { toast } from 'sonner'
 
 
@@ -208,7 +209,7 @@ function OnboardingChecklistPageContent() {
         })
 
 
-        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        await ensureOkResponse(response, 'Unable to load onboarding checklist templates right now.')
 
 
         const result = await response.json()
@@ -536,7 +537,7 @@ function OnboardingChecklistPageContent() {
       })
 
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      await ensureOkResponse(response, 'Unable to update this task status right now.')
 
 
       const result = await response.json()
@@ -581,16 +582,36 @@ function OnboardingChecklistPageContent() {
         throw new Error('Please select a valid department before saving.')
       }
 
+      const payloadTasks = tasks
+        .map((row, index) => ({
+          task: row.task.trim(),
+          sort_order: index + 1,
+          is_active: true,
+        }))
+        .filter((row) => row.task.length > 0)
+
+      if (payloadTasks.length === 0) {
+        throw new Error('Please add at least one checklist task before saving.')
+      }
+
+      const duplicateTask = (() => {
+        const seen = new Set<string>()
+        for (const row of payloadTasks) {
+          const normalized = row.task.toLowerCase()
+          if (seen.has(normalized)) return row.task
+          seen.add(normalized)
+        }
+        return null
+      })()
+
+      if (duplicateTask) {
+        throw new Error(`The task "${duplicateTask}" is duplicated. Please keep task names unique.`)
+      }
+
       const payload = {
         department_id: departmentId,
         checklist_type: 'ONBOARDING',
-        tasks: tasks
-          .map((row, index) => ({
-            task: row.task.trim(),
-            sort_order: index + 1,
-            is_active: true,
-          }))
-          .filter((row) => row.task.length > 0),
+        tasks: payloadTasks,
       }
 
 
@@ -604,7 +625,7 @@ function OnboardingChecklistPageContent() {
       })
 
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      await ensureOkResponse(response, 'Unable to save the checklist template.')
 
 
       const result = await response.json()
@@ -676,9 +697,30 @@ function OnboardingChecklistPageContent() {
 
 
   const handleCreateRecord = async () => {
-    if (!newRecord.name.trim() || !newRecord.startDate) {
+    if (!newRecord.name.trim()) {
       toast.warning('Incomplete Form', {
-        description: 'Name and start date are required.',
+        description: 'Employee name is required.',
+      })
+      return
+    }
+
+    if (!newRecord.position.trim()) {
+      toast.warning('Incomplete Form', {
+        description: 'Position is required.',
+      })
+      return
+    }
+
+    if (!newRecord.department.trim()) {
+      toast.warning('Incomplete Form', {
+        description: 'Department is required.',
+      })
+      return
+    }
+
+    if (!newRecord.startDate) {
+      toast.warning('Incomplete Form', {
+        description: 'Start date is required.',
       })
       return
     }
@@ -705,7 +747,7 @@ function OnboardingChecklistPageContent() {
       })
 
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      await ensureOkResponse(response, 'Unable to create the onboarding record.')
 
 
       const result = await response.json()

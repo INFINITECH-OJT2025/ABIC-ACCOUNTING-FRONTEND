@@ -20,12 +20,18 @@ class OnboardingChecklistController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'position' => 'required|string|max:255',
-            'department' => 'required|string|max:255',
+            'name' => 'required|string|min:2|max:255',
+            'position' => 'required|string|min:2|max:255',
+            'department' => 'required|string|min:2|max:255',
             'startDate' => 'required|date',
-            'tasks' => 'nullable|array',
-            'status' => 'nullable|string|max:255',
+            'tasks' => 'nullable|array|max:200',
+            'status' => 'nullable|string|in:PENDING,DONE',
+        ], [
+            'name.required' => 'Employee name is required.',
+            'position.required' => 'Position is required.',
+            'department.required' => 'Department is required.',
+            'startDate.required' => 'Start date is required.',
+            'status.in' => 'Status must be either PENDING or DONE.',
         ]);
 
         try {
@@ -73,12 +79,14 @@ class OnboardingChecklistController extends Controller
         }
 
         $validated = $request->validate([
-            'name' => 'sometimes|string|max:255',
-            'position' => 'sometimes|string|max:255',
-            'department' => 'sometimes|string|max:255',
+            'name' => 'sometimes|string|min:2|max:255',
+            'position' => 'sometimes|string|min:2|max:255',
+            'department' => 'sometimes|string|min:2|max:255',
             'startDate' => 'sometimes|date',
-            'tasks' => 'sometimes|array',
-            'status' => 'sometimes|string|max:255',
+            'tasks' => 'sometimes|array|max:200',
+            'status' => 'sometimes|string|in:PENDING,DONE',
+        ], [
+            'status.in' => 'Status must be either PENDING or DONE.',
         ]);
 
         try {

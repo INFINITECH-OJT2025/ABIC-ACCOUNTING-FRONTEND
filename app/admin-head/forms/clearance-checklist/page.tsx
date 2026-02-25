@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { getApiUrl } from '@/lib/api'
+import { ensureOkResponse } from '@/lib/api/error-message'
 import { toast } from 'sonner'
 
 
@@ -191,7 +192,7 @@ export default function ClearanceChecklistPage() {
         })
 
 
-        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        await ensureOkResponse(response, 'Unable to load clearance checklist templates right now.')
 
 
         const result = await response.json()
@@ -469,7 +470,7 @@ export default function ClearanceChecklistPage() {
       })
 
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      await ensureOkResponse(response, 'Unable to update this task status right now.')
 
 
       const result = await response.json()
@@ -514,16 +515,36 @@ export default function ClearanceChecklistPage() {
         throw new Error('Please select a valid department before saving.')
       }
 
+      const payloadTasks = tasks
+        .map((row, index) => ({
+          task: row.task.trim(),
+          sort_order: index + 1,
+          is_active: true,
+        }))
+        .filter((row) => row.task.length > 0)
+
+      if (payloadTasks.length === 0) {
+        throw new Error('Please add at least one checklist task before saving.')
+      }
+
+      const duplicateTask = (() => {
+        const seen = new Set<string>()
+        for (const row of payloadTasks) {
+          const normalized = row.task.toLowerCase()
+          if (seen.has(normalized)) return row.task
+          seen.add(normalized)
+        }
+        return null
+      })()
+
+      if (duplicateTask) {
+        throw new Error(`The task "${duplicateTask}" is duplicated. Please keep task names unique.`)
+      }
+
       const payload = {
         department_id: departmentId,
         checklist_type: 'CLEARANCE',
-        tasks: tasks
-          .map((row, index) => ({
-            task: row.task.trim(),
-            sort_order: index + 1,
-            is_active: true,
-          }))
-          .filter((row) => row.task.length > 0),
+        tasks: payloadTasks,
       }
 
 
@@ -537,7 +558,7 @@ export default function ClearanceChecklistPage() {
       })
 
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      await ensureOkResponse(response, 'Unable to save the checklist template.')
 
 
       const result = await response.json()

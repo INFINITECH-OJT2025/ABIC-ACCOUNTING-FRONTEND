@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { getApiUrl } from '@/lib/api'
+import { ensureOkResponse } from '@/lib/api/error-message'
 import { toast } from 'sonner'
 import {
   Building2,
@@ -313,7 +314,7 @@ export default function GovernmentDirectoryPage() {
         })
 
 
-        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        await ensureOkResponse(response, 'Unable to load directory data right now.')
 
 
         const result = await response.json()
@@ -608,14 +609,25 @@ export default function GovernmentDirectoryPage() {
       setShowValidation(true)
 
 
-      const hasInvalidAgencyName = draft.name.trim().length === 0
-      const hasInvalidContacts = draft.contacts.some((row) => row.type.trim().length === 0 || row.value.trim().length === 0)
-      const hasInvalidProcesses = draft.processes.some((row) => row.process.trim().length === 0)
-
-
-      if (hasInvalidAgencyName || hasInvalidContacts || hasInvalidProcesses) {
+      if (draft.name.trim().length === 0) {
         toast.error('Validation Failed', {
-          description: 'Please complete all required fields before saving.',
+          description: 'Agency name is required.',
+        })
+        return
+      }
+
+      const invalidContactIndex = draft.contacts.findIndex((row) => row.type.trim().length === 0 || row.value.trim().length === 0)
+      if (invalidContactIndex !== -1) {
+        toast.error('Validation Failed', {
+          description: `Contact row ${invalidContactIndex + 1} must include both type and value.`,
+        })
+        return
+      }
+
+      const invalidProcessIndex = draft.processes.findIndex((row) => row.process.trim().length === 0)
+      if (invalidProcessIndex !== -1) {
+        toast.error('Validation Failed', {
+          description: `Step ${invalidProcessIndex + 1} cannot be empty.`,
         })
         return
       }
@@ -659,15 +671,7 @@ export default function GovernmentDirectoryPage() {
       })
 
 
-      if (!response.ok) {
-        let backendMessage = `HTTP ${response.status}`
-        try {
-          const errorBody = await response.json()
-          if (errorBody?.message) backendMessage = `${errorBody.message} (HTTP ${response.status})`
-        } catch {
-        }
-        throw new Error(backendMessage)
-      }
+      await ensureOkResponse(response, 'Unable to save directory changes.')
 
 
       const result = await response.json()
@@ -710,9 +714,7 @@ export default function GovernmentDirectoryPage() {
     })
 
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`)
-    }
+    await ensureOkResponse(response, 'Unable to update agency image.')
 
 
     const result = await response.json()
@@ -732,15 +734,7 @@ export default function GovernmentDirectoryPage() {
       const response = await fetch(`${getApiUrl()}/api/directory/cloudinary-images?prefix=directory/&max_results=60`, {
         headers: { Accept: 'application/json' },
       })
-      if (!response.ok) {
-        let backendMessage = `HTTP ${response.status}`
-        try {
-          const errorBody = await response.json()
-          if (errorBody?.message) backendMessage = `${errorBody.message} (HTTP ${response.status})`
-        } catch {
-        }
-        throw new Error(backendMessage)
-      }
+      await ensureOkResponse(response, 'Unable to load images from Cloudinary.')
       const result = await response.json()
       const rows = Array.isArray(result?.data) ? result.data : []
       setCloudinaryImages(rows)
@@ -760,15 +754,7 @@ export default function GovernmentDirectoryPage() {
         headers: { Accept: 'application/json' },
       })
 
-      if (!response.ok) {
-        let backendMessage = `HTTP ${response.status}`
-        try {
-          const errorBody = await response.json()
-          if (errorBody?.message) backendMessage = `${errorBody.message} (HTTP ${response.status})`
-        } catch {
-        }
-        throw new Error(backendMessage)
-      }
+      await ensureOkResponse(response, 'Unable to load general contacts.')
 
       const result = await response.json()
       const rows = Array.isArray(result?.data) ? result.data : []
@@ -926,10 +912,10 @@ export default function GovernmentDirectoryPage() {
 
   const saveGeneralContacts = async () => {
     try {
-      const hasInvalidRows = generalContactsDraft.some((row) => row.establishment_name.trim().length === 0 || row.value.trim().length === 0)
-      if (hasInvalidRows) {
+      const invalidRowIndex = generalContactsDraft.findIndex((row) => row.establishment_name.trim().length === 0 || row.value.trim().length === 0)
+      if (invalidRowIndex !== -1) {
         toast.error('Validation Failed', {
-          description: 'Establishment name and value are required for each general contact row.',
+          description: `Row ${invalidRowIndex + 1} requires both establishment name and value.`,
         })
         return
       }
@@ -956,15 +942,7 @@ export default function GovernmentDirectoryPage() {
         body: JSON.stringify({ contacts: payload }),
       })
 
-      if (!response.ok) {
-        let backendMessage = `HTTP ${response.status}`
-        try {
-          const errorBody = await response.json()
-          if (errorBody?.message) backendMessage = `${errorBody.message} (HTTP ${response.status})`
-        } catch {
-        }
-        throw new Error(backendMessage)
-      }
+      await ensureOkResponse(response, 'Unable to save general contacts.')
 
       const result = await response.json()
       const rows = Array.isArray(result?.data) ? result.data : []
@@ -2001,15 +1979,7 @@ export default function GovernmentDirectoryPage() {
                   })
 
 
-                  if (!response.ok) {
-                    let backendMessage = `HTTP ${response.status}`
-                    try {
-                      const errorBody = await response.json()
-                      if (errorBody?.message) backendMessage = `${errorBody.message} (HTTP ${response.status})`
-                    } catch {
-                    }
-                    throw new Error(backendMessage)
-                  }
+                  await ensureOkResponse(response, 'Unable to delete the selected image.')
 
 
                   setCloudinaryImages((prev) => prev.filter((item) => item.public_id !== deleteCandidate.public_id))

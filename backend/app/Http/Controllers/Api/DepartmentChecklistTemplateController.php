@@ -14,6 +14,11 @@ class DepartmentChecklistTemplateController extends Controller
         $validated = $request->validate([
             'checklist_type' => 'required|string|in:ONBOARDING,CLEARANCE',
             'department_id' => 'nullable|integer|exists:departments,id',
+        ], [
+            'checklist_type.required' => 'Please specify which checklist to load (ONBOARDING or CLEARANCE).',
+            'checklist_type.in' => 'Checklist type must be either ONBOARDING or CLEARANCE.',
+            'department_id.integer' => 'Department selection is invalid.',
+            'department_id.exists' => 'The selected department does not exist anymore.',
         ]);
 
         $query = DepartmentChecklistTemplate::query()
@@ -36,11 +41,40 @@ class DepartmentChecklistTemplateController extends Controller
         $validated = $request->validate([
             'department_id' => 'required|integer|exists:departments,id',
             'checklist_type' => 'required|string|in:ONBOARDING,CLEARANCE',
-            'tasks' => 'required|array',
-            'tasks.*.task' => 'required|string',
-            'tasks.*.sort_order' => 'nullable|integer|min:0',
+            'tasks' => 'required|array|min:1|max:200',
+            'tasks.*.task' => 'required|string|min:2|max:500',
+            'tasks.*.sort_order' => 'nullable|integer|min:1|max:10000',
             'tasks.*.is_active' => 'nullable|boolean',
+        ], [
+            'department_id.required' => 'Please choose a department before saving.',
+            'department_id.exists' => 'The selected department is no longer available. Please refresh and try again.',
+            'checklist_type.required' => 'Checklist type is required.',
+            'checklist_type.in' => 'Checklist type must be either ONBOARDING or CLEARANCE.',
+            'tasks.required' => 'Please add at least one checklist task before saving.',
+            'tasks.array' => 'Checklist tasks must be sent as a list.',
+            'tasks.min' => 'Please add at least one checklist task before saving.',
+            'tasks.max' => 'You can save up to 200 tasks per checklist template.',
+            'tasks.*.task.required' => 'Each task row must include a task description.',
+            'tasks.*.task.min' => 'Each task must be at least 2 characters long.',
+            'tasks.*.task.max' => 'Each task must be 500 characters or less.',
+            'tasks.*.sort_order.integer' => 'Task order values must be whole numbers.',
+            'tasks.*.sort_order.min' => 'Task order must start at 1.',
+            'tasks.*.sort_order.max' => 'Task order is too large.',
         ]);
+
+        $normalizedTasks = collect($validated['tasks'] ?? [])
+            ->map(fn ($row) => mb_strtolower(trim((string) ($row['task'] ?? ''))))
+            ->filter(fn ($task) => $task !== '');
+
+        if ($normalizedTasks->duplicates()->isNotEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Some tasks are duplicated. Please keep each task name unique.',
+                'errors' => [
+                    'tasks' => ['Some tasks are duplicated. Please keep each task name unique.'],
+                ],
+            ], 422);
+        }
 
         $template = DB::transaction(function () use ($validated) {
             $template = DepartmentChecklistTemplate::query()->updateOrCreate(

@@ -82,14 +82,31 @@ class DirectoryController extends Controller
 
     public function update(Request $request, $code)
     {
-        $agency = Agency::where('code', $code)->firstOrFail();
+        $agency = Agency::where('code', $code)->first();
+        if (!$agency) {
+            return response()->json(['message' => 'Agency record not found.'], 404);
+        }
 
         $validated = $request->validate([
-            'name' => 'required|string',
-            'full_name' => 'nullable|string',
-            'summary' => 'nullable|string',
-            'contacts' => 'array',
-            'processes' => 'array',
+            'name' => 'required|string|min:2|max:255',
+            'full_name' => 'nullable|string|max:255',
+            'summary' => 'nullable|string|max:2000',
+            'contacts' => 'nullable|array|max:200',
+            'contacts.*.type' => 'required|string|max:100',
+            'contacts.*.label' => 'nullable|string|max:255',
+            'contacts.*.value' => 'required|string|min:2|max:1000',
+            'contacts.*.sort_order' => 'nullable|integer|min:1|max:10000',
+            'processes' => 'nullable|array|max:500',
+            'processes.*.process_type' => 'required|string|in:Adding,Removing',
+            'processes.*.process' => 'required|string|min:2|max:1000',
+            'processes.*.step_number' => 'nullable|integer|min:1|max:10000',
+        ], [
+            'name.required' => 'Agency name is required.',
+            'name.min' => 'Agency name must be at least 2 characters long.',
+            'contacts.*.type.required' => 'Each contact row needs a contact type.',
+            'contacts.*.value.required' => 'Each contact row needs a contact value.',
+            'processes.*.process_type.in' => 'Process type must be either Adding or Removing.',
+            'processes.*.process.required' => 'Each process row needs a step description.',
         ]);
 
         $agency->update([
@@ -131,11 +148,21 @@ class DirectoryController extends Controller
 
     public function updateImage(Request $request, $code)
     {
-        $agency = Agency::where('code', $code)->firstOrFail();
+        $agency = Agency::where('code', $code)->first();
+        if (!$agency) {
+            return response()->json(['message' => 'Agency record not found.'], 404);
+        }
 
         $validated = $request->validate([
-            'image_url' => 'required|url',
-            'image_public_id' => 'nullable|string',
+            'image_url' => 'required|url|max:2048',
+            'image_public_id' => 'nullable|string|max:255',
+            'format' => 'nullable|string|in:jpg,jpeg,png,gif,webp,heic,heif',
+            'bytes' => 'nullable|integer|min:1|max:20971520',
+        ], [
+            'image_url.required' => 'Image URL is required.',
+            'image_url.url' => 'Image URL must be a valid link.',
+            'format.in' => 'Only JPG, PNG, GIF, WebP, HEIC, and HEIF images are allowed.',
+            'bytes.max' => 'Image size must be 20MB or less.',
         ]);
 
         $agency->update([
@@ -159,16 +186,22 @@ class DirectoryController extends Controller
     public function updateGeneralContacts(Request $request)
     {
         $validated = $request->validate([
-            'contacts' => 'required|array',
-            'contacts.*.type' => 'nullable|string',
-            'contacts.*.label' => 'nullable|string',
-            'contacts.*.value' => 'required|string',
-            'contacts.*.establishment_name' => 'required|string',
-            'contacts.*.services' => 'nullable|string',
-            'contacts.*.contact_person' => 'nullable|string',
-            'contacts.*.sort_order' => 'nullable|integer|min:0',
-            'contacts.*.avatar_url' => 'nullable|url',
-            'contacts.*.avatar_public_id' => 'nullable|string',
+            'contacts' => 'required|array|min:1|max:500',
+            'contacts.*.type' => 'nullable|string|max:100',
+            'contacts.*.label' => 'nullable|string|max:255',
+            'contacts.*.value' => 'required|string|min:2|max:1000',
+            'contacts.*.establishment_name' => 'required|string|min:2|max:255',
+            'contacts.*.services' => 'nullable|string|max:255',
+            'contacts.*.contact_person' => 'nullable|string|max:255',
+            'contacts.*.sort_order' => 'nullable|integer|min:1|max:10000',
+            'contacts.*.avatar_url' => 'nullable|url|max:2048',
+            'contacts.*.avatar_public_id' => 'nullable|string|max:255',
+        ], [
+            'contacts.required' => 'Please provide at least one general contact entry.',
+            'contacts.min' => 'Please provide at least one general contact entry.',
+            'contacts.*.establishment_name.required' => 'Each row needs an establishment name.',
+            'contacts.*.value.required' => 'Each row needs a contact value.',
+            'contacts.*.avatar_url.url' => 'Avatar URL must be a valid link.',
         ]);
 
         $contacts = $validated['contacts'] ?? [];
@@ -247,7 +280,9 @@ class DirectoryController extends Controller
     public function deleteCloudinaryImage(Request $request)
     {
         $validated = $request->validate([
-            'public_id' => 'required|string',
+            'public_id' => 'required|string|max:255',
+        ], [
+            'public_id.required' => 'Cloudinary image ID is required for deletion.',
         ]);
 
         $cloudName = env('NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME');
