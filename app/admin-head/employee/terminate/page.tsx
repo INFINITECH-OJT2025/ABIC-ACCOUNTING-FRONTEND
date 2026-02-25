@@ -233,9 +233,9 @@ export default function TerminatePage() {
       const resignedData = await resignedRes.json()
 
       if (empData.success && Array.isArray(empData.data)) {
-        // Only show currently employed employees in dropdown
+        // Only show currently employed or rehired employees in dropdown
         const active = empData.data.filter(
-          (emp: Employee) => String(emp.status).toLowerCase() === 'employed'
+          (emp: Employee) => ['employed', 'rehired_employee'].includes(String(emp.status).toLowerCase())
         ).sort((a: Employee, b: Employee) => a.last_name.localeCompare(b.last_name))
         setEmployees(active)
       }
@@ -549,7 +549,58 @@ export default function TerminatePage() {
       onConfirm: async () => {
         try {
           setRehireLoading(employeeId)
-          const response = await fetch(`${getApiUrl()}/api/employees/${employeeId}/rehire`, {
+          const rehireEmailQuery = selectedTermination?.employee?.email
+            ? `&email=${encodeURIComponent(selectedTermination.employee.email)}`
+            : ''
+          const profileResponse = await fetch(`${getApiUrl()}/api/employees/${encodeURIComponent(employeeId)}`, {
+            headers: {
+              Accept: 'application/json',
+            },
+          })
+          const profileData = await profileResponse.json()
+          const employeeProfile = profileData?.data ?? null
+
+          const requiredProfileFields = [
+            'position',
+            'date_hired',
+            'last_name',
+            'first_name',
+            'birthday',
+            'birthplace',
+            'civil_status',
+            'gender',
+            'mobile_number',
+            'street',
+            'region',
+            'province',
+            'city_municipality',
+            'barangay',
+            'zip_code',
+            'email_address',
+            'perm_street',
+            'perm_region',
+            'perm_province',
+            'perm_city_municipality',
+            'perm_barangay',
+            'perm_zip_code',
+          ]
+
+          const missingFields = requiredProfileFields.filter((field) => {
+            const value = employeeProfile?.[field]
+            return value === null || value === undefined || String(value).trim() === ''
+          })
+
+          if (!employeeProfile || missingFields.length > 0) {
+            toast.error(
+              'Re-hire blocked: please complete and save employee information in onboarding before re-hiring.'
+            )
+            setShowDetailDialog(false)
+            localStorage.removeItem('employee_onboarding_state')
+            router.push(`/admin-head/employee/onboard?id=${encodeURIComponent(employeeId)}&view=onboard&rehire=1&batch=1${rehireEmailQuery}`)
+            return
+          }
+
+          const response = await fetch(`${getApiUrl()}/api/employees/${encodeURIComponent(employeeId)}/rehire`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -562,9 +613,47 @@ export default function TerminatePage() {
           const data = await response.json()
 
           if (data.success) {
+            let resolvedEmployeeId = String(
+              data?.data?.id ??
+              data?.employee?.id ??
+              data?.rehire?.id ??
+              employeeId
+            )
+
+            // Some backends issue a new employee code on re-hire (e.g. 27-0002 -> 29-0002).
+            // If response doesn't provide it, resolve by latest record with the same email.
+            const selectedEmail = String(selectedTermination?.employee?.email ?? '').trim().toLowerCase()
+            if (selectedEmail && resolvedEmployeeId === employeeId) {
+              try {
+                const employeesResponse = await fetch(`${getApiUrl()}/api/employees`, {
+                  headers: { Accept: 'application/json' },
+                })
+                const employeesData = await employeesResponse.json()
+                const employees = Array.isArray(employeesData?.data) ? employeesData.data : []
+                const matched = employees
+                  .filter((emp: any) => {
+                    const email = String(emp?.email ?? emp?.email_address ?? '').trim().toLowerCase()
+                    return email === selectedEmail
+                  })
+                  .sort((a: any, b: any) => {
+                    const aTs = new Date(a?.updated_at ?? a?.created_at ?? 0).getTime()
+                    const bTs = new Date(b?.updated_at ?? b?.created_at ?? 0).getTime()
+                    return bTs - aTs
+                  })[0]
+
+                if (matched?.id) {
+                  resolvedEmployeeId = String(matched.id)
+                }
+              } catch (resolveError) {
+                console.error('Unable to resolve latest employee ID after re-hire:', resolveError)
+              }
+            }
+
             toast.success(data.message || 'Employee re-hired successfully')
-            fetchData()
+            // Ensure onboarding loads fresh server data for this employee.
+            localStorage.removeItem('employee_onboarding_state')
             setShowDetailDialog(false)
+            router.push(`/admin-head/employee/onboard?id=${encodeURIComponent(resolvedEmployeeId)}&view=onboard&rehire=1&batch=1${rehireEmailQuery}`)
           } else {
             if (data.errors) {
               const errorMessages = Object.values(data.errors).flat().join(' ')

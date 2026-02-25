@@ -46,6 +46,7 @@ Route::post('/employees/{id}/terminate', [EmployeeController::class, 'terminate'
 Route::post('/employees/{id}/rehire', [EmployeeController::class, 'rehire']);
 Route::get('/terminations', [EmployeeController::class, 'getTerminations']);
 Route::get('/resigned', [EmployeeController::class, 'getResigned']);
+Route::get('/rehired', [EmployeeController::class, 'getRehired']);
 
 // Additional Fields API Routes
 Route::get('/employee-additional-fields', [EmployeeAdditionalFieldController::class, 'index']);
@@ -65,4 +66,3 @@ Route::get('/directory/agencies', [DirectoryController::class, 'index']);
 Route::put('/directory/agencies/{code}', [DirectoryController::class, 'update']);
 Route::put('/directory/agencies/{code}/image', [DirectoryController::class, 'updateImage']);
 Route::get('/directory/cloudinary-images', [DirectoryController::class, 'listCloudinaryImages']);
-
