@@ -12,6 +12,13 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import {
@@ -45,11 +52,16 @@ import {
   Trash2,
   Copy,
   Clock,
-  ArrowRight
+  ArrowRight,
+  Users,
+  Eye,
+  Image as ImageIcon,
+  MoreVertical
 } from 'lucide-react'
 
 
 type ProcessType = 'Adding' | 'Removing'
+type GeneralContactsSort = 'EST_ASC' | 'EST_DESC'
 
 
 type BackendContact = {
@@ -119,6 +131,33 @@ type EditDraft = {
   processes: EditableProcess[]
 }
 
+type GeneralContact = {
+  id: number
+  type: string
+  label: string | null
+  establishment_name: string
+  services: string | null
+  contact_person: string | null
+  value: string
+  sort_order: number
+  avatar_url: string | null
+  avatar_public_id: string | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+type EditableGeneralContact = {
+  type: string
+  label: string
+  establishment_name: string
+  services: string
+  contact_person: string
+  value: string
+  sort_order: number
+  avatar_url: string
+  avatar_public_id: string
+}
+
 
 type PortalLink = {
   code: string
@@ -135,6 +174,8 @@ const OFFICIAL_PORTALS: PortalLink[] = [
   { code: 'philhealth', label: 'PhilHealth', url: 'https://www.philhealth.gov.ph/' },
   { code: 'tin', label: 'TIN (BIR)', url: 'https://www.bir.gov.ph/eServices' },
 ]
+const GENERAL_CONTACTS_KEY = 'general-contacts'
+type CloudinaryPickerTarget = { type: 'agency' } | { type: 'general-contact'; index: number }
 
 
 const normalizeCode = (value: string): string => String(value || '').trim().toLowerCase()
@@ -172,6 +213,54 @@ const getDetailIcon = (type: string, label: string) => {
   return Phone
 }
 
+const getLabelInitials = (label: string | null | undefined): string => {
+  const normalized = String(label || '').trim()
+  if (!normalized) return '?'
+  const parts = normalized.split(/\s+/).filter(Boolean)
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase()
+  }
+  return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase()
+}
+
+const parseBackendDateMs = (value: string | null | undefined): number => {
+  const raw = String(value || '').trim()
+  if (!raw) return NaN
+  const normalized = raw.replace(' ', 'T')
+
+  // Fast path for standard ISO values.
+  const directMs = new Date(normalized).getTime()
+  if (!Number.isNaN(directMs)) return directMs
+
+  // Fallback for MySQL/Laravel timestamp variants (with optional microseconds/timezone).
+  const match = normalized.match(
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(?:Z|([+-]\d{2}:\d{2}))?$/
+  )
+  if (!match) return NaN
+
+  const year = Number(match[1])
+  const month = Number(match[2]) - 1
+  const day = Number(match[3])
+  const hour = Number(match[4])
+  const minute = Number(match[5])
+  const second = Number(match[6])
+  const milli = match[7] ? Number(match[7].slice(0, 3).padEnd(3, '0')) : 0
+
+  // If timezone is explicit (or Z), parse in UTC; otherwise treat as local time.
+  if (normalized.endsWith('Z') || match[8]) {
+    const utcMs = Date.UTC(year, month, day, hour, minute, second, milli)
+    if (match[8]) {
+      const [tzHour, tzMinute] = match[8].slice(1).split(':').map(Number)
+      const offsetMinutes = tzHour * 60 + tzMinute
+      const sign = match[8].startsWith('+') ? 1 : -1
+      return utcMs - sign * offsetMinutes * 60_000
+    }
+    return utcMs
+  }
+
+  return new Date(year, month, day, hour, minute, second, milli).getTime()
+}
+
 
 export default function GovernmentDirectoryPage() {
   const [activeAgency, setActiveAgency] = useState<string>('')
@@ -181,14 +270,38 @@ export default function GovernmentDirectoryPage() {
   const [loadingDirectory, setLoadingDirectory] = useState(true)
   const [updatingImage, setUpdatingImage] = useState(false)
   const [cloudinaryPickerOpen, setCloudinaryPickerOpen] = useState(false)
+  const [cloudinaryPickerTarget, setCloudinaryPickerTarget] = useState<CloudinaryPickerTarget | null>(null)
   const [cloudinaryImages, setCloudinaryImages] = useState<CloudinaryAsset[]>([])
   const [loadingCloudinaryImages, setLoadingCloudinaryImages] = useState(false)
   const [deleteCandidate, setDeleteCandidate] = useState<CloudinaryAsset | null>(null)
   const [deletingCloudinaryImage, setDeletingCloudinaryImage] = useState(false)
+  const [generalContacts, setGeneralContacts] = useState<GeneralContact[]>([])
+  const [generalContactsDraft, setGeneralContactsDraft] = useState<EditableGeneralContact[]>([])
+  const [generalContactsSearch, setGeneralContactsSearch] = useState('')
+  const [generalContactsSort, setGeneralContactsSort] = useState<GeneralContactsSort>('EST_ASC')
+  const [loadingGeneralContacts, setLoadingGeneralContacts] = useState(false)
+  const [savingGeneralContacts, setSavingGeneralContacts] = useState(false)
+  const [editingGeneralContacts, setEditingGeneralContacts] = useState(false)
+  const [avatarPreview, setAvatarPreview] = useState<{ url: string; title: string } | null>(null)
   const [editMode, setEditMode] = useState(false)
   const [savingChanges, setSavingChanges] = useState(false)
   const [draft, setDraft] = useState<EditDraft | null>(null)
   const [showValidation, setShowValidation] = useState(false)
+  const filteredGeneralContacts = useMemo(() => {
+    const term = generalContactsSearch.trim().toLowerCase()
+    const filtered = !term ? generalContacts : generalContacts.filter((row) => {
+      const establishment = String(row.establishment_name || '').toLowerCase()
+      const services = String(row.services || '').toLowerCase()
+      const contactPerson = String(row.contact_person || '').toLowerCase()
+      return establishment.includes(term) || services.includes(term) || contactPerson.includes(term)
+    })
+    const direction = generalContactsSort === 'EST_ASC' ? 1 : -1
+    return [...filtered].sort((a, b) => {
+      const left = String(a.establishment_name || '').toLowerCase()
+      const right = String(b.establishment_name || '').toLowerCase()
+      return left.localeCompare(right) * direction
+    })
+  }, [generalContacts, generalContactsSearch, generalContactsSort])
 
 
   useEffect(() => {
@@ -280,6 +393,7 @@ export default function GovernmentDirectoryPage() {
     () => mergedAgencies.find((item) => item.key === activeAgency) ?? mergedAgencies[0] ?? null,
     [activeAgency, mergedAgencies]
   )
+  const isGeneralContactsView = activeAgency === GENERAL_CONTACTS_KEY
 
 
   const currentSteps = useMemo(() => {
@@ -325,6 +439,20 @@ export default function GovernmentDirectoryPage() {
 
     return { contactsCount, addingStepsCount, removingStepsCount, updatedAtText, activeLink }
   }, [activeBackendAgency, editMode, draft, activeAgency])
+
+  const generalContactsUpdatedAtText = useMemo(() => {
+    const latestMs = generalContacts.reduce<number>((max, row) => {
+      const ms = parseBackendDateMs(row.updated_at || row.created_at || null)
+      if (Number.isNaN(ms)) return max
+      return ms > max ? ms : max
+    }, NaN)
+    if (Number.isNaN(latestMs)) return 'N/A'
+    return new Date(latestMs).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+  }, [generalContacts])
 
 
   const currentProcessDraftRows = useMemo(() => {
@@ -597,9 +725,10 @@ export default function GovernmentDirectoryPage() {
   }
 
 
-  const loadCloudinaryImages = async () => {
+  const loadCloudinaryImages = async (target: CloudinaryPickerTarget = { type: 'agency' }) => {
     try {
       setLoadingCloudinaryImages(true)
+      setCloudinaryPickerTarget(target)
       const response = await fetch(`${getApiUrl()}/api/directory/cloudinary-images?prefix=directory/&max_results=60`, {
         headers: { Accept: 'application/json' },
       })
@@ -621,6 +750,244 @@ export default function GovernmentDirectoryPage() {
       toast.error('Cloudinary Load Failed', { description: message })
     } finally {
       setLoadingCloudinaryImages(false)
+    }
+  }
+
+  const loadGeneralContacts = async () => {
+    try {
+      setLoadingGeneralContacts(true)
+      const response = await fetch(`${getApiUrl()}/api/directory/general-contacts`, {
+        headers: { Accept: 'application/json' },
+      })
+
+      if (!response.ok) {
+        let backendMessage = `HTTP ${response.status}`
+        try {
+          const errorBody = await response.json()
+          if (errorBody?.message) backendMessage = `${errorBody.message} (HTTP ${response.status})`
+        } catch {
+        }
+        throw new Error(backendMessage)
+      }
+
+      const result = await response.json()
+      const rows = Array.isArray(result?.data) ? result.data : []
+      const sorted = [...rows].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      setGeneralContacts(sorted)
+      if (!editingGeneralContacts) {
+        setGeneralContactsDraft(sorted.map((row) => ({
+          type: row.type || 'phone',
+          label: row.label || '',
+          establishment_name: row.establishment_name || row.label || '',
+          services: row.services || '',
+          contact_person: row.contact_person || '',
+          value: row.value || '',
+          sort_order: row.sort_order || 0,
+          avatar_url: row.avatar_url || '',
+          avatar_public_id: row.avatar_public_id || '',
+        })))
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load general contacts'
+      toast.error('General Contacts Load Failed', { description: message })
+    } finally {
+      setLoadingGeneralContacts(false)
+    }
+  }
+
+  const openGeneralContactsView = () => {
+    if (editMode) {
+      toast.warning('Save or cancel changes first.')
+      return
+    }
+    setActiveAgency(GENERAL_CONTACTS_KEY)
+    void loadGeneralContacts()
+  }
+
+  const startGeneralContactsEdit = () => {
+    setGeneralContactsDraft(
+      generalContacts.map((row, index) => ({
+        type: row.type || 'phone',
+        label: row.label || '',
+        establishment_name: row.establishment_name || row.label || '',
+        services: row.services || '',
+        contact_person: row.contact_person || '',
+        value: row.value || '',
+        sort_order: row.sort_order || (index + 1),
+        avatar_url: row.avatar_url || '',
+        avatar_public_id: row.avatar_public_id || '',
+      }))
+    )
+    setEditingGeneralContacts(true)
+  }
+
+  const cancelGeneralContactsEdit = () => {
+    setEditingGeneralContacts(false)
+    setGeneralContactsDraft(
+      generalContacts.map((row, index) => ({
+        type: row.type || 'phone',
+        label: row.label || '',
+        establishment_name: row.establishment_name || row.label || '',
+        services: row.services || '',
+        contact_person: row.contact_person || '',
+        value: row.value || '',
+        sort_order: row.sort_order || (index + 1),
+        avatar_url: row.avatar_url || '',
+        avatar_public_id: row.avatar_public_id || '',
+      }))
+    )
+  }
+
+  const addGeneralContactRow = () => {
+    setGeneralContactsDraft((prev) => [
+      ...prev,
+      {
+        type: 'phone',
+        label: '',
+        establishment_name: '',
+        services: '',
+        contact_person: '',
+        value: '',
+        sort_order: prev.length + 1,
+        avatar_url: '',
+        avatar_public_id: '',
+      },
+    ])
+  }
+
+  const removeGeneralContactRow = (index: number) => {
+    setGeneralContactsDraft((prev) => (
+      prev.filter((_, i) => i !== index).map((row, i) => ({ ...row, sort_order: i + 1 }))
+    ))
+  }
+
+  const updateGeneralContactField = (
+    index: number,
+    field: 'type' | 'label' | 'establishment_name' | 'services' | 'contact_person' | 'value' | 'avatar_url' | 'avatar_public_id',
+    value: string
+  ) => {
+    setGeneralContactsDraft((prev) => {
+      const next = [...prev]
+      const target = next[index]
+      if (!target) return prev
+      next[index] = { ...target, [field]: value }
+      return next
+    })
+  }
+
+  const validateImageRestrictions = (formatValue: string, bytesValue: number) => {
+    const format = String(formatValue || '').toLowerCase()
+    const bytes = Number(bytesValue || 0)
+    if (!ALLOWED_UPLOAD_FORMATS.includes(format as (typeof ALLOWED_UPLOAD_FORMATS)[number])) {
+      throw new Error('Only JPEG/JPG, PNG, GIF, WebP, and HEIC/HEIF are allowed.')
+    }
+    if (bytes > MAX_IMAGE_BYTES) {
+      throw new Error('File exceeds the 20MB upload limit.')
+    }
+  }
+
+  const setGeneralContactAvatarAt = (index: number, imageUrl: string, publicId: string) => {
+    setGeneralContactsDraft((prev) => {
+      const next = [...prev]
+      const target = next[index]
+      if (!target) return prev
+      next[index] = {
+        ...target,
+        avatar_url: imageUrl,
+        avatar_public_id: publicId,
+      }
+      return next
+    })
+  }
+
+  const openGeneralContactCloudinaryPicker = (index: number) => {
+    void loadCloudinaryImages({ type: 'general-contact', index })
+  }
+
+  const uploadGeneralContactAvatar = async (index: number, uploadResult: any) => {
+    try {
+      const info = uploadResult?.info ?? uploadResult
+      const imageUrl = info?.secure_url
+      const publicId = info?.public_id
+      const format = String(info?.format || '').toLowerCase()
+      const bytes = Number(info?.bytes || 0)
+
+      if (!imageUrl || !publicId) {
+        throw new Error('Upload did not return image details.')
+      }
+      validateImageRestrictions(format, bytes)
+      setGeneralContactAvatarAt(index, imageUrl, publicId)
+      toast.success('Avatar selected. Save contacts to apply changes.')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to set avatar'
+      toast.error('Avatar Upload Failed', { description: message })
+    }
+  }
+
+  const saveGeneralContacts = async () => {
+    try {
+      const hasInvalidRows = generalContactsDraft.some((row) => row.establishment_name.trim().length === 0 || row.value.trim().length === 0)
+      if (hasInvalidRows) {
+        toast.error('Validation Failed', {
+          description: 'Establishment name and value are required for each general contact row.',
+        })
+        return
+      }
+
+      setSavingGeneralContacts(true)
+      const payload = generalContactsDraft.map((row, index) => ({
+        type: row.type.trim() || 'phone',
+        label: row.establishment_name.trim() || null,
+        establishment_name: row.establishment_name.trim(),
+        services: row.services.trim() || null,
+        contact_person: row.contact_person.trim() || null,
+        value: row.value.trim(),
+        sort_order: index + 1,
+        avatar_url: row.avatar_url.trim() || null,
+        avatar_public_id: row.avatar_public_id.trim() || null,
+      }))
+
+      const response = await fetch(`${getApiUrl()}/api/directory/general-contacts`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ contacts: payload }),
+      })
+
+      if (!response.ok) {
+        let backendMessage = `HTTP ${response.status}`
+        try {
+          const errorBody = await response.json()
+          if (errorBody?.message) backendMessage = `${errorBody.message} (HTTP ${response.status})`
+        } catch {
+        }
+        throw new Error(backendMessage)
+      }
+
+      const result = await response.json()
+      const rows = Array.isArray(result?.data) ? result.data : []
+      const sorted = [...rows].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      setGeneralContacts(sorted)
+      setGeneralContactsDraft(sorted.map((row, index) => ({
+        type: row.type || 'phone',
+        label: row.label || '',
+        establishment_name: row.establishment_name || row.label || '',
+        services: row.services || '',
+        contact_person: row.contact_person || '',
+        value: row.value || '',
+        sort_order: row.sort_order || (index + 1),
+        avatar_url: row.avatar_url || '',
+        avatar_public_id: row.avatar_public_id || '',
+      })))
+      setEditingGeneralContacts(false)
+      toast.success('General contacts updated successfully!')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to save general contacts'
+      toast.error('Save Failed', { description: message })
+    } finally {
+      setSavingGeneralContacts(false)
     }
   }
 
@@ -683,10 +1050,27 @@ export default function GovernmentDirectoryPage() {
 
   if (loadingDirectory && !agency) {
     return (
-      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-[#A4163A] mx-auto mb-4" />
-          <p className="text-xl font-bold text-slate-700">Loading Directory...</p>
+      <div className="min-h-screen bg-[#F0F2F5] p-6 md:p-8">
+        <div className="rounded-2xl overflow-hidden shadow-xl border border-slate-200 bg-white">
+          <div className="p-6 bg-gradient-to-r from-[#A4163A] to-[#7B0F2B]">
+            <Skeleton className="h-8 w-64 bg-white/25" />
+            <Skeleton className="h-4 w-80 mt-3 bg-white/20" />
+            <div className="flex gap-4 mt-6">
+              <Skeleton className="h-7 w-24 bg-white/25" />
+              <Skeleton className="h-7 w-24 bg-white/20" />
+              <Skeleton className="h-7 w-24 bg-white/20" />
+              <Skeleton className="h-7 w-24 bg-white/20" />
+            </div>
+          </div>
+          <div className="p-6">
+            <Skeleton className="h-[260px] w-full rounded-xl" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+              <Skeleton className="h-20 w-full rounded-xl" />
+              <Skeleton className="h-20 w-full rounded-xl" />
+              <Skeleton className="h-20 w-full rounded-xl" />
+              <Skeleton className="h-20 w-full rounded-xl" />
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -730,38 +1114,42 @@ export default function GovernmentDirectoryPage() {
 
             {/* EDIT MODE TOGGLE */}
             <div className="flex items-center gap-2">
-              {editMode ? (
+              {!isGeneralContactsView && (
                 <>
-                  <Button
-                    variant="ghost"
-                    onClick={cancelEditMode}
-                    className="text-white hover:bg-white/20 hover:text-white"
-                  >
-                    CANCEL
-                  </Button>
-                  <Button
-                    onClick={saveDirectoryChanges}
-                    disabled={savingChanges || !draft}
-                    variant="default"
-                    className="font-bold text-[#A4163A] bg-white hover:bg-stone-100"
-                  >
-                    {savingChanges ? (
-                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                    ) : (
-                      <Save className="w-4 h-4 mr-2" />
-                    )}
-                    SAVE SHANGES
-                  </Button>
+                  {editMode ? (
+                    <>
+                      <Button
+                        variant="ghost"
+                        onClick={cancelEditMode}
+                        className="text-white hover:bg-white/20 hover:text-white"
+                      >
+                        CANCEL
+                      </Button>
+                      <Button
+                        onClick={saveDirectoryChanges}
+                        disabled={savingChanges || !draft}
+                        variant="default"
+                        className="font-bold text-[#A4163A] bg-white hover:bg-stone-100"
+                      >
+                        {savingChanges ? (
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        ) : (
+                          <Save className="w-4 h-4 mr-2" />
+                        )}
+                        SAVE SHANGES
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      onClick={startEditMode}
+                      variant="outline"
+                      className="border-white/30 rounded-lg text-white hover:bg-white/20 hover:text-white bg-transparent backdrop-blur-sm"
+                    >
+                      <Edit3 className="w-4 h-4 mr-2" />
+                      UPDATE MODE
+                    </Button>
+                  )}
                 </>
-              ) : (
-                <Button
-                  onClick={startEditMode}
-                  variant="outline"
-                  className="border-white/30 rounded-lg text-white hover:bg-white/20 hover:text-white bg-transparent backdrop-blur-sm"
-                >
-                  <Edit3 className="w-4 h-4 mr-2" />
-                  UPDATE MODE
-                </Button>
               )}
             </div>
           </div>
@@ -778,6 +1166,10 @@ export default function GovernmentDirectoryPage() {
                   onClick={() => {
                     if (editMode) {
                       toast.warning('Save or cancel changes first.')
+                      return
+                    }
+                    if (editingGeneralContacts) {
+                      toast.warning('Save or cancel general contacts first.')
                       return
                     }
                     setActiveAgency(item.key)
@@ -805,6 +1197,28 @@ export default function GovernmentDirectoryPage() {
                 </button>
               )
             })}
+            <button
+              onClick={openGeneralContactsView}
+              className={cn(
+                "relative py-3 transition-all duration-300 whitespace-nowrap group flex items-center gap-3 outline-none",
+                isGeneralContactsView
+                  ? "text-white scale-110"
+                  : "text-white/60 hover:text-white hover:scale-105"
+              )}
+            >
+              <Users className={cn("transition-all duration-300", isGeneralContactsView ? "w-6 h-6 stroke-[3]" : "w-5 h-5 stroke-2")} />
+              <span
+                className={cn(
+                  "uppercase tracking-widest transition-all duration-300",
+                  isGeneralContactsView ? "font-black text-xl shadow-sm" : "font-bold text-lg"
+                )}
+              >
+                General Contacts
+              </span>
+              {isGeneralContactsView && (
+                <span className="absolute bottom-0 left-0 w-full h-1 bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.5)]" />
+              )}
+            </button>
           </div>
         </div>
       </header>
@@ -812,363 +1226,681 @@ export default function GovernmentDirectoryPage() {
 
       {/* ----- MAIN CONTENT ----- */}
       <main className="w-full px-4 md:px-8 py-8 -mt-2 flex-grow">
-
-
-        {/* COMBINED HERO & PROCESS SECTION */}
-        <div className="flex flex-col shadow-xl border border-slate-200 rounded-sm overflow-hidden mb-8">
-
-
-          {/* 1. HERO BANNER */}
-          <div className="relative w-full h-[400px] bg-white group">
-            {!imageError[agency.key] ? (
-              <img
-                src={agency.image}
-                alt={agency.shortName}
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                onError={() => setImageError(p => ({ ...p, [agency.key]: true }))}
-              />
-            ) : (
-              <div className="w-full h-full bg-slate-200 flex items-center justify-center">
-                <agency.icon className="w-24 h-24 text-slate-400" />
-              </div>
-            )}
-
-
-            {/* Banner Overlays */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
-
-
-            <div className="absolute top-6 right-6 flex flex-col gap-3">
-              {/* Upload Buttons */}
-              {uploadPreset ? (
-                <CldUploadWidget
-                  uploadPreset={uploadPreset}
-                  options={{
-                    multiple: false,
-                    maxFiles: 1,
-                    resourceType: 'image',
-                    sources: ['local'],
-                    folder: `directory/${activeAgency}`,
-                    maxFileSize: MAX_IMAGE_BYTES,
-                    clientAllowedFormats: [...ALLOWED_UPLOAD_FORMATS],
-                  }}
-                  onSuccess={(result) => void handleImageUpdate(result)}
-                >
-                  {({ open }) => (
+        {isGeneralContactsView ? (
+          <Card className="border border-slate-200 shadow-xl rounded-sm overflow-hidden">
+            <div className="px-6 md:px-8 py-6 border-b border-slate-100 bg-gradient-to-r from-white to-rose-50/30">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                  <p className="text-xs font-black tracking-[0.22em] text-[#A4163A] uppercase">Directory Group</p>
+                  <h2 className="text-3xl font-black text-slate-900 tracking-tight mt-1">General Contacts</h2>
+                  <p className="text-sm text-slate-600 mt-1">Shared contact information not tied to a specific agency.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {!editingGeneralContacts && (
+                    <Input
+                      value={generalContactsSearch}
+                      onChange={(e) => setGeneralContactsSearch(e.target.value)}
+                      placeholder="Search establishment, services, contact person..."
+                      className="w-[360px] max-w-full h-10 rounded-sm"
+                    />
+                  )}
+                  {!editingGeneralContacts && (
+                    <Select value={generalContactsSort} onValueChange={(value) => setGeneralContactsSort(value as GeneralContactsSort)}>
+                      <SelectTrigger className="w-[220px] h-10 rounded-lg bg-white border-slate-200">
+                        <SelectValue placeholder="Sort by establishment" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="EST_ASC">Establishment: A to Z</SelectItem>
+                        <SelectItem value="EST_DESC">Establishment: Z to A</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <Button
+                    variant="outline"
+                    className="rounded-lg"
+                    onClick={() => void loadGeneralContacts()}
+                    disabled={loadingGeneralContacts || savingGeneralContacts}
+                  >
+                    {loadingGeneralContacts ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                    Refresh
+                  </Button>
+                  {editingGeneralContacts ? (
+                    <>
+                      <Button
+                        variant="ghost"
+                        onClick={cancelGeneralContactsEdit}
+                        disabled={savingGeneralContacts}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={() => void saveGeneralContacts()}
+                        className="bg-[#A4163A] hover:bg-[#8D1332] text-white"
+                        disabled={savingGeneralContacts}
+                      >
+                        {savingGeneralContacts ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="w-4 h-4 mr-2" />
+                        )}
+                        Save
+                      </Button>
+                    </>
+                  ) : (
                     <Button
-                      onClick={() => open()}
-                      disabled={updatingImage}
-                      className="bg-[#A4163A] hover:bg-[#8a1230] text-white border-none rounded-sm px-6 shadow-lg shadow-red-900/20 font-bold"
+                      onClick={startGeneralContactsEdit}
+                      className="bg-[#A4163A] hover:bg-[#8D1332] text-white"
+                      disabled={loadingGeneralContacts}
                     >
-                      {updatingImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImageUp className="mr-2 h-4 w-4" />}
-                      Update Picture
+                      <Edit3 className="w-4 h-4 mr-2" />
+                      Edit Contacts
                     </Button>
                   )}
-                </CldUploadWidget>
-              ) : (
-                <Button disabled className="bg-slate-800 text-white rounded-sm">Config Error</Button>
-              )}
-
-
-              <Button
-                onClick={() => void loadCloudinaryImages()}
-                disabled={loadingCloudinaryImages || updatingImage}
-                className="bg-[#A4163A] hover:bg-[#8a1230] text-white border-none rounded-sm px-6 shadow-lg shadow-red-900/20 font-bold"
-              >
-                {loadingCloudinaryImages ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Images className="mr-2 h-4 w-4" />}
-                Select from Image uploads
-              </Button>
-              <p className="text-[10px] font-bold text-white/80 text-right mt-1 drop-shadow-md">
-                Max 20MB - JPG, JPEG, PNG, GIF, WebP, HEIC, HEIF
-              </p>
+                </div>
+              </div>
             </div>
 
-
-            <div className="absolute bottom-0 left-0 p-10 w-full max-w-4xl">
-              <div className="flex items-center gap-3 mb-3">
-                <p className="text-xs md:text-sm font-black text-white/80 tracking-[0.3em] uppercase bg-white/10 backdrop-blur-md px-4 py-1.5 rounded-sm inline-block border border-white/20 shadow-sm">
-                  AGENCY DIRECTORY
-                </p>
-              </div>
-
-
-              {editMode && draft ? (
+            <div className="px-6 md:px-8 py-6">
+              {loadingGeneralContacts ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  {Array.from({ length: 8 }).map((_, idx) => (
+                    <div key={`general-contact-skeleton-${idx}`} className="border border-slate-100 rounded-md p-3">
+                      <div className="flex items-start gap-3">
+                        <Skeleton className="h-8 w-8 rounded-full shrink-0" />
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <Skeleton className="h-3 w-3/4" />
+                          <Skeleton className="h-3 w-2/3" />
+                          <Skeleton className="h-4 w-1/2" />
+                        </div>
+                        <Skeleton className="h-8 w-8 rounded-md" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : editingGeneralContacts ? (
                 <div className="space-y-3">
-                  <Input
-                    value={draft.name}
-                    onChange={e => setDraft({ ...draft, name: e.target.value })}
-                    className="text-4xl md:text-6xl font-black text-white bg-transparent border-b border-white/40 rounded-none px-0 h-auto focus-visible:ring-0 focus-visible:border-white placeholder:text-white/30"
-                    placeholder="SHORT NAME"
-                  />
-                  <Input
-                    value={draft.full_name}
-                    onChange={e => setDraft({ ...draft, full_name: e.target.value })}
-                    className="text-xl md:text-2xl font-medium text-white/90 bg-transparent border-b border-white/40 rounded-none px-0 h-auto focus-visible:ring-0 focus-visible:border-white placeholder:text-white/30"
-                    placeholder="Agency Full Business Name"
-                  />
-                </div>
-              ) : (
-                <>
-                  <h2 className="text-4xl md:text-6xl font-black text-white tracking-tight drop-shadow-sm mb-2">
-                    {agency.shortName}
-                  </h2>
-                  <p className="text-lg md:text-2xl font-medium text-white/90 leading-snug max-w-2xl drop-shadow-sm">
-                    {agency.fullName}
-                  </p>
-                </>
-              )}
-            </div>
-          </div>
-
-
-          {/* 2. PROCESS STEPS */}
-          <div className="bg-white p-8 md:p-10 relative overflow-hidden">
-            {/* Background decoration */}
-            <div className="absolute -top-24 -right-24 w-64 h-64 bg-red-50 rounded-full blur-3xl opacity-50 pointer-events-none" />
-
-
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-10 relative z-10">
-              <div>
-                <p className="text-lg font-black text-[#A4163A] uppercase tracking-[0.25em] mb-2">GOVERNMENT CONTRIBUTION</p>
-                <h3 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Process Steps</h3>
-                {editMode && draft && (
-                  <Textarea
-                    value={draft.summary}
-                    onChange={e => {
-                      setDraft({ ...draft, summary: e.target.value })
-                    }}
-                    className="mt-4 max-w-2xl rounded-sm"
-                    placeholder="Agency summary or additional notes..."
-                  />
-                )}
-              </div>
-
-
-              <div className="flex items-center gap-3">
-                <div className="flex bg-slate-100 p-1.5 rounded-sm border border-slate-200">
-                  {(['Adding', 'Removing'] as ProcessType[]).map((type) => {
-                    const isActive = activeProcess === type
-                    return (
-                      <button
-                        key={type}
-                        onClick={() => setActiveProcess(type)}
-                        className={cn(
-                          "px-6 py-2.5 rounded-sm text-sm font-black transition-all flex items-center gap-2",
-                          isActive ? "bg-[#A4163A] text-white shadow-md transform scale-105" : "text-slate-500 hover:text-slate-900 hover:bg-slate-200"
-                        )}
-                      >
-                        {type === 'Adding' ? <UserPlus className="w-4 h-4" /> : <UserMinus className="w-4 h-4" />}
-                        <span>{type}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
-
-
-            {/* TABLE / LIST */}
-            <div className="relative z-10">
-              <div className="border rounded-sm overflow-hidden border-slate-100 shadow-sm">
-                {editMode && (
-                  <div className="bg-slate-50 p-3 border-b border-slate-100 flex justify-end">
-                    <Button onClick={addProcessStep} size="sm" variant="outline" className="text-[#A4163A] border-[#A4163A]/20 bg-[#A4163A]/5 hover:bg-[#A4163A]/10 rounded-sm">
-                      <Plus className="mr-2 h-4 w-4" /> Add Step
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-[#A4163A] border-[#A4163A]/30"
+                      onClick={addGeneralContactRow}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Row
                     </Button>
                   </div>
-                )}
+                  {generalContactsDraft.length === 0 ? (
+                    <p className="text-sm text-slate-500">No rows yet. Click Add Row to create one.</p>
+                  ) : (
+                    generalContactsDraft.map((row, index) => (
+                      <div key={`general-contact-draft-${index}`} className="border border-slate-200 rounded-md p-3 space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="h-10 w-10 rounded-full overflow-hidden border border-slate-200 bg-slate-100 shrink-0 flex items-center justify-center">
+                              {row.avatar_url ? (
+                                <img src={row.avatar_url} alt={row.establishment_name || 'Avatar'} className="h-full w-full object-cover" />
+                              ) : (
+                                <span className="text-xs font-black text-slate-600">
+                                  {getLabelInitials(row.establishment_name)}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs font-semibold text-slate-500 truncate">
+                              {row.avatar_url ? 'Avatar selected' : 'No avatar selected'}
+                            </p>
+                          </div>
 
-
-                <Table>
-                  <TableHeader className="bg-slate-50/50">
-                    <TableRow className="hover:bg-slate-50/50 border-slate-100">
-                      <TableHead className="w-[80px] text-center font-black text-slate-400 uppercase text-[20px] tracking-widest py-4">Step</TableHead>
-                      <TableHead className="font-black text-slate-400 uppercase text-[20px] tracking-widest py-4">Process Description</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {editMode ? (
-                      currentProcessDraftRows.length > 0 ? (
-                        currentProcessDraftRows.map((step, index) => (
-                          <TableRow key={index} className="border-slate-100 hover:bg-slate-50/50">
-                            <TableCell className="text-center align-top py-6">
-                              <div className="h-8 w-8 rounded-sm bg-[#A4163A]/10 text-[#A4163A] font-black text-sm flex items-center justify-center mx-auto">
-                                {index + 1}
-                              </div>
-                            </TableCell>
-                            <TableCell className="py-6 align-top">
-                              <div className="flex gap-2">
-                                <Textarea
-                                  value={step.process}
-                                  onChange={(e) => updateProcessTextAt(index, e.target.value)}
-                                  className="min-h-[60px] resize-y rounded-sm"
-                                />
-                                <Button size="icon" variant="ghost" onClick={() => removeProcessAt(index)} className="text-rose-500 hover:bg-rose-50 hover:text-rose-600 shrink-0 h-9 w-9 rounded-sm">
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={2} className="h-32 text-center text-slate-400 italic">No draft steps yet.</TableCell>
-                        </TableRow>
-                      )
-                    ) : (
-                      currentSteps.length > 0 ? (
-                        currentSteps.map((step, index) => (
-                          <TableRow key={index} className="border-slate-100 hover:bg-slate-50/30 transition-colors">
-                            <TableCell className="text-center align-top py-6">
-                              <div className="h-10 w-10 rounded-sm bg-slate-100 text-slate-600 font-black text-base flex items-center justify-center mx-auto shadow-sm">
-                                {index + 1}
-                              </div>
-                            </TableCell>
-                            <TableCell className="py-6 align-top">
-                              <p className="text-xl font-medium text-slate-800 leading-relaxed pt-1.5">{step}</p>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={2} className="h-32 text-center text-slate-400 italic">No process steps found for this category.</TableCell>
-                        </TableRow>
-                      )
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          </div>
-        </div>
-        {/* 3. CONTACT GRIDS */}
-        <div>
-          <div className="mt-8 mb-4 border-b border-slate-200 pb-2">
-            <h3 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-              <Phone className="w-5 h-5 text-[#A4163A]" />
-              Contact Information
-            </h3>
-            <p className="text-slate-500 font-medium text-sm mt-1">
-              24/7 hotline, mobile support, callback service, and main office details.
-            </p>
-          </div>
-          {editMode && (
-            <div className="mb-4 flex justify-end">
-              <Button onClick={addContact} variant="outline" className="text-[#A4163A] border-[#A4163A]/20 bg-white shadow-sm rounded-sm">
-                <Plus className="mr-2 h-4 w-4" /> Add Contact Field
-              </Button>
-            </div>
-          )}
-
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {(editMode && draft
-              ? draft.contacts
-              : agency.details
-            ).filter(row => {
-              if (editMode) return true
-              // In view mode, only show if value exists
-              return row.value && row.value.trim().length > 0
-            })
-              .map((row, idx) => {
-                const isEditable = editMode && draft
-                const actualRow = isEditable ? row : row
-                // Note: agency.details already has icon, but draft doesn't.
-                const Icon = isEditable
-                  ? getDetailIcon(row.type, row.label)
-                  : (row as any).icon
-
-
-                return (
-                  <div key={idx} className="group bg-white rounded-sm p-3 border border-slate-200 hover:border-[#A4163A] transition-colors flex items-center justify-between gap-4 shadow-sm hover:shadow-md">
-                    {isEditable ? (
-                      <div className="flex-1 space-y-2 relative z-10 w-full">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="sm" variant="outline" className="h-8 px-2">
+                                <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
+                                Avatar
+                                <MoreVertical className="h-3.5 w-3.5 ml-1.5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56">
+                              <DropdownMenuItem
+                                disabled={!row.avatar_url}
+                                onSelect={(e) => {
+                                  e.preventDefault()
+                                  if (!row.avatar_url) return
+                                  setAvatarPreview({
+                                    url: row.avatar_url,
+                                    title: row.establishment_name || 'General Contact Avatar',
+                                  })
+                                }}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                See avatar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onSelect={(e) => {
+                                  e.preventDefault()
+                                  openGeneralContactCloudinaryPicker(index)
+                                }}
+                              >
+                                <Images className="h-4 w-4 mr-2" />
+                                Select from uploaded images
+                              </DropdownMenuItem>
+                              {uploadPreset ? (
+                                <CldUploadWidget
+                                  uploadPreset={uploadPreset}
+                                  options={{
+                                    multiple: false,
+                                    maxFiles: 1,
+                                    resourceType: 'image',
+                                    sources: ['local'],
+                                    folder: 'directory/general-contacts',
+                                    maxFileSize: MAX_IMAGE_BYTES,
+                                    clientAllowedFormats: [...ALLOWED_UPLOAD_FORMATS],
+                                  }}
+                                  onSuccess={(result) => void uploadGeneralContactAvatar(index, result)}
+                                >
+                                  {({ open }) => (
+                                    <DropdownMenuItem
+                                      onSelect={(e) => {
+                                        e.preventDefault()
+                                        open()
+                                      }}
+                                    >
+                                      <ImageUp className="h-4 w-4 mr-2" />
+                                      Upload image
+                                    </DropdownMenuItem>
+                                  )}
+                                </CldUploadWidget>
+                              ) : (
+                                <DropdownMenuItem disabled>
+                                  <ImageUp className="h-4 w-4 mr-2" />
+                                  Upload image
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem
+                                disabled={!row.avatar_url}
+                                onSelect={(e) => {
+                                  e.preventDefault()
+                                  updateGeneralContactField(index, 'avatar_url', '')
+                                  updateGeneralContactField(index, 'avatar_public_id', '')
+                                  toast.success('Avatar cleared. Save contacts to apply changes.')
+                                }}
+                              >
+                                <X className="h-4 w-4 mr-2" />
+                                Clear avatar
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                         <div className="flex gap-2">
                           <Input
-                            value={row.type}
-                            onChange={(e) => updateContactAt(idx, 'type', e.target.value)}
-                            placeholder="Type (e.g. Hotline)"
-                            className="font-bold text-xs uppercase rounded-sm h-8"
+                            value={row.establishment_name}
+                            onChange={(e) => updateGeneralContactField(index, 'establishment_name', e.target.value)}
+                            placeholder="Establishment Name (Required)"
+                            className="h-9 rounded-sm"
                           />
                           <Input
-                            value={row.label}
-                            onChange={(e) => updateContactAt(idx, 'label', e.target.value)}
-                            placeholder="Label"
-                            className="font-bold text-xs uppercase rounded-sm h-8"
+                            value={row.services}
+                            onChange={(e) => updateGeneralContactField(index, 'services', e.target.value)}
+                            placeholder="Services (Optional)"
+                            className="h-9 rounded-sm"
                           />
                         </div>
-                        <Input
-                          value={row.value}
-                          onChange={(e) => updateContactAt(idx, 'value', e.target.value)}
-                          placeholder="Value"
-                          className="rounded-sm h-9"
-                        />
-                        <Button size="sm" variant="ghost" onClick={() => removeContactAt(idx)} className="text-rose-500 w-full hover:bg-rose-50 rounded-sm h-8">
-                          <Trash2 className="w-4 h-4 mr-2" /> Remove
-                        </Button>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-3 overflow-hidden">
-                          <div className="h-10 w-10 rounded-full bg-slate-50 text-[#A4163A] flex items-center justify-center shrink-0 border border-slate-100">
-                            <Icon className="h-5 w-5" />
-                          </div>
-                          <div className="flex flex-col min-w-0">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-0.5">
-                              {row.label || row.type}
-                            </p>
-                            <p className="text-sm md:text-base font-bold text-slate-800 truncate leading-none pb-0.5">
-                              {row.value}
-                            </p>
-                          </div>
+                        <div className="flex gap-2">
+                          <Input
+                            value={row.contact_person}
+                            onChange={(e) => updateGeneralContactField(index, 'contact_person', e.target.value)}
+                            placeholder="Contact Person (Optional)"
+                            className="h-9 rounded-sm"
+                          />
+                          <Input
+                            value={row.value}
+                            onChange={(e) => updateGeneralContactField(index, 'value', e.target.value)}
+                            placeholder="Contact Number / Value (Required)"
+                            className="h-9 rounded-sm"
+                          />
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => removeGeneralContactRow(index)}
+                            className="text-rose-500 hover:bg-rose-50 hover:text-rose-600 h-9 w-9 rounded-lg"
+                            aria-label="Remove row"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
-
-
+                      </div>
+                    ))
+                  )}
+                </div>
+              ) : filteredGeneralContacts.length === 0 ? (
+                <p className="text-sm text-slate-500">
+                  {generalContacts.length === 0 ? 'No general contacts yet.' : 'No contacts match your search.'}
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  {filteredGeneralContacts.map((contact) => {
+                    return (
+                      <div key={contact.id} className="flex items-start gap-3 rounded-md border border-slate-100 p-3 min-w-0">
+                        {contact.avatar_url ? (
+                          <div className="mt-0.5 h-8 w-8 rounded-full overflow-hidden border border-slate-200 shrink-0">
+                            <img src={contact.avatar_url} alt={contact.establishment_name || contact.label || contact.type} className="h-full w-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className="mt-0.5 h-8 w-8 rounded-full bg-slate-100 text-[#A4163A] flex items-center justify-center shrink-0">
+                            <span className="text-[10px] font-black text-slate-700">
+                              {getLabelInitials(contact.establishment_name)}
+                            </span>
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-black text-slate-500 uppercase tracking-wider">{contact.establishment_name || contact.label || contact.type}</p>
+                          {contact.services ? (
+                            <p className="text-[11px] text-slate-500 mt-0.5 break-words">{contact.services}</p>
+                          ) : null}
+                          {contact.contact_person ? (
+                            <p className="text-[11px] text-slate-500 break-words">Contact: {contact.contact_person}</p>
+                          ) : null}
+                          <p className="text-sm font-semibold text-slate-800 break-words">{contact.value}</p>
+                        </div>
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-8 px-3 text-slate-400 hover:text-[#A4163A] hover:bg-rose-50 rounded-sm font-bold text-xs tracking-wider"
-                          onClick={() => void handleCopyText(row.label || row.type, row.value)}
+                          className="h-8 px-2 text-slate-500 hover:text-[#A4163A] hover:bg-rose-50"
+                          onClick={() => void handleCopyText(contact.establishment_name || contact.label || contact.type, contact.value)}
                         >
-                          <Copy className="h-3.5 w-3.5 mr-2" />
-                          COPY
+                          <Copy className="h-3.5 w-3.5" />
                         </Button>
-                      </>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </Card>
+        ) : (
+          <>
+            {/* COMBINED HERO & PROCESS SECTION */}
+            <div className="flex flex-col shadow-xl border border-slate-200 rounded-sm overflow-hidden mb-8">
+
+
+              {/* 1. HERO BANNER */}
+              <div className="relative w-full h-[400px] bg-white group">
+                {!imageError[agency.key] ? (
+                  <img
+                    src={agency.image}
+                    alt={agency.shortName}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    onError={() => setImageError(p => ({ ...p, [agency.key]: true }))}
+                  />
+                ) : (
+                  <div className="w-full h-full bg-slate-200 flex items-center justify-center">
+                    <agency.icon className="w-24 h-24 text-slate-400" />
+                  </div>
+                )}
+
+
+                {/* Banner Overlays */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+
+
+                <div className="absolute top-6 right-6 flex flex-col gap-3">
+                  {/* Upload Buttons */}
+                  {uploadPreset ? (
+                    <CldUploadWidget
+                      uploadPreset={uploadPreset}
+                      options={{
+                        multiple: false,
+                        maxFiles: 1,
+                        resourceType: 'image',
+                        sources: ['local'],
+                        folder: `directory/${activeAgency}`,
+                        maxFileSize: MAX_IMAGE_BYTES,
+                        clientAllowedFormats: [...ALLOWED_UPLOAD_FORMATS],
+                      }}
+                      onSuccess={(result) => void handleImageUpdate(result)}
+                    >
+                      {({ open }) => (
+                        <Button
+                          onClick={() => open()}
+                          disabled={updatingImage}
+                          className="bg-[#A4163A] hover:bg-[#8a1230] text-white border-none rounded-lg px-6 shadow-lg shadow-red-900/20 font-bold"
+                        >
+                          {updatingImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImageUp className="mr-2 h-4 w-4" />}
+                          Update Picture
+                        </Button>
+                      )}
+                    </CldUploadWidget>
+                  ) : (
+                    <Button disabled className="bg-slate-800 text-white rounded-lg">Config Error</Button>
+                  )}
+
+
+                  <Button
+                    onClick={() => void loadCloudinaryImages({ type: 'agency' })}
+                    disabled={loadingCloudinaryImages || updatingImage}
+                    className="bg-[#A4163A] hover:bg-[#8a1230] text-white border-none rounded-lg px-6 shadow-lg shadow-red-900/20 font-bold"
+                  >
+                    {loadingCloudinaryImages ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Images className="mr-2 h-4 w-4" />}
+                    Select from Image uploads
+                  </Button>
+                  <p className="text-[10px] font-bold text-white/80 text-right mt-1 drop-shadow-md">
+                    Max 20MB - JPG, JPEG, PNG, GIF, WebP, HEIC, HEIF
+                  </p>
+                </div>
+
+
+                <div className="absolute bottom-0 left-0 p-10 w-full max-w-4xl">
+                  <div className="flex items-center gap-3 mb-3">
+                    <p className="text-xs md:text-sm font-black text-white/80 tracking-[0.3em] uppercase bg-white/10 backdrop-blur-md px-4 py-1.5 rounded-sm inline-block border border-white/20 shadow-sm">
+                      AGENCY DIRECTORY
+                    </p>
+                  </div>
+
+
+                  {editMode && draft ? (
+                    <div className="space-y-3">
+                      <Input
+                        value={draft.name}
+                        onChange={e => setDraft({ ...draft, name: e.target.value })}
+                        className="text-4xl md:text-6xl font-black text-white bg-transparent border-b border-white/40 rounded-none px-0 h-auto focus-visible:ring-0 focus-visible:border-white placeholder:text-white/30"
+                        placeholder="SHORT NAME"
+                      />
+                      <Input
+                        value={draft.full_name}
+                        onChange={e => setDraft({ ...draft, full_name: e.target.value })}
+                        className="text-xl md:text-2xl font-medium text-white/90 bg-transparent border-b border-white/40 rounded-none px-0 h-auto focus-visible:ring-0 focus-visible:border-white placeholder:text-white/30"
+                        placeholder="Agency Full Business Name"
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <h2 className="text-4xl md:text-6xl font-black text-white tracking-tight drop-shadow-sm mb-2">
+                        {agency.shortName}
+                      </h2>
+                      <p className="text-lg md:text-2xl font-medium text-white/90 leading-snug max-w-2xl drop-shadow-sm">
+                        {agency.fullName}
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+
+
+              {/* 2. PROCESS STEPS */}
+              <div className="bg-white p-8 md:p-10 relative overflow-hidden">
+                {/* Background decoration */}
+                <div className="absolute -top-24 -right-24 w-64 h-64 bg-red-50 rounded-full blur-3xl opacity-50 pointer-events-none" />
+
+
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-10 relative z-10">
+                  <div>
+                    <p className="text-lg font-black text-[#A4163A] uppercase tracking-[0.25em] mb-2">GOVERNMENT CONTRIBUTION</p>
+                    <h3 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Process Steps</h3>
+                    {editMode && draft && (
+                      <Textarea
+                        value={draft.summary}
+                        onChange={e => {
+                          setDraft({ ...draft, summary: e.target.value })
+                        }}
+                        className="mt-4 max-w-2xl rounded-sm"
+                        placeholder="Agency summary or additional notes..."
+                      />
                     )}
                   </div>
-                )
-              })}
-          </div>
-        </div>
+
+
+                  <div className="flex items-center gap-3">
+                    <div className="flex bg-slate-100 p-1.5 rounded-sm border border-slate-200">
+                      {(['Adding', 'Removing'] as ProcessType[]).map((type) => {
+                        const isActive = activeProcess === type
+                        return (
+                          <button
+                            key={type}
+                            onClick={() => setActiveProcess(type)}
+                            className={cn(
+                              "px-6 py-2.5 rounded-lg text-sm font-black transition-all flex items-center gap-2",
+                              isActive ? "bg-[#A4163A] text-white shadow-md transform scale-105" : "text-slate-500 hover:text-slate-900 hover:bg-slate-200"
+                            )}
+                          >
+                            {type === 'Adding' ? <UserPlus className="w-4 h-4" /> : <UserMinus className="w-4 h-4" />}
+                            <span>{type}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+
+                {/* TABLE / LIST */}
+                <div className="relative z-10">
+                  <div className="border rounded-sm overflow-hidden border-slate-100 shadow-sm">
+                    {editMode && (
+                      <div className="bg-slate-50 p-3 border-b border-slate-100 flex justify-end">
+                        <Button onClick={addProcessStep} size="sm" variant="outline" className="text-[#A4163A] border-[#A4163A]/20 bg-[#A4163A]/5 hover:bg-[#A4163A]/10 rounded-lg">
+                          <Plus className="mr-2 h-4 w-4" /> Add Step
+                        </Button>
+                      </div>
+                    )}
+
+
+                    <Table>
+                      <TableHeader className="bg-slate-50/50">
+                        <TableRow className="hover:bg-slate-50/50 border-slate-100">
+                          <TableHead className="w-[80px] text-center font-black text-slate-400 uppercase text-[20px] tracking-widest py-4">Step</TableHead>
+                          <TableHead className="font-black text-slate-400 uppercase text-[20px] tracking-widest py-4">Process Description</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {editMode ? (
+                          currentProcessDraftRows.length > 0 ? (
+                            currentProcessDraftRows.map((step, index) => (
+                              <TableRow key={index} className="border-slate-100 hover:bg-slate-50/50">
+                                <TableCell className="text-center align-top py-6">
+                                  <div className="h-8 w-8 rounded-sm bg-[#A4163A]/10 text-[#A4163A] font-black text-sm flex items-center justify-center mx-auto">
+                                    {index + 1}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="py-6 align-top">
+                                  <div className="flex gap-2">
+                                    <Textarea
+                                      value={step.process}
+                                      onChange={(e) => updateProcessTextAt(index, e.target.value)}
+                                      className="min-h-[60px] resize-y rounded-sm"
+                                    />
+                                    <Button size="icon" variant="ghost" onClick={() => removeProcessAt(index)} className="text-rose-500 hover:bg-rose-50 hover:text-rose-600 shrink-0 h-9 w-9 rounded-lg">
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          ) : (
+                            <TableRow>
+                              <TableCell colSpan={2} className="h-32 text-center text-slate-400 italic">No draft steps yet.</TableCell>
+                            </TableRow>
+                          )
+                        ) : (
+                          currentSteps.length > 0 ? (
+                            currentSteps.map((step, index) => (
+                              <TableRow key={index} className="border-slate-100 hover:bg-slate-50/30 transition-colors">
+                                <TableCell className="text-center align-top py-6">
+                                  <div className="h-10 w-10 rounded-sm bg-slate-100 text-slate-600 font-black text-base flex items-center justify-center mx-auto shadow-sm">
+                                    {index + 1}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="py-6 align-top">
+                                  <p className="text-xl font-medium text-slate-800 leading-relaxed pt-1.5">{step}</p>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          ) : (
+                            <TableRow>
+                              <TableCell colSpan={2} className="h-32 text-center text-slate-400 italic">No process steps found for this category.</TableCell>
+                            </TableRow>
+                          )
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {/* 3. CONTACT GRIDS */}
+            <div>
+              <div className="mt-8 mb-4 border-b border-slate-200 pb-2">
+                <h3 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+                  <Phone className="w-5 h-5 text-[#A4163A]" />
+                  Contact Information
+                </h3>
+                <p className="text-slate-500 font-medium text-sm mt-1">
+                  24/7 hotline, mobile support, callback service, and main office details.
+                </p>
+              </div>
+              {editMode && (
+                <div className="mb-4 flex justify-end">
+                  <Button onClick={addContact} variant="outline" className="text-[#A4163A] border-[#A4163A]/20 bg-white shadow-sm rounded-lg">
+                    <Plus className="mr-2 h-4 w-4" /> Add Contact Field
+                  </Button>
+                </div>
+              )}
+
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {(editMode && draft
+                  ? draft.contacts
+                  : agency.details
+                ).filter(row => {
+                  if (editMode) return true
+                  // In view mode, only show if value exists
+                  return row.value && row.value.trim().length > 0
+                })
+                  .map((row, idx) => {
+                    const isEditable = editMode && draft
+                    const actualRow = isEditable ? row : row
+                    // Note: agency.details already has icon, but draft doesn't.
+                    const Icon = isEditable
+                      ? getDetailIcon(row.type, row.label)
+                      : (row as any).icon
+
+
+                    return (
+                      <div key={idx} className="group bg-white rounded-sm p-3 border border-slate-200 hover:border-[#A4163A] transition-colors flex items-center justify-between gap-4 shadow-sm hover:shadow-md">
+                        {isEditable ? (
+                          <div className="flex-1 space-y-2 relative z-10 w-full">
+                            <div className="flex gap-2">
+                              <Input
+                                value={row.type}
+                                onChange={(e) => updateContactAt(idx, 'type', e.target.value)}
+                                placeholder="Type (e.g. Hotline)"
+                                className="font-bold text-xs uppercase rounded-sm h-8"
+                              />
+                              <Input
+                                value={row.label}
+                                onChange={(e) => updateContactAt(idx, 'label', e.target.value)}
+                                placeholder="Label"
+                                className="font-bold text-xs uppercase rounded-sm h-8"
+                              />
+                            </div>
+                            <Input
+                              value={row.value}
+                              onChange={(e) => updateContactAt(idx, 'value', e.target.value)}
+                              placeholder="Value"
+                              className="rounded-sm h-9"
+                            />
+                            <Button size="sm" variant="ghost" onClick={() => removeContactAt(idx)} className="text-rose-500 w-full hover:bg-rose-50 rounded-lg h-8">
+                              <Trash2 className="w-4 h-4 mr-2" /> Remove
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-3 overflow-hidden">
+                              <div className="h-10 w-10 rounded-full bg-slate-50 text-[#A4163A] flex items-center justify-center shrink-0 border border-slate-100">
+                                <Icon className="h-5 w-5" />
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-0.5">
+                                  {row.label || row.type}
+                                </p>
+                                <p className="text-sm md:text-base font-bold text-slate-800 truncate leading-none pb-0.5">
+                                  {row.value}
+                                </p>
+                              </div>
+                            </div>
+
+
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 px-3 text-slate-400 hover:text-[#A4163A] hover:bg-rose-50 rounded-lg font-bold text-xs tracking-wider"
+                              onClick={() => void handleCopyText(row.label || row.type, row.value)}
+                            >
+                              <Copy className="h-3.5 w-3.5 mr-2" />
+                              COPY
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    )
+                  })}
+              </div>
+            </div>
+          </>
+        )}
       </main>
 
 
       {/* 4. FOOTER */}
       <footer className="w-full bg-[#A4163A] text-white py-4 px-8 mt-auto sticky bottom-0 z-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
         <div className="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4 text-xs md:text-sm font-bold uppercase tracking-widest">
-          <div className="flex items-center gap-2">
-            <span className="opacity-70">OFFICIAL ONLINE PORTAL:</span>
-            <a href={snapshot.activeLink} target="_blank" rel="noreferrer" className="hover:underline hover:text-white text-white/90">
-              {snapshot.activeLink !== 'N/A' ? snapshot.activeLink : '(LINK)'}
-            </a>
-          </div>
+          {!isGeneralContactsView ? (
+            <div className="flex items-center gap-2">
+              <span className="opacity-70">OFFICIAL ONLINE PORTAL:</span>
+              <a href={snapshot.activeLink} target="_blank" rel="noreferrer" className="hover:underline hover:text-white text-white/90">
+                {snapshot.activeLink !== 'N/A' ? snapshot.activeLink : '(LINK)'}
+              </a>
+            </div>
+          ) : <div />}
 
 
           <div className="flex items-center gap-2">
             <span className="opacity-70">LAST UPDATED:</span>
-            <span className="text-white/90">{snapshot.updatedAtText}</span>
+            <span className="text-white/90">{isGeneralContactsView ? generalContactsUpdatedAtText : snapshot.updatedAtText}</span>
           </div>
         </div>
       </footer>
 
 
       {/* ----- MODALS ----- */}
-      <Dialog open={cloudinaryPickerOpen} onOpenChange={setCloudinaryPickerOpen}>
+      <Dialog open={avatarPreview !== null} onOpenChange={(open) => { if (!open) setAvatarPreview(null) }}>
+        <DialogContent className="sm:max-w-md p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6">
+            <DialogTitle>{avatarPreview?.title || 'Avatar Preview'}</DialogTitle>
+            <DialogDescription>General contact avatar preview.</DialogDescription>
+          </DialogHeader>
+          <div className="px-6 pb-6">
+            {avatarPreview?.url ? (
+              <div className="rounded-xl border border-slate-200 overflow-hidden bg-slate-50">
+                <img src={avatarPreview.url} alt={avatarPreview.title} className="w-full h-auto object-cover" />
+              </div>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={cloudinaryPickerOpen}
+        onOpenChange={(open) => {
+          setCloudinaryPickerOpen(open)
+          if (!open) setCloudinaryPickerTarget(null)
+        }}
+      >
         <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-hidden p-0">
           <DialogHeader className="px-6 pt-6">
-            <DialogTitle>Select Agency Image</DialogTitle>
+            <DialogTitle>
+              {cloudinaryPickerTarget?.type === 'general-contact' ? 'Select Avatar Image' : 'Select Agency Image'}
+            </DialogTitle>
             <DialogDescription>
-              Choose an existing image from your uploads.
+              Choose an existing image from your uploads. Max 20MB and allowed formats: JPG, JPEG, PNG, GIF, WebP, HEIC, HEIF.
             </DialogDescription>
           </DialogHeader>
           <div className="px-6 pb-6 overflow-y-auto">
@@ -1183,18 +1915,24 @@ export default function GovernmentDirectoryPage() {
                     className="group relative rounded-xl border border-slate-200 bg-white overflow-hidden text-left hover:border-[#A4163A]/50"
                     onClick={async () => {
                       try {
+                        validateImageRestrictions(asset.format, Number(asset.bytes || 0))
                         setUpdatingImage(true)
-                        await persistAgencyImage({
-                          imageUrl: asset.secure_url,
-                          publicId: asset.public_id,
-                          format: asset.format,
-                          bytes: asset.bytes,
-                        })
+                        if (cloudinaryPickerTarget?.type === 'general-contact') {
+                          setGeneralContactAvatarAt(cloudinaryPickerTarget.index, asset.secure_url, asset.public_id)
+                          toast.success('Avatar selected. Save contacts to apply changes.')
+                        } else {
+                          await persistAgencyImage({
+                            imageUrl: asset.secure_url,
+                            publicId: asset.public_id,
+                            format: asset.format,
+                            bytes: asset.bytes,
+                          })
+                          toast.success('Agency picture updated successfully!')
+                        }
                         setCloudinaryPickerOpen(false)
-                        toast.success('Agency picture updated successfully!')
                       } catch (err) {
                         const message = err instanceof Error ? err.message : 'Failed to update picture'
-                        toast.error('Image Update Failed', { description: message })
+                        toast.error('Image Selection Failed', { description: message })
                       } finally {
                         setUpdatingImage(false)
                       }
@@ -1293,4 +2031,3 @@ export default function GovernmentDirectoryPage() {
     </div>
   )
 }
-
