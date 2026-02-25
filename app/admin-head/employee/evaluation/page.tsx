@@ -18,6 +18,7 @@ interface Employee {
   date_hired: string
   status: 'pending' | 'employed' | 'terminated' | 'rehire_pending' | 'rehired_employee'
   position: string
+  regularization_date: string | null
 }
 
 interface Evaluation {
@@ -26,11 +27,13 @@ interface Evaluation {
   remarks_1: string | null
   score_2: number | null
   remarks_2: string | null
+  status: string | null
 }
 
 export default function EvaluationPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [evaluations, setEvaluations] = useState<Record<string, Evaluation>>({})
+  const [persistedEvaluations, setPersistedEvaluations] = useState<Record<string, Evaluation>>({})
   const [loading, setLoading] = useState(true)
   const [isActionLoading, setIsActionLoading] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
@@ -54,6 +57,7 @@ export default function EvaluationPage() {
           evalMap[evalItem.employee_id] = evalItem
         })
         setEvaluations(evalMap)
+        setPersistedEvaluations(JSON.parse(JSON.stringify(evalMap)))
       }
     } catch (error) {
       console.error('Error fetching evaluations:', error)
@@ -83,23 +87,34 @@ export default function EvaluationPage() {
     }
   }
 
-  const calculateEvaluationDates = (dateHired: string) => {
+  const calculateEvaluationDates = (dateHired: string, employee?: Employee) => {
     if (!dateHired) return null
     const hiredDate = new Date(dateHired)
     
     const firstEval = addMonths(hiredDate, 3)
     const secondEval = addMonths(hiredDate, 5)
-    const regularization = addMonths(hiredDate, 6)
+    // Use the employee's regularization_date if it exists, otherwise default to 6 months
+    const regularizationDate = employee?.regularization_date 
+      ? new Date(employee.regularization_date) 
+      : addMonths(hiredDate, 6)
     
     const monthsEmployed = differenceInMonths(new Date(), hiredDate)
-    const status = monthsEmployed >= 6 ? 'Regular' : 'Probee'
+    
+    // Prioritize status from evaluation record if it exists
+    const evaluation = evaluations[employee?.id || '']
+    const status = evaluation?.status || (monthsEmployed >= 6 ? 'Regular' : 'Probee')
     
     return {
       firstEval: format(firstEval, 'MMMM d, yyyy'),
       secondEval: format(secondEval, 'MMMM d, yyyy'),
-      regularization: format(regularization, 'MMMM d, yyyy'),
+      regularization: format(regularizationDate, 'MMMM d, yyyy'),
       status
     }
+  }
+
+  // Helper to calculate dates for an employee
+  const getDatesForEmployee = (emp: Employee) => {
+    return calculateEvaluationDates(emp.date_hired, emp)
   }
 
   const handleScoreChange = (employeeId: string, scoreType: 'score_1' | 'score_2', value: string) => {
@@ -109,7 +124,7 @@ export default function EvaluationPage() {
     setEvaluations(prev => ({
       ...prev,
       [employeeId]: {
-        ...(prev[employeeId] || { employee_id: employeeId, score_1: null, remarks_1: null, score_2: null, remarks_2: null }),
+        ...(prev[employeeId] || { employee_id: employeeId, score_1: null, remarks_1: null, score_2: null, remarks_2: null, status: null }),
         [scoreType]: score,
         [scoreType === 'score_1' ? 'remarks_1' : 'remarks_2']: remarks
       }
@@ -130,6 +145,7 @@ export default function EvaluationPage() {
       const data = await response.json()
       if (data.success) {
         toast.success('Evaluation saved successfully')
+        fetchData() // Refresh to get updated regularization dates and status
       } else {
         toast.error(data.message || 'Failed to save evaluation')
       }
@@ -144,7 +160,14 @@ export default function EvaluationPage() {
   const filteredEmployees = employees.filter(emp => 
     `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
     emp.id.includes(searchQuery)
-  )
+  ).sort((a, b) => {
+    const statusA = getDatesForEmployee(a)?.status || ''
+    const statusB = getDatesForEmployee(b)?.status || ''
+    
+    // Probee first, then Regular
+    const order: Record<string, number> = { 'Probee': 0, 'Regular': 1, 'Regularized': 1 }
+    return (order[statusA] ?? 10) - (order[statusB] ?? 10)
+  })
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -221,8 +244,8 @@ export default function EvaluationPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           {[
             { label: 'Total Employed', value: employees.length, icon: UserCheck, color: 'text-blue-600', bg: 'bg-blue-50' },
-            { label: 'Under Probation', value: employees.filter(e => calculateEvaluationDates(e.date_hired)?.status === 'Probee').length, icon: Calendar, color: 'text-amber-600', bg: 'bg-amber-50' },
-            { label: 'Regular Employees', value: employees.filter(e => calculateEvaluationDates(e.date_hired)?.status === 'Regular').length, icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+            { label: 'Under Probation', value: employees.filter(e => getDatesForEmployee(e)?.status === 'Probee').length, icon: Calendar, color: 'text-amber-600', bg: 'bg-amber-50' },
+            { label: 'Regular Employees', value: employees.filter(e => ['Regular', 'Regularized'].includes(getDatesForEmployee(e)?.status || '')).length, icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
             { label: 'Pending Reviews', value: 0, icon: MessageSquare, color: 'text-rose-600', bg: 'bg-rose-50' },
           ].map((stat, i) => (
             <Card key={i} className="border-none shadow-sm overflow-hidden">
@@ -278,8 +301,9 @@ export default function EvaluationPage() {
                   <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap text-center">2nd Evaluation</th>
                   <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap text-center">Score</th>
                   <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap text-center">Remarks</th>
-                  <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider whitespace-nowrap text-center">Regularization</th>
-                  <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider whitespace-nowrap text-center">Action</th>
+                   <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider whitespace-nowrap text-center">Regularization</th>
+                   <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider whitespace-nowrap text-center">Eval Status</th>
+                   <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider whitespace-nowrap text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100">
@@ -291,7 +315,10 @@ export default function EvaluationPage() {
                   </tr>
                 ) : (
                   filteredEmployees.map((emp) => {
-                    const dates = calculateEvaluationDates(emp.date_hired)
+                    const dates = getDatesForEmployee(emp)
+                    const isScore1Saved = persistedEvaluations[emp.id]?.score_1 !== null && persistedEvaluations[emp.id]?.score_1 !== undefined
+                    const isScore2Saved = persistedEvaluations[emp.id]?.score_2 !== null && persistedEvaluations[emp.id]?.score_2 !== undefined
+
                     return (
                       <tr key={emp.id} className="hover:bg-[#FFE5EC] border-b border-rose-50 transition-colors duration-200 group">
                         <td className="px-6 py-4 font-bold text-[#630C22] border-r border-rose-50/30 whitespace-nowrap">{emp.id}</td>
@@ -306,7 +333,7 @@ export default function EvaluationPage() {
                         </td>
                         <td className="px-6 py-4 border-r border-rose-50/30 text-center">
                           <Badge className={`${
-                            dates?.status === 'Regular' 
+                            dates?.status === 'Regular' || dates?.status === 'Regularized'
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
                               : 'bg-amber-50 text-amber-700 border-amber-200'
                           } border shadow-none font-bold px-3 py-1 uppercase text-[10px] pointer-events-none rounded-full`}>
@@ -322,6 +349,7 @@ export default function EvaluationPage() {
                             className="w-20 mx-auto text-center h-9 border-rose-100"
                             value={evaluations[emp.id]?.score_1 ?? ''}
                             onChange={(e) => handleScoreChange(emp.id, 'score_1', e.target.value)}
+                            disabled={isScore1Saved}
                           />
                         </td>
                         <td className="px-6 py-4 border-r border-rose-50/30 text-center">
@@ -344,6 +372,7 @@ export default function EvaluationPage() {
                             className="w-20 mx-auto text-center h-9 border-rose-100"
                             value={evaluations[emp.id]?.score_2 ?? ''}
                             onChange={(e) => handleScoreChange(emp.id, 'score_2', e.target.value)}
+                            disabled={isScore2Saved}
                           />
                         </td>
                         <td className="px-6 py-4 border-r border-rose-50/30 text-center">
@@ -357,15 +386,23 @@ export default function EvaluationPage() {
                             </Badge>
                           ) : <span className="text-slate-300 italic text-xs">Pending</span>}
                         </td>
-                        <td className="px-6 py-4 font-bold text-[#A4163A] text-sm whitespace-nowrap text-center border-r border-rose-50/30">
-                          {dates?.regularization || '-'}
-                        </td>
+                         <td className="px-6 py-4 font-bold text-[#A4163A] text-sm whitespace-nowrap text-center border-r border-rose-50/30">
+                           {dates?.regularization || '-'}
+                         </td>
+                         <td className="px-6 py-4 border-r border-rose-50/30 text-center">
+                           {evaluations[emp.id]?.status ? (
+                             <Badge variant="outline" className="border-rose-200 text-rose-700 bg-rose-50 font-bold px-2 py-0.5 uppercase text-[9px] rounded-md">
+                               {evaluations[emp.id]?.status}
+                             </Badge>
+                           ) : <span className="text-slate-300 italic text-[10px]">None</span>}
+                         </td>
                         <td className="px-6 py-4 text-center">
                           <Button 
                             variant="outline" 
                             size="sm"
-                            className="text-[#630C22] border-[#630C22] hover:bg-[#630C22] hover:text-white rounded-lg font-bold"
+                            className="text-[#630C22] border-[#630C22] hover:bg-[#630C22] hover:text-white rounded-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                             onClick={() => saveEvaluation(emp.id)}
+                            disabled={isScore1Saved && isScore2Saved}
                           >
                             Save
                           </Button>

@@ -12,6 +12,7 @@ class Evaluation extends Model
         'remarks_1',
         'score_2',
         'remarks_2',
+        'status',
     ];
 
     public function employee()
