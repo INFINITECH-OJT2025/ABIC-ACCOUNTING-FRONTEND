@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\DepartmentChecklistTemplate;
+use App\Support\Validation\AppLimits;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -41,9 +42,9 @@ class DepartmentChecklistTemplateController extends Controller
         $validated = $request->validate([
             'department_id' => 'required|integer|exists:departments,id',
             'checklist_type' => 'required|string|in:ONBOARDING,CLEARANCE',
-            'tasks' => 'required|array|min:1|max:200',
-            'tasks.*.task' => 'required|string|min:2|max:500',
-            'tasks.*.sort_order' => 'nullable|integer|min:1|max:10000',
+            'tasks' => 'required|array|min:1|max:' . AppLimits::CHECKLIST_TASK_ROWS_APP_MAX,
+            'tasks.*.task' => 'required|string|min:' . AppLimits::CHECKLIST_TASK_APP_MIN . '|max:' . AppLimits::CHECKLIST_TASK_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
+            'tasks.*.sort_order' => 'nullable|integer|min:' . AppLimits::CHECKLIST_SORT_ORDER_APP_MIN . '|max:' . AppLimits::CHECKLIST_SORT_ORDER_APP_MAX,
             'tasks.*.is_active' => 'nullable|boolean',
         ], [
             'department_id.required' => 'Please choose a department before saving.',
@@ -53,12 +54,13 @@ class DepartmentChecklistTemplateController extends Controller
             'tasks.required' => 'Please add at least one checklist task before saving.',
             'tasks.array' => 'Checklist tasks must be sent as a list.',
             'tasks.min' => 'Please add at least one checklist task before saving.',
-            'tasks.max' => 'You can save up to 200 tasks per checklist template.',
+            'tasks.max' => 'You can save up to ' . AppLimits::CHECKLIST_TASK_ROWS_APP_MAX . ' tasks per checklist template.',
             'tasks.*.task.required' => 'Each task row must include a task description.',
-            'tasks.*.task.min' => 'Each task must be at least 2 characters long.',
-            'tasks.*.task.max' => 'Each task must be 500 characters or less.',
+            'tasks.*.task.min' => 'Each task must be at least ' . AppLimits::CHECKLIST_TASK_APP_MIN . ' characters long.',
+            'tasks.*.task.max' => 'Each task must be ' . AppLimits::CHECKLIST_TASK_APP_MAX . ' characters or less.',
+            'tasks.*.task.not_regex' => 'Task text contains unsupported special characters (' . AppLimits::FORBIDDEN_TEXT_LABEL . ').',
             'tasks.*.sort_order.integer' => 'Task order values must be whole numbers.',
-            'tasks.*.sort_order.min' => 'Task order must start at 1.',
+            'tasks.*.sort_order.min' => 'Task order must start at ' . AppLimits::CHECKLIST_SORT_ORDER_APP_MIN . '.',
             'tasks.*.sort_order.max' => 'Task order is too large.',
         ]);
 

@@ -5,6 +5,7 @@
 
 
 import React, { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table"
@@ -33,6 +34,7 @@ import {
 import { cn } from "@/lib/utils"
 import { getApiUrl } from '@/lib/api'
 import { ensureOkResponse } from '@/lib/api/error-message'
+import { VALIDATION_CONSTRAINTS } from '@/lib/validation/constraints'
 import { toast } from 'sonner'
 
 
@@ -161,6 +163,7 @@ const isRecordDone = (record: ClearanceRecord) =>
 
 
 export default function ClearanceChecklistPage() {
+  const router = useRouter()
   const editMode = true
   const [saving, setSaving] = useState(false)
   const [tasks, setTasks] = useState<ChecklistTask[]>([])
@@ -181,6 +184,7 @@ export default function ClearanceChecklistPage() {
   const [unsavedPromptOpen, setUnsavedPromptOpen] = useState(false)
   const [pendingDepartmentSelection, setPendingDepartmentSelection] = useState<string | null>(null)
   const [pendingNavigationUrl, setPendingNavigationUrl] = useState<string | null>(null)
+  const [reloadToken, setReloadToken] = useState(0)
 
 
   useEffect(() => {
@@ -258,7 +262,7 @@ export default function ClearanceChecklistPage() {
 
 
     fetchOptions()
-  }, [])
+  }, [reloadToken])
 
   useEffect(() => {
     if (!employeeInfo?.department) return
@@ -422,7 +426,7 @@ export default function ClearanceChecklistPage() {
       return
     }
     if (route) {
-      window.location.href = route
+      router.push(route)
     }
   }
 
@@ -598,7 +602,7 @@ export default function ClearanceChecklistPage() {
       return
     }
     if (route) {
-      window.location.href = route
+      router.push(route)
     }
   }
 
@@ -620,14 +624,14 @@ export default function ClearanceChecklistPage() {
       if (current === next) return
 
       event.preventDefault()
-      setPendingNavigationUrl(url.toString())
+      setPendingNavigationUrl(next)
       setPendingDepartmentSelection(null)
       setUnsavedPromptOpen(true)
     }
 
     document.addEventListener('click', handleDocumentClick, true)
     return () => document.removeEventListener('click', handleDocumentClick, true)
-  }, [hasUnsavedChanges])
+  }, [hasUnsavedChanges, router])
 
 
   if (loading) {
@@ -675,7 +679,15 @@ export default function ClearanceChecklistPage() {
 
 
   if (error) {
-    return <div className="p-8 text-rose-600">Failed to load clearance checklist: {error}</div>
+    return (
+      <div className="p-8 text-rose-700 space-y-3">
+        <p>Failed to load clearance checklist: {error}</p>
+        <div className="flex gap-2">
+          <Button onClick={() => setReloadToken((prev) => prev + 1)} className="bg-[#A4163A] hover:bg-[#800020] text-white">Retry</Button>
+          <Button variant="outline" onClick={() => router.back()}>Go Back</Button>
+        </div>
+      </div>
+    )
   }
 
 
@@ -775,7 +787,7 @@ export default function ClearanceChecklistPage() {
                 <TableHead className="font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">
                   Required Clearance Tasks
                   <p className="mt-1 text-[9px] normal-case font-semibold tracking-normal text-[#800020]/70">
-                    Task length: 2 to 500 characters.
+                    Task length: {VALIDATION_CONSTRAINTS.checklistTemplate.task.min} to {VALIDATION_CONSTRAINTS.checklistTemplate.task.max} characters.
                   </p>
                 </TableHead>
                 <TableHead className="w-[80px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">Action</TableHead>
@@ -790,16 +802,20 @@ export default function ClearanceChecklistPage() {
                         <Input
                           value={item.task}
                           onChange={(e) => updateTaskText(item.id, e.target.value)}
-                          minLength={2}
-                          maxLength={500}
-                          title="Task must be 2 to 500 characters."
+                          minLength={VALIDATION_CONSTRAINTS.checklistTemplate.task.min}
+                          maxLength={VALIDATION_CONSTRAINTS.checklistTemplate.task.max}
+                          title={`Task must be ${VALIDATION_CONSTRAINTS.checklistTemplate.task.min} to ${VALIDATION_CONSTRAINTS.checklistTemplate.task.max} characters.`}
                           className={cn(
                             "h-8 border-transparent bg-transparent hover:border-[#FFE5EC]/50 focus:border-[#A4163A] focus-visible:ring-0 transition-all font-bold px-0 text-sm",
                             item.status === 'DONE' ? "text-slate-300 line-through" : "text-slate-700"
                           )}
                           placeholder="Define clearance task..."
                         />
-                        <TextFieldStatus value={item.task} min={2} max={500} />
+                        <TextFieldStatus
+                          value={item.task}
+                          min={VALIDATION_CONSTRAINTS.checklistTemplate.task.min}
+                          max={VALIDATION_CONSTRAINTS.checklistTemplate.task.max}
+                        />
                       </div>
                     ) : (
                       <span className={cn(

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Agency;
 use App\Models\GeneralContact;
+use App\Support\Validation\AppLimits;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -88,25 +89,30 @@ class DirectoryController extends Controller
         }
 
         $validated = $request->validate([
-            'name' => 'required|string|min:2|max:255',
-            'full_name' => 'nullable|string|max:255',
-            'summary' => 'nullable|string|max:2000',
+            'name' => 'required|string|min:' . AppLimits::DIRECTORY_AGENCY_NAME_APP_MIN . '|max:' . AppLimits::DIRECTORY_AGENCY_NAME_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
+            'full_name' => 'nullable|string|max:' . AppLimits::DIRECTORY_FULL_NAME_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
+            'summary' => 'nullable|string|max:' . AppLimits::DIRECTORY_SUMMARY_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
             'contacts' => 'nullable|array|max:200',
-            'contacts.*.type' => 'required|string|max:100',
-            'contacts.*.label' => 'nullable|string|max:255',
-            'contacts.*.value' => 'required|string|min:2|max:1000',
+            'contacts.*.type' => 'required|string|max:' . AppLimits::DIRECTORY_CONTACT_TYPE_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
+            'contacts.*.label' => 'nullable|string|max:' . AppLimits::DIRECTORY_CONTACT_LABEL_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
+            'contacts.*.value' => 'required|string|min:' . AppLimits::DIRECTORY_CONTACT_VALUE_APP_MIN . '|max:' . AppLimits::DIRECTORY_CONTACT_VALUE_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
             'contacts.*.sort_order' => 'nullable|integer|min:1|max:10000',
             'processes' => 'nullable|array|max:500',
             'processes.*.process_type' => 'required|string|in:Adding,Removing',
-            'processes.*.process' => 'required|string|min:2|max:1000',
+            'processes.*.process' => 'required|string|min:' . AppLimits::DIRECTORY_PROCESS_TEXT_APP_MIN . '|max:' . AppLimits::DIRECTORY_PROCESS_TEXT_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
             'processes.*.step_number' => 'nullable|integer|min:1|max:10000',
         ], [
             'name.required' => 'Agency name is required.',
-            'name.min' => 'Agency name must be at least 2 characters long.',
+            'name.min' => 'Agency name must be at least ' . AppLimits::DIRECTORY_AGENCY_NAME_APP_MIN . ' characters long.',
+            'name.not_regex' => 'Agency name contains unsupported special characters (' . AppLimits::FORBIDDEN_TEXT_LABEL . ').',
             'contacts.*.type.required' => 'Each contact row needs a contact type.',
             'contacts.*.value.required' => 'Each contact row needs a contact value.',
             'processes.*.process_type.in' => 'Process type must be either Adding or Removing.',
             'processes.*.process.required' => 'Each process row needs a step description.',
+            'contacts.*.type.not_regex' => 'Contact type contains unsupported special characters (' . AppLimits::FORBIDDEN_TEXT_LABEL . ').',
+            'contacts.*.label.not_regex' => 'Contact label contains unsupported special characters (' . AppLimits::FORBIDDEN_TEXT_LABEL . ').',
+            'contacts.*.value.not_regex' => 'Contact value contains unsupported special characters (' . AppLimits::FORBIDDEN_TEXT_LABEL . ').',
+            'processes.*.process.not_regex' => 'Process text contains unsupported special characters (' . AppLimits::FORBIDDEN_TEXT_LABEL . ').',
         ]);
 
         $agency->update([
@@ -187,12 +193,13 @@ class DirectoryController extends Controller
     {
         $validated = $request->validate([
             'contacts' => 'required|array|min:1|max:500',
-            'contacts.*.type' => 'nullable|string|max:100',
-            'contacts.*.label' => 'nullable|string|max:255',
-            'contacts.*.value' => 'required|string|min:2|max:1000',
-            'contacts.*.establishment_name' => 'required|string|min:2|max:255',
-            'contacts.*.services' => 'nullable|string|max:255',
-            'contacts.*.contact_person' => 'nullable|string|max:255',
+            'contacts.*.id' => 'nullable|integer|exists:general_contacts,id',
+            'contacts.*.type' => 'nullable|string|max:' . AppLimits::DIRECTORY_CONTACT_TYPE_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
+            'contacts.*.label' => 'nullable|string|max:' . AppLimits::DIRECTORY_CONTACT_LABEL_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
+            'contacts.*.value' => 'required|string|min:' . AppLimits::DIRECTORY_GENERAL_VALUE_APP_MIN . '|max:' . AppLimits::DIRECTORY_GENERAL_VALUE_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
+            'contacts.*.establishment_name' => 'required|string|min:' . AppLimits::DIRECTORY_GENERAL_ESTABLISHMENT_APP_MIN . '|max:' . AppLimits::DIRECTORY_GENERAL_ESTABLISHMENT_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
+            'contacts.*.services' => 'nullable|string|max:' . AppLimits::DIRECTORY_GENERAL_SERVICES_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
+            'contacts.*.contact_person' => 'nullable|string|max:' . AppLimits::DIRECTORY_GENERAL_CONTACT_PERSON_APP_MAX . '|not_regex:' . AppLimits::FORBIDDEN_TEXT_REGEX,
             'contacts.*.sort_order' => 'nullable|integer|min:1|max:10000',
             'contacts.*.avatar_url' => 'nullable|url|max:2048',
             'contacts.*.avatar_public_id' => 'nullable|string|max:255',
@@ -202,15 +209,31 @@ class DirectoryController extends Controller
             'contacts.*.establishment_name.required' => 'Each row needs an establishment name.',
             'contacts.*.value.required' => 'Each row needs a contact value.',
             'contacts.*.avatar_url.url' => 'Avatar URL must be a valid link.',
+            'contacts.*.establishment_name.not_regex' => 'Establishment name contains unsupported special characters (' . AppLimits::FORBIDDEN_TEXT_LABEL . ').',
+            'contacts.*.services.not_regex' => 'Services contains unsupported special characters (' . AppLimits::FORBIDDEN_TEXT_LABEL . ').',
+            'contacts.*.contact_person.not_regex' => 'Contact person contains unsupported special characters (' . AppLimits::FORBIDDEN_TEXT_LABEL . ').',
+            'contacts.*.value.not_regex' => 'Contact value contains unsupported special characters (' . AppLimits::FORBIDDEN_TEXT_LABEL . ').',
         ]);
 
         $contacts = $validated['contacts'] ?? [];
 
         DB::transaction(function () use ($contacts): void {
-            GeneralContact::query()->delete();
+            $incomingIds = collect($contacts)
+                ->pluck('id')
+                ->filter(fn ($id) => $id !== null)
+                ->map(fn ($id) => (int) $id)
+                ->values();
+
+            if ($incomingIds->isEmpty()) {
+                GeneralContact::query()->delete();
+            } else {
+                GeneralContact::query()
+                    ->whereNotIn('id', $incomingIds)
+                    ->delete();
+            }
 
             foreach ($contacts as $index => $contact) {
-                GeneralContact::query()->create([
+                $payload = [
                     'type' => trim((string) ($contact['type'] ?? 'phone')) ?: 'phone',
                     'label' => isset($contact['label']) && trim((string) $contact['label']) !== ''
                         ? trim((string) $contact['label'])
@@ -230,7 +253,17 @@ class DirectoryController extends Controller
                         ? trim((string) $contact['avatar_public_id'])
                         : null,
                     'sort_order' => isset($contact['sort_order']) ? (int) $contact['sort_order'] : ($index + 1),
-                ]);
+                ];
+
+                if (isset($contact['id'])) {
+                    $existing = GeneralContact::query()->find((int) $contact['id']);
+                    if ($existing) {
+                        $existing->update($payload);
+                        continue;
+                    }
+                }
+
+                GeneralContact::query()->create($payload);
             }
         });
 
@@ -257,8 +290,7 @@ class DirectoryController extends Controller
         $maxResults = $request->query('max_results', 30);
 
         try {
-            $response = Http::withoutVerifying()
-                ->withBasicAuth($apiKey, $apiSecret)
+            $response = Http::withBasicAuth($apiKey, $apiSecret)
                 ->get("https://api.cloudinary.com/v1_1/{$cloudName}/resources/image", [
                     'type' => 'upload',
                     'prefix' => $prefix,
@@ -298,8 +330,7 @@ class DirectoryController extends Controller
         $signature = sha1("public_id={$publicId}&timestamp={$timestamp}{$apiSecret}");
 
         try {
-            $response = Http::withoutVerifying()
-                ->asForm()
+            $response = Http::asForm()
                 ->post("https://api.cloudinary.com/v1_1/{$cloudName}/image/destroy", [
                     'public_id' => $publicId,
                     'timestamp' => $timestamp,

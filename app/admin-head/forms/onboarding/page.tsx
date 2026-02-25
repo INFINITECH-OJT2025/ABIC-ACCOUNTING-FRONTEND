@@ -5,7 +5,7 @@
 
 
 import React, { useEffect, useMemo, useState, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table"
@@ -39,6 +39,7 @@ import { Label } from '@/components/ui/label'
 import { cn } from "@/lib/utils"
 import { getApiUrl } from '@/lib/api'
 import { ensureOkResponse } from '@/lib/api/error-message'
+import { VALIDATION_CONSTRAINTS } from '@/lib/validation/constraints'
 import { toast } from 'sonner'
 
 
@@ -168,6 +169,7 @@ export default function OnboardingChecklistPage() {
 
 
 function OnboardingChecklistPageContent() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const targetName = searchParams.get('name')
   const editMode = true
@@ -198,6 +200,7 @@ function OnboardingChecklistPageContent() {
   const [unsavedPromptOpen, setUnsavedPromptOpen] = useState(false)
   const [pendingDepartmentSelection, setPendingDepartmentSelection] = useState<string | null>(null)
   const [pendingNavigationUrl, setPendingNavigationUrl] = useState<string | null>(null)
+  const [reloadToken, setReloadToken] = useState(0)
 
 
   useEffect(() => {
@@ -290,7 +293,7 @@ function OnboardingChecklistPageContent() {
 
 
     fetchOptions()
-  }, [])
+  }, [reloadToken])
 
   useEffect(() => {
     if (!employeeInfo?.department) return
@@ -441,7 +444,7 @@ function OnboardingChecklistPageContent() {
       return
     }
     if (route) {
-      window.location.href = route
+      router.push(route)
     }
   }
 
@@ -665,7 +668,7 @@ function OnboardingChecklistPageContent() {
       return
     }
     if (route) {
-      window.location.href = route
+      router.push(route)
     }
   }
 
@@ -687,14 +690,14 @@ function OnboardingChecklistPageContent() {
       if (current === next) return
 
       event.preventDefault()
-      setPendingNavigationUrl(url.toString())
+      setPendingNavigationUrl(next)
       setPendingDepartmentSelection(null)
       setUnsavedPromptOpen(true)
     }
 
     document.addEventListener('click', handleDocumentClick, true)
     return () => document.removeEventListener('click', handleDocumentClick, true)
-  }, [hasUnsavedChanges])
+  }, [hasUnsavedChanges, router])
 
 
   const handleCreateRecord = async () => {
@@ -818,7 +821,15 @@ function OnboardingChecklistPageContent() {
 
 
   if (error) {
-    return <div className="p-8 text-rose-600">Failed to load onboarding checklist: {error}</div>
+    return (
+      <div className="p-8 text-rose-700 space-y-3">
+        <p>Failed to load onboarding checklist: {error}</p>
+        <div className="flex gap-2">
+          <Button onClick={() => setReloadToken((prev) => prev + 1)} className="bg-[#A4163A] hover:bg-[#800020] text-white">Retry</Button>
+          <Button variant="outline" onClick={() => router.back()}>Go Back</Button>
+        </div>
+      </div>
+    )
   }
 
 
@@ -927,7 +938,7 @@ function OnboardingChecklistPageContent() {
                 <TableHead className="font-black text-[#800020] uppercase tracking-[0.12em] text-[12px] py-3">
                   <span>Required Onboarding Tasks</span>
                   <p className="mt-1 text-[10px] normal-case font-semibold tracking-normal text-[#800020]/70">
-                    Task length: 2 to 500 characters.
+                    Task length: {VALIDATION_CONSTRAINTS.checklistTemplate.task.min} to {VALIDATION_CONSTRAINTS.checklistTemplate.task.max} characters.
                   </p>
                 </TableHead>
                 <TableHead className="w-[80px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[12px] py-3">Action</TableHead>
@@ -942,16 +953,20 @@ function OnboardingChecklistPageContent() {
                         <Input
                           value={item.task}
                           onChange={(e) => updateTaskText(item.id, e.target.value)}
-                          minLength={2}
-                          maxLength={500}
-                          title="Task must be 2 to 500 characters."
+                          minLength={VALIDATION_CONSTRAINTS.checklistTemplate.task.min}
+                          maxLength={VALIDATION_CONSTRAINTS.checklistTemplate.task.max}
+                          title={`Task must be ${VALIDATION_CONSTRAINTS.checklistTemplate.task.min} to ${VALIDATION_CONSTRAINTS.checklistTemplate.task.max} characters.`}
                           className={cn(
                             "h-8 border-transparent bg-transparent hover:border-[#FFE5EC]/50 focus:border-[#A4163A] focus-visible:ring-0 transition-all font-bold px-0 text-lg",
                             item.status === 'DONE' ? "text-slate-300 line-through" : "text-slate-700"
                           )}
                           placeholder="Define onboarding task..."
                         />
-                        <TextFieldStatus value={item.task} min={2} max={500} />
+                        <TextFieldStatus
+                          value={item.task}
+                          min={VALIDATION_CONSTRAINTS.checklistTemplate.task.min}
+                          max={VALIDATION_CONSTRAINTS.checklistTemplate.task.max}
+                        />
                       </div>
                     ) : (
                       <span className={cn(
@@ -1039,14 +1054,14 @@ function OnboardingChecklistPageContent() {
               <Input
                 value={newRecord.name}
                 onChange={(e) => setNewRecord(prev => ({ ...prev, name: e.target.value }))}
-                minLength={2}
-                maxLength={255}
-                title="Name must be 2 to 255 characters."
+                minLength={VALIDATION_CONSTRAINTS.onboardingRecord.name.min}
+                maxLength={VALIDATION_CONSTRAINTS.onboardingRecord.name.max}
+                title={`Name must be ${VALIDATION_CONSTRAINTS.onboardingRecord.name.min} to ${VALIDATION_CONSTRAINTS.onboardingRecord.name.max} characters.`}
                 placeholder="Ex. Juan Dela Cruz"
                 className="rounded-xl border-[#FFE5EC] border-2 h-14 text-lg font-bold focus:ring-[#800020]/10 focus:border-[#800020]"
               />
-              <TextFieldStatus value={newRecord.name} min={2} max={255} />
-              <p className="text-[11px] font-semibold text-slate-500">Minimum 2, maximum 255 characters.</p>
+              <TextFieldStatus value={newRecord.name} min={VALIDATION_CONSTRAINTS.onboardingRecord.name.min} max={VALIDATION_CONSTRAINTS.onboardingRecord.name.max} />
+              <p className="text-[11px] font-semibold text-slate-500">Minimum {VALIDATION_CONSTRAINTS.onboardingRecord.name.min}, maximum {VALIDATION_CONSTRAINTS.onboardingRecord.name.max} characters.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
@@ -1054,28 +1069,28 @@ function OnboardingChecklistPageContent() {
                 <Input
                   value={newRecord.position}
                   onChange={(e) => setNewRecord(prev => ({ ...prev, position: e.target.value }))}
-                  minLength={2}
-                  maxLength={255}
-                  title="Position must be 2 to 255 characters."
+                  minLength={VALIDATION_CONSTRAINTS.onboardingRecord.position.min}
+                  maxLength={VALIDATION_CONSTRAINTS.onboardingRecord.position.max}
+                  title={`Position must be ${VALIDATION_CONSTRAINTS.onboardingRecord.position.min} to ${VALIDATION_CONSTRAINTS.onboardingRecord.position.max} characters.`}
                   placeholder="Ex. Senior Accountant"
                   className="rounded-xl border-[#FFE5EC] border-2 h-14 text-lg font-bold focus:ring-[#800020]/10 focus:border-[#800020]"
                 />
-                <TextFieldStatus value={newRecord.position} min={2} max={255} />
-                <p className="text-[11px] font-semibold text-slate-500">Minimum 2, maximum 255 characters.</p>
+                <TextFieldStatus value={newRecord.position} min={VALIDATION_CONSTRAINTS.onboardingRecord.position.min} max={VALIDATION_CONSTRAINTS.onboardingRecord.position.max} />
+                <p className="text-[11px] font-semibold text-slate-500">Minimum {VALIDATION_CONSTRAINTS.onboardingRecord.position.min}, maximum {VALIDATION_CONSTRAINTS.onboardingRecord.position.max} characters.</p>
               </div>
               <div className="space-y-2">
                 <Label className="text-[11px] font-black text-[#800020] uppercase tracking-[0.2em]">Department</Label>
                 <Input
                   value={newRecord.department}
                   onChange={(e) => setNewRecord(prev => ({ ...prev, department: e.target.value }))}
-                  minLength={2}
-                  maxLength={255}
-                  title="Department must be 2 to 255 characters."
+                  minLength={VALIDATION_CONSTRAINTS.onboardingRecord.department.min}
+                  maxLength={VALIDATION_CONSTRAINTS.onboardingRecord.department.max}
+                  title={`Department must be ${VALIDATION_CONSTRAINTS.onboardingRecord.department.min} to ${VALIDATION_CONSTRAINTS.onboardingRecord.department.max} characters.`}
                   placeholder="Ex. Finance"
                   className="rounded-xl border-[#FFE5EC] border-2 h-14 text-lg font-bold focus:ring-[#800020]/10 focus:border-[#800020]"
                 />
-                <TextFieldStatus value={newRecord.department} min={2} max={255} />
-                <p className="text-[11px] font-semibold text-slate-500">Minimum 2, maximum 255 characters.</p>
+                <TextFieldStatus value={newRecord.department} min={VALIDATION_CONSTRAINTS.onboardingRecord.department.min} max={VALIDATION_CONSTRAINTS.onboardingRecord.department.max} />
+                <p className="text-[11px] font-semibold text-slate-500">Minimum {VALIDATION_CONSTRAINTS.onboardingRecord.department.min}, maximum {VALIDATION_CONSTRAINTS.onboardingRecord.department.max} characters.</p>
               </div>
             </div>
             <div className="space-y-2">

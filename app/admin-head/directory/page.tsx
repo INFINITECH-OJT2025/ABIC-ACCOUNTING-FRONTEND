@@ -31,6 +31,7 @@ import {
 import { cn } from '@/lib/utils'
 import { getApiUrl } from '@/lib/api'
 import { ensureOkResponse } from '@/lib/api/error-message'
+import { VALIDATION_CONSTRAINTS } from '@/lib/validation/constraints'
 import { toast } from 'sonner'
 import {
   Building2,
@@ -149,6 +150,7 @@ type GeneralContact = {
 }
 
 type EditableGeneralContact = {
+  id?: number
   type: string
   label: string
   establishment_name: string
@@ -763,6 +765,7 @@ export default function GovernmentDirectoryPage() {
       setGeneralContacts(sorted)
       if (!editingGeneralContacts) {
         setGeneralContactsDraft(sorted.map((row) => ({
+          id: row.id,
           type: row.type || 'phone',
           label: row.label || '',
           establishment_name: row.establishment_name || row.label || '',
@@ -794,6 +797,7 @@ export default function GovernmentDirectoryPage() {
   const startGeneralContactsEdit = () => {
     setGeneralContactsDraft(
       generalContacts.map((row, index) => ({
+        id: row.id,
         type: row.type || 'phone',
         label: row.label || '',
         establishment_name: row.establishment_name || row.label || '',
@@ -812,6 +816,7 @@ export default function GovernmentDirectoryPage() {
     setEditingGeneralContacts(false)
     setGeneralContactsDraft(
       generalContacts.map((row, index) => ({
+        id: row.id,
         type: row.type || 'phone',
         label: row.label || '',
         establishment_name: row.establishment_name || row.label || '',
@@ -923,6 +928,7 @@ export default function GovernmentDirectoryPage() {
 
       setSavingGeneralContacts(true)
       const payload = generalContactsDraft.map((row, index) => ({
+        id: row.id ?? null,
         type: row.type.trim() || 'phone',
         label: row.establishment_name.trim() || null,
         establishment_name: row.establishment_name.trim(),
@@ -950,6 +956,7 @@ export default function GovernmentDirectoryPage() {
       const sorted = [...rows].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
       setGeneralContacts(sorted)
       setGeneralContactsDraft(sorted.map((row, index) => ({
+        id: row.id,
         type: row.type || 'phone',
         label: row.label || '',
         establishment_name: row.establishment_name || row.label || '',
@@ -1314,7 +1321,7 @@ export default function GovernmentDirectoryPage() {
                   ) : (
                     <>
                     <p className="text-[11px] font-semibold text-slate-500">
-                      Constraints: Establishment 2-255 chars, Services up to 255, Contact Person up to 255, Contact Value 2-1000.
+                      Constraints: Establishment {VALIDATION_CONSTRAINTS.directory.generalEstablishment.min}-{VALIDATION_CONSTRAINTS.directory.generalEstablishment.max} chars, Services up to {VALIDATION_CONSTRAINTS.directory.generalServices.max}, Contact Person up to {VALIDATION_CONSTRAINTS.directory.generalContactPerson.max}, Contact Value {VALIDATION_CONSTRAINTS.directory.generalValue.min}-{VALIDATION_CONSTRAINTS.directory.generalValue.max}.
                     </p>
                     {generalContactsDraft.map((row, index) => (
                       <div key={`general-contact-draft-${index}`} className="border border-slate-200 rounded-md p-3 space-y-2">
@@ -1418,17 +1425,17 @@ export default function GovernmentDirectoryPage() {
                           <Input
                             value={row.establishment_name}
                             onChange={(e) => updateGeneralContactField(index, 'establishment_name', e.target.value)}
-                            minLength={2}
-                            maxLength={255}
-                            title="Establishment name must be 2 to 255 characters."
+                            minLength={VALIDATION_CONSTRAINTS.directory.generalEstablishment.min}
+                            maxLength={VALIDATION_CONSTRAINTS.directory.generalEstablishment.max}
+                            title={`Establishment name must be ${VALIDATION_CONSTRAINTS.directory.generalEstablishment.min} to ${VALIDATION_CONSTRAINTS.directory.generalEstablishment.max} characters.`}
                             placeholder="Establishment Name (Required)"
                             className="h-9 rounded-sm"
                           />
                           <Input
                             value={row.services}
                             onChange={(e) => updateGeneralContactField(index, 'services', e.target.value)}
-                            maxLength={255}
-                            title="Services can be up to 255 characters."
+                            maxLength={VALIDATION_CONSTRAINTS.directory.generalServices.max}
+                            title={`Services can be up to ${VALIDATION_CONSTRAINTS.directory.generalServices.max} characters.`}
                             placeholder="Services (Optional)"
                             className="h-9 rounded-sm"
                           />
@@ -1437,17 +1444,17 @@ export default function GovernmentDirectoryPage() {
                           <Input
                             value={row.contact_person}
                             onChange={(e) => updateGeneralContactField(index, 'contact_person', e.target.value)}
-                            maxLength={255}
-                            title="Contact person can be up to 255 characters."
+                            maxLength={VALIDATION_CONSTRAINTS.directory.generalContactPerson.max}
+                            title={`Contact person can be up to ${VALIDATION_CONSTRAINTS.directory.generalContactPerson.max} characters.`}
                             placeholder="Contact Person (Optional)"
                             className="h-9 rounded-sm"
                           />
                           <Input
                             value={row.value}
                             onChange={(e) => updateGeneralContactField(index, 'value', e.target.value)}
-                            minLength={2}
-                            maxLength={1000}
-                            title="Contact value must be 2 to 1000 characters."
+                            minLength={VALIDATION_CONSTRAINTS.directory.generalValue.min}
+                            maxLength={VALIDATION_CONSTRAINTS.directory.generalValue.max}
+                            title={`Contact value must be ${VALIDATION_CONSTRAINTS.directory.generalValue.min} to ${VALIDATION_CONSTRAINTS.directory.generalValue.max} characters.`}
                             placeholder="Contact Number / Value (Required)"
                             className="h-9 rounded-sm"
                           />
@@ -1461,10 +1468,10 @@ export default function GovernmentDirectoryPage() {
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
-                        <TextFieldStatus value={row.establishment_name} min={2} max={255} />
-                        <TextFieldStatus value={row.services} max={255} />
-                        <TextFieldStatus value={row.contact_person} max={255} />
-                        <TextFieldStatus value={row.value} min={2} max={1000} />
+                        <TextFieldStatus value={row.establishment_name} min={VALIDATION_CONSTRAINTS.directory.generalEstablishment.min} max={VALIDATION_CONSTRAINTS.directory.generalEstablishment.max} />
+                        <TextFieldStatus value={row.services} max={VALIDATION_CONSTRAINTS.directory.generalServices.max} />
+                        <TextFieldStatus value={row.contact_person} max={VALIDATION_CONSTRAINTS.directory.generalContactPerson.max} />
+                        <TextFieldStatus value={row.value} min={VALIDATION_CONSTRAINTS.directory.generalValue.min} max={VALIDATION_CONSTRAINTS.directory.generalValue.max} />
                       </div>
                     ))}
                     </>
@@ -1598,27 +1605,27 @@ export default function GovernmentDirectoryPage() {
               {editMode && draft ? (
                 <div className="space-y-3">
                   <p className="text-[11px] font-semibold text-white/80">
-                    Constraints: Short Name 2-255 chars, Full Name up to 255 chars.
+                    Constraints: Short Name {VALIDATION_CONSTRAINTS.directory.agencyName.min}-{VALIDATION_CONSTRAINTS.directory.agencyName.max} chars, Full Name up to {VALIDATION_CONSTRAINTS.directory.agencyFullName.max} chars.
                   </p>
                   <Input
                     value={draft.name}
                     onChange={e => setDraft({ ...draft, name: e.target.value })}
-                    minLength={2}
-                    maxLength={255}
-                    title="Short name must be 2 to 255 characters."
+                    minLength={VALIDATION_CONSTRAINTS.directory.agencyName.min}
+                    maxLength={VALIDATION_CONSTRAINTS.directory.agencyName.max}
+                    title={`Short name must be ${VALIDATION_CONSTRAINTS.directory.agencyName.min} to ${VALIDATION_CONSTRAINTS.directory.agencyName.max} characters.`}
                     className="text-4xl md:text-6xl font-black text-white bg-transparent border-b border-white/40 rounded-none px-0 h-auto focus-visible:ring-0 focus-visible:border-white placeholder:text-white/30"
                     placeholder="SHORT NAME"
                   />
-                  <TextFieldStatus value={draft.name} min={2} max={255} className="text-white/85" />
+                  <TextFieldStatus value={draft.name} min={VALIDATION_CONSTRAINTS.directory.agencyName.min} max={VALIDATION_CONSTRAINTS.directory.agencyName.max} className="text-white/85" />
                   <Input
                     value={draft.full_name}
                     onChange={e => setDraft({ ...draft, full_name: e.target.value })}
-                    maxLength={255}
-                    title="Full name can be up to 255 characters."
+                    maxLength={VALIDATION_CONSTRAINTS.directory.agencyFullName.max}
+                    title={`Full name can be up to ${VALIDATION_CONSTRAINTS.directory.agencyFullName.max} characters.`}
                     className="text-xl md:text-2xl font-medium text-white/90 bg-transparent border-b border-white/40 rounded-none px-0 h-auto focus-visible:ring-0 focus-visible:border-white placeholder:text-white/30"
                     placeholder="Agency Full Business Name"
                   />
-                  <TextFieldStatus value={draft.full_name} max={255} className="text-white/85" />
+                  <TextFieldStatus value={draft.full_name} max={VALIDATION_CONSTRAINTS.directory.agencyFullName.max} className="text-white/85" />
                 </div>
               ) : (
                 <>
@@ -1646,18 +1653,18 @@ export default function GovernmentDirectoryPage() {
                 <h3 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Process Steps</h3>
                 {editMode && draft && (
                   <>
-                    <p className="text-[11px] font-semibold text-slate-500 mt-3">Summary: up to 2000 characters.</p>
+                    <p className="text-[11px] font-semibold text-slate-500 mt-3">Summary: up to {VALIDATION_CONSTRAINTS.directory.agencySummary.max} characters.</p>
                     <Textarea
                       value={draft.summary}
                       onChange={e => {
                         setDraft({ ...draft, summary: e.target.value })
                       }}
-                      maxLength={2000}
-                      title="Summary can be up to 2000 characters."
+                      maxLength={VALIDATION_CONSTRAINTS.directory.agencySummary.max}
+                      title={`Summary can be up to ${VALIDATION_CONSTRAINTS.directory.agencySummary.max} characters.`}
                       className="mt-2 max-w-2xl rounded-sm"
                       placeholder="Agency summary or additional notes..."
                     />
-                    <TextFieldStatus value={draft.summary} max={2000} />
+                    <TextFieldStatus value={draft.summary} max={VALIDATION_CONSTRAINTS.directory.agencySummary.max} />
                   </>
                 )}
               </div>
@@ -1720,12 +1727,12 @@ export default function GovernmentDirectoryPage() {
                                 <Textarea
                                   value={step.process}
                                   onChange={(e) => updateProcessTextAt(index, e.target.value)}
-                                  minLength={2}
-                                  maxLength={1000}
-                                  title="Process description must be 2 to 1000 characters."
+                                  minLength={VALIDATION_CONSTRAINTS.directory.processStep.min}
+                                  maxLength={VALIDATION_CONSTRAINTS.directory.processStep.max}
+                                  title={`Process description must be ${VALIDATION_CONSTRAINTS.directory.processStep.min} to ${VALIDATION_CONSTRAINTS.directory.processStep.max} characters.`}
                                   className="min-h-[60px] resize-y rounded-sm"
                                 />
-                                <TextFieldStatus value={step.process} min={2} max={1000} />
+                                <TextFieldStatus value={step.process} min={VALIDATION_CONSTRAINTS.directory.processStep.min} max={VALIDATION_CONSTRAINTS.directory.processStep.max} />
                                 <Button size="icon" variant="ghost" onClick={() => removeProcessAt(index)} className="text-rose-500 hover:bg-rose-50 hover:text-rose-600 shrink-0 h-9 w-9 rounded-lg">
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
@@ -1776,7 +1783,7 @@ export default function GovernmentDirectoryPage() {
             </p>
             {editMode && (
               <p className="text-[11px] font-semibold text-slate-500 mt-1">
-                Constraints: Type up to 100 chars, Label up to 255 chars, Value 2-1000 chars.
+                Constraints: Type up to {VALIDATION_CONSTRAINTS.directory.contactType.max} chars, Label up to {VALIDATION_CONSTRAINTS.directory.contactLabel.max} chars, Value {VALIDATION_CONSTRAINTS.directory.contactValue.min}-{VALIDATION_CONSTRAINTS.directory.contactValue.max} chars.
               </p>
             )}
           </div>
@@ -1815,16 +1822,16 @@ export default function GovernmentDirectoryPage() {
                           <Input
                             value={row.type}
                             onChange={(e) => updateContactAt(idx, 'type', e.target.value)}
-                            maxLength={100}
-                            title="Type can be up to 100 characters."
+                            maxLength={VALIDATION_CONSTRAINTS.directory.contactType.max}
+                            title={`Type can be up to ${VALIDATION_CONSTRAINTS.directory.contactType.max} characters.`}
                             placeholder="Type (e.g. Hotline)"
                             className="font-bold text-xs uppercase rounded-sm h-8"
                           />
                           <Input
                             value={row.label}
                             onChange={(e) => updateContactAt(idx, 'label', e.target.value)}
-                            maxLength={255}
-                            title="Label can be up to 255 characters."
+                            maxLength={VALIDATION_CONSTRAINTS.directory.contactLabel.max}
+                            title={`Label can be up to ${VALIDATION_CONSTRAINTS.directory.contactLabel.max} characters.`}
                             placeholder="Label"
                             className="font-bold text-xs uppercase rounded-sm h-8"
                           />
@@ -1832,15 +1839,15 @@ export default function GovernmentDirectoryPage() {
                         <Input
                           value={row.value}
                           onChange={(e) => updateContactAt(idx, 'value', e.target.value)}
-                          minLength={2}
-                          maxLength={1000}
-                          title="Value must be 2 to 1000 characters."
+                          minLength={VALIDATION_CONSTRAINTS.directory.contactValue.min}
+                          maxLength={VALIDATION_CONSTRAINTS.directory.contactValue.max}
+                          title={`Value must be ${VALIDATION_CONSTRAINTS.directory.contactValue.min} to ${VALIDATION_CONSTRAINTS.directory.contactValue.max} characters.`}
                           placeholder="Value"
                           className="rounded-sm h-9"
                         />
-                        <TextFieldStatus value={row.type} max={100} />
-                        <TextFieldStatus value={row.label} max={255} />
-                        <TextFieldStatus value={row.value} min={2} max={1000} />
+                        <TextFieldStatus value={row.type} max={VALIDATION_CONSTRAINTS.directory.contactType.max} />
+                        <TextFieldStatus value={row.label} max={VALIDATION_CONSTRAINTS.directory.contactLabel.max} />
+                        <TextFieldStatus value={row.value} min={VALIDATION_CONSTRAINTS.directory.contactValue.min} max={VALIDATION_CONSTRAINTS.directory.contactValue.max} />
                         <Button size="sm" variant="ghost" onClick={() => removeContactAt(idx)} className="text-rose-500 w-full hover:bg-rose-50 rounded-lg h-8">
                           <Trash2 className="w-4 h-4 mr-2" /> Remove
                         </Button>
