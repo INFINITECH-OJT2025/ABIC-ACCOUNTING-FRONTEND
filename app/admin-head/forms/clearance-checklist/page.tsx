@@ -11,6 +11,7 @@ import {
 import { Card } from "@/components/ui/card"
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { TextFieldStatus } from '@/components/ui/text-field-status'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -773,6 +774,9 @@ export default function ClearanceChecklistPage() {
               <TableRow className="border-b border-[#FFE5EC] hover:bg-transparent">
                 <TableHead className="font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">
                   Required Clearance Tasks
+                  <p className="mt-1 text-[9px] normal-case font-semibold tracking-normal text-[#800020]/70">
+                    Task length: 2 to 500 characters.
+                  </p>
                 </TableHead>
                 <TableHead className="w-[80px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">Action</TableHead>
               </TableRow>
@@ -782,15 +786,21 @@ export default function ClearanceChecklistPage() {
                 <TableRow key={item.id} className="border-b border-rose-50/30 last:border-0 hover:bg-[#FFE5EC]/5 transition-colors group">
                   <TableCell className="py-2.5">
                     {editMode ? (
-                      <Input
-                        value={item.task}
-                        onChange={(e) => updateTaskText(item.id, e.target.value)}
-                        className={cn(
-                          "h-8 border-transparent bg-transparent hover:border-[#FFE5EC]/50 focus:border-[#A4163A] focus-visible:ring-0 transition-all font-bold px-0 text-sm",
-                          item.status === 'DONE' ? "text-slate-300 line-through" : "text-slate-700"
-                        )}
-                        placeholder="Define clearance task..."
-                      />
+                      <div>
+                        <Input
+                          value={item.task}
+                          onChange={(e) => updateTaskText(item.id, e.target.value)}
+                          minLength={2}
+                          maxLength={500}
+                          title="Task must be 2 to 500 characters."
+                          className={cn(
+                            "h-8 border-transparent bg-transparent hover:border-[#FFE5EC]/50 focus:border-[#A4163A] focus-visible:ring-0 transition-all font-bold px-0 text-sm",
+                            item.status === 'DONE' ? "text-slate-300 line-through" : "text-slate-700"
+                          )}
+                          placeholder="Define clearance task..."
+                        />
+                        <TextFieldStatus value={item.task} min={2} max={500} />
+                      </div>
                     ) : (
                       <span className={cn(
                         "text-sm font-bold transition-all duration-300",

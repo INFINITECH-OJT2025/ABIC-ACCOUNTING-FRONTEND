@@ -12,6 +12,7 @@ import {
 import { Card } from "@/components/ui/card"
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { TextFieldStatus } from '@/components/ui/text-field-status'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -925,6 +926,9 @@ function OnboardingChecklistPageContent() {
               <TableRow className="border-b border-[#FFE5EC] hover:bg-transparent">
                 <TableHead className="font-black text-[#800020] uppercase tracking-[0.12em] text-[12px] py-3">
                   <span>Required Onboarding Tasks</span>
+                  <p className="mt-1 text-[10px] normal-case font-semibold tracking-normal text-[#800020]/70">
+                    Task length: 2 to 500 characters.
+                  </p>
                 </TableHead>
                 <TableHead className="w-[80px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[12px] py-3">Action</TableHead>
               </TableRow>
@@ -934,15 +938,21 @@ function OnboardingChecklistPageContent() {
                 <TableRow key={item.id} className="border-b border-rose-50/30 last:border-0 hover:bg-[#FFE5EC]/5 transition-colors group">
                   <TableCell className="py-2.5">
                     {editMode ? (
-                      <Input
-                        value={item.task}
-                        onChange={(e) => updateTaskText(item.id, e.target.value)}
-                        className={cn(
-                          "h-8 border-transparent bg-transparent hover:border-[#FFE5EC]/50 focus:border-[#A4163A] focus-visible:ring-0 transition-all font-bold px-0 text-lg",
-                          item.status === 'DONE' ? "text-slate-300 line-through" : "text-slate-700"
-                        )}
-                        placeholder="Define onboarding task..."
-                      />
+                      <div>
+                        <Input
+                          value={item.task}
+                          onChange={(e) => updateTaskText(item.id, e.target.value)}
+                          minLength={2}
+                          maxLength={500}
+                          title="Task must be 2 to 500 characters."
+                          className={cn(
+                            "h-8 border-transparent bg-transparent hover:border-[#FFE5EC]/50 focus:border-[#A4163A] focus-visible:ring-0 transition-all font-bold px-0 text-lg",
+                            item.status === 'DONE' ? "text-slate-300 line-through" : "text-slate-700"
+                          )}
+                          placeholder="Define onboarding task..."
+                        />
+                        <TextFieldStatus value={item.task} min={2} max={500} />
+                      </div>
                     ) : (
                       <span className={cn(
                         "text-sm font-bold transition-all duration-300",
@@ -1029,9 +1039,14 @@ function OnboardingChecklistPageContent() {
               <Input
                 value={newRecord.name}
                 onChange={(e) => setNewRecord(prev => ({ ...prev, name: e.target.value }))}
+                minLength={2}
+                maxLength={255}
+                title="Name must be 2 to 255 characters."
                 placeholder="Ex. Juan Dela Cruz"
                 className="rounded-xl border-[#FFE5EC] border-2 h-14 text-lg font-bold focus:ring-[#800020]/10 focus:border-[#800020]"
               />
+              <TextFieldStatus value={newRecord.name} min={2} max={255} />
+              <p className="text-[11px] font-semibold text-slate-500">Minimum 2, maximum 255 characters.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
@@ -1039,18 +1054,28 @@ function OnboardingChecklistPageContent() {
                 <Input
                   value={newRecord.position}
                   onChange={(e) => setNewRecord(prev => ({ ...prev, position: e.target.value }))}
+                  minLength={2}
+                  maxLength={255}
+                  title="Position must be 2 to 255 characters."
                   placeholder="Ex. Senior Accountant"
                   className="rounded-xl border-[#FFE5EC] border-2 h-14 text-lg font-bold focus:ring-[#800020]/10 focus:border-[#800020]"
                 />
+                <TextFieldStatus value={newRecord.position} min={2} max={255} />
+                <p className="text-[11px] font-semibold text-slate-500">Minimum 2, maximum 255 characters.</p>
               </div>
               <div className="space-y-2">
                 <Label className="text-[11px] font-black text-[#800020] uppercase tracking-[0.2em]">Department</Label>
                 <Input
                   value={newRecord.department}
                   onChange={(e) => setNewRecord(prev => ({ ...prev, department: e.target.value }))}
+                  minLength={2}
+                  maxLength={255}
+                  title="Department must be 2 to 255 characters."
                   placeholder="Ex. Finance"
                   className="rounded-xl border-[#FFE5EC] border-2 h-14 text-lg font-bold focus:ring-[#800020]/10 focus:border-[#800020]"
                 />
+                <TextFieldStatus value={newRecord.department} min={2} max={255} />
+                <p className="text-[11px] font-semibold text-slate-500">Minimum 2, maximum 255 characters.</p>
               </div>
             </div>
             <div className="space-y-2">

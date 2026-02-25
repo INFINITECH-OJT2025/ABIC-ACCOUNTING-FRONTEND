@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { TextFieldStatus } from '@/components/ui/text-field-status'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -1311,7 +1312,11 @@ export default function GovernmentDirectoryPage() {
                   {generalContactsDraft.length === 0 ? (
                     <p className="text-sm text-slate-500">No rows yet. Click Add Row to create one.</p>
                   ) : (
-                    generalContactsDraft.map((row, index) => (
+                    <>
+                    <p className="text-[11px] font-semibold text-slate-500">
+                      Constraints: Establishment 2-255 chars, Services up to 255, Contact Person up to 255, Contact Value 2-1000.
+                    </p>
+                    {generalContactsDraft.map((row, index) => (
                       <div key={`general-contact-draft-${index}`} className="border border-slate-200 rounded-md p-3 space-y-2">
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-2 min-w-0">
@@ -1378,8 +1383,9 @@ export default function GovernmentDirectoryPage() {
                                   {({ open }) => (
                                     <DropdownMenuItem
                                       onSelect={(e) => {
-                                        e.preventDefault()
-                                        open()
+                                        // Let Radix close the dropdown first, then open Cloudinary.
+                                        // This prevents the uploader modal from being dismissed when clicking "Browse".
+                                        window.setTimeout(() => open(), 0)
                                       }}
                                     >
                                       <ImageUp className="h-4 w-4 mr-2" />
@@ -1412,12 +1418,17 @@ export default function GovernmentDirectoryPage() {
                           <Input
                             value={row.establishment_name}
                             onChange={(e) => updateGeneralContactField(index, 'establishment_name', e.target.value)}
+                            minLength={2}
+                            maxLength={255}
+                            title="Establishment name must be 2 to 255 characters."
                             placeholder="Establishment Name (Required)"
                             className="h-9 rounded-sm"
                           />
                           <Input
                             value={row.services}
                             onChange={(e) => updateGeneralContactField(index, 'services', e.target.value)}
+                            maxLength={255}
+                            title="Services can be up to 255 characters."
                             placeholder="Services (Optional)"
                             className="h-9 rounded-sm"
                           />
@@ -1426,12 +1437,17 @@ export default function GovernmentDirectoryPage() {
                           <Input
                             value={row.contact_person}
                             onChange={(e) => updateGeneralContactField(index, 'contact_person', e.target.value)}
+                            maxLength={255}
+                            title="Contact person can be up to 255 characters."
                             placeholder="Contact Person (Optional)"
                             className="h-9 rounded-sm"
                           />
                           <Input
                             value={row.value}
                             onChange={(e) => updateGeneralContactField(index, 'value', e.target.value)}
+                            minLength={2}
+                            maxLength={1000}
+                            title="Contact value must be 2 to 1000 characters."
                             placeholder="Contact Number / Value (Required)"
                             className="h-9 rounded-sm"
                           />
@@ -1445,8 +1461,13 @@ export default function GovernmentDirectoryPage() {
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
+                        <TextFieldStatus value={row.establishment_name} min={2} max={255} />
+                        <TextFieldStatus value={row.services} max={255} />
+                        <TextFieldStatus value={row.contact_person} max={255} />
+                        <TextFieldStatus value={row.value} min={2} max={1000} />
                       </div>
-                    ))
+                    ))}
+                    </>
                   )}
                 </div>
               ) : filteredGeneralContacts.length === 0 ? (
@@ -1576,18 +1597,28 @@ export default function GovernmentDirectoryPage() {
 
               {editMode && draft ? (
                 <div className="space-y-3">
+                  <p className="text-[11px] font-semibold text-white/80">
+                    Constraints: Short Name 2-255 chars, Full Name up to 255 chars.
+                  </p>
                   <Input
                     value={draft.name}
                     onChange={e => setDraft({ ...draft, name: e.target.value })}
+                    minLength={2}
+                    maxLength={255}
+                    title="Short name must be 2 to 255 characters."
                     className="text-4xl md:text-6xl font-black text-white bg-transparent border-b border-white/40 rounded-none px-0 h-auto focus-visible:ring-0 focus-visible:border-white placeholder:text-white/30"
                     placeholder="SHORT NAME"
                   />
+                  <TextFieldStatus value={draft.name} min={2} max={255} className="text-white/85" />
                   <Input
                     value={draft.full_name}
                     onChange={e => setDraft({ ...draft, full_name: e.target.value })}
+                    maxLength={255}
+                    title="Full name can be up to 255 characters."
                     className="text-xl md:text-2xl font-medium text-white/90 bg-transparent border-b border-white/40 rounded-none px-0 h-auto focus-visible:ring-0 focus-visible:border-white placeholder:text-white/30"
                     placeholder="Agency Full Business Name"
                   />
+                  <TextFieldStatus value={draft.full_name} max={255} className="text-white/85" />
                 </div>
               ) : (
                 <>
@@ -1614,14 +1645,20 @@ export default function GovernmentDirectoryPage() {
                 <p className="text-lg font-black text-[#A4163A] uppercase tracking-[0.25em] mb-2">GOVERNMENT CONTRIBUTION</p>
                 <h3 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Process Steps</h3>
                 {editMode && draft && (
-                  <Textarea
-                    value={draft.summary}
-                    onChange={e => {
-                      setDraft({ ...draft, summary: e.target.value })
-                    }}
-                    className="mt-4 max-w-2xl rounded-sm"
-                    placeholder="Agency summary or additional notes..."
-                  />
+                  <>
+                    <p className="text-[11px] font-semibold text-slate-500 mt-3">Summary: up to 2000 characters.</p>
+                    <Textarea
+                      value={draft.summary}
+                      onChange={e => {
+                        setDraft({ ...draft, summary: e.target.value })
+                      }}
+                      maxLength={2000}
+                      title="Summary can be up to 2000 characters."
+                      className="mt-2 max-w-2xl rounded-sm"
+                      placeholder="Agency summary or additional notes..."
+                    />
+                    <TextFieldStatus value={draft.summary} max={2000} />
+                  </>
                 )}
               </div>
 
@@ -1683,8 +1720,12 @@ export default function GovernmentDirectoryPage() {
                                 <Textarea
                                   value={step.process}
                                   onChange={(e) => updateProcessTextAt(index, e.target.value)}
+                                  minLength={2}
+                                  maxLength={1000}
+                                  title="Process description must be 2 to 1000 characters."
                                   className="min-h-[60px] resize-y rounded-sm"
                                 />
+                                <TextFieldStatus value={step.process} min={2} max={1000} />
                                 <Button size="icon" variant="ghost" onClick={() => removeProcessAt(index)} className="text-rose-500 hover:bg-rose-50 hover:text-rose-600 shrink-0 h-9 w-9 rounded-lg">
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
@@ -1733,6 +1774,11 @@ export default function GovernmentDirectoryPage() {
             <p className="text-slate-500 font-medium text-sm mt-1">
               24/7 hotline, mobile support, callback service, and main office details.
             </p>
+            {editMode && (
+              <p className="text-[11px] font-semibold text-slate-500 mt-1">
+                Constraints: Type up to 100 chars, Label up to 255 chars, Value 2-1000 chars.
+              </p>
+            )}
           </div>
           {editMode && (
             <div className="mb-4 flex justify-end">
@@ -1769,12 +1815,16 @@ export default function GovernmentDirectoryPage() {
                           <Input
                             value={row.type}
                             onChange={(e) => updateContactAt(idx, 'type', e.target.value)}
+                            maxLength={100}
+                            title="Type can be up to 100 characters."
                             placeholder="Type (e.g. Hotline)"
                             className="font-bold text-xs uppercase rounded-sm h-8"
                           />
                           <Input
                             value={row.label}
                             onChange={(e) => updateContactAt(idx, 'label', e.target.value)}
+                            maxLength={255}
+                            title="Label can be up to 255 characters."
                             placeholder="Label"
                             className="font-bold text-xs uppercase rounded-sm h-8"
                           />
@@ -1782,9 +1832,15 @@ export default function GovernmentDirectoryPage() {
                         <Input
                           value={row.value}
                           onChange={(e) => updateContactAt(idx, 'value', e.target.value)}
+                          minLength={2}
+                          maxLength={1000}
+                          title="Value must be 2 to 1000 characters."
                           placeholder="Value"
                           className="rounded-sm h-9"
                         />
+                        <TextFieldStatus value={row.type} max={100} />
+                        <TextFieldStatus value={row.label} max={255} />
+                        <TextFieldStatus value={row.value} min={2} max={1000} />
                         <Button size="sm" variant="ghost" onClick={() => removeContactAt(idx)} className="text-rose-500 w-full hover:bg-rose-50 rounded-lg h-8">
                           <Trash2 className="w-4 h-4 mr-2" /> Remove
                         </Button>
