@@ -1914,6 +1914,25 @@ export default function GovernmentDirectoryPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={loadingCloudinaryImages && !cloudinaryPickerOpen} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6">
+            <DialogTitle className="flex items-center gap-2">
+              <Loader2 className="h-5 w-5 animate-spin text-[#A4163A]" />
+              Loading Uploaded Images
+            </DialogTitle>
+            <DialogDescription>
+              Fetching your uploaded images from Cloudinary. Please wait...
+            </DialogDescription>
+          </DialogHeader>
+          <div className="px-6 pb-6">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              This may take a few seconds depending on network speed.
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog
         open={cloudinaryPickerOpen}
         onOpenChange={(open) => {
