@@ -11,6 +11,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { TriangleAlert } from "lucide-react"
+import { useRef } from "react"
+import { buttonTokens, modalTokens } from "@/lib/ui/tokens"
 
 type UnsavedChangesDialogProps = {
   open: boolean
@@ -27,35 +29,37 @@ export function UnsavedChangesDialog({
   onProceedWithoutSaving,
   onSaveAndContinue,
 }: UnsavedChangesDialogProps) {
+  const titleRef = useRef<HTMLHeadingElement | null>(null)
+
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-w-[520px] rounded-2xl border border-[#E9B8C4] bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.18)]">
+      <AlertDialogContent
+        className={modalTokens.container}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault()
+          titleRef.current?.focus()
+        }}
+        onEscapeKeyDown={() => onOpenChange(false)}
+      >
         <AlertDialogHeader>
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-rose-50 text-[#E11D48]">
+          <div className={modalTokens.iconWrap}>
             <TriangleAlert className="h-6 w-6" />
           </div>
-          <AlertDialogTitle className="text-left text-3xl font-semibold tracking-tight text-slate-900">Unsaved Changes Detected</AlertDialogTitle>
-          <AlertDialogDescription className="mt-2 text-left text-lg text-slate-500">
+          <AlertDialogTitle ref={titleRef} tabIndex={-1} className={modalTokens.title}>
+            Unsaved Changes Detected
+          </AlertDialogTitle>
+          <AlertDialogDescription className={modalTokens.description}>
             You have unsaved changes. You can save first, or continue without saving.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <AlertDialogFooter className="mt-8 flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <AlertDialogCancel
-            className="h-12 rounded-none border border-slate-300 px-6 font-semibold text-slate-700 hover:bg-slate-100"
-            onClick={onStay}
-          >
+        <AlertDialogFooter className={modalTokens.footer}>
+          <AlertDialogCancel className={buttonTokens.neutral} onClick={onStay}>
             Stay
           </AlertDialogCancel>
-          <AlertDialogAction
-            className="h-12 rounded-none bg-[#A4163A] px-6 font-semibold text-white hover:bg-[#8C1231]"
-            onClick={onProceedWithoutSaving}
-          >
+          <AlertDialogAction className={buttonTokens.primary} onClick={onProceedWithoutSaving}>
             Proceed Without Saving
           </AlertDialogAction>
-          <AlertDialogAction
-            className="h-12 rounded-none bg-[#B10F1F] px-6 font-semibold text-white hover:bg-[#950D1A]"
-            onClick={onSaveAndContinue}
-          >
+          <AlertDialogAction className={buttonTokens.danger} onClick={onSaveAndContinue}>
             Save and Continue
           </AlertDialogAction>
         </AlertDialogFooter>
@@ -77,23 +81,34 @@ export function DeleteTaskDialog({
   onCancel,
   onDelete,
 }: DeleteTaskDialogProps) {
+  const titleRef = useRef<HTMLHeadingElement | null>(null)
+
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-w-[520px] rounded-2xl border border-[#E9B8C4] bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.18)]">
+      <AlertDialogContent
+        className={modalTokens.container}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault()
+          titleRef.current?.focus()
+        }}
+        onEscapeKeyDown={() => onOpenChange(false)}
+      >
         <AlertDialogHeader>
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-rose-50 text-[#E11D48]">
+          <div className={modalTokens.iconWrap}>
             <TriangleAlert className="h-6 w-6" />
           </div>
-          <AlertDialogTitle className="text-left text-3xl font-semibold tracking-tight text-slate-900">Delete this task?</AlertDialogTitle>
-          <AlertDialogDescription className="mt-2 text-left text-lg text-slate-500">
+          <AlertDialogTitle ref={titleRef} tabIndex={-1} className={modalTokens.title}>
+            Delete this task?
+          </AlertDialogTitle>
+          <AlertDialogDescription className={modalTokens.description}>
             This task will be removed from the current checklist.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <AlertDialogFooter className="mt-8 flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <AlertDialogCancel onClick={onCancel} className="h-12 rounded-none border border-slate-300 px-6 font-semibold text-slate-700 hover:bg-slate-100">
+        <AlertDialogFooter className={modalTokens.footer}>
+          <AlertDialogCancel onClick={onCancel} className={buttonTokens.neutral}>
             Cancel
           </AlertDialogCancel>
-          <AlertDialogAction className="h-12 rounded-none bg-[#B10F1F] px-6 font-semibold text-white hover:bg-[#950D1A]" onClick={onDelete}>
+          <AlertDialogAction className={buttonTokens.danger} onClick={onDelete}>
             Delete Task
           </AlertDialogAction>
         </AlertDialogFooter>

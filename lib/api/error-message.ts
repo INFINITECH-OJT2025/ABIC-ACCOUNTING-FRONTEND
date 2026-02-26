@@ -1,5 +1,6 @@
 type ApiErrorBody = {
   message?: unknown
+  details?: unknown
   errors?: Record<string, unknown>
 }
 
@@ -51,7 +52,11 @@ export const getApiErrorMessage = async (response: Response, fallback: string): 
   }
 
   if (typeof body?.message === 'string' && body.message.trim().length > 0) {
-    return body.message.trim()
+    const message = body.message.trim()
+    if (typeof body?.details === 'string' && body.details.trim().length > 0) {
+      return `${message}: ${body.details.trim()}`
+    }
+    return message
   }
 
   return STATUS_MESSAGES[response.status] || fallback

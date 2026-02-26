@@ -4,7 +4,7 @@
 "use client"
 
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { CldUploadWidget } from 'next-cloudinary'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -32,6 +32,10 @@ import { cn } from '@/lib/utils'
 import { getApiUrl } from '@/lib/api'
 import { ensureOkResponse } from '@/lib/api/error-message'
 import { VALIDATION_CONSTRAINTS } from '@/lib/validation/constraints'
+import { directoryDraftSchema, generalContactsSchema } from '@/lib/validation/schemas'
+import { buttonTokens, modalTokens } from '@/lib/ui/tokens'
+import { PageEmptyState, PageErrorState } from '@/components/state/page-feedback'
+import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
   Building2,
@@ -268,11 +272,11 @@ const parseBackendDateMs = (value: string | null | undefined): number => {
 
 
 export default function GovernmentDirectoryPage() {
+  const deleteDialogTitleRef = useRef<HTMLHeadingElement | null>(null)
   const [activeAgency, setActiveAgency] = useState<string>('')
   const [activeProcess, setActiveProcess] = useState<ProcessType>('Adding')
   const [imageError, setImageError] = useState<Record<string, boolean>>({})
   const [agenciesByCode, setAgenciesByCode] = useState<Record<string, BackendAgency>>({})
-  const [loadingDirectory, setLoadingDirectory] = useState(true)
   const [updatingImage, setUpdatingImage] = useState(false)
   const [cloudinaryPickerOpen, setCloudinaryPickerOpen] = useState(false)
   const [cloudinaryPickerTarget, setCloudinaryPickerTarget] = useState<CloudinaryPickerTarget | null>(null)
@@ -308,51 +312,36 @@ export default function GovernmentDirectoryPage() {
     })
   }, [generalContacts, generalContactsSearch, generalContactsSort])
 
+  const directoryQuery = useQuery({
+    queryKey: ['directory-agencies'],
+    queryFn: async (): Promise<Record<string, BackendAgency>> => {
+      const response = await fetch(`${getApiUrl()}/api/directory/agencies`, {
+        headers: { Accept: 'application/json' },
+      })
+      await ensureOkResponse(response, 'Unable to load directory data right now.')
+      const result = await response.json()
+      const rows = Array.isArray(result?.data) ? result.data : []
+      const mapped: Record<string, BackendAgency> = {}
+      rows.forEach((row: BackendAgency) => {
+        const code = normalizeCode(row?.code)
+        if (code) mapped[code] = row
+      })
+      return mapped
+    },
+  })
 
   useEffect(() => {
-    const fetchDirectory = async () => {
-      try {
-        setLoadingDirectory(true)
-        const response = await fetch(`${getApiUrl()}/api/directory/agencies`, {
-          headers: { Accept: 'application/json' },
-        })
-
-
-        await ensureOkResponse(response, 'Unable to load directory data right now.')
-
-
-        const result = await response.json()
-        const rows = Array.isArray(result?.data) ? result.data : []
-
-
-        const mapped: Record<string, BackendAgency> = {}
-        rows.forEach((row: BackendAgency) => {
-          const code = normalizeCode(row?.code)
-          if (code) mapped[code] = row
-        })
-
-
-        setAgenciesByCode(mapped)
-        if (!activeAgency) {
-          // Default to PhilHealth if present, else first available
-          if (mapped['philhealth']) {
-            setActiveAgency('philhealth')
-          } else {
-            const firstCode = Object.keys(mapped)[0] ?? ''
-            if (firstCode) setActiveAgency(firstCode)
-          }
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to load directory data'
-        toast.error('Directory Load Failed', { description: message })
-      } finally {
-        setLoadingDirectory(false)
+    if (!directoryQuery.data) return
+    setAgenciesByCode(directoryQuery.data)
+    if (!activeAgency) {
+      if (directoryQuery.data['philhealth']) {
+        setActiveAgency('philhealth')
+      } else {
+        const firstCode = Object.keys(directoryQuery.data)[0] ?? ''
+        if (firstCode) setActiveAgency(firstCode)
       }
     }
-
-
-    fetchDirectory()
-  }, [])
+  }, [directoryQuery.data, activeAgency])
 
 
   const mergedAgencies = useMemo(() => {
@@ -612,26 +601,11 @@ export default function GovernmentDirectoryPage() {
       setSavingChanges(true)
       setShowValidation(true)
 
-
-      if (draft.name.trim().length === 0) {
+      const draftValidation = directoryDraftSchema.safeParse(draft)
+      if (!draftValidation.success) {
+        const message = draftValidation.error.issues[0]?.message || 'Please review your directory entries.'
         toast.error('Validation Failed', {
-          description: 'Agency name is required.',
-        })
-        return
-      }
-
-      const invalidContactIndex = draft.contacts.findIndex((row) => row.type.trim().length === 0 || row.value.trim().length === 0)
-      if (invalidContactIndex !== -1) {
-        toast.error('Validation Failed', {
-          description: `Contact row ${invalidContactIndex + 1} must include both type and value.`,
-        })
-        return
-      }
-
-      const invalidProcessIndex = draft.processes.findIndex((row) => row.process.trim().length === 0)
-      if (invalidProcessIndex !== -1) {
-        toast.error('Validation Failed', {
-          description: `Step ${invalidProcessIndex + 1} cannot be empty.`,
+          description: message,
         })
         return
       }
@@ -919,10 +893,11 @@ export default function GovernmentDirectoryPage() {
 
   const saveGeneralContacts = async () => {
     try {
-      const invalidRowIndex = generalContactsDraft.findIndex((row) => row.establishment_name.trim().length === 0 || row.value.trim().length === 0)
-      if (invalidRowIndex !== -1) {
+      const contactsValidation = generalContactsSchema.safeParse(generalContactsDraft)
+      if (!contactsValidation.success) {
+        const message = contactsValidation.error.issues[0]?.message || 'Please review all general contact fields.'
         toast.error('Validation Failed', {
-          description: `Row ${invalidRowIndex + 1} requires both establishment name and value.`,
+          description: message,
         })
         return
       }
@@ -1035,7 +1010,7 @@ export default function GovernmentDirectoryPage() {
   // --- RENDERING ---
 
 
-  if (loadingDirectory && !agency) {
+  if (directoryQuery.isLoading && !agency) {
     return (
       <div className="min-h-screen bg-[#F0F2F5] p-6 md:p-8">
         <div className="rounded-2xl overflow-hidden shadow-xl border border-slate-200 bg-white">
@@ -1063,16 +1038,26 @@ export default function GovernmentDirectoryPage() {
     )
   }
 
-
-  if (!loadingDirectory && !agency) {
+  if (directoryQuery.error) {
+    const message = directoryQuery.error instanceof Error ? directoryQuery.error.message : 'Failed to load directory data.'
     return (
-      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
-        <div className="text-center max-w-md p-8 bg-white rounded-xl shadow-xl">
-          <Building2 className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">No Agencies Found</h2>
-          <p className="text-slate-600">The directory database is empty. Please verify the backend data.</p>
-        </div>
-      </div>
+      <PageErrorState
+        title="Directory Load Failed"
+        description={message}
+        onRetry={() => void directoryQuery.refetch()}
+      />
+    )
+  }
+
+
+  if (!directoryQuery.isLoading && !agency) {
+    return (
+      <PageEmptyState
+        title="No agencies found"
+        description="The directory database is empty. Seed agencies or create records in the backend."
+        actionLabel="Reload"
+        onAction={() => void directoryQuery.refetch()}
+      />
     )
   }
 
@@ -2018,20 +2003,29 @@ export default function GovernmentDirectoryPage() {
 
 
       <AlertDialog open={deleteCandidate !== null} onOpenChange={(open) => { if (!open) setDeleteCandidate(null) }}>
-        <AlertDialogContent className="max-w-[520px] rounded-2xl border border-[#E9B8C4] bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.18)]">
+        <AlertDialogContent
+          className={modalTokens.container}
+          onOpenAutoFocus={(event) => {
+            event.preventDefault()
+            deleteDialogTitleRef.current?.focus()
+          }}
+          onEscapeKeyDown={() => setDeleteCandidate(null)}
+        >
           <AlertDialogHeader>
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-rose-50 text-[#E11D48]">
+            <div className={modalTokens.iconWrap}>
               <TriangleAlert className="h-6 w-6" />
             </div>
-            <AlertDialogTitle className="text-left text-3xl font-semibold tracking-tight text-slate-900">Delete this Cloudinary image?</AlertDialogTitle>
-            <AlertDialogDescription className="mt-2 text-left text-lg text-slate-500">
+            <AlertDialogTitle ref={deleteDialogTitleRef} tabIndex={-1} className={modalTokens.title}>
+              Delete this Cloudinary image?
+            </AlertDialogTitle>
+            <AlertDialogDescription className={modalTokens.description}>
               This will permanently delete the selected image file from Cloudinary.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="mt-8 flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <AlertDialogCancel onClick={() => setDeleteCandidate(null)} className="h-12 rounded-none border border-slate-300 px-6 font-semibold text-slate-700 hover:bg-slate-100">Cancel</AlertDialogCancel>
+          <AlertDialogFooter className={modalTokens.footer}>
+            <AlertDialogCancel onClick={() => setDeleteCandidate(null)} className={buttonTokens.neutral}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="h-12 rounded-none bg-[#B10F1F] px-6 font-semibold text-white hover:bg-[#950D1A]"
+              className={buttonTokens.danger}
               onClick={async () => {
                 if (!deleteCandidate) return
                 try {

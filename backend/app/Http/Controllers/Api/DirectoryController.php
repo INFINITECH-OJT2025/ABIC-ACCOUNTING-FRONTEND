@@ -11,9 +11,32 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Http\Client\PendingRequest;
 
 class DirectoryController extends Controller
 {
+    private function cloudinaryConfig(): array
+    {
+        $cloudName = trim((string) (env('CLOUDINARY_CLOUD_NAME') ?: env('NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME')));
+        $apiKey = trim((string) env('CLOUDINARY_API_KEY'));
+        $apiSecret = trim((string) env('CLOUDINARY_API_SECRET'));
+        $verifySsl = filter_var(env('CLOUDINARY_VERIFY_SSL', true), FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
+
+        return [
+            'cloud_name' => $cloudName,
+            'api_key' => $apiKey,
+            'api_secret' => $apiSecret,
+            'verify_ssl' => $verifySsl !== false,
+        ];
+    }
+
+    private function cloudinaryHttpClient(string $apiKey, string $apiSecret, bool $verifySsl): PendingRequest
+    {
+        return Http::withBasicAuth($apiKey, $apiSecret)->withOptions([
+            'verify' => $verifySsl,
+        ]);
+    }
+
     public function index()
     {
         $agencies = Agency::with(['contacts', 'processes'])->get();
@@ -359,20 +382,22 @@ class DirectoryController extends Controller
 
     public function listCloudinaryImages(Request $request)
     {
-        // Try getting from config first, then env
-        $cloudName = env('NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME');
-        $apiKey = env('CLOUDINARY_API_KEY');
-        $apiSecret = env('CLOUDINARY_API_SECRET');
+        $config = $this->cloudinaryConfig();
+        $cloudName = $config['cloud_name'];
+        $apiKey = $config['api_key'];
+        $apiSecret = $config['api_secret'];
+        $verifySsl = $config['verify_ssl'];
 
         if (!$cloudName || !$apiKey || !$apiSecret) {
             return response()->json(['message' => 'Cloudinary credentials not configured'], 500);
         }
 
         $prefix = $request->query('prefix', '');
-        $maxResults = $request->query('max_results', 30);
+        $maxResults = (int) $request->query('max_results', 30);
+        $maxResults = max(1, min($maxResults, 100));
 
         try {
-            $response = Http::withBasicAuth($apiKey, $apiSecret)
+            $response = $this->cloudinaryHttpClient($apiKey, $apiSecret, $verifySsl)
                 ->get("https://api.cloudinary.com/v1_1/{$cloudName}/resources/image", [
                     'type' => 'upload',
                     'prefix' => $prefix,
@@ -380,14 +405,23 @@ class DirectoryController extends Controller
                 ]);
 
             if ($response->failed()) {
-                Log::error('Cloudinary API Error', ['body' => $response->body()]);
-                return response()->json(['message' => 'Failed to fetch images from Cloudinary'], $response->status());
+                Log::error('Cloudinary API Error', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+                return response()->json([
+                    'message' => 'Failed to fetch images from Cloudinary',
+                    'details' => $response->json()['error']['message'] ?? null,
+                ], $response->status());
             }
 
             return response()->json(['data' => $response->json()['resources'] ?? []]);
         } catch (\Exception $e) {
             Log::error('Cloudinary Exception', ['message' => $e->getMessage()]);
-            return response()->json(['message' => 'Internal Server Error'], 500);
+            return response()->json([
+                'message' => 'Internal Server Error',
+                'details' => $e->getMessage(),
+            ], 500);
         }
     }
 
@@ -399,9 +433,11 @@ class DirectoryController extends Controller
             'public_id.required' => 'Cloudinary image ID is required for deletion.',
         ]);
 
-        $cloudName = env('NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME');
-        $apiKey = env('CLOUDINARY_API_KEY');
-        $apiSecret = env('CLOUDINARY_API_SECRET');
+        $config = $this->cloudinaryConfig();
+        $cloudName = $config['cloud_name'];
+        $apiKey = $config['api_key'];
+        $apiSecret = $config['api_secret'];
+        $verifySsl = $config['verify_ssl'];
 
         if (!$cloudName || !$apiKey || !$apiSecret) {
             return response()->json(['message' => 'Cloudinary credentials not configured'], 500);
@@ -412,7 +448,9 @@ class DirectoryController extends Controller
         $signature = sha1("public_id={$publicId}&timestamp={$timestamp}{$apiSecret}");
 
         try {
-            $response = Http::asForm()
+            $response = Http::asForm()->withOptions([
+                'verify' => $verifySsl,
+            ])
                 ->post("https://api.cloudinary.com/v1_1/{$cloudName}/image/destroy", [
                     'public_id' => $publicId,
                     'timestamp' => $timestamp,
@@ -443,7 +481,10 @@ class DirectoryController extends Controller
             return response()->json(['message' => 'Image deleted successfully']);
         } catch (\Exception $e) {
             Log::error('Cloudinary Delete Exception', ['message' => $e->getMessage()]);
-            return response()->json(['message' => 'Internal Server Error'], 500);
+            return response()->json([
+                'message' => 'Internal Server Error',
+                'details' => $e->getMessage(),
+            ], 500);
         }
     }
 }

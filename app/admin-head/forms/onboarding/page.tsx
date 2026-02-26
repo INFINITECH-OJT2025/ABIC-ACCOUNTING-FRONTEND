@@ -15,7 +15,6 @@ import { Input } from '@/components/ui/input'
 import { TextFieldStatus } from '@/components/ui/text-field-status'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
-import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select"
@@ -40,8 +39,11 @@ import { cn } from "@/lib/utils"
 import { getApiUrl } from '@/lib/api'
 import { ensureOkResponse } from '@/lib/api/error-message'
 import { VALIDATION_CONSTRAINTS } from '@/lib/validation/constraints'
+import { checklistTemplateTasksSchema, onboardingRecordSchema } from '@/lib/validation/schemas'
 import { DeleteTaskDialog, UnsavedChangesDialog } from '@/components/checklist/confirm-dialogs'
 import { useChecklistTemplateSetup } from '@/lib/hooks/use-checklist-template-setup'
+import { PageEmptyState, PageErrorState } from '@/components/state/page-feedback'
+import { ChecklistPageSkeleton } from '@/components/state/checklist-page-skeleton'
 import { toast } from 'sonner'
 
 
@@ -351,6 +353,7 @@ function OnboardingChecklistPageContent() {
   }, [employeeInfo?.department, records])
 
   const hasUnsavedChanges = useMemo(() => {
+    if (String(employeeInfo?.id || '') === '' && tasks.length === 0) return false
     const departmentName = String(employeeInfo?.department || '').trim()
     if (!departmentName) return false
     const savedRecord = records.find((record) => String(record.department || '').trim() === departmentName)
@@ -492,6 +495,12 @@ function OnboardingChecklistPageContent() {
         throw new Error('Please add at least one checklist task before saving.')
       }
 
+      const tasksValidation = checklistTemplateTasksSchema.safeParse(payloadTasks)
+      if (!tasksValidation.success) {
+        const message = tasksValidation.error.issues[0]?.message || 'Some checklist tasks are invalid.'
+        throw new Error(message)
+      }
+
       const duplicateTask = (() => {
         const seen = new Set<string>()
         for (const row of payloadTasks) {
@@ -595,30 +604,11 @@ function OnboardingChecklistPageContent() {
 
 
   const handleCreateRecord = async () => {
-    if (!newRecord.name.trim()) {
+    const formValidation = onboardingRecordSchema.safeParse(newRecord)
+    if (!formValidation.success) {
+      const message = formValidation.error.issues[0]?.message || 'Please complete all required fields.'
       toast.warning('Incomplete Form', {
-        description: 'Employee name is required.',
-      })
-      return
-    }
-
-    if (!newRecord.position.trim()) {
-      toast.warning('Incomplete Form', {
-        description: 'Position is required.',
-      })
-      return
-    }
-
-    if (!newRecord.department.trim()) {
-      toast.warning('Incomplete Form', {
-        description: 'Department is required.',
-      })
-      return
-    }
-
-    if (!newRecord.startDate) {
-      toast.warning('Incomplete Form', {
-        description: 'Start date is required.',
+        description: message,
       })
       return
     }
@@ -671,58 +661,29 @@ function OnboardingChecklistPageContent() {
 
 
   if (loading) {
-    return (
-      <div className="min-h-screen w-full bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-12">
-        <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md mb-8">
-          <div className="w-full px-4 md:px-8 py-6">
-            <Skeleton className="h-8 w-72 bg-white/25" />
-            <Skeleton className="h-4 w-56 mt-3 bg-white/20" />
-          </div>
-          <div className="border-t border-white/10 bg-white/5 backdrop-blur-sm">
-            <div className="w-full px-4 md:px-8 py-3">
-              <Skeleton className="h-10 w-[320px] bg-white/20" />
-            </div>
-          </div>
-        </div>
-        <main className="w-full px-4 md:px-8 relative mb-20">
-          <Card className="rounded-2xl border-2 border-[#FFE5EC] shadow-lg overflow-hidden bg-white mb-6">
-            <div className="p-5">
-              <Skeleton className="h-4 w-40 mb-3" />
-              <Skeleton className="h-8 w-72" />
-            </div>
-          </Card>
-          <Card className="rounded-2xl border-2 border-[#FFE5EC] shadow-2xl bg-white overflow-hidden mb-12">
-            <div className="p-5 border-b border-[#FFE5EC]">
-              <Skeleton className="h-4 w-56" />
-            </div>
-            <div className="p-5 space-y-4">
-              {Array.from({ length: 6 }).map((_, idx) => (
-                <div key={`onboarding-task-skeleton-${idx}`} className="flex items-center gap-4">
-                  <Skeleton className="h-8 flex-1" />
-                  <Skeleton className="h-8 w-8" />
-                </div>
-              ))}
-            </div>
-            <div className="p-4 border-t border-[#FFE5EC] flex items-center justify-between">
-              <Skeleton className="h-9 w-28" />
-              <Skeleton className="h-9 w-40" />
-            </div>
-          </Card>
-        </main>
-      </div>
-    )
+    return <ChecklistPageSkeleton />
   }
 
 
   if (error) {
     return (
-      <div className="p-8 text-rose-700 space-y-3">
-        <p>Failed to load onboarding checklist: {error}</p>
-        <div className="flex gap-2">
-          <Button onClick={() => setReloadToken((prev) => prev + 1)} className="bg-[#A4163A] hover:bg-[#800020] text-white">Retry</Button>
-          <Button variant="outline" onClick={() => router.back()}>Go Back</Button>
-        </div>
-      </div>
+      <PageErrorState
+        title="Failed to load onboarding checklist"
+        description={error}
+        onRetry={() => setReloadToken((prev) => prev + 1)}
+        onBack={() => router.back()}
+      />
+    )
+  }
+
+  if (!employeeInfo) {
+    return (
+      <PageEmptyState
+        title="No onboarding template available"
+        description="Create or seed department checklist templates to start onboarding workflows."
+        actionLabel="Reload"
+        onAction={() => setReloadToken((prev) => prev + 1)}
+      />
     )
   }
 

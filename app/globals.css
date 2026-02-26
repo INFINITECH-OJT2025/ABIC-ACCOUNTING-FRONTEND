@@ -48,6 +48,8 @@
 
 :root {
   --radius: 0.625rem;
+  --modal-border: #e9b8c4;
+  --modal-shadow: 0 14px 40px rgba(15, 23, 42, 0.18);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
