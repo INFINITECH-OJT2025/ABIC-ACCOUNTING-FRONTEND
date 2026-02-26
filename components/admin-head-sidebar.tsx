@@ -70,7 +70,7 @@ export default function AdminHeadSidebar() {
 
 
   return (
-    <div className={`${isCollapsed ? 'w-20' : 'w-64'} bg-gradient-to-r from-[#7B0F2B] to-[#A4163A] text-white min-h-screen p-4 flex flex-col transition-all duration-300 ease-in-out relative z-50`}>
+    <div className={`${isCollapsed ? 'w-20' : 'w-64'} bg-gradient-to-r from-[#7B0F2B] to-[#A4163A] text-white h-screen sticky top-0 p-4 flex flex-col transition-all duration-300 ease-in-out z-50`}>
 
 
       <button
