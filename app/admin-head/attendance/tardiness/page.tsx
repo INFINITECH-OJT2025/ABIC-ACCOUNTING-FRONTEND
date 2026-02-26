@@ -1252,15 +1252,15 @@ export default function AttendanceDashboard() {
 
               {/* Year selector & Actions */}
               <div className="flex items-center gap-3">
-                <Button onClick={handleAddNewYearConfirm} variant="outline" className="border-white/30 text-white hover:bg-white/20 hover:text-white bg-transparent backdrop-blur-sm shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg">
+                <Button onClick={handleAddNewYearConfirm} variant="outline" className="bg-white border-transparent text-[#7B0F2B] hover:bg-rose-50 hover:text-[#4A081A] shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg">
                   <Plus className="w-4 h-4 mr-2" /> New Year
                 </Button>
                 <Button
                   onClick={() => setIsEntryFormOpen(!isEntryFormOpen)}
                   variant="outline"
                   className={cn(
-                    "border-white/30 text-white hover:bg-white/20 hover:text-white bg-transparent backdrop-blur-sm shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg flex items-center gap-2",
-                    isEntryFormOpen && "bg-white/20 border-white/50"
+                    "bg-white border-transparent text-[#7B0F2B] hover:bg-rose-50 hover:text-[#4A081A] shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg flex items-center gap-2",
+                    isEntryFormOpen && "bg-rose-100 text-[#4A081A]"
                   )}
                 >
                   {isEntryFormOpen ? (

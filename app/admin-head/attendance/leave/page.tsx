@@ -334,7 +334,7 @@ function DateRangePicker({
                 type="button"
                 onClick={() => handleDayClick(day)}
                 className={cn(
-                  'w-8 h-8 text-xs font-medium rounded-full flex items-center justify-center transition',
+                  'w-8 h-8 text-sm font-medium rounded-full flex items-center justify-center transition',
                   start || end
                     ? 'bg-[#630C22] text-white font-bold'
                     : inRange
@@ -532,15 +532,15 @@ function CalendarView({ year, month, entries, weekOnly = false }: {
     <>
       <div className="bg-white rounded-xl shadow border border-rose-100 overflow-hidden">
         {/* Legend */}
-        <div className="flex items-center gap-4 px-6 py-3 border-b border-rose-50 justify-end text-xs">
-          <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-2 rounded-sm bg-orange-400"></span> Pending</span>
-          <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-2 rounded-sm bg-green-500"></span> Approved/Completed</span>
-          <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-2 rounded-sm bg-red-500"></span> Declined</span>
+        <div className="flex items-center gap-4 px-6 py-3 border-b border-rose-50 justify-end text-md">
+          <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-2 rounded-md bg-orange-400"></span> Pending</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-2 rounded-md bg-green-500"></span> Approved/Completed</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-2 rounded-md bg-red-500"></span> Declined</span>
         </div>
         {/* Weekday headers */}
         <div className="grid grid-cols-7 bg-rose-50 border-b border-rose-100">
           {WEEKDAYS.map(w => (
-            <div key={w} className="py-2 text-center text-xs font-bold text-[#4A081A] uppercase tracking-wide">
+            <div key={w} className="py-2 text-center text-md font-bold text-[#4A081A] uppercase tracking-wide">
               {w}
             </div>
           ))}
@@ -548,16 +548,16 @@ function CalendarView({ year, month, entries, weekOnly = false }: {
         {/* Day cells */}
         <div className="grid grid-cols-7 divide-x divide-y divide-rose-50">
           {cells.map((day, idx) => {
-            if (!day) return <div key={`empty-${idx}`} className="min-h-[90px] bg-white" />
+            if (!day) return <div key={`empty-${idx}`} className="min-h-[140px] bg-white" />
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
             const dayEntries = entriesForDay(day)
             const isToday = new Date().toISOString().slice(0, 10) === dateStr
 
             return (
-              <div key={day} className={cn('min-h-[90px] p-1.5 bg-white', isToday && 'bg-rose-50')}>
+              <div key={day} className={cn('min-h-[140px] p-1.5 bg-white', isToday && 'bg-rose-50')}>
                 <div className={cn(
-                  'text-xs font-semibold mb-1',
-                  isToday ? 'text-[#4A081A] font-bold' : 'text-slate-500'
+                  'text-lg font-semibold mb-2 ml-1 mt-1',
+                  isToday ? 'text-[#4A081A] font-bold' : 'text-slate-600'
                 )}>
                   {day}
                 </div>
@@ -567,13 +567,14 @@ function CalendarView({ year, month, entries, weekOnly = false }: {
                   const isPending = e.approved_by === 'Pending'
                   const barColor =
                     isDeclined ? 'bg-red-500'
-                      : isPending ? 'bg-orange-400'
-                        : 'bg-green-500'
+                      : isPending ? 'bg-orange-500'
+                        : 'bg-[#10D14F]' // Using bright green like in the image
 
                   // Rounded edges only at true entry start/end or week row boundary
                   const entryStartStr = e.start_date.slice(0, 10)
                   const entryEndStr = e.leave_end_date.slice(0, 10)
                   const isStart = entryStartStr === dateStr
+
                   const isEnd = entryEndStr === dateStr
                   const roundLeft = isStart || colInRow === 0
                   const roundRight = isEnd || colInRow === 6
@@ -586,10 +587,10 @@ function CalendarView({ year, month, entries, weekOnly = false }: {
                       style={{
                         marginLeft: roundLeft ? '2px' : '0px',
                         marginRight: roundRight ? '2px' : '-1px',
-                        borderRadius: `${roundLeft ? 3 : 0}px ${roundRight ? 3 : 0}px ${roundRight ? 3 : 0}px ${roundLeft ? 3 : 0}px`,
+                        borderRadius: `${roundLeft ? 4 : 0}px ${roundRight ? 4 : 0}px ${roundRight ? 4 : 0}px ${roundLeft ? 4 : 0}px`,
                       }}
                       className={cn(
-                        'h-[14px] px-1.5 text-[10px] leading-[14px] text-white font-medium truncate overflow-hidden select-none cursor-pointer hover:brightness-110 transition-[filter] mb-0.5',
+                        'h-[22px] px-2 text-[11px] leading-[22px] text-white font-semibold tracking-wide truncate overflow-hidden select-none cursor-pointer hover:brightness-110 transition-[filter] mb-[3px] shadow-sm',
                         barColor
                       )}
                     >
@@ -598,12 +599,12 @@ function CalendarView({ year, month, entries, weekOnly = false }: {
                   )
                 })}
                 {dayEntries.length > 5 && (
-                  <button
+                  <div
                     onClick={(ev) => { ev.stopPropagation(); setViewAllForDay(day) }}
-                    className="text-[9px] text-slate-400 mt-0.5 hover:text-[#4A081A] hover:font-bold transition-colors w-full text-left bg-transparent border-0 p-0"
+                    className="text-[11px] text-[#4A081A] text-center font-bold mt-1 cursor-pointer hover:font-extrabold hover:text-[#630C22]"
                   >
-                    +{dayEntries.length - 5} more
-                  </button>
+                    + {dayEntries.length - 5} MORE
+                  </div>
                 )}
               </div>
             )
@@ -880,8 +881,8 @@ export default function LeavePage() {
       department: entry.department,
       category: entry.category,
       shift: entry.shift || '',
-      start_date: entry.start_date,
-      leave_end_date: entry.leave_end_date,
+      start_date: normalizeDate(entry.start_date),
+      leave_end_date: normalizeDate(entry.leave_end_date),
       number_of_days: entry.number_of_days,
       approved_by: entry.approved_by,
       remarks: entry.remarks,
@@ -986,6 +987,28 @@ export default function LeavePage() {
     if (!inlineForm.leave_end_date) { toast.error('Please enter a leave end date'); return }
     if (!inlineForm.approved_by) { toast.error('Please select approval status'); return }
     if (!inlineForm.remarks) { toast.error('Please select leave type'); return }
+
+    const newStartStr = normalizeDate(inlineForm.start_date)
+    const newEndStr = normalizeDate(inlineForm.leave_end_date)
+
+    const isDoubleEntry = entries.some(e => {
+      if (inlineForm.id && String(e.id) === String(inlineForm.id)) return false // Skip current entry on edit
+
+      const isSameEmpId = Boolean(e.employee_id && inlineForm.employee_id && String(e.employee_id) === String(inlineForm.employee_id))
+      const isSameEmpName = Boolean(e.employee_name && inlineForm.employee_name && String(e.employee_name).trim().toLowerCase() === String(inlineForm.employee_name).trim().toLowerCase())
+      if (!isSameEmpId && !isSameEmpName) return false
+
+      const eStartStr = normalizeDate(e.start_date)
+      const eEndStr = normalizeDate(e.leave_end_date)
+
+      // Overlap condition using YYYY-MM-DD string comparison
+      return (newStartStr <= eEndStr) && (newEndStr >= eStartStr)
+    })
+
+    if (isDoubleEntry) {
+      toast.error(`${inlineForm.employee_name} already has a leave entry during these dates.`)
+      return
+    }
 
     const payload = {
       ...inlineForm,
@@ -1115,8 +1138,8 @@ export default function LeavePage() {
                 onClick={() => setShowCalendar(v => !v)}
                 variant="outline"
                 className={cn(
-                  "border-white/30 text-white hover:bg-white/20 hover:text-white bg-transparent backdrop-blur-sm shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg flex items-center gap-2",
-                  !showCalendar && "bg-white/20 border-white/50"
+                  "bg-white border-transparent text-[#7B0F2B] hover:bg-rose-50 hover:text-[#4A081A] shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg flex items-center gap-2",
+                  !showCalendar && "bg-rose-100 text-[#4A081A]"
                 )}
               >
                 {showCalendar ? (
@@ -1129,8 +1152,8 @@ export default function LeavePage() {
                 onClick={() => setAddModalOpen(v => !v)}
                 variant="outline"
                 className={cn(
-                  "border-white/30 text-white hover:bg-white/20 hover:text-white bg-transparent backdrop-blur-sm shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg flex items-center gap-2",
-                  addModalOpen && "bg-white/20 border-white/50"
+                  "bg-white border-transparent text-[#7B0F2B] hover:bg-rose-50 hover:text-[#4A081A] shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg flex items-center gap-2",
+                  addModalOpen && "bg-rose-100 text-[#4A081A]"
                 )}
               >
                 {addModalOpen ? (
@@ -1248,9 +1271,9 @@ export default function LeavePage() {
         <div className="px-8 py-6">
           <div className="bg-white rounded-xl shadow border border-rose-100 overflow-hidden ring-4 ring-rose-50/50">
             {/* Form Header */}
-            <div className="bg-[#630C22] px-6 py-4 flex justify-between items-center">
+            <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] px-6 py-4 flex justify-between items-center">
               <h2 className="text-white text-xl font-bold">
-                {inlineForm.id ? 'Update Leave Monitoring' : 'Add Leave Monitoring'}
+                {inlineForm.id ? 'Update Leave Record' : 'Add Leave Record'}
               </h2>
               {inlineForm.id && (
                 <Button
@@ -1269,7 +1292,7 @@ export default function LeavePage() {
                 {/* Row 1 */}
                 <div className="flex items-center gap-4">
                   <span className="text-[10px] font-extrabold text-[#4A081A] uppercase tracking-[0.15em] w-24 shrink-0 text-right">EMP. ID:</span>
-                  <div className="flex-1 border border-[#630C22] rounded-lg px-4 py-3 text-sm bg-slate-50 text-slate-400 italic font-medium truncate select-all shadow-sm h-[46px] flex items-center">
+                  <div className="flex-1 border border-[#630C22] rounded-lg px-4 py-3 text-xs bg-slate-50 text-slate-400 italic font-medium truncate select-all shadow-sm h-[46px] flex items-center">
                     {inlineForm.employee_id || 'Auto-filled on name selection'}
                   </div>
                 </div>
@@ -1309,21 +1332,21 @@ export default function LeavePage() {
                     <PopoverTrigger asChild>
                       <button type="button" className="flex items-center justify-between flex-1 border border-[#630C22] rounded-lg px-4 py-3 text-sm bg-white hover:border-[#4A081A] transition-all shadow-sm h-[46px]">
                         {inlineForm.category === 'half-day' ? (
-                          <span className="px-3 py-1 rounded-full bg-yellow-400 text-yellow-900 font-extrabold text-[10px] uppercase">half-day</span>
+                          <span className="px-3 py-1 rounded-full bg-[#FFF3C4] text-[#A67B00] border-2 border-[#FFE894] font-extrabold text-[10px] uppercase">half-day</span>
                         ) : inlineForm.category === 'whole-day' ? (
-                          <span className="px-3 py-1 rounded-full bg-[#630C22] text-white font-extrabold text-[10px] uppercase">whole day</span>
+                          <span className="px-3 py-1 rounded-full bg-[#FFEAEB] text-[#800020] border-2 border-[#FFD1D4] font-extrabold text-[10px] uppercase">whole day</span>
                         ) : (
                           <span className="text-slate-400 italic">Half-day/Whole day</span>
                         )}
                         <ChevronDown className="w-4 h-4 text-slate-400" />
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent className="p-2 w-48 space-y-1">
+                    <PopoverContent className="p-2 w-48 space-y-1 bg-white border-0 shadow-none">
                       {inlineForm.category !== 'half-day' && (
-                        <button type="button" onClick={() => setInlineForm(p => ({ ...p, category: 'half-day', shift: '' }))} className="w-full text-center px-3 py-2.5 rounded-md bg-yellow-400 text-yellow-900 font-bold text-sm hover:bg-yellow-300 transition-all uppercase tracking-wider">half-day</button>
+                        <button type="button" onClick={() => setInlineForm(p => ({ ...p, category: 'half-day', shift: '' }))} className="w-full text-center px-3 py-2.5 rounded-full bg-[#FFF3C4] text-[#A67B00] font-extrabold text-sm hover:bg-[#FFE894] transition-all uppercase tracking-wider border-2 border-[#FFE894]">half-day</button>
                       )}
                       {inlineForm.category !== 'whole-day' && (
-                        <button type="button" onClick={() => setInlineForm(p => ({ ...p, category: 'whole-day', shift: '' }))} className="w-full text-center px-3 py-2.5 rounded-md bg-[#630C22] text-white font-bold text-sm hover:bg-[#4A081A] transition-all uppercase tracking-wider">whole day</button>
+                        <button type="button" onClick={() => setInlineForm(p => ({ ...p, category: 'whole-day', shift: '' }))} className="w-full text-center px-3 py-2.5 rounded-full bg-[#FFEAEB] text-[#800020] font-extrabold text-sm hover:bg-[#FFD1D4] transition-all uppercase tracking-wider border-2 border-[#FFD1D4] mt-2">whole day</button>
                       )}
                     </PopoverContent>
                   </Popover>
@@ -1405,7 +1428,7 @@ export default function LeavePage() {
                   {calendarMode === 'week' ? `Week of ${MONTHS[calendarMonth]} ${calendarYear}` : `${MONTHS[calendarMonth]} ${calendarYear}`}
                 </span>
                 {/* WEEK / MONTH toggle */}
-                <div className="flex text-xs border border-rose-200 rounded-lg overflow-hidden">
+                <div className="flex text-LG border border-rose-200 rounded-lg overflow-hidden">
                   <button
                     onClick={() => setCalendarMode('week')}
                     className={cn(
@@ -1448,7 +1471,7 @@ export default function LeavePage() {
                     setCalendarMode('month')
                     setShowCalendar(true)
                   }}
-                  className="text-xs px-3 py-1.5 border border-rose-300 rounded-md text-[#4A081A] hover:bg-rose-50 transition font-semibold"
+                  className="text-LG px-3 py-1.5 border border-rose-300 rounded-md text-[#4A081A] hover:bg-rose-50 transition font-semibold"
                 >
                   TODAY
                 </button>
@@ -1476,29 +1499,29 @@ export default function LeavePage() {
         <section>
           <div className="rounded-xl overflow-hidden shadow border border-rose-100">
             {/* Table header banner */}
-            <div className="bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#7B0F2B] py-3 text-center text-white text-sm font-bold tracking-widest uppercase">
+            <div className="bg-gradient-to-r from-[#7B0F2B] to-[#A4163A] py-3 text-center text-white text-md font-bold tracking-widest uppercase">
               Leave Monitoring {MONTHS[calendarMonth]} {calendarYear}
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
+              <table className="w-full text-md border-collapse">
                 <thead>
                   <tr className="bg-[#c0143c] text-white">
-                    <th className="border border-[#7B0F2B] px-3 py-3 font-bold text-xs uppercase text-center w-24">Emp. ID</th>
-                    <th className="border border-[#7B0F2B] px-3 py-3 font-bold text-xs uppercase text-center">Employee Name</th>
-                    <th className="border border-[#7B0F2B] px-3 py-3 font-bold text-xs uppercase text-center">
+                    <th className="border border-[#7B0F2B] px-3 py-3 font-bold text-lg uppercase text-center w-24">Emp. ID</th>
+                    <th className="border border-[#7B0F2B] px-3 py-3 font-bold text-lg uppercase text-center">Employee Name</th>
+                    <th className="border border-[#7B0F2B] px-3 py-3 font-bold text-lg uppercase text-center">
                       Category
                     </th>
-                    <th className="border border-[#7B0F2B] px-3 py-3 font-bold text-xs uppercase text-center">Shift</th>
-                    <th className="border border-[#7B0F2B] px-3 py-3 font-bold text-xs uppercase text-center">Start Date</th>
-                    <th className="border border-[#7B0F2B] px-3 py-3 font-bold text-xs uppercase text-center">Leave End Date</th>
-                    <th className="border border-[#7B0F2B] px-3 py-3 font-bold text-xs uppercase text-center">No. of Days</th>
-                    <th className="border border-[#7B0F2B] px-3 py-3 font-bold text-xs uppercase text-center">
+                    <th className="border border-[#7B0F2B] px-3 py-3 font-bold text-lg uppercase text-center">Shift</th>
+                    <th className="border border-[#7B0F2B] px-3 py-3 font-bold text-lg uppercase text-center">Start Date</th>
+                    <th className="border border-[#7B0F2B] px-3 py-3 font-bold text-lg uppercase text-center">Leave End Date</th>
+                    <th className="border border-[#7B0F2B] px-3 py-3 font-bold text-lg uppercase text-center">No. of Days</th>
+                    <th className="border border-[#7B0F2B] px-3 py-3 font-bold text-lg uppercase text-center">
                       Approved By
                     </th>
-                    <th className="border border-[#7B0F2B] px-3 py-3 font-bold text-xs uppercase text-center">Remarks</th>
-                    <th className="border border-[#7B0F2B] px-3 py-3 font-bold text-xs uppercase text-center max-w-[150px]">Reason</th>
-                    <th className="border border-[#7B0F2B] px-3 py-3 font-bold text-xs uppercase text-center w-24 whitespace-nowrap">Actions</th>
+                    <th className="border border-[#7B0F2B] px-3 py-3 font-bold text-lg uppercase text-center">Remarks</th>
+                    <th className="border border-[#7B0F2B] px-3 py-3 font-bold text-lg uppercase text-center max-w-[150px]">Reason</th>
+                    <th className="border border-[#7B0F2B] px-3 py-3 font-bold text-lg uppercase text-center w-24 whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1514,7 +1537,7 @@ export default function LeavePage() {
                         key={entry.id}
                         className={cn('border-b border-rose-50 hover:bg-rose-50 transition', idx % 2 === 0 ? 'bg-white' : 'bg-rose-50/30')}
                       >
-                        <td className="border border-rose-100 px-3 py-3 text-center text-slate-700 font-bold text-xs">{entry.employee_id}</td>
+                        <td className="border border-rose-100 px-3 py-3 text-center text-slate-700 font-bold text-lg">{entry.employee_id}</td>
                         <td className="border border-rose-100 px-3 py-3 font-semibold text-slate-700">{entry.employee_name}</td>
                         <td className="border border-rose-100 px-3 py-3 text-center">
                           <span className={cn(
@@ -1524,10 +1547,10 @@ export default function LeavePage() {
                             {entry.category === 'half-day' ? 'HALF-DAY' : 'WHOLE DAY'}
                           </span>
                         </td>
-                        <td className="border border-rose-100 px-3 py-3 text-center text-slate-600 text-xs italic">{entry.shift || '—'}</td>
-                        <td className="border border-rose-100 px-3 py-3 text-center text-slate-600 text-xs font-medium">{formatDisplayDate(entry.start_date)}</td>
-                        <td className="border border-rose-100 px-3 py-3 text-center text-slate-600 text-xs font-medium">{formatDisplayDate(entry.leave_end_date)}</td>
-                        <td className="border border-rose-100 px-3 py-3 text-center font-bold text-[#4A081A] text-xs">
+                        <td className="border border-rose-100 px-3 py-3 text-center text-slate-600 text-lg italic">{entry.shift || '—'}</td>
+                        <td className="border border-rose-100 px-3 py-3 text-center text-slate-600 text-lg font-medium">{formatDisplayDate(entry.start_date)}</td>
+                        <td className="border border-rose-100 px-3 py-3 text-center text-slate-600 text-lg font-medium">{formatDisplayDate(entry.leave_end_date)}</td>
+                        <td className="border border-rose-100 px-3 py-3 text-center font-bold text-[#4A081A] text-lg">
                           {formatDays(entry.number_of_days, entry.category)}
                         </td>
                         <td className="border border-rose-100 px-3 py-3 text-center">
@@ -1540,10 +1563,10 @@ export default function LeavePage() {
                             {entry.approved_by}
                           </span>
                         </td>
-                        <td className="border border-rose-100 px-3 py-3 text-center">
-                          <span className="font-semibold text-[#4A081A] text-xs">{entry.remarks}</span>
+                        <td className="border border-rose-100 px-3 py-3 text-center text-lg">
+                          <span className="font-semibold text-[#4A081A] text-lg">{entry.remarks}</span>
                         </td>
-                        <td className="border border-rose-100 px-3 py-3 text-slate-600 text-xs max-w-[150px]">
+                        <td className="border border-rose-100 px-3 py-3 text-slate-600 text-lg max-w-[150px]">
                           {entry.cite_reason ? (
                             <div className="flex items-center gap-2">
                               <p className="italic truncate flex-1" title={entry.cite_reason}>{entry.cite_reason}</p>
