@@ -27,7 +27,6 @@ export async function PATCH(
         return NextResponse.json({
             success: true,
             message: 'Tardiness entry updated successfully',
-            data: result,
         })
     } catch (error: any) {
         console.error('API Error:', error)

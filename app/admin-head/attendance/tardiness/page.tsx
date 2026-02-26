@@ -1,13 +1,5 @@
 //tardiness
 
-
-//latest tardiness
-
-
-
-
-
-
 'use client'
 
 
@@ -569,13 +561,15 @@ function EmployeeSelector({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between h-7 md:h-8 text-xl md:text-xl border-stone-200 hover:bg-stone-50 font-medium"
+          className="w-full justify-center gap-2 h-9 text-sm border-stone-200 hover:bg-stone-50 font-normal text-slate-700 rounded-sm shadow-none"
         >
-          <span className="truncate">{value || "Select employee..."}</span>
-          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <span className="truncate shrink-0">
+            {value ? (value.length > 35 ? value.substring(0, 35) + '...' : value) : "Select employee..."}
+          </span>
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[200px] p-0">
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
         <Command>
           <CommandInput placeholder="Search employee..." className="h-9" />
           <CommandEmpty>No employee found.</CommandEmpty>
@@ -1072,6 +1066,8 @@ export default function AttendanceDashboard() {
         const data = await res.json()
         if (!data.success) {
           toast.error(data.message || 'Failed to update entry')
+        } else {
+          toast.success(data.message || 'Tardiness entry updated successfully')
         }
       } catch (err) {
         console.error('Update error:', err)
@@ -1428,64 +1424,73 @@ export default function AttendanceDashboard() {
 
         <div className={cn(
           "overflow-hidden transition-all duration-500 ease-in-out",
-          isEntryFormOpen ? "max-h-[500px] opacity-100 mb-2" : "max-h-0 opacity-0 pointer-events-none"
+          isEntryFormOpen ? "max-h-[500px] opacity-100 mb-6" : "max-h-0 opacity-0 pointer-events-none mb-0"
         )}>
           <div className="flex justify-center pt-2">
-            <Card className="w-full max-w-5xl bg-white border border-[#FFE5EC] shadow-lg rounded-xl overflow-hidden ring-4 ring-rose-50/50">
-              <CardContent className="p-4 md:p-5">
-                <div className="flex flex-col lg:flex-row items-center gap-4 lg:gap-6">
-                  {/* Minimal Header Part */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <div className="p-1.5 bg-rose-50 rounded-lg">
-                      <Plus className="w-4 h-4 text-[#4A081A]" />
+            <Card className="w-full bg-white border-[1.5px] border-[#800020] shadow-sm rounded-none">
+              <CardContent className="p-6 pb-4">
+                <div className="flex flex-col">
+                  {/* Header Part */}
+                  <div className="flex items-center gap-2 shrink-0 mb-4 mt-2">
+                    <div className="w-6 h-6 bg-[#FBDADD]/40 rounded-md flex items-center justify-center">
+                      <Plus className="w-3.5 h-3.5 text-[#4A081A] stroke-[2.5]" />
                     </div>
-                    <h2 className="text-lg font-black text-[#4A081A] uppercase tracking-wider whitespace-nowrap">
+                    <h2 className="text-[13px] font-black text-[#4A081A] uppercase tracking-wider whitespace-nowrap">
                       New Late Entry
                     </h2>
                   </div>
 
-
-                  {/* Form Fields - Horizontal Inline */}
-                  <div className="flex flex-1 flex-col sm:flex-row items-center gap-4 w-full">
-                    <div className="flex-1 w-full min-w-[200px]">
-                      <EmployeeSelector
-                        value={newEntryEmployee}
-                        onChange={setNewEntryEmployee}
-                        employees={employees}
-                      />
+                  {/* Form Fields & Actions - Horizontal Inline */}
+                  <div className="flex flex-col lg:flex-row items-center w-full px-2 gap-4">
+                    {/* Employee & Time Group */}
+                    <div className="flex flex-col sm:flex-row items-center flex-1 gap-4 w-full">
+                      <div className="flex-1 w-full">
+                        <EmployeeSelector
+                          value={newEntryEmployee}
+                          onChange={setNewEntryEmployee}
+                          employees={employees}
+                        />
+                      </div>
+                      <div className="relative group w-full sm:w-36 shrink-0">
+                        <Clock className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400 group-focus-within:text-[#4A081A] transition-colors" />
+                        <Input
+                          id="time"
+                          type="time"
+                          value={newEntryTime}
+                          onChange={(e) => setNewEntryTime(e.target.value)}
+                          className="bg-white border text-center border-rose-100 text-slate-800 pl-8 pr-2 h-9 w-full rounded-md text-sm font-bold focus:ring-[#800020]/10 focus:border-[#630C22] shadow-none transition-all"
+                        />
+                      </div>
                     </div>
 
-
-                    <div className="relative group w-full sm:w-40 shrink-0">
-                      <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 group-focus-within:text-[#4A081A] transition-colors" />
-                      <Input
-                        id="time"
-                        type="time"
-                        value={newEntryTime}
-                        onChange={(e) => setNewEntryTime(e.target.value)}
-                        className="bg-white border border-[#FFE5EC] text-slate-800 pl-9 h-10 w-full rounded-lg text-lg font-bold focus:ring-[#800020]/10 focus:border-[#630C22] transition-all"
-                      />
+                    {/* Actions Group */}
+                    <div className="flex items-center gap-3 shrink-0 mt-4 lg:mt-0 lg:ml-auto">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setIsEntryFormOpen(false)
+                          resetAddEntryFields()
+                        }}
+                        className="border border-[#FBDADD] text-slate-700 hover:bg-rose-50 text-xs px-6 h-9 rounded-sm shadow-none font-medium"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        onClick={handleSaveClick}
+                        disabled={isSaving || selectedYear !== new Date().getFullYear()}
+                        className="bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#800020] hover:shadow-md active:scale-95 text-white font-medium text-sm px-6 h-9 rounded-md transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed min-w-[120px] shadow-none"
+                      >
+                        {isSaving ? (
+                          <div className="flex items-center justify-center gap-2">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            <span>Saving...</span>
+                          </div>
+                        ) : (
+                          "Save Record"
+                        )}
+                      </Button>
                     </div>
-                  </div>
-
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Button
-                      type="submit"
-                      onClick={handleSaveClick}
-                      disabled={isSaving || selectedYear !== new Date().getFullYear()}
-                      className="bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#800020] hover:shadow-lg active:scale-95 text-white font-bold text-xl px-6 h-10 rounded-lg transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed min-w-[120px]"
-                    >
-                      {isSaving ? (
-                        <div className="flex items-center gap-2">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          <span>Saving...</span>
-                        </div>
-                      ) : (
-                        "Save Record"
-                      )}
-                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -1512,6 +1517,7 @@ export default function AttendanceDashboard() {
                     `${selectedMonth} ${selectedYear} – 1-15`,
                     firstCutoffEntries
                   )}
+                  totalRecords={firstCutoffEntries.length}
                   pagination={{
                     currentPage: firstPagination.currentPage,
                     totalPages: firstPagination.totalPages,
@@ -1532,6 +1538,7 @@ export default function AttendanceDashboard() {
                     `${selectedMonth} ${selectedYear} – ${selectedMonth === 'February' ? '16-28/29' : '16-30/31'}`,
                     secondCutoffEntries
                   )}
+                  totalRecords={secondCutoffEntries.length}
                   pagination={{
                     currentPage: secondPagination.currentPage,
                     totalPages: secondPagination.totalPages,
@@ -1649,12 +1656,14 @@ function CutoffTable({
   entries,
   onUpdateTime,
   onSummaryClick,
+  totalRecords,
   pagination,
 }: {
   title: string
   entries: LateEntry[]
   onUpdateTime: (id: string | number, newTime: string) => void
   onSummaryClick: () => void
+  totalRecords: number
   pagination: {
     currentPage: number
     totalPages: number
@@ -1685,7 +1694,7 @@ function CutoffTable({
           <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#C9184A]" />
           <span>Minutes from 8:00 AM</span>
           <span className="text-[#FFE5EC]">|</span>
-          <span>{entries.length} records</span>
+          <span>{totalRecords} records</span>
         </CardDescription>
       </CardHeader>
 
@@ -1719,10 +1728,10 @@ function CutoffTable({
                   </td>
                   <td className="px-3 py-5">
                     <Input
-                      value={entry.actual_in || entry.actualIn || ''}
-                      onChange={(e) => onUpdateTime(entry.id, e.target.value.toUpperCase())}
-                      placeholder="8:00 AM"
-                      className="bg-white border-[#FFE5EC] text-slate-800 placeholder:text-slate-300 h-10 text-base md:text-lg w-28 font-bold focus:ring-2 focus:ring-[#A0153E] uppercase shadow-sm"
+                      type="time"
+                      value={(entry.actual_in || entry.actualIn || '').substring(0, 5)}
+                      onChange={(e) => onUpdateTime(entry.id, e.target.value)}
+                      className="bg-white border-[#FFE5EC] text-slate-800 placeholder:text-slate-300 h-10 text-base md:text-lg w-32 font-bold focus:ring-2 focus:ring-[#A0153E] shadow-sm appearance-none"
                     />
                   </td>
 

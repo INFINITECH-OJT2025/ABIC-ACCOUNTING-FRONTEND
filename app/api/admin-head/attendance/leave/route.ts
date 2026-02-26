@@ -43,7 +43,6 @@ export async function POST(request: NextRequest) {
             approved_by,
             remarks,
             cite_reason,
-            status,
         } = body
 
         if (!employee_name || !category || !start_date || !leave_end_date || !approved_by || !remarks) {
@@ -53,35 +52,125 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        const result = await query(
+        const result: any = await query(
             `INSERT INTO leave_entries
         (employee_id, employee_name, department, category, shift, start_date, leave_end_date,
          number_of_days, approved_by, remarks, cite_reason, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                employee_id ?? null,
+                employee_id || null,
                 employee_name,
-                department ?? '',
+                department || '',
                 category,
-                shift ?? null,
+                shift || null,
                 start_date,
                 leave_end_date,
                 number_of_days ?? 0,
                 approved_by,
                 remarks,
-                cite_reason ?? '',
-                status ?? 'Pending',
+                cite_reason || '',
+                approved_by, // Sync initial status with approved_by
             ]
         )
 
         return NextResponse.json(
-            { success: true, message: 'Leave entry saved successfully', data: result },
+            { success: true, message: 'Leave entry saved successfully', id: result.insertId },
             { status: 201 }
         )
     } catch (error: any) {
         console.error('Leave POST Error:', error)
         return NextResponse.json(
-            { success: false, message: 'Failed to save leave entry' },
+            { success: false, message: 'Failed to save leave entry: ' + error.message },
+            { status: 500 }
+        )
+    }
+}
+
+// PUT /api/admin-head/attendance/leave
+export async function PUT(request: NextRequest) {
+    try {
+        const body = await request.json()
+        const {
+            id,
+            employee_id,
+            employee_name,
+            department,
+            category,
+            shift,
+            start_date,
+            leave_end_date,
+            number_of_days,
+            approved_by,
+            remarks,
+            cite_reason,
+        } = body
+
+        if (!id) {
+            return NextResponse.json(
+                { success: false, message: 'Missing record ID' },
+                { status: 400 }
+            )
+        }
+
+        const result: any = await query(
+            `UPDATE leave_entries
+             SET employee_id = ?, employee_name = ?, department = ?, category = ?, 
+                 shift = ?, start_date = ?, leave_end_date = ?, number_of_days = ?, 
+                 approved_by = ?, remarks = ?, cite_reason = ?, status = ?
+             WHERE id = ?`,
+            [
+                employee_id || null,
+                employee_name,
+                department || '',
+                category,
+                shift || null,
+                start_date,
+                leave_end_date,
+                number_of_days ?? 0,
+                approved_by,
+                remarks,
+                cite_reason || '',
+                approved_by, // Keep status in sync
+                id
+            ]
+        )
+
+        if (result && result.affectedRows === 0) {
+            return NextResponse.json(
+                { success: false, message: 'No record found with ID: ' + id },
+                { status: 404 }
+            )
+        }
+
+        return NextResponse.json({ success: true, message: 'Leave entry updated successfully' })
+    } catch (error: any) {
+        console.error('Leave PUT Error:', error)
+        return NextResponse.json(
+            { success: false, message: 'Failed to update leave entry: ' + error.message },
+            { status: 500 }
+        )
+    }
+}
+
+// DELETE /api/admin-head/attendance/leave
+export async function DELETE(request: NextRequest) {
+    try {
+        const { searchParams } = new URL(request.url)
+        const id = searchParams.get('id')
+
+        if (!id) {
+            return NextResponse.json(
+                { success: false, message: 'Missing record ID' },
+                { status: 400 }
+            )
+        }
+
+        await query('DELETE FROM leave_entries WHERE id = ?', [id])
+        return NextResponse.json({ success: true, message: 'Leave entry deleted successfully' })
+    } catch (error: any) {
+        console.error('Leave DELETE Error:', error)
+        return NextResponse.json(
+            { success: false, message: 'Failed to delete leave entry' },
             { status: 500 }
         )
     }
