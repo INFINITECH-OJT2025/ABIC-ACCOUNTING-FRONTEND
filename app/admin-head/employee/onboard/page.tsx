@@ -196,24 +196,8 @@ function OnboardPageContent() {
     { id: 7, title: 'Permanent Address', icon: MapPin, description: 'Permanent residence' },
   ]
 
-  const onboardingTasks = [
-    "Signing of Job Offer",
-    "Signing of Employment Contract",
-    "Information Fill-Up for ID and Employee Record",
-    "Provide Link to Employee Handbook",
-    "Conduct Onboarding Presentation",
-    "Introduce to Departments and Key Team Members",
-    "Distribute Polo Shirt, ID Lace & keys",
-    "Add Employee to Biometrics",
-    "Create Company Accounts (Email and Telegram - Required)",
-    "Create Optional Accounts (Viber, WhatsApp, WeChat - Sales/Marketing only)",
-    "Set Up Email Signature",
-    "Add New Employee to Official Group Chats",
-    "Add New Employee to Masterfile Google Sheet",
-    "Add New Employee to Tardiness & Leave Monitoring Google Sheet",
-    "Prepare Requirement Checklist (Medical Certificate, Diploma, TOR, Birth Certificate, PhilHealth, Pag-IBIG, SSS)",
-    "Collect and Verify Employee Requirements"
-  ]
+  const [onboardingTasks, setOnboardingTasks] = useState<string[]>([])
+  const [loadingTasks, setLoadingTasks] = useState(false)
 
   const completionPercentage = useMemo(() => {
     if (!onboardingTasks.length) return 0
@@ -546,6 +530,38 @@ function OnboardPageContent() {
     return () => clearTimeout(timer)
   }, [onboardFormData.first_name, onboardFormData.last_name, isRehireFlow])
 
+  // Fetch Onboarding Template Tasks when department is available
+  useEffect(() => {
+    const currentDepartment = checklistData?.department || progressionFormData?.department || onboardFormData?.department
+    if (!currentDepartment || view === 'onboard' || checklistRecordId !== null) {
+      return
+    }
+
+    const fetchTasks = async () => {
+      setLoadingTasks(true)
+      try {
+        const response = await apiFetch(`/api/department-checklist-templates?checklist_type=ONBOARDING`)
+        const data = await response.json()
+        if (data && data.data) {
+          const template = data.data.find((t: any) => t.department_name === currentDepartment)
+          if (template && template.tasks && template.tasks.length > 0) {
+            setOnboardingTasks(template.tasks.map((t: any) => t.task))
+          } else {
+            setOnboardingTasks([])
+          }
+        } else {
+          setOnboardingTasks([])
+        }
+      } catch (error) {
+        console.error('Error fetching onboarding tasks:', error)
+        setOnboardingTasks([])
+      } finally {
+        setLoadingTasks(false)
+      }
+    }
+    fetchTasks()
+  }, [view, checklistData?.department, progressionFormData?.department, onboardFormData?.department, checklistRecordId])
+
 
   const fetchChecklistProgress = async (employeeName: string) => {
     try {
@@ -613,8 +629,12 @@ function OnboardPageContent() {
         : 'Completed'
 
       const tasks = Array.isArray(matched?.tasks) ? matched.tasks : []
+      if (tasks.length > 0) {
+        setOnboardingTasks(tasks.map((t: any) => t?.task ?? t?.name ?? t))
+      }
+
       const restoredTasks = tasks.reduce((acc: { [key: string]: string }, task: any) => {
-        const taskName = String(task?.task ?? '').trim()
+        const taskName = String(task?.task ?? task?.name ?? task ?? '').trim()
         const taskStatus = String(task?.status ?? '').toUpperCase()
         if (!taskName || taskStatus !== 'DONE') return acc
         const taskDate = String(task?.date ?? '').trim()
@@ -1782,7 +1802,23 @@ function OnboardPageContent() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {onboardingTasks.map((task, index) => (
+                    {loadingTasks ? (
+                      <TableRow>
+                        <TableCell colSpan={3} className="py-8 text-center">
+                          <div className="flex flex-col items-center justify-center text-slate-400">
+                             <Loader2 className="h-6 w-6 animate-spin mb-2" />
+                             <span className="text-xs font-medium">Loading tasks...</span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : onboardingTasks.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={3} className="py-8 text-center text-slate-500 text-sm font-medium">
+                          No onboarding tasks found for this department.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      onboardingTasks.map((task, index) => (
                       <TableRow 
                         key={index} 
                         className="border-b border-rose-50/30 last:border-0 hover:bg-[#FFE5EC]/5 transition-colors group cursor-pointer"
@@ -1812,7 +1848,7 @@ function OnboardPageContent() {
                           </span>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    )))}
                   </TableBody>
                 </Table>
 
