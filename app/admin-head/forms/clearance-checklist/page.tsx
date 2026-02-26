@@ -909,18 +909,19 @@ export default function ClearanceChecklistPage() {
       </AlertDialog>
 
       <AlertDialog open={unsavedPromptOpen} onOpenChange={setUnsavedPromptOpen}>
-        <AlertDialogContent className="max-w-2xl border-4 border-amber-300 rounded-3xl p-0 bg-white shadow-2xl overflow-hidden">
-          <div className="h-2 w-full bg-gradient-to-r from-amber-300 via-amber-400 to-amber-300" />
-          <div className="p-8">
+        <AlertDialogContent className="max-w-[520px] rounded-2xl border border-[#E9B8C4] bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.18)]">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-3xl font-black text-slate-900 tracking-tight">Unsaved Changes Detected</AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-600 text-base leading-relaxed mt-2">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-rose-50 text-[#E11D48]">
+              <TriangleAlert className="h-6 w-6" />
+            </div>
+            <AlertDialogTitle className="text-left text-3xl font-semibold tracking-tight text-slate-900">Unsaved Changes Detected</AlertDialogTitle>
+            <AlertDialogDescription className="mt-2 text-left text-lg text-slate-500">
               You have unsaved changes. You can save first, or continue without saving.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-3 mt-6">
+          <AlertDialogFooter className="mt-8 flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <AlertDialogCancel
-              className="h-12 rounded-xl border border-slate-300 text-slate-700 font-semibold hover:bg-slate-100"
+              className="h-12 rounded-none border border-slate-300 px-6 font-semibold text-slate-700 hover:bg-slate-100"
               onClick={() => {
                 setUnsavedPromptOpen(false)
                 clearUnsavedIntents()
@@ -929,38 +930,39 @@ export default function ClearanceChecklistPage() {
               Stay
             </AlertDialogCancel>
             <AlertDialogAction
-              className="h-12 rounded-xl bg-[#A4163A] text-white hover:bg-[#800020] font-bold shadow-md"
+              className="h-12 rounded-none bg-[#A4163A] px-6 font-semibold text-white hover:bg-[#8C1231]"
               onClick={proceedWithoutSaving}
             >
               Proceed Without Saving
             </AlertDialogAction>
             <AlertDialogAction
-              className="h-12 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 font-bold shadow-md"
+              className="h-12 rounded-none bg-[#B10F1F] px-6 font-semibold text-white hover:bg-[#950D1A]"
               onClick={() => void handleSaveAndContinue()}
             >
               Save and Continue
             </AlertDialogAction>
           </AlertDialogFooter>
-          </div>
         </AlertDialogContent>
       </AlertDialog>
 
 
       <AlertDialog open={taskIdToDelete !== null} onOpenChange={(open) => { if (!open) setTaskIdToDelete(null) }}>
-        <AlertDialogContent className="border-2 border-rose-200">
+        <AlertDialogContent className="max-w-[520px] rounded-2xl border border-[#E9B8C4] bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.18)]">
           <AlertDialogHeader>
-            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-rose-50 text-rose-600">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-rose-50 text-[#E11D48]">
               <TriangleAlert className="h-6 w-6" />
             </div>
-            <AlertDialogTitle>Delete this task?</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle className="text-left text-3xl font-semibold tracking-tight text-slate-900">Delete this task?</AlertDialogTitle>
+            <AlertDialogDescription className="mt-2 text-left text-lg text-slate-500">
               This task will be removed from the current checklist.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setTaskIdToDelete(null)}>Cancel</AlertDialogCancel>
+          <AlertDialogFooter className="mt-8 flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <AlertDialogCancel onClick={() => setTaskIdToDelete(null)} className="h-12 rounded-none border border-slate-300 px-6 font-semibold text-slate-700 hover:bg-slate-100">
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
-              className="bg-rose-600 text-white hover:bg-rose-700"
+              className="h-12 rounded-none bg-[#B10F1F] px-6 font-semibold text-white hover:bg-[#950D1A]"
               onClick={() => {
                 if (taskIdToDelete !== null) removeTask(taskIdToDelete)
                 setTaskIdToDelete(null)

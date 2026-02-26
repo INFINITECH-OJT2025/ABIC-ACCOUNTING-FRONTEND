@@ -59,7 +59,8 @@ import {
   Users,
   Eye,
   Image as ImageIcon,
-  MoreVertical
+  MoreVertical,
+  TriangleAlert
 } from 'lucide-react'
 
 
@@ -2017,17 +2018,20 @@ export default function GovernmentDirectoryPage() {
 
 
       <AlertDialog open={deleteCandidate !== null} onOpenChange={(open) => { if (!open) setDeleteCandidate(null) }}>
-        <AlertDialogContent className="border-2 border-rose-200">
+        <AlertDialogContent className="max-w-[520px] rounded-2xl border border-[#E9B8C4] bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.18)]">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this Cloudinary image?</AlertDialogTitle>
-            <AlertDialogDescription>
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-rose-50 text-[#E11D48]">
+              <TriangleAlert className="h-6 w-6" />
+            </div>
+            <AlertDialogTitle className="text-left text-3xl font-semibold tracking-tight text-slate-900">Delete this Cloudinary image?</AlertDialogTitle>
+            <AlertDialogDescription className="mt-2 text-left text-lg text-slate-500">
               This will permanently delete the selected image file from Cloudinary.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeleteCandidate(null)}>Cancel</AlertDialogCancel>
+          <AlertDialogFooter className="mt-8 flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <AlertDialogCancel onClick={() => setDeleteCandidate(null)} className="h-12 rounded-none border border-slate-300 px-6 font-semibold text-slate-700 hover:bg-slate-100">Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-rose-600 text-white hover:bg-rose-700"
+              className="h-12 rounded-none bg-[#B10F1F] px-6 font-semibold text-white hover:bg-[#950D1A]"
               onClick={async () => {
                 if (!deleteCandidate) return
                 try {
