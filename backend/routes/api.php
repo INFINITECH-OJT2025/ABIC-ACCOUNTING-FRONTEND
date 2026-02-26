@@ -77,3 +77,7 @@ Route::get('/directory/general-contacts', [DirectoryController::class, 'listGene
 Route::put('/directory/general-contacts', [DirectoryController::class, 'updateGeneralContacts']);
 Route::get('/directory/cloudinary-images', [DirectoryController::class, 'listCloudinaryImages']);
 Route::delete('/directory/cloudinary-images', [DirectoryController::class, 'deleteCloudinaryImage']);
+
+// Department Shift Schedule Routes
+use App\Http\Controllers\Api\DepartmentShiftScheduleController;
+Route::get('/department-shift-schedules', [DepartmentShiftScheduleController::class, 'index']);
