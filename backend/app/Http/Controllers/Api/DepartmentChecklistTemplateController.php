@@ -117,6 +117,9 @@ class DepartmentChecklistTemplateController extends Controller
                 ]);
             }
 
+            // Always refresh template updated_at when tasks are saved, even if base fields are unchanged.
+            $template->touch();
+
             return $template->load(['department:id,name', 'tasks']);
         });
 
