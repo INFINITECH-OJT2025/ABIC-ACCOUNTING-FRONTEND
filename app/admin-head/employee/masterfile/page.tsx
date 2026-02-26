@@ -1019,21 +1019,23 @@ export default function MasterfilePage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                       {pendingList.map((employee) => {
                         const { isComplete, status } = checkCompleteness(employee as any)
+                        const isFullyComplete = isComplete && employee.onboarding_tasks?.isComplete
 
                         return (
                           <div
                             key={employee.id}
                             onClick={() => fetchEmployeeDetails(employee.id)}
-                            className={`group relative bg-white border rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer overflow-hidden ${isComplete
+                            className={`group relative bg-white border rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer overflow-hidden ${isFullyComplete
                               ? 'border-emerald-200 hover:border-emerald-400 ring-1 ring-emerald-50'
-                              : 'border-slate-200 hover:border-orange-300'
+                              : 'border-orange-200 hover:border-orange-300'
                               }`}
                           >
                             {/* Ready Indicator Strip */}
-                            {isComplete && <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>}
+                            {isFullyComplete && <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>}
+                            {!isFullyComplete && <div className="absolute top-0 left-0 w-full h-1 bg-orange-400"></div>}
 
                             <div className="flex items-center gap-4 mb-4">
-                              <div className={`w-14 h-14 min-w-[3.5rem] rounded-full flex items-center justify-center text-xl font-bold transition-colors duration-200 ${isComplete
+                              <div className={`w-14 h-14 min-w-[3.5rem] rounded-full flex items-center justify-center text-xl font-bold transition-colors duration-200 ${isFullyComplete
                                 ? 'bg-emerald-100 text-emerald-700 group-hover:bg-emerald-500 group-hover:text-white'
                                 : 'bg-orange-100 text-orange-700 group-hover:bg-orange-500 group-hover:text-white'
                                 }`}>
@@ -1049,17 +1051,17 @@ export default function MasterfilePage() {
                               </div>
                             </div>
                             <div className="flex justify-between items-center pt-3 border-t border-slate-50">
-                              {isComplete ? (
+                              {isFullyComplete ? (
                                 <Badge variant="outline" className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border-emerald-100">
-                                  {employee.onboarding_tasks?.isComplete ? status : "PENDING: ONBOARDING CHECKLIST"}
+                                  {status}
                                 </Badge>
                               ) : (
                                 <div className="flex flex-col gap-1 items-start">
-                                  <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">
-                                    {employee.onboarding_tasks?.isComplete ? status : "PENDING: ONBOARDING CHECKLIST"}
-                                  </span>
+                                  <Badge variant="outline" className="text-[10px] font-bold text-orange-600 bg-orange-50 border-orange-200 shadow-none uppercase tracking-wider rounded-full">
+                                    {!isComplete ? status : "PENDING: ONBOARDING CHECKLIST"}
+                                  </Badge>
                                   {employee.onboarding_tasks && (
-                                    <span className="text-[9px] font-medium text-slate-400">
+                                    <span className="text-[9px] font-medium text-slate-400 mt-1 pl-1">
                                       Tasks: {employee.onboarding_tasks.done}/{employee.onboarding_tasks.total}
                                     </span>
                                   )}

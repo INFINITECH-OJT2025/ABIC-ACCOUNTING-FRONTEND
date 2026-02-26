@@ -36,7 +36,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { Users, FileText, Check, ChevronsUpDown, X, Search, ArrowUpDown, History, Clock3, ArrowUpAZ, ArrowDownAZ } from 'lucide-react'
+import { Users, FileText, Check, ChevronsUpDown, X, Search, ArrowUpDown, History, Clock3, ArrowUpAZ, ArrowDownAZ, ChevronLeft } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from '@/components/ui/input'
@@ -51,6 +51,7 @@ interface Employee {
   email: string
   position: string
   status: string
+  department?: string
 }
 
 interface TerminationRecord {
@@ -124,8 +125,154 @@ function TerminatePageContent() {
   const [exitActionType, setExitActionType] = useState<'terminate' | 'resigned'>('terminate')
   const router = useRouter()
   const pathname = usePathname()
+  
+  // Clearance Checklist States
+  const [view, setView] = useState<'main' | 'checklist'>('main')
+  const [checklistEmployee, setChecklistEmployee] = useState<TerminationRecord | null>(null)
+  const [clearanceTasks, setClearanceTasks] = useState<string[]>([])
+  const [completedClearanceTasks, setCompletedClearanceTasks] = useState<Record<string, string>>({})
+  const [savedClearanceTasks, setSavedClearanceTasks] = useState<Set<string>>(new Set())
+  const [checklistRecordId, setChecklistRecordId] = useState<string | null>(null)
+  const [loadingTasks, setLoadingTasks] = useState(false)
+  const [isSavingChecklist, setIsSavingChecklist] = useState(false)
   const searchParams = useSearchParams()
   const isHistoryView = searchParams.get('view') === 'history'
+
+  const prepareClearanceChecklist = async (employeeRec: TerminationRecord) => {
+    setLoadingTasks(true)
+    try {
+      const empName = `${employeeRec.employee?.first_name} ${employeeRec.employee?.last_name}`
+      const department = employeeRec.employee?.department || ''
+
+      // 1. Fetch Template Tasks per department
+      let tasksArray: string[] = []
+      const templateRes = await fetch(`${getApiUrl()}/api/department-checklist-templates?checklist_type=CLEARANCE`, { headers: { Accept: 'application/json' } })
+      if (templateRes.ok) {
+        const templateData = await templateRes.json()
+        if (templateData && templateData.data) {
+          const template = templateData.data.find((t: any) => t.department_name === department)
+          if (template && template.tasks && template.tasks.length > 0) {
+            tasksArray = template.tasks.map((t: any) => t.task)
+          }
+        }
+      }
+      setClearanceTasks(tasksArray)
+
+      // 2. Fetch employee's clearance record
+      const recordRes = await fetch(`${getApiUrl()}/api/clearance-checklist`, { headers: { Accept: 'application/json' } })
+      const newCompleted: Record<string, string> = {}
+      const newSaved = new Set<string>()
+      
+      if (recordRes.ok) {
+        const recordData = await recordRes.json()
+        const list = Array.isArray(recordData?.data) ? recordData.data : []
+        const normalizeName = (value: unknown) => String(value || '').toLowerCase().replace(/\s+/g, ' ').trim()
+        const match = list.find((item: any) => normalizeName(item.name) === normalizeName(empName))
+        
+        if (match) {
+          setChecklistRecordId(String(match.id))
+          if (Array.isArray(match.tasks)) {
+            match.tasks.forEach((t: any) => {
+               if (String(t.status).toUpperCase() === 'DONE') {
+                  newCompleted[t.task] = t.date || new Date().toLocaleString('en-CA').split(',')[0]
+                  newSaved.add(t.task)
+               }
+            })
+          }
+        } else {
+          setChecklistRecordId(null)
+        }
+      }
+      setCompletedClearanceTasks(newCompleted)
+      setSavedClearanceTasks(newSaved)
+    } catch (e) {
+      console.error('Error fetching clearance tasks:', e)
+    } finally {
+      setLoadingTasks(false)
+    }
+  }
+
+  const handleSaveClearance = async (isFinalSave = false) => {
+    if (!checklistEmployee) return false
+
+    setIsSavingChecklist(true)
+    try {
+      const emp = checklistEmployee.employee
+      const tasksPayload = clearanceTasks.map(task => ({
+        task,
+        status: completedClearanceTasks[task] ? 'DONE' : 'PENDING',
+        date: completedClearanceTasks[task] || ''
+      }))
+      
+      const isResigned = checklistEmployee.exit_type === 'resigned'
+      const lastDay = checklistEmployee.termination_date || new Date().toISOString().slice(0, 10)
+      
+      const payload = {
+        name: `${emp.first_name} ${emp.last_name}`,
+        position: emp.position || 'Unknown',
+        department: emp.department || 'Unknown',
+        startDate: (emp as any).date_hired || new Date().toISOString().slice(0, 10),
+        resignationDate: isResigned ? lastDay : new Date().toISOString().slice(0, 10),
+        lastDay: lastDay,
+        tasks: tasksPayload,
+        status: isFinalSave || Object.keys(completedClearanceTasks).length === clearanceTasks.length ? 'DONE' : 'PENDING'
+      }
+
+      const method = checklistRecordId ? 'PUT' : 'POST'
+      const url = checklistRecordId 
+          ? `${getApiUrl()}/api/clearance-checklist/${checklistRecordId}`
+          : `${getApiUrl()}/api/clearance-checklist`
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+
+      const data = await res.json()
+      if (data.success || res.ok) {
+         toast.success("Clearance Progress Saved!")
+         setSavedClearanceTasks(new Set(Object.keys(completedClearanceTasks)))
+         if (!checklistRecordId && data.data?.id) {
+           setChecklistRecordId(String(data.data.id))
+         }
+         return true
+      } else {
+         toast.error(data.message || 'Failed to save clearance progress')
+         return false
+      }
+    } catch(e) {
+      toast.error('Submission failed. Check your network or backend.')
+      return false
+    } finally {
+      setIsSavingChecklist(false)
+    }
+  }
+
+  const toggleClearanceTask = (task: string) => {
+    if (savedClearanceTasks.has(task)) {
+       // Optional: Decide if we want to allow unchecking previously saved tasks
+       // Let's allow it but we keep it saved in the Set until they hit "Save" again.
+    }
+    setCompletedClearanceTasks(prev => {
+      const next = { ...prev }
+      if (next[task]) delete next[task]
+      else next[task] = new Date().toLocaleDateString('en-CA')
+      return next
+    })
+  }
+
+  const toggleAllClearanceTasks = () => {
+    const allDone = clearanceTasks.every(t => completedClearanceTasks[t])
+    if (allDone) {
+      setCompletedClearanceTasks({})
+    } else {
+      const all: Record<string, string> = {}
+      const today = new Date().toLocaleDateString('en-CA')
+      clearanceTasks.forEach(t => all[t] = today)
+      setCompletedClearanceTasks(all)
+    }
+  }
 
   const getLatestPerEmployee = (records: TerminationRecord[]) => {
     const latestMap = new Map<string, TerminationRecord>()
@@ -512,6 +659,23 @@ function TerminatePageContent() {
             })
             setIsRequestFormOpen(false)
             fetchData()
+            
+            // Build temporary TerminationRecord to pass to checklist
+            if (selectedEmployee) {
+              const tempRecord: TerminationRecord = {
+                id: data.data?.id || Date.now(),
+                employee_id: selectedEmployeeId,
+                termination_date: snapshot.termination_date,
+                reason: snapshot.reason,
+                notes: snapshot.notes,
+                exit_type: exitActionType,
+                status: exitActionType === 'resigned' ? 'resigned' : 'completed',
+                employee: selectedEmployee
+              }
+              setChecklistEmployee(tempRecord)
+              prepareClearanceChecklist(tempRecord)
+              setView('checklist')
+            }
           } else {
             if (data.errors) {
               const errorMessages = Object.values(data.errors).flat().join(' ')
@@ -871,10 +1035,12 @@ function TerminatePageContent() {
       </div>
 
       <div className="w-full px-4 md:px-8 space-y-6">
-        <div className={cn(
-          "overflow-hidden transition-all duration-500 ease-in-out",
-          isRequestFormOpen ? "max-h-[900px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"
-        )}>
+        {view === 'main' && (
+          <>
+            <div className={cn(
+              "overflow-hidden transition-all duration-500 ease-in-out",
+              isRequestFormOpen ? "max-h-[900px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"
+            )}>
           <div className="w-full bg-white border border-slate-200 rounded-2xl shadow-lg p-4 md:p-5 space-y-4">
             <div className="flex items-center gap-2">
               <Users className="h-4 w-4 text-[#A4163A]" />
@@ -1213,6 +1379,18 @@ function TerminatePageContent() {
                                   size="sm"
                                   className="text-[#800020] font-bold hover:text-[#A0153E] hover:bg-rose-50 rounded-lg px-4"
                                   onClick={() => {
+                                    setChecklistEmployee(record)
+                                    prepareClearanceChecklist(record)
+                                    setView('checklist')
+                                  }}
+                                >
+                                  Clearance
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-slate-600 font-bold hover:text-slate-800 hover:bg-slate-100 rounded-lg px-4"
+                                  onClick={() => {
                                     setSelectedTermination(record)
                                     setShowDetailDialog(true)
                                   }}
@@ -1458,6 +1636,142 @@ function TerminatePageContent() {
             </>
           )}
         </div>
+        </>
+      )}
+
+      {view === 'checklist' && checklistEmployee && (
+          <div className="max-w-[1600px] mx-auto py-4 text-stone-900 animate-in fade-in zoom-in-95 duration-300">
+            <div className="mb-6">
+              <Button 
+                variant="ghost" 
+                onClick={() => setView('main')}
+                className="text-slate-600 hover:text-slate-900 -ml-4"
+              >
+                <ChevronLeft className="w-4 h-4 mr-1" />
+                Back to Records
+              </Button>
+            </div>
+            
+            <div className="rounded-2xl border-2 border-[#FFE5EC] shadow-2xl bg-white overflow-hidden mb-12">
+              <div className="bg-[#FFE5EC]/20 p-4 md:px-8 border-b border-[#FFE5EC]">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-[11px] font-black text-[#800020] uppercase tracking-widest">
+                    Clearance Check Progress: {checklistEmployee.employee?.first_name} {checklistEmployee.employee?.last_name}
+                  </h3>
+                  <span className="text-sm font-black text-[#A4163A] bg-white px-3 py-0.5 rounded-full shadow-sm border border-[#FFE5EC]">
+                    {Object.keys(completedClearanceTasks).length} / {clearanceTasks.length > 0 ? clearanceTasks.length : 1} Completed
+                  </span>
+                </div>
+                <div className="w-full bg-white h-2.5 rounded-full overflow-hidden border border-[#FFE5EC] shadow-inner p-0.5">
+                  <div
+                    className="bg-gradient-to-r from-[#A4163A] to-[#630C22] h-full rounded-full transition-all duration-1000 ease-out shadow-sm"
+                    style={{ width: clearanceTasks.length > 0 ? `${(Object.keys(completedClearanceTasks).length / clearanceTasks.length) * 100}%` : '100%' }}
+                  />
+                </div>
+              </div>
+
+              <Table>
+                <TableHeader className="bg-[#FFE5EC]/40">
+                  <TableRow className="border-b border-[#FFE5EC] hover:bg-transparent">
+                    <TableHead className="w-[200px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">Completed Date</TableHead>
+                    <TableHead className="w-[100px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">Status</TableHead>
+                    <TableHead className="font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">
+                      <div className="flex items-center justify-between">
+                        <span>Tasks for {checklistEmployee.employee?.department || 'Department'}</span>
+                        <button 
+                          onClick={toggleAllClearanceTasks}
+                          className="text-[8px] normal-case bg-white/50 hover:bg-rose-50 text-[#800020] px-2 py-1 rounded-md border border-[#FFE5EC] transition-all font-black shadow-sm"
+                        >
+                          {clearanceTasks.length > 0 && clearanceTasks.every(task => completedClearanceTasks[task]) ? 'UNCHECK ALL' : 'CHECK ALL'}
+                        </button>
+                      </div>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loadingTasks ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="py-8 text-center">
+                        <div className="flex flex-col items-center justify-center text-slate-400">
+                           <History className="h-6 w-6 animate-spin mb-2" />
+                           <span className="text-xs font-medium">Loading clearance tasks...</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : clearanceTasks.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="py-8 text-center text-slate-500 text-sm font-medium">
+                        No clearance tasks found for this department.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    clearanceTasks.map((task, index) => (
+                    <TableRow 
+                      key={index} 
+                      className="border-b border-rose-50/30 last:border-0 hover:bg-[#FFE5EC]/5 transition-colors group cursor-pointer"
+                      onClick={() => toggleClearanceTask(task)}
+                    >
+                      <TableCell className="text-center py-2.5 font-mono text-[10px] font-bold text-slate-400">
+                        {completedClearanceTasks[task] || '-'}
+                      </TableCell>
+                      <TableCell className="py-2.5">
+                        <div className="flex justify-center">
+                          <div className={cn(
+                            "w-5 h-5 rounded flex items-center justify-center transition-all border-2",
+                              completedClearanceTasks[task]
+                                ? (savedClearanceTasks.has(task) ? "bg-emerald-700 border-emerald-700 opacity-60 cursor-not-allowed" : "bg-emerald-500 border-emerald-500 text-white shadow-sm")
+                                : "border-slate-200 bg-white hover:border-[#A4163A]"
+                          )}>
+                            {completedClearanceTasks[task] && <Check className="h-3.5 w-3.5" />}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-2.5">
+                        <span className={cn(
+                          "text-sm font-bold transition-all duration-300",
+                          completedClearanceTasks[task] ? "text-slate-300 line-through" : "text-slate-700"
+                        )}>
+                          {task}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  )))}
+                </TableBody>
+              </Table>
+
+              <div className="p-4 md:px-8 bg-slate-50/50 border-t border-[#FFE5EC] flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="flex items-center gap-3">
+                  <p className="text-[8px] font-black text-slate-300 uppercase tracking-[0.2em] italic">
+                    CLEARANCE FRAMEWORK • ABIC HR
+                  </p>
+                </div>
+                
+                <div className="flex gap-3">
+                  <Button
+                    onClick={async () => {
+                      const success = await handleSaveClearance(true)
+                      if (success) {
+                        fetchData()
+                        setView('main')
+                      }
+                    }}
+                    disabled={Object.keys(completedClearanceTasks).length < clearanceTasks.length || isSavingChecklist}
+                    className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg active:scale-95 transition-all rounded-xl disabled:opacity-50"
+                  >
+                    {isSavingChecklist ? 'SAVING...' : 'COMPLETE CLEARANCE'}
+                  </Button>
+                  <Button 
+                    onClick={() => handleSaveClearance(false)} 
+                    disabled={isSavingChecklist}
+                    className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-[#A4163A] hover:bg-[#800020] text-white shadow-lg active:scale-95 transition-all rounded-xl"
+                  >
+                    {isSavingChecklist ? 'SAVING...' : 'SAVE PROGRESS'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Termination Detail View Modal */}
