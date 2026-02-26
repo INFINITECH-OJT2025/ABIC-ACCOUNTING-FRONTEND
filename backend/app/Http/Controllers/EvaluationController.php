@@ -26,6 +26,7 @@ class EvaluationController extends Controller
             'score_2' => 'nullable|integer',
             'remarks_2' => 'nullable|string',
             'status' => 'nullable|string',
+            'regularization_date' => 'nullable|date',
         ]);
 
         // Calculate overall status if not provided (Prefer "Regularized" or "Probee" as per user request)
@@ -44,26 +45,13 @@ class EvaluationController extends Controller
             $validated
         );
 
-        // Update employee regularization date only (Stop updating status)
-        $employee = \App\Models\Employee::find($validated['employee_id']);
-        if ($employee) {
-            $hiredDate = \Carbon\Carbon::parse($employee->date_hired);
-
-            // Standard regularization is 6 months from hire date
-            $regularizationDate = $hiredDate->copy()->addMonths(6);
-
-            $isScore1Passed = isset($validated['score_1']) && $validated['score_1'] >= 31;
-            $isScore2Passed = isset($validated['score_2']) && $validated['score_2'] >= 31;
-
-            // If neither passed, let's extend regularization by 3 months
-            if (isset($validated['score_1']) && isset($validated['score_2'])) {
-                if (!$isScore1Passed && !$isScore2Passed) {
-                    $regularizationDate = $hiredDate->copy()->addMonths(9); // Extended
-                }
+        // Update employee status if set to Regular
+        if (isset($validated['status']) && $validated['status'] === 'Regular') {
+            $employee = \App\Models\Employee::find($validated['employee_id']);
+            if ($employee) {
+                $employee->status = 'employed'; // Or 'regularized' if you prefer
+                $employee->save();
             }
-
-            $employee->regularization_date = $regularizationDate->format('Y-m-d');
-            $employee->save();
         }
 
         return response()->json([

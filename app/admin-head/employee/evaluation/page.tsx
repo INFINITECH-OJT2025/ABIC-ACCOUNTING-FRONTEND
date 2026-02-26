@@ -28,6 +28,8 @@ interface Evaluation {
   score_2: number | null
   remarks_2: string | null
   status: string | null
+  regularization_date?: string
+  updated_at?: string
 }
 
 export default function EvaluationPage() {
@@ -38,6 +40,7 @@ export default function EvaluationPage() {
   const [isActionLoading, setIsActionLoading] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const saveTimeoutRef = React.useRef<Record<string, NodeJS.Timeout>>({})
 
   useEffect(() => {
     fetchData()
@@ -91,23 +94,27 @@ export default function EvaluationPage() {
     if (!dateHired) return null
     const hiredDate = new Date(dateHired)
     
+    const evaluation = evaluations[employee?.id || '']
+    
     const firstEval = addMonths(hiredDate, 3)
     const secondEval = addMonths(hiredDate, 5)
-    // Use the employee's regularization_date if it exists, otherwise default to 6 months
-    const regularizationDate = employee?.regularization_date 
-      ? new Date(employee.regularization_date) 
-      : addMonths(hiredDate, 6)
+    
+    let regularizationDate = null
+    if (evaluation?.regularization_date) {
+      regularizationDate = new Date(evaluation.regularization_date)
+    } else if ((evaluation?.status === 'Regular' || evaluation?.status === 'Regularized') && evaluation?.updated_at) {
+      regularizationDate = new Date(evaluation.updated_at)
+    }
     
     const monthsEmployed = differenceInMonths(new Date(), hiredDate)
     
     // Prioritize status from evaluation record if it exists
-    const evaluation = evaluations[employee?.id || '']
     const status = evaluation?.status || (monthsEmployed >= 6 ? 'Regular' : 'Probee')
     
     return {
       firstEval: format(firstEval, 'MMMM d, yyyy'),
       secondEval: format(secondEval, 'MMMM d, yyyy'),
-      regularization: format(regularizationDate, 'MMMM d, yyyy'),
+      regularization: regularizationDate ? format(regularizationDate, 'MMMM d, yyyy') : '-',
       status
     }
   }
@@ -118,22 +125,63 @@ export default function EvaluationPage() {
   }
 
   const handleScoreChange = (employeeId: string, scoreType: 'score_1' | 'score_2', value: string) => {
-    const score = value === '' ? null : parseInt(value)
+    // Restrict to numbers only and max 2 digits
+    const cleanedValue = value.replace(/[^0-9]/g, '').slice(0, 2)
+    const score = cleanedValue === '' ? null : parseInt(cleanedValue)
     const remarks = score === null ? null : (score >= 31 ? 'Passed' : 'Failed')
     
-    setEvaluations(prev => ({
-      ...prev,
-      [employeeId]: {
+    setEvaluations(prev => {
+      const updated = {
         ...(prev[employeeId] || { employee_id: employeeId, score_1: null, remarks_1: null, score_2: null, remarks_2: null, status: null }),
         [scoreType]: score,
         [scoreType === 'score_1' ? 'remarks_1' : 'remarks_2']: remarks
+      };
+      
+      // Debounced auto-save
+      const key = `${employeeId}-${scoreType}`;
+      if (saveTimeoutRef.current[key]) {
+        clearTimeout(saveTimeoutRef.current[key]);
       }
-    }))
+      
+      saveTimeoutRef.current[key] = setTimeout(() => {
+        saveEvaluationForAuto(employeeId, updated);
+      }, 1000); // Save after 1 second of inactivity
+
+      return {
+        ...prev,
+        [employeeId]: updated
+      };
+    })
   }
 
-  const saveEvaluation = async (employeeId: string) => {
-    const evalData = evaluations[employeeId]
-    if (!evalData) return
+  const saveEvaluationForAuto = async (employeeId: string, evalData: Evaluation) => {
+    try {
+      await fetch(`${getApiUrl()}/api/evaluations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(evalData)
+      });
+      // Silent refresh of persisted state
+      setPersistedEvaluations(prev => ({
+        ...prev,
+        [employeeId]: JSON.parse(JSON.stringify(evalData))
+      }));
+    } catch (error) {
+      console.error('Auto-save failed:', error);
+    }
+  }
+
+  const saveEvaluation = async (employeeId: string, isRecommend = false) => {
+    const currentEval = evaluations[employeeId]
+    if (!currentEval) return
+
+    const evalData = { ...currentEval }
+    if (isRecommend) {
+      evalData.status = 'Regular'
+      // Determine the regularization date: use current date
+      const today = new Date();
+      evalData.regularization_date = format(today, 'yyyy-MM-dd');
+    }
 
     setIsActionLoading(true)
     try {
@@ -144,7 +192,7 @@ export default function EvaluationPage() {
       })
       const data = await response.json()
       if (data.success) {
-        toast.success('Evaluation saved successfully')
+        toast.success(isRecommend ? 'Employee recommended to Regular status' : 'Evaluation saved successfully')
         fetchData() // Refresh to get updated regularization dates and status
       } else {
         toast.error(data.message || 'Failed to save evaluation')
@@ -316,6 +364,7 @@ export default function EvaluationPage() {
                 ) : (
                   filteredEmployees.map((emp) => {
                     const dates = getDatesForEmployee(emp)
+                    const isRecommended = dates?.status === 'Regular' || dates?.status === 'Regularized'
                     const isScore1Saved = persistedEvaluations[emp.id]?.score_1 !== null && persistedEvaluations[emp.id]?.score_1 !== undefined
                     const isScore2Saved = persistedEvaluations[emp.id]?.score_2 !== null && persistedEvaluations[emp.id]?.score_2 !== undefined
 
@@ -345,11 +394,13 @@ export default function EvaluationPage() {
                         </td>
                         <td className="px-4 py-4 border-r border-rose-50/30">
                           <Input 
-                            type="number" 
-                            className="w-20 mx-auto text-center h-9 border-rose-100"
+                            type="text" 
+                            inputMode="numeric"
+                            className="w-14 mx-auto text-center h-10 border border-rose-200 bg-white text-[#1a1a1a] text-lg font-medium focus:border-[#C9184A] focus:ring-0 rounded-md shadow-sm"
+                            placeholder="0"
                             value={evaluations[emp.id]?.score_1 ?? ''}
                             onChange={(e) => handleScoreChange(emp.id, 'score_1', e.target.value)}
-                            disabled={isScore1Saved}
+                            disabled={isRecommended}
                           />
                         </td>
                         <td className="px-6 py-4 border-r border-rose-50/30 text-center">
@@ -368,11 +419,13 @@ export default function EvaluationPage() {
                         </td>
                         <td className="px-4 py-4 border-r border-rose-50/30">
                           <Input 
-                            type="number" 
-                            className="w-20 mx-auto text-center h-9 border-rose-100"
+                            type="text" 
+                            inputMode="numeric"
+                            className="w-14 mx-auto text-center h-10 border border-rose-200 bg-white text-[#1a1a1a] text-lg font-medium focus:border-[#C9184A] focus:ring-0 rounded-md shadow-sm"
+                            placeholder="0"
                             value={evaluations[emp.id]?.score_2 ?? ''}
                             onChange={(e) => handleScoreChange(emp.id, 'score_2', e.target.value)}
-                            disabled={isScore2Saved}
+                            disabled={isRecommended}
                           />
                         </td>
                         <td className="px-6 py-4 border-r border-rose-50/30 text-center">
@@ -390,22 +443,39 @@ export default function EvaluationPage() {
                            {dates?.regularization || '-'}
                          </td>
                          <td className="px-6 py-4 border-r border-rose-50/30 text-center">
-                           {evaluations[emp.id]?.status ? (
+                           {dates?.status === 'Regular' || dates?.status === 'Regularized' ? null : (evaluations[emp.id]?.remarks_1 === 'Passed' || evaluations[emp.id]?.remarks_2 === 'Passed') ? (
+                             <Badge variant="outline" className="border-blue-200 text-blue-700 bg-blue-50 font-bold px-2 py-0.5 uppercase text-[9px] rounded-md whitespace-nowrap">
+                               For Recommendation
+                             </Badge>
+                           ) : evaluations[emp.id]?.status ? (
                              <Badge variant="outline" className="border-rose-200 text-rose-700 bg-rose-50 font-bold px-2 py-0.5 uppercase text-[9px] rounded-md">
                                {evaluations[emp.id]?.status}
                              </Badge>
                            ) : <span className="text-slate-300 italic text-[10px]">None</span>}
                          </td>
                         <td className="px-6 py-4 text-center">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            className="text-[#630C22] border-[#630C22] hover:bg-[#630C22] hover:text-white rounded-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-                            onClick={() => saveEvaluation(emp.id)}
-                            disabled={isScore1Saved && isScore2Saved}
-                          >
-                            Save
-                          </Button>
+                          {(() => {
+                            const isForRecommendation = evaluations[emp.id]?.remarks_1 === 'Passed' || evaluations[emp.id]?.remarks_2 === 'Passed';
+                            const isRecommended = dates?.status === 'Regular' || dates?.status === 'Regularized';
+                            
+                            if (isRecommended) return null;
+
+                            return (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                className={`rounded-lg font-bold transition-all ${
+                                  isForRecommendation && !isRecommended
+                                    ? 'bg-blue-600 text-white hover:bg-blue-700 border-none px-4 shadow-sm'
+                                    : 'text-[#630C22] border-[#630C22] hover:bg-[#630C22] hover:text-white'
+                                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                onClick={() => saveEvaluation(emp.id, isForRecommendation && !isRecommended)}
+                                disabled={isRecommended || (isScore1Saved && isScore2Saved && !isForRecommendation)}
+                              >
+                                {isForRecommendation && !isRecommended ? 'Recommend' : (isRecommended ? 'Recommended' : 'Save')}
+                              </Button>
+                            );
+                          })()}
                         </td>
                       </tr>
                     )
