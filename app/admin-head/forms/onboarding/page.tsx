@@ -33,13 +33,15 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
-  Save, Lock, ChevronLeft, ChevronRight, Check, Trash2, Plus, LayoutDashboard, ClipboardList, TriangleAlert, FolderPlus, Filter, ArrowUpDown, ListFilter, CheckCircle2, CircleDashed, Clock3, History, ArrowUpAZ, ArrowDownAZ, ChevronDown, Users, Loader2, X
+  Save, Lock, ChevronLeft, ChevronRight, Check, Trash2, Plus, LayoutDashboard, ClipboardList, FolderPlus, Filter, ArrowUpDown, ListFilter, CheckCircle2, CircleDashed, Clock3, History, ArrowUpAZ, ArrowDownAZ, ChevronDown, Users, Loader2, X
 } from 'lucide-react'
 import { Label } from '@/components/ui/label'
 import { cn } from "@/lib/utils"
 import { getApiUrl } from '@/lib/api'
 import { ensureOkResponse } from '@/lib/api/error-message'
 import { VALIDATION_CONSTRAINTS } from '@/lib/validation/constraints'
+import { DeleteTaskDialog, UnsavedChangesDialog } from '@/components/checklist/confirm-dialogs'
+import { useChecklistTemplateSetup } from '@/lib/hooks/use-checklist-template-setup'
 import { toast } from 'sonner'
 
 
@@ -67,15 +69,6 @@ interface OnboardingRecord {
   tasks: ChecklistTask[]
 }
 
-
-interface NamedOption {
-  name: string
-}
-
-interface DepartmentOption {
-  id: number
-  name: string
-}
 
 const buildBlankRecord = (departmentName: string): OnboardingRecord => ({
   id: '',
@@ -176,142 +169,43 @@ function OnboardingChecklistPageContent() {
   const [saving, setSaving] = useState(false)
   const [creatingRecord, setCreatingRecord] = useState(false)
   const [addRecordOpen, setAddRecordOpen] = useState(false)
-  const [tasks, setTasks] = useState<ChecklistTask[]>([])
   const [taskIdToDelete, setTaskIdToDelete] = useState<number | null>(null)
   const [open, setOpen] = useState(false)
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [records, setRecords] = useState<OnboardingRecord[]>([])
-  const [employeeInfo, setEmployeeInfo] = useState<OnboardingRecord | null>(null)
-  const [departmentsData, setDepartmentsData] = useState<DepartmentOption[]>([])
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | null>(null)
-  const [positionOptions, setPositionOptions] = useState<string[]>([])
-  const [departmentOptions, setDepartmentOptions] = useState<string[]>([])
   const [newRecord, setNewRecord] = useState({
     name: '',
     position: '',
     department: '',
     startDate: '',
   })
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [recordStatusFilter, setRecordStatusFilter] = useState<RecordStatusFilter>('ALL')
   const [recordSort, setRecordSort] = useState<RecordSort>('UPDATED_DESC')
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false)
   const [unsavedPromptOpen, setUnsavedPromptOpen] = useState(false)
   const [pendingDepartmentSelection, setPendingDepartmentSelection] = useState<string | null>(null)
   const [pendingNavigationUrl, setPendingNavigationUrl] = useState<string | null>(null)
-  const [reloadToken, setReloadToken] = useState(0)
-
-
-  useEffect(() => {
-    const fetchChecklists = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        const response = await fetch(`${getApiUrl()}/api/department-checklist-templates?checklist_type=ONBOARDING`, {
-          headers: { Accept: 'application/json' },
-        })
-
-
-        await ensureOkResponse(response, 'Unable to load onboarding checklist templates right now.')
-
-
-        const result = await response.json()
-        const data = Array.isArray(result?.data) ? result.data.map(normalizeTemplateRecord) : []
-        setRecords(data)
-
-
-        if (data.length > 0) {
-          let indexToSelect = 0
-
-
-          // Auto-select based on search param
-          if (targetName) {
-            const target = targetName.toLowerCase()
-            const matchingIndex = data.findIndex((r: OnboardingRecord) =>
-              r.name.toLowerCase() === target || String(r.department || '').toLowerCase() === target
-            )
-            if (matchingIndex !== -1) {
-              indexToSelect = matchingIndex
-            }
-          }
-
-
-          const selected = data[indexToSelect]
-          setCurrentIndex(indexToSelect)
-          setEmployeeInfo(selected)
-          setTasks(selected.tasks)
-          if (selected?.department) {
-            const departmentMatch = departmentsData.find((item) => item.name === selected.department)
-            setSelectedDepartmentId(departmentMatch?.id ?? null)
-          }
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to load checklists'
-        setError(message)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-
-    fetchChecklists()
-  }, [])
-
-
-  useEffect(() => {
-    const fetchOptions = async () => {
-      try {
-        const [positionsResponse, departmentsResponse] = await Promise.all([
-          fetch(`${getApiUrl()}/api/positions`, { headers: { Accept: 'application/json' } }),
-          fetch(`${getApiUrl()}/api/departments`, { headers: { Accept: 'application/json' } }),
-        ])
-
-
-        if (positionsResponse.ok) {
-          const positionsData = await positionsResponse.json()
-          const names = Array.isArray(positionsData?.data)
-            ? (positionsData.data as NamedOption[]).map((item) => item.name).filter((name): name is string => !!name)
-            : []
-          setPositionOptions([...new Set(names)])
-        }
-
-
-        if (departmentsResponse.ok) {
-          const departmentsData = await departmentsResponse.json()
-          const rows = Array.isArray(departmentsData?.data)
-            ? (departmentsData.data as DepartmentOption[])
-              .filter((item): item is DepartmentOption => Number.isFinite(Number(item?.id)) && typeof item?.name === 'string')
-            : []
-          const sortedRows = [...rows].sort((a, b) => a.name.localeCompare(b.name))
-          setDepartmentsData(sortedRows)
-          setDepartmentOptions(sortedRows.map((item) => item.name))
-        }
-      } catch {
-      }
-    }
-
-
-    fetchOptions()
-  }, [reloadToken])
-
-  useEffect(() => {
-    if (!employeeInfo?.department) return
-    const departmentMatch = departmentsData.find((item) => item.name === employeeInfo.department)
-    setSelectedDepartmentId(departmentMatch?.id ?? null)
-  }, [employeeInfo?.department, departmentsData])
-
-  useEffect(() => {
-    if (loading) return
-    if (employeeInfo) return
-    const firstDepartment = departmentOptions[0]
-    if (!firstDepartment) return
-    const blank = buildBlankRecord(firstDepartment)
-    setEmployeeInfo(blank)
-    setTasks([])
-    const departmentMatch = departmentsData.find((item) => item.name === firstDepartment)
-    setSelectedDepartmentId(departmentMatch?.id ?? null)
-  }, [loading, employeeInfo, departmentOptions, departmentsData])
+  const {
+    records,
+    setRecords,
+    employeeInfo,
+    setEmployeeInfo,
+    tasks,
+    setTasks,
+    currentIndex,
+    setCurrentIndex,
+    departmentsData,
+    selectedDepartmentId,
+    setSelectedDepartmentId,
+    positionOptions,
+    departmentOptions,
+    loading,
+    error,
+    setReloadToken,
+  } = useChecklistTemplateSetup<ChecklistTask, OnboardingRecord>({
+    checklistType: 'ONBOARDING',
+    normalizeTemplateRecord,
+    buildBlankRecord,
+    targetName,
+  })
 
 
   const completionPercentage = useMemo(() => {
@@ -1142,71 +1036,28 @@ function OnboardingChecklistPageContent() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={unsavedPromptOpen} onOpenChange={setUnsavedPromptOpen}>
-        <AlertDialogContent className="max-w-[520px] rounded-2xl border border-[#E9B8C4] bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.18)]">
-          <AlertDialogHeader>
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-rose-50 text-[#E11D48]">
-              <TriangleAlert className="h-6 w-6" />
-            </div>
-            <AlertDialogTitle className="text-left text-3xl font-semibold tracking-tight text-slate-900">Unsaved Changes Detected</AlertDialogTitle>
-            <AlertDialogDescription className="mt-2 text-left text-lg text-slate-500">
-              You have unsaved changes. You can save first, or continue without saving.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="mt-8 flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <AlertDialogCancel
-              className="h-12 rounded-none border border-slate-300 px-6 font-semibold text-slate-700 hover:bg-slate-100"
-              onClick={() => {
-                setUnsavedPromptOpen(false)
-                clearUnsavedIntents()
-              }}
-            >
-              Stay
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="h-12 rounded-none bg-[#A4163A] px-6 font-semibold text-white hover:bg-[#8C1231]"
-              onClick={proceedWithoutSaving}
-            >
-              Proceed Without Saving
-            </AlertDialogAction>
-            <AlertDialogAction
-              className="h-12 rounded-none bg-[#B10F1F] px-6 font-semibold text-white hover:bg-[#950D1A]"
-              onClick={() => void handleSaveAndContinue()}
-            >
-              Save and Continue
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <UnsavedChangesDialog
+        open={unsavedPromptOpen}
+        onOpenChange={setUnsavedPromptOpen}
+        onStay={() => {
+          setUnsavedPromptOpen(false)
+          clearUnsavedIntents()
+        }}
+        onProceedWithoutSaving={proceedWithoutSaving}
+        onSaveAndContinue={() => void handleSaveAndContinue()}
+      />
 
-
-      <AlertDialog open={taskIdToDelete !== null} onOpenChange={(open) => { if (!open) setTaskIdToDelete(null) }}>
-        <AlertDialogContent className="max-w-[520px] rounded-2xl border border-[#E9B8C4] bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.18)]">
-          <AlertDialogHeader>
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-rose-50 text-[#E11D48]">
-              <TriangleAlert className="h-6 w-6" />
-            </div>
-            <AlertDialogTitle className="text-left text-3xl font-semibold tracking-tight text-slate-900">Delete this task?</AlertDialogTitle>
-            <AlertDialogDescription className="mt-2 text-left text-lg text-slate-500">
-              This task will be removed from the current checklist.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="mt-8 flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <AlertDialogCancel onClick={() => setTaskIdToDelete(null)} className="h-12 rounded-none border border-slate-300 px-6 font-semibold text-slate-700 hover:bg-slate-100">
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="h-12 rounded-none bg-[#B10F1F] px-6 font-semibold text-white hover:bg-[#950D1A]"
-              onClick={() => {
-                if (taskIdToDelete !== null) removeTask(taskIdToDelete)
-                setTaskIdToDelete(null)
-              }}
-            >
-              Delete Task
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteTaskDialog
+        open={taskIdToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setTaskIdToDelete(null)
+        }}
+        onCancel={() => setTaskIdToDelete(null)}
+        onDelete={() => {
+          if (taskIdToDelete !== null) removeTask(taskIdToDelete)
+          setTaskIdToDelete(null)
+        }}
+      />
     </div>
   )
 }
