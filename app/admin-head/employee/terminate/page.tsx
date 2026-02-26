@@ -50,7 +50,7 @@ interface Employee {
   last_name: string
   email: string
   position: string
-  status: string
+  status: string | 'pending' | 'employed' | 'terminated' | 'rehire_pending' | 'rehired_employee' | 'termination_pending' | 'resignation_pending'
   department?: string
 }
 
@@ -236,6 +236,22 @@ function TerminatePageContent() {
          if (!checklistRecordId && data.data?.id) {
            setChecklistRecordId(String(data.data.id))
          }
+
+         // Ensure final termination transition
+         if (isFinalSave && emp.id) {
+           try {
+              const finalStatus = isResigned ? 'resigned' : 'terminated'
+              await fetch(`${getApiUrl()}/api/employees/${emp.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ status: finalStatus })
+              })
+              toast.success(`Employee fully marked as ${finalStatus}!`)
+           } catch (err) {
+              console.error('Final termination status update failed', err)
+           }
+         }
+
          return true
       } else {
          toast.error(data.message || 'Failed to save clearance progress')
@@ -408,6 +424,19 @@ function TerminatePageContent() {
           exit_type: 'resigned',
         }))
         setResigned(normalizedResigned)
+        
+        // Auto-open checklist if requested via URL
+        const checklistEmployeeId = searchParams.get('employeeId')
+        const actionParam = searchParams.get('action')
+        if (actionParam === 'checklist' && checklistEmployeeId) {
+          const foundRecord = (Array.isArray(termData.data) ? termData.data : []).find((r: any) => String(r.employee_id) === checklistEmployeeId) 
+                              || normalizedResigned.find((r: any) => String(r.employee_id) === checklistEmployeeId)
+          if (foundRecord) {
+             setChecklistEmployee(foundRecord)
+             setView('checklist')
+             prepareClearanceChecklist(foundRecord)
+          }
+        }
       } else {
         toast.error('Failed to load resigned history')
       }
@@ -612,7 +641,7 @@ function TerminatePageContent() {
                 termination_date: formData.termination_date,
                 reason: formData.reason,
                 notes: formData.notes,
-                status: exitActionType === 'resigned' ? 'resigned' : 'completed',
+                status: exitActionType === 'resigned' ? 'resigned' : 'pending',
                 exit_type: exitActionType,
                 recommended_by: formData.recommended_by || null,
                 notice_mode: formData.notice_modes.includes('both')
@@ -669,7 +698,7 @@ function TerminatePageContent() {
                 reason: snapshot.reason,
                 notes: snapshot.notes,
                 exit_type: exitActionType,
-                status: exitActionType === 'resigned' ? 'resigned' : 'completed',
+                status: exitActionType === 'resigned' ? 'resigned' : 'pending',
                 employee: selectedEmployee
               }
               setChecklistEmployee(tempRecord)
@@ -819,6 +848,16 @@ function TerminatePageContent() {
               } catch (resolveError) {
                 console.error('Unable to resolve latest employee ID after re-hire:', resolveError)
               }
+            }
+
+            try {
+              await fetch(`${getApiUrl()}/api/employees/${encodeURIComponent(resolvedEmployeeId)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ status: 'rehire_pending', rehire_process: true })
+              })
+            } catch (flagError) {
+              console.error('Failed to mark rehire process as in progress:', flagError)
             }
 
             toast.success(data.message || 'Employee re-hired successfully')
@@ -1377,18 +1416,6 @@ function TerminatePageContent() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="text-[#800020] font-bold hover:text-[#A0153E] hover:bg-rose-50 rounded-lg px-4"
-                                  onClick={() => {
-                                    setChecklistEmployee(record)
-                                    prepareClearanceChecklist(record)
-                                    setView('checklist')
-                                  }}
-                                >
-                                  Clearance
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
                                   className="text-slate-600 font-bold hover:text-slate-800 hover:bg-slate-100 rounded-lg px-4"
                                   onClick={() => {
                                     setSelectedTermination(record)
@@ -1751,8 +1778,7 @@ function TerminatePageContent() {
                     onClick={async () => {
                       const success = await handleSaveClearance(true)
                       if (success) {
-                        fetchData()
-                        setView('main')
+                        router.push('/admin-head/employee/masterfile')
                       }
                     }}
                     disabled={Object.keys(completedClearanceTasks).length < clearanceTasks.length || isSavingChecklist}
@@ -1761,7 +1787,12 @@ function TerminatePageContent() {
                     {isSavingChecklist ? 'SAVING...' : 'COMPLETE CLEARANCE'}
                   </Button>
                   <Button 
-                    onClick={() => handleSaveClearance(false)} 
+                    onClick={async () => {
+                      const success = await handleSaveClearance(false)
+                      if (success) {
+                        router.push('/admin-head/employee/masterfile')
+                      }
+                    }} 
                     disabled={isSavingChecklist}
                     className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-[#A4163A] hover:bg-[#800020] text-white shadow-lg active:scale-95 transition-all rounded-xl"
                   >

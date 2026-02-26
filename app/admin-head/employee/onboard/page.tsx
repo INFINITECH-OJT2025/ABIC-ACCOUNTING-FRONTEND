@@ -186,6 +186,30 @@ function OnboardPageContent() {
     variant: 'default'
   })
 
+  const persistRehireBatchProgress = (employeeId: string, batch: number) => {
+    if (!employeeId || !isRehireFlow) return
+    try {
+      const raw = localStorage.getItem('rehire_batch_progress')
+      const parsed = raw ? JSON.parse(raw) : {}
+      parsed[String(employeeId)] = batch
+      localStorage.setItem('rehire_batch_progress', JSON.stringify(parsed))
+    } catch (error) {
+      console.error('Failed to persist rehire batch progress:', error)
+    }
+  }
+
+  const clearRehireBatchProgress = (employeeId?: string | null) => {
+    if (!employeeId) return
+    try {
+      const raw = localStorage.getItem('rehire_batch_progress')
+      const parsed = raw ? JSON.parse(raw) : {}
+      delete parsed[String(employeeId)]
+      localStorage.setItem('rehire_batch_progress', JSON.stringify(parsed))
+    } catch (error) {
+      console.error('Failed to clear rehire batch progress:', error)
+    }
+  }
+
   const batches = [
     { id: 1, title: 'Employee Details', icon: Briefcase, description: 'Basic employment information' },
     { id: 2, title: 'Personal Information', icon: User, description: 'Your personal details' },
@@ -259,6 +283,22 @@ function OnboardPageContent() {
       return JSON.parse(raw)
     } catch {
       return null
+    }
+  }
+
+  const ensureRehirePendingStatus = async (employeeId?: string | null) => {
+    if (!isRehireFlow || !employeeId) return true
+    try {
+      const response = await apiFetch(`/api/employees/${encodeURIComponent(employeeId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'rehire_pending', rehire_process: true }),
+      })
+      const data = await parseJsonFromResponse(response)
+      return Boolean(response.ok && data?.success)
+    } catch (error) {
+      console.error('Failed to enforce rehire_pending status:', error)
+      return false
     }
   }
 
@@ -386,13 +426,16 @@ function OnboardPageContent() {
 
     // Load employee if ID is provided in URL
     if (employeeIdParam) {
-      const requestedView: 'onboard' | 'checklist' | 'update-info' = isRehireFlow
-        ? 'onboard'
-        : requestedViewParam === 'checklist'
+      const requestedView: 'onboard' | 'checklist' | 'update-info' =
+        requestedViewParam === 'checklist'
           ? 'checklist'
           : requestedViewParam === 'onboard'
             ? 'onboard'
-            : 'update-info'
+            : requestedViewParam === 'update-info'
+              ? 'update-info'
+              : isRehireFlow
+                ? 'onboard'
+                : 'update-info'
       loadExistingEmployee(employeeIdParam, requestedView)
     } else {
       const timer = setTimeout(() => setLoading(false), 1200)
@@ -563,13 +606,19 @@ function OnboardPageContent() {
   }, [view, checklistData?.department, progressionFormData?.department, onboardFormData?.department, checklistRecordId])
 
 
-  const fetchChecklistProgress = async (employeeName: string) => {
+  const fetchChecklistProgress = async (params: {
+    employeeName: string
+    employeeId?: string | number | null
+    rehireStartedAt?: string | null
+  }) => {
+    const { employeeName, employeeId, rehireStartedAt } = params
     try {
       const response = await fetch(`${getApiUrl()}/api/onboarding-checklist`, {
         headers: { Accept: 'application/json' },
       })
       const data = await response.json()
       const list = Array.isArray(data?.data) ? data.data : []
+      const normalizedEmployeeId = String(employeeId ?? '').trim().toLowerCase()
       const normalizeName = (value: unknown) =>
         toPlainString(value)
           .toLowerCase()
@@ -585,9 +634,25 @@ function OnboardPageContent() {
         return bTime - aTime
       })
 
-      let matched = sortedByLatest.find((item: any) => normalizeName(item?.name) === normalizedName)
+      const rehireStartTs = new Date(rehireStartedAt ?? 0).getTime()
+      const scopedForCurrentRehire = sortedByLatest.filter((item: any) => {
+        if (!Number.isFinite(rehireStartTs) || rehireStartTs <= 0) return true
+        const itemUpdatedTs = new Date(item?.updated_at ?? item?.created_at ?? 0).getTime()
+        return Number.isFinite(itemUpdatedTs) && itemUpdatedTs >= rehireStartTs
+      })
+
+      let matched = normalizedEmployeeId
+        ? scopedForCurrentRehire.find((item: any) => {
+            const checklistEmpId = String(item?.employeeId ?? item?.employee_id ?? '').trim().toLowerCase()
+            return checklistEmpId === normalizedEmployeeId
+          })
+        : undefined
+
+      if (!matched) {
+        matched = scopedForCurrentRehire.find((item: any) => normalizeName(item?.name) === normalizedName)
+      }
       if (!matched && firstName && lastName) {
-        matched = sortedByLatest.find((item: any) => {
+        matched = scopedForCurrentRehire.find((item: any) => {
           const candidate = normalizeName(item?.name)
           return candidate.includes(firstName) && candidate.includes(lastName)
         })
@@ -677,7 +742,16 @@ function OnboardPageContent() {
           raw_date: toIsoDate(emp.onboarding_date || emp.date_hired)
         })
         if (!isRehireFlow) {
-          await fetchChecklistProgress(`${emp.first_name} ${emp.last_name}`)
+          await fetchChecklistProgress({
+            employeeName: `${emp.first_name} ${emp.last_name}`,
+            employeeId: String(emp?.id ?? id),
+          })
+        } else if (targetView === 'checklist' || targetView === 'update-info') {
+          await fetchChecklistProgress({
+            employeeName: `${emp.first_name} ${emp.last_name}`,
+            employeeId: String(emp?.id ?? id),
+            rehireStartedAt: emp?.rehired_at ?? null,
+          })
         } else {
           setChecklistRecordId(null)
           setCompletedTasks({})
@@ -1016,6 +1090,7 @@ function OnboardPageContent() {
           throw new Error(onboardData?.message || 'Failed to start re-hire onboarding')
         }
 
+        await ensureRehirePendingStatus(String(onboardingEmployeeId))
         toast.success('Re-hire onboarding started')
         setProgressionFormData((prev) => ({
           ...prev,
@@ -1120,9 +1195,9 @@ function OnboardPageContent() {
 
   const handleSaveChecklist = async (
     redirect = true,
-    options: { showSuccessToast?: boolean } = {}
+    options: { showSuccessToast?: boolean; finalizeRehire?: boolean } = {}
   ) => {
-    const { showSuccessToast = true } = options
+    const { showSuccessToast = true, finalizeRehire = false } = options
     if (!checklistData) return false
 
     setIsSaving(true)
@@ -1164,7 +1239,9 @@ function OnboardPageContent() {
             position: toPlainString(checklistData.position),
             department: normalizedDepartment,
             startDate: normalizedStartDate,
-            status: completionPercentage === 100 ? 'DONE' : 'PENDING',
+            status: isRehireFlow
+              ? (finalizeRehire ? 'DONE' : 'PENDING')
+              : (completionPercentage === 100 ? 'DONE' : 'PENDING'),
             tasks: allTasks
           }),
         }
@@ -1181,6 +1258,9 @@ function OnboardPageContent() {
           setChecklistRecordId(savedId)
           // Synchronize savedTasks with currently completed tasks
           setSavedTasks(new Set(Object.keys(completedTasks)))
+        }
+        if (isRehireFlow && onboardingEmployeeId) {
+          await ensureRehirePendingStatus(String(onboardingEmployeeId))
         }
         if (showSuccessToast) {
           toast.success('Checklist progress saved successfully')
@@ -1367,7 +1447,7 @@ function OnboardPageContent() {
         return
       }
 
-      const checklistSaved = await handleSaveChecklist(false, { showSuccessToast: false })
+      const checklistSaved = await handleSaveChecklist(false, { showSuccessToast: false, finalizeRehire: isRehireFlow })
       if (!checklistSaved) {
         toast.error('Failed to save onboarding checklist. Please try again.')
         return
@@ -1383,7 +1463,7 @@ function OnboardPageContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
           isRehireFlow
-            ? { ...cleanedData, rehire_process: true }
+            ? { ...cleanedData, rehire_process: false, status: 'rehire_pending' }
             : cleanedData
         ),
       })
@@ -1391,6 +1471,9 @@ function OnboardPageContent() {
       const data = await response.json()
       if (response.ok && data.success) {
         toast.success('Employee record completed successfully!')
+        if (isRehireFlow && onboardingEmployeeId) {
+          clearRehireBatchProgress(onboardingEmployeeId)
+        }
         clearStorage()
         router.push('/admin-head/employee/masterfile')
       } else {
@@ -1416,11 +1499,14 @@ function OnboardPageContent() {
       const response = await apiFetch(`/api/employees/${onboardingEmployeeId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(isRehireFlow ? { ...cleanedData, rehire_process: true } : cleanedData),
+        body: JSON.stringify(isRehireFlow ? { ...cleanedData, rehire_process: true, status: 'rehire_pending' } : cleanedData),
       })
 
       const data = await response.json()
       if (response.ok && data.success) {
+        if (isRehireFlow && onboardingEmployeeId) {
+          persistRehireBatchProgress(String(onboardingEmployeeId), currentBatch)
+        }
         toast.success('Progress saved successfully')
         clearStorage()
         router.push('/admin-head/employee/masterfile')

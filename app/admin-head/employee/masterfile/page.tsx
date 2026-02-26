@@ -39,8 +39,9 @@ interface Employee {
   last_name: string
   email: string
   position: string
-  status: 'pending' | 'employed' | 'terminated' | 'rehire_pending' | 'rehired_employee'
+  status: 'pending' | 'employed' | 'terminated' | 'rehire_pending' | 'rehired_employee' | 'termination_pending' | 'resignation_pending'
   created_at: string
+  updated_at?: string
   onboarding_tasks?: {
     done: number
     total: number
@@ -48,6 +49,7 @@ interface Employee {
   }
   termination_date?: string
   termination_reason?: string
+  rehire_started_at?: string | null
 }
 
 interface EmployeeDetails extends Employee {
@@ -60,6 +62,8 @@ const statusBadgeColors = {
   terminated: 'bg-rose-50 text-rose-700 border-rose-200',
   rehire_pending: 'bg-orange-50 text-orange-700 border-orange-200',
   rehired_employee: 'bg-blue-50 text-blue-700 border-blue-200',
+  termination_pending: 'bg-rose-50 text-rose-700 border-rose-200 shadow-none uppercase tracking-wider',
+  resignation_pending: 'bg-rose-50 text-rose-700 border-rose-200 shadow-none uppercase tracking-wider',
 }
 
 const statusLabels = {
@@ -68,6 +72,8 @@ const statusLabels = {
   terminated: 'Terminated',
   rehire_pending: 'Rehire Pending',
   rehired_employee: 'Rehired Employee',
+  termination_pending: 'Pending Termination',
+  resignation_pending: 'Pending Resignation',
 }
 
 export default function MasterfilePage() {
@@ -99,8 +105,27 @@ export default function MasterfilePage() {
   const [loadingCities, setLoadingCities] = useState(false)
   const [loadingBarangays, setLoadingBarangays] = useState(false)
   const [checklists, setChecklists] = useState<OnboardingChecklist[]>([])
+  const [rehireBatchProgress, setRehireBatchProgress] = useState<Record<string, number>>({})
 
   const [sortOrder, setSortOrder] = useState<'recent' | 'oldest' | 'az' | 'za'>('recent')
+
+  const loadRehireBatchProgress = () => {
+    try {
+      const raw = localStorage.getItem('rehire_batch_progress')
+      const parsed = raw ? JSON.parse(raw) : {}
+      const next: Record<string, number> = {}
+      Object.entries(parsed || {}).forEach(([id, value]) => {
+        const batch = Number(value)
+        if (Number.isFinite(batch) && batch >= 1 && batch <= 7) {
+          next[String(id)] = batch
+        }
+      })
+      setRehireBatchProgress(next)
+    } catch (error) {
+      console.error('Failed to load rehire batch progress:', error)
+      setRehireBatchProgress({})
+    }
+  }
 
   // Modal State
   const [confirmModal, setConfirmModal] = useState<{
@@ -124,6 +149,7 @@ export default function MasterfilePage() {
   useEffect(() => {
     fetchEmployees()
     fetchRegions()
+    loadRehireBatchProgress()
   }, [])
 
   const fetchRegions = async () => {
@@ -368,6 +394,7 @@ export default function MasterfilePage() {
   }
 
   const fetchEmployees = async () => {
+    loadRehireBatchProgress()
     setFetchError(null)
     try {
       const apiUrl = getApiUrl()
@@ -401,13 +428,17 @@ export default function MasterfilePage() {
 
         setChecklists(checklistsList)
 
-        const enhancedEmployees = empData.data.map((emp: Employee) => {
+        const enhancedEmployees = await Promise.all(empData.data.map(async (emp: Employee) => {
           const fullName = normalizeName(`${emp.first_name} ${emp.last_name}`)
+          const empEmail = normalizeName(emp.email || '')
+          const empId = String(emp.id ?? '').trim().toLowerCase()
           const nameParts = fullName.split(' ').filter(Boolean)
           const firstName = nameParts[0] || ''
           const lastName = nameParts[nameParts.length - 1] || ''
           const checklistMatches = checklistsList
             .filter((c: any) => {
+              const checklistEmployeeId = String(c?.employeeId ?? c?.employee_id ?? '').trim().toLowerCase()
+              if (empId && checklistEmployeeId && checklistEmployeeId === empId) return true
               const candidate = normalizeName(c?.name)
               if (!candidate) return false
               if (candidate === fullName) return true
@@ -422,29 +453,75 @@ export default function MasterfilePage() {
               return bTime - aTime
             })
           const checklist = checklistMatches[0]
-          const termination = terminationsList.find((t: any) => t.employee_id === emp.id)
+          const termination = terminationsList
+            .filter((t: any) => {
+              const idMatch = String(t?.employee_id ?? '') === String(emp.id)
+              const terminationEmail = normalizeName(t?.employee?.email ?? t?.employee?.email_address ?? '')
+              const emailMatch = Boolean(empEmail) && terminationEmail === empEmail
+              return idMatch || emailMatch
+            })
+            .sort((a: any, b: any) => {
+              const aTs = new Date(a?.rehired_at ?? a?.updated_at ?? a?.created_at ?? a?.termination_date ?? 0).getTime()
+              const bTs = new Date(b?.rehired_at ?? b?.updated_at ?? b?.created_at ?? b?.termination_date ?? 0).getTime()
+              return bTs - aTs
+            })[0]
 
-          let enhancedEmp = { ...emp }
+          let enhancedEmp: any = { ...emp }
+
+          // For pending/rehire cards, pull full profile so batch detection is accurate.
+          if (['pending', 'rehire_pending'].includes(String(emp.status))) {
+            try {
+              const detailsResponse = await fetch(`${apiUrl}/api/employees/${emp.id}`, {
+                headers: { Accept: 'application/json' },
+              })
+              if (detailsResponse.ok) {
+                const detailsData = await detailsResponse.json()
+                if (detailsData?.success && detailsData?.data) {
+                  enhancedEmp = { ...enhancedEmp, ...detailsData.data }
+                }
+              }
+            } catch (detailsError) {
+              console.error(`Failed to fetch detailed profile for ${emp.id}:`, detailsError)
+            }
+          }
 
           if (termination) {
             enhancedEmp.termination_date = termination.termination_date
             enhancedEmp.termination_reason = termination.reason
+            enhancedEmp.rehire_started_at = termination.rehired_at ?? null
           }
 
           if (checklist) {
             const tasks = Array.isArray(checklist.tasks) ? checklist.tasks : []
             const doneCount = tasks.filter((t: any) => String(t?.status ?? '').toUpperCase() === 'DONE').length
+            const checklistStatus = String(checklist?.status ?? '').toUpperCase()
+            const checklistUpdatedAt = new Date(checklist?.updated_at ?? checklist?.created_at ?? 0).getTime()
+            const rehireStartedAt = new Date(enhancedEmp?.rehire_started_at ?? 0).getTime()
+            const rehireCycleFallbackStart = new Date(enhancedEmp?.updated_at ?? 0).getTime()
+            const rehireCycleStartAt = Number.isFinite(rehireStartedAt) && rehireStartedAt > 0
+              ? rehireStartedAt
+              : rehireCycleFallbackStart
+            const checklistBelongsToCurrentRehire = enhancedEmp.status !== 'rehire_pending'
+              ? true
+              : Number.isFinite(rehireCycleStartAt) && rehireCycleStartAt > 0 && checklistUpdatedAt >= rehireCycleStartAt
+
             enhancedEmp = {
               ...enhancedEmp,
               onboarding_tasks: {
-                done: doneCount,
+                done: checklistBelongsToCurrentRehire ? doneCount : 0,
                 total: tasks.length,
-                isComplete: doneCount === tasks.length && tasks.length > 0
+                isComplete: checklistBelongsToCurrentRehire
+                  && doneCount === tasks.length
+                  && tasks.length > 0
+                  && (
+                    enhancedEmp.status !== 'rehire_pending'
+                    || checklistStatus === 'DONE'
+                  )
               }
             }
           }
           return enhancedEmp
-        })
+        }))
         setEmployees(enhancedEmployees || [])
       } else {
         toast.error(empData.message || 'Failed to fetch employees')
@@ -484,7 +561,8 @@ export default function MasterfilePage() {
           ...data.data,
           onboarding_tasks: existingEmp?.onboarding_tasks,
           termination_date: existingEmp?.termination_date,
-          termination_reason: existingEmp?.termination_reason
+          termination_reason: existingEmp?.termination_reason,
+          rehire_started_at: existingEmp?.rehire_started_at
         }
         setSelectedEmployee(enhancedDetails)
       } else {
@@ -502,9 +580,10 @@ export default function MasterfilePage() {
 
   const checkCompleteness = (emp: any) => {
     if (!emp) return { isComplete: false, status: 'Incomplete', batchId: 1 }
+    const employmentDate = emp.date_hired || emp.onboarding_date
 
     // Batch 1: Employment Information
-    if (!emp.position || emp.position.toString().trim() === '' || !emp.date_hired) {
+    if (!emp.position || emp.position.toString().trim() === '' || !employmentDate) {
       return { isComplete: false, status: 'Pending: Employment Information', batchId: 1 }
     }
 
@@ -546,9 +625,19 @@ export default function MasterfilePage() {
 
     return { 
       isComplete: true, 
-      status: emp.status === 'rehire_pending' ? 'READY TO RE-HIRE' : 'READY TO EMPLOY', 
+      status: emp.status === 'rehire_pending' ? 'PENDING: COMPLETE & FINISH REHIRE' : 'READY TO EMPLOY', 
       batchId: 1 
     }
+  }
+
+  const batchLabelById: Record<number, string> = {
+    1: 'Employee Details',
+    2: 'Personal Information',
+    3: 'Contact Information',
+    4: 'Government IDs',
+    5: 'Family Information',
+    6: 'Current Address',
+    7: 'Permanent Address',
   }
 
   const handleSetAsEmployed = async () => {
@@ -657,7 +746,7 @@ export default function MasterfilePage() {
   )
   const terminatedList = filterEmployees(employees.filter(e => e.status === 'terminated'))
   const pendingList = filterEmployees(
-    employees.filter(e => e.status === 'pending' || e.status === 'rehire_pending')
+    employees.filter(e => ['pending', 'rehire_pending', 'termination_pending', 'resignation_pending'].includes(e.status))
   )
   const allList = filterEmployees(employees)
 
@@ -1018,26 +1107,50 @@ export default function MasterfilePage() {
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                       {pendingList.map((employee) => {
-                        const { isComplete, status } = checkCompleteness(employee as any)
+                        const isTerminationPending = employee.status === 'termination_pending' || employee.status === 'resignation_pending'
+                        const isRehirePending = employee.status === 'rehire_pending'
+                        const checklistTasksComplete =
+                          Number(employee.onboarding_tasks?.total ?? 0) > 0 &&
+                          Number(employee.onboarding_tasks?.done ?? 0) === Number(employee.onboarding_tasks?.total ?? 0)
+                        
+                        // Use default logic if NOT termination pending
+                        const { isComplete, status, batchId } = checkCompleteness(employee as any)
                         const isFullyComplete = isComplete && employee.onboarding_tasks?.isComplete
+                        const savedBatchId = rehireBatchProgress[String(employee.id)]
+                        const displayBatchId = isRehirePending && Number.isFinite(savedBatchId) ? savedBatchId : batchId
+                        const batchLabel = batchLabelById[displayBatchId] || 'Employee Details'
+
+                        // For termination, it's not complete until status changes to 'terminated' or 'resigned' in the db
+                        const displayStatus = employee.status === 'resignation_pending' ? 'PENDING RESIGNATION' : 'PENDING TERMINATION'
 
                         return (
                           <div
                             key={employee.id}
                             onClick={() => fetchEmployeeDetails(employee.id)}
-                            className={`group relative bg-white border rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer overflow-hidden ${isFullyComplete
+                            className={`group relative bg-white border rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer overflow-hidden ${
+                              isTerminationPending 
+                              ? 'border-rose-200 hover:border-rose-300'
+                              : isFullyComplete
                               ? 'border-emerald-200 hover:border-emerald-400 ring-1 ring-emerald-50'
-                              : 'border-orange-200 hover:border-orange-300'
+                              : isRehirePending
+                                ? 'border-blue-200 hover:border-blue-300'
+                                : 'border-orange-200 hover:border-orange-300'
                               }`}
                           >
                             {/* Ready Indicator Strip */}
-                            {isFullyComplete && <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>}
-                            {!isFullyComplete && <div className="absolute top-0 left-0 w-full h-1 bg-orange-400"></div>}
+                            {isTerminationPending && <div className="absolute top-0 left-0 w-full h-1 bg-rose-500"></div>}
+                            {(!isTerminationPending && isFullyComplete) && <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>}
+                            {(!isTerminationPending && !isFullyComplete) && <div className={`absolute top-0 left-0 w-full h-1 ${isRehirePending ? 'bg-blue-500' : 'bg-orange-400'}`}></div>}
 
                             <div className="flex items-center gap-4 mb-4">
-                              <div className={`w-14 h-14 min-w-[3.5rem] rounded-full flex items-center justify-center text-xl font-bold transition-colors duration-200 ${isFullyComplete
+                              <div className={`w-14 h-14 min-w-[3.5rem] rounded-full flex items-center justify-center text-xl font-bold transition-colors duration-200 ${
+                                isTerminationPending
+                                ? 'bg-rose-100 text-rose-700 group-hover:bg-rose-500 group-hover:text-white'
+                                : isFullyComplete
                                 ? 'bg-emerald-100 text-emerald-700 group-hover:bg-emerald-500 group-hover:text-white'
-                                : 'bg-orange-100 text-orange-700 group-hover:bg-orange-500 group-hover:text-white'
+                                : isRehirePending
+                                  ? 'bg-blue-100 text-blue-700 group-hover:bg-blue-500 group-hover:text-white'
+                                  : 'bg-orange-100 text-orange-700 group-hover:bg-orange-500 group-hover:text-white'
                                 }`}>
                                 {employee.first_name.charAt(0)}{employee.last_name.charAt(0)}
                               </div>
@@ -1051,24 +1164,66 @@ export default function MasterfilePage() {
                               </div>
                             </div>
                             <div className="flex justify-between items-center pt-3 border-t border-slate-50">
-                              {isFullyComplete ? (
+                              {isTerminationPending ? (
+                                <Badge variant="outline" className="text-[10px] font-bold text-rose-600 bg-rose-50 border-rose-200 shadow-none uppercase tracking-wider rounded-full">
+                                  {displayStatus}
+                                </Badge>
+                              ) : isFullyComplete ? (
                                 <Badge variant="outline" className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border-emerald-100">
-                                  {status}
+                                  {isRehirePending ? 'READY TO RE-HIRE' : status}
                                 </Badge>
                               ) : (
                                 <div className="flex flex-col gap-1 items-start">
-                                  <Badge variant="outline" className="text-[10px] font-bold text-orange-600 bg-orange-50 border-orange-200 shadow-none uppercase tracking-wider rounded-full">
-                                    {!isComplete ? status : "PENDING: ONBOARDING CHECKLIST"}
+                                  <Badge variant="outline" className={`text-[10px] font-bold shadow-none uppercase tracking-wider rounded-full ${isRehirePending ? 'text-blue-700 bg-blue-50 border-blue-200' : 'text-orange-600 bg-orange-50 border-orange-200'}`}>
+                                    {!isComplete
+                                      ? status
+                                      : isRehirePending
+                                        ? "PENDING: COMPLETE & FINISH REHIRE"
+                                        : "PENDING: ONBOARDING CHECKLIST"}
                                   </Badge>
                                   {employee.onboarding_tasks && (
                                     <span className="text-[9px] font-medium text-slate-400 mt-1 pl-1">
-                                      Tasks: {employee.onboarding_tasks.done}/{employee.onboarding_tasks.total}
+                                      {isRehirePending
+                                        ? `Batch ${displayBatchId}: ${batchLabel}`
+                                        : `Tasks: ${employee.onboarding_tasks.done}/${employee.onboarding_tasks.total}`}
                                     </span>
                                   )}
                                 </div>
                               )}
                               <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                {(employee.status === 'pending' || employee.status === 'rehire_pending') && (!isComplete || !employee.onboarding_tasks?.isComplete) && (
+                                {isTerminationPending && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => router.push(`/admin-head/employee/terminate?view=history&action=checklist&employeeId=${employee.id}`)}
+                                    className="h-7 px-2 text-[10px] font-bold border rounded-lg transition-all text-rose-600 bg-rose-50 hover:bg-rose-100 border-rose-100 animate-pulse hover:animate-none"
+                                  >
+                                    Continue Clearance
+                                  </Button>
+                                )}
+                                {isRehirePending && !isFullyComplete && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      router.push(
+                                        checklistTasksComplete
+                                          ? `/admin-head/employee/onboard?id=${employee.id}&view=update-info&rehire=1&batch=${displayBatchId}`
+                                          : `/admin-head/employee/onboard?id=${employee.id}&view=checklist&rehire=1&batch=${displayBatchId}`
+                                      )
+                                    }
+                                    className={`h-7 px-2 text-[10px] font-bold border rounded-lg transition-all ${
+                                      isRehirePending
+                                        ? 'text-blue-700 bg-blue-50 hover:bg-blue-100 border-blue-200 animate-pulse hover:animate-none'
+                                        : employee.onboarding_tasks?.isComplete
+                                          ? 'text-[#630C22] bg-rose-50 hover:bg-rose-100 border-rose-100'
+                                          : 'text-blue-600 bg-blue-50 hover:bg-blue-100 border-blue-100 animate-pulse hover:animate-none'
+                                    }`}
+                                  >
+                                    {isRehirePending ? 'Continue Rehire' : employee.onboarding_tasks?.isComplete ? 'Update Profile' : 'Continue Onboarding'}
+                                  </Button>
+                                )}
+                                {(employee.status === 'pending') && (!isComplete || !employee.onboarding_tasks?.isComplete) && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -1193,9 +1348,19 @@ export default function MasterfilePage() {
                 <div className="bg-white border-2 border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 justify-between shadow-sm font-bold inline-flex items-center whitespace-nowrap rounded-lg">
                   {(selectedEmployee?.status === 'pending' || selectedEmployee?.status === 'rehire_pending') ? (
                     <div className="flex items-center gap-2">
-                      {selectedEmployee.onboarding_tasks?.isComplete ? 
-                        checkCompleteness(selectedEmployee).status : 
-                        "PENDING: ONBOARDING CHECKLIST"}
+                      {selectedEmployee.status === 'rehire_pending'
+                        ? (
+                            selectedEmployee.onboarding_tasks?.isComplete &&
+                            checkCompleteness(selectedEmployee).isComplete &&
+                            Boolean(selectedEmployee.rehire_started_at)
+                              ? 'READY TO RE-HIRE'
+                              : 'PENDING: COMPLETE & FINISH REHIRE'
+                          )
+                        : (
+                            selectedEmployee.onboarding_tasks?.isComplete
+                              ? checkCompleteness(selectedEmployee).status
+                              : "PENDING: ONBOARDING CHECKLIST"
+                          )}
                     </div>
                   ) : (
                     statusLabels[selectedEmployee?.status || 'pending']
