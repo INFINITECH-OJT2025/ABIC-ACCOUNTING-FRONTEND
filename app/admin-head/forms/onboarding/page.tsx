@@ -32,7 +32,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
-  Save, Lock, ChevronLeft, ChevronRight, Check, Trash2, Plus, LayoutDashboard, ClipboardList, FolderPlus, Filter, ArrowUpDown, ListFilter, CheckCircle2, CircleDashed, Clock3, History, ArrowUpAZ, ArrowDownAZ, ChevronDown, Users, Loader2, X
+  Save, Lock, ChevronLeft, ChevronRight, Check, Trash2, Plus, LayoutDashboard, ClipboardList, FolderPlus, Filter, ArrowUpDown, ListFilter, CheckCircle2, CircleDashed, Clock3, History, ArrowUpAZ, ArrowDownAZ, ChevronDown, Users, Loader2, X, GripVertical
 } from 'lucide-react'
 import { Label } from '@/components/ui/label'
 import { cn } from "@/lib/utils"
@@ -172,6 +172,9 @@ function OnboardingChecklistPageContent() {
   const [creatingRecord, setCreatingRecord] = useState(false)
   const [addRecordOpen, setAddRecordOpen] = useState(false)
   const [taskIdToDelete, setTaskIdToDelete] = useState<number | null>(null)
+  const [dragTaskId, setDragTaskId] = useState<number | null>(null)
+  const [dragOverTaskId, setDragOverTaskId] = useState<number | null>(null)
+  const [recentlyMovedTaskId, setRecentlyMovedTaskId] = useState<number | null>(null)
   const [open, setOpen] = useState(false)
   const [newRecord, setNewRecord] = useState({
     name: '',
@@ -421,6 +424,27 @@ function OnboardingChecklistPageContent() {
   const updateTaskText = (id: number, text: string) => {
     setTasks(tasks.map(t => t.id === id ? { ...t, task: text } : t));
   };
+
+  const reorderTasksById = (sourceId: number, targetId: number) => {
+    if (sourceId === targetId) return
+    setTasks((prev) => {
+      const sourceIndex = prev.findIndex((row) => row.id === sourceId)
+      const targetIndex = prev.findIndex((row) => row.id === targetId)
+      if (sourceIndex === -1 || targetIndex === -1) return prev
+
+      const next = [...prev]
+      const [moved] = next.splice(sourceIndex, 1)
+      next.splice(targetIndex, 0, moved)
+      setRecentlyMovedTaskId(moved.id)
+      return next
+    })
+  }
+
+  useEffect(() => {
+    if (recentlyMovedTaskId === null) return
+    const timer = setTimeout(() => setRecentlyMovedTaskId(null), 220)
+    return () => clearTimeout(timer)
+  }, [recentlyMovedTaskId])
 
 
   const persistTaskStatus = async (updatedTasks: ChecklistTask[], previousTasks: ChecklistTask[]) => {
@@ -801,10 +825,59 @@ function OnboardingChecklistPageContent() {
             </TableHeader>
             <TableBody>
               {tasks.map((item) => (
-                <TableRow key={item.id} className="border-b border-rose-50/30 last:border-0 hover:bg-[#FFE5EC]/5 transition-colors group">
+                <TableRow
+                  key={item.id}
+                  onDragOver={(event) => {
+                    if (!editMode || tasks.length <= 1) return
+                    event.preventDefault()
+                    event.dataTransfer.dropEffect = 'move'
+                  }}
+                  onDragEnter={(event) => {
+                    if (!editMode || tasks.length <= 1) return
+                    event.preventDefault()
+                    setDragOverTaskId(item.id)
+                    if (dragTaskId !== null && dragTaskId !== item.id) {
+                      reorderTasksById(dragTaskId, item.id)
+                    }
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault()
+                    if (!editMode || tasks.length <= 1) return
+                    const sourceId = dragTaskId ?? Number(event.dataTransfer.getData('text/plain'))
+                    if (!Number.isFinite(sourceId)) return
+                    reorderTasksById(sourceId, item.id)
+                    setDragOverTaskId(null)
+                    setDragTaskId(null)
+                  }}
+                  onDragEnd={() => {
+                    setDragTaskId(null)
+                    setDragOverTaskId(null)
+                  }}
+                  className={cn(
+                    "border-b border-rose-50/30 last:border-0 hover:bg-[#FFE5EC]/5 transition-all duration-200 ease-out group",
+                    dragTaskId === item.id ? "opacity-45" : "",
+                    dragOverTaskId === item.id && dragTaskId !== item.id ? "bg-rose-50/60 ring-1 ring-rose-200" : "",
+                    recentlyMovedTaskId === item.id ? "bg-rose-50/40" : ""
+                  )}
+                >
                   <TableCell className="py-2.5">
                     {editMode ? (
-                      <div>
+                      <div className="flex items-start gap-2">
+                        <button
+                          type="button"
+                          draggable={tasks.length > 1}
+                          onDragStart={(event) => {
+                            setDragTaskId(item.id)
+                            event.dataTransfer.effectAllowed = 'move'
+                            event.dataTransfer.setData('text/plain', String(item.id))
+                          }}
+                          aria-label="Drag to reorder task"
+                          title="Drag to reorder"
+                          className="mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-md border border-rose-100 bg-rose-50/70 text-[#A4163A] shadow-sm transition-all hover:scale-105 hover:bg-rose-100 cursor-grab active:cursor-grabbing"
+                        >
+                          <GripVertical className="h-3.5 w-3.5" />
+                        </button>
+                        <div className="flex-1">
                         <Input
                           value={item.task}
                           onChange={(e) => updateTaskText(item.id, e.target.value)}
@@ -822,6 +895,7 @@ function OnboardingChecklistPageContent() {
                           min={VALIDATION_CONSTRAINTS.checklistTemplate.task.min}
                           max={VALIDATION_CONSTRAINTS.checklistTemplate.task.max}
                         />
+                        </div>
                       </div>
                     ) : (
                       <span className={cn(
