@@ -312,6 +312,26 @@ export default function GovernmentDirectoryPage() {
     })
   }, [generalContacts, generalContactsSearch, generalContactsSort])
 
+  const filteredGeneralContactsDraft = useMemo(() => {
+    const term = generalContactsSearch.trim().toLowerCase()
+    const indexed = generalContactsDraft.map((row, index) => ({ row, index }))
+    const filtered = !term
+      ? indexed
+      : indexed.filter(({ row }) => {
+          const establishment = String(row.establishment_name || '').toLowerCase()
+          const services = String(row.services || '').toLowerCase()
+          const contactPerson = String(row.contact_person || '').toLowerCase()
+          return establishment.includes(term) || services.includes(term) || contactPerson.includes(term)
+        })
+
+    const direction = generalContactsSort === 'EST_ASC' ? 1 : -1
+    return [...filtered].sort((a, b) => {
+      const left = String(a.row.establishment_name || '').toLowerCase()
+      const right = String(b.row.establishment_name || '').toLowerCase()
+      return left.localeCompare(right) * direction
+    })
+  }, [generalContactsDraft, generalContactsSearch, generalContactsSort])
+
   const directoryQuery = useQuery({
     queryKey: ['directory-agencies'],
     queryFn: async (): Promise<Record<string, BackendAgency>> => {
@@ -1208,25 +1228,21 @@ export default function GovernmentDirectoryPage() {
                   <p className="text-sm text-slate-600 mt-1">Shared contact information not tied to a specific agency.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {!editingGeneralContacts && (
-                    <Input
-                      value={generalContactsSearch}
-                      onChange={(e) => setGeneralContactsSearch(e.target.value)}
-                      placeholder="Search establishment, services, contact person..."
-                      className="w-[360px] max-w-full h-10 rounded-sm"
-                    />
-                  )}
-                  {!editingGeneralContacts && (
-                    <Select value={generalContactsSort} onValueChange={(value) => setGeneralContactsSort(value as GeneralContactsSort)}>
-                      <SelectTrigger className="w-[220px] h-10 rounded-lg bg-white border-slate-200">
-                        <SelectValue placeholder="Sort by establishment" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="EST_ASC">Establishment: A to Z</SelectItem>
-                        <SelectItem value="EST_DESC">Establishment: Z to A</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
+                  <Input
+                    value={generalContactsSearch}
+                    onChange={(e) => setGeneralContactsSearch(e.target.value)}
+                    placeholder="Search establishment, services, contact person..."
+                    className="w-[360px] max-w-full h-10 rounded-sm"
+                  />
+                  <Select value={generalContactsSort} onValueChange={(value) => setGeneralContactsSort(value as GeneralContactsSort)}>
+                    <SelectTrigger className="w-[220px] h-10 rounded-lg bg-white border-slate-200">
+                      <SelectValue placeholder="Sort by establishment" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="EST_ASC">Establishment: A to Z</SelectItem>
+                      <SelectItem value="EST_DESC">Establishment: Z to A</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <Button
                     variant="outline"
                     className="rounded-lg"
@@ -1309,7 +1325,7 @@ export default function GovernmentDirectoryPage() {
                     <p className="text-[11px] font-semibold text-slate-500">
                       Constraints: Establishment {VALIDATION_CONSTRAINTS.directory.generalEstablishment.min}-{VALIDATION_CONSTRAINTS.directory.generalEstablishment.max} chars, Services up to {VALIDATION_CONSTRAINTS.directory.generalServices.max}, Contact Person up to {VALIDATION_CONSTRAINTS.directory.generalContactPerson.max}, Contact Value {VALIDATION_CONSTRAINTS.directory.generalValue.min}-{VALIDATION_CONSTRAINTS.directory.generalValue.max}.
                     </p>
-                    {generalContactsDraft.map((row, index) => (
+                    {filteredGeneralContactsDraft.map(({ row, index }) => (
                       <div key={`general-contact-draft-${index}`} className="border border-slate-200 rounded-md p-3 space-y-2">
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-2 min-w-0">
