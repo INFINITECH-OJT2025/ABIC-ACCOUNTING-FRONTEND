@@ -772,7 +772,7 @@ export default function LeavePage() {
   // ── Data Fetching ──────────────────────────────────────────────────────────
   const fetchEntries = async () => {
     try {
-      const res = await fetch('/api/admin-head/attendance/leave')
+      const res = await fetch(`${getApiUrl()}/api/leaves`)
       const data = await res.json()
       if (data.success) setEntries(data.data ?? [])
     } catch (e) {
@@ -783,7 +783,7 @@ export default function LeavePage() {
   const handleSave = async (entry: Omit<LeaveEntry, 'id'>) => {
     try {
       console.log('Sending Save Request:', entry)
-      const res = await fetch('/api/admin-head/attendance/leave', {
+      const res = await fetch(`${getApiUrl()}/api/leaves`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(entry),
@@ -808,7 +808,7 @@ export default function LeavePage() {
   const handleUpdate = async (entry: LeaveEntry) => {
     try {
       console.log('Sending Update Request:', entry)
-      const res = await fetch('/api/admin-head/attendance/leave', {
+      const res = await fetch(`${getApiUrl()}/api/leaves/${entry.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(entry),
@@ -903,7 +903,7 @@ export default function LeavePage() {
     if (entryToDelete === null) return
     setIsDeleting(true)
     try {
-      const res = await fetch(`/api/admin-head/attendance/leave?id=${entryToDelete}`, {
+      const res = await fetch(`${getApiUrl()}/api/leaves/${entryToDelete}`, {
         method: 'DELETE',
       })
       const data = await res.json()

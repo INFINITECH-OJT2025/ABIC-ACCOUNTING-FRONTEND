@@ -86,3 +86,7 @@ Route::delete('/directory/cloudinary-images', [DirectoryController::class, 'dele
 // Department Shift Schedule Routes
 use App\Http\Controllers\Api\DepartmentShiftScheduleController;
 Route::get('/department-shift-schedules', [DepartmentShiftScheduleController::class, 'index']);
+
+// Leave Routes
+use App\Http\Controllers\Api\LeaveController;
+Route::apiResource('leaves', LeaveController::class);

@@ -52,7 +52,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-
+import { Skeleton } from '@/components/ui/skeleton'
 
 import { cn } from '@/lib/utils'
 
@@ -248,14 +248,17 @@ function recalculateWarnings(entries: LateEntry[]): LateEntry[] {
 // ---------- PAGINATION HOOK ----------
 function usePagination<T>(items: T[], itemsPerPage: number = 15) {
   const [currentPage, setCurrentPage] = useState(1)
-  const totalPages = Math.ceil(items.length / itemsPerPage)
 
+  const totalPages = Math.max(1, Math.ceil(items.length / itemsPerPage))
 
-  const paginatedItems = items.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  )
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [items.length, itemsPerPage, currentPage, totalPages])
 
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const paginatedItems = items.slice(startIndex, startIndex + itemsPerPage)
 
   return {
     currentPage,
@@ -541,6 +544,44 @@ function exportToExcel(
 }
 
 
+// ---------- FUZZY SEARCH UTILITY ----------
+function isFuzzyMatch(term: string, target: string): boolean {
+  if (target.includes(term)) return true;
+  if (term.length < 4) return false;
+
+  const maxTypos = term.length <= 5 ? 1 : 2;
+
+  // Check if term is fuzzy matched within target
+  for (let k = 0; k < target.length; k++) {
+    for (let len = term.length - maxTypos; len <= term.length + maxTypos; len++) {
+      if (len < 1 || k + len > target.length) continue;
+      const sub = target.substring(k, k + len);
+
+      const matrix = Array(sub.length + 1).fill(null).map(() => Array(term.length + 1).fill(0));
+      for (let i = 0; i <= sub.length; i++) matrix[i][0] = i;
+      for (let j = 0; j <= term.length; j++) matrix[0][j] = j;
+      for (let i = 1; i <= sub.length; i++) {
+        for (let j = 1; j <= term.length; j++) {
+          if (sub.charAt(i - 1) === term.charAt(j - 1)) {
+            matrix[i][j] = matrix[i - 1][j - 1];
+          } else {
+            matrix[i][j] = Math.min(
+              matrix[i - 1][j - 1] + 1,
+              Math.min(matrix[i][j - 1] + 1, matrix[i - 1][j] + 1)
+            );
+          }
+        }
+      }
+
+      if (matrix[sub.length][term.length] <= maxTypos) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+
 // ---------- EMPLOYEE SELECTOR COMPONENT ----------
 function EmployeeSelector({
   value,
@@ -570,7 +611,11 @@ function EmployeeSelector({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
-        <Command>
+        <Command filter={(value, search) => {
+          const searchTerms = search.toLowerCase().trim().split(/\s+/)
+          const target = value.toLowerCase()
+          return searchTerms.every(term => isFuzzyMatch(term, target)) ? 1 : 0
+        }}>
           <CommandInput placeholder="Search employee..." className="h-9" />
           <CommandEmpty>No employee found.</CommandEmpty>
           <CommandList>
@@ -665,9 +710,11 @@ function SummarySheet({ isOpen, onClose, cutoffTitle, entries, selectedYear, sel
 
 
   // Filter based on search query
-  const filteredSummaryArray = summaryArray.filter(emp =>
-    emp.name.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredSummaryArray = summaryArray.filter(emp => {
+    const searchTerms = searchQuery.toLowerCase().trim().split(/\s+/)
+    const target = emp.name.toLowerCase()
+    return searchTerms.every(term => isFuzzyMatch(term, target))
+  })
 
 
   const totalLateMinutes = summaryArray.reduce((sum, emp) => sum + emp.totalMinutes, 0)
@@ -712,7 +759,10 @@ function SummarySheet({ isOpen, onClose, cutoffTitle, entries, selectedYear, sel
               <Input
                 placeholder="Search employee..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value)
+                  summaryPagination.setCurrentPage(1)
+                }}
                 className="bg-white/90 border-0 text-slate-800 placeholder:text-slate-400 pl-10 h-10 w-full focus:ring-2 focus:ring-white rounded-lg"
               />
             </div>
@@ -931,19 +981,21 @@ export default function AttendanceDashboard() {
 
 
   // Filter entries based on search before pagination
-  const filteredFirstEntries = firstCutoffEntries.filter(entry =>
-    entry.employee_name.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredFirstEntries = firstCutoffEntries.filter(entry => {
+    const empName = (entry.employee_name || entry.employeeName || '').toLowerCase()
+    const searchTerms = searchQuery.toLowerCase().trim().split(/\s+/)
+    return searchTerms.every(term => isFuzzyMatch(term, empName))
+  })
 
 
-  const filteredSecondEntries = secondCutoffEntries.filter(entry =>
-    entry.employee_name.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredSecondEntries = secondCutoffEntries.filter(entry => {
+    const empName = (entry.employee_name || entry.employeeName || '').toLowerCase()
+    const searchTerms = searchQuery.toLowerCase().trim().split(/\s+/)
+    return searchTerms.every(term => isFuzzyMatch(term, empName))
+  })
 
 
-  // Pagination states for each table (using filtered entries)
-  const firstPagination = usePagination(filteredFirstEntries, 15)
-  const secondPagination = usePagination(filteredSecondEntries, 15)
+  // Pagination states for each table removed per user request
 
 
   // New Year confirmation state
@@ -1404,7 +1456,9 @@ export default function AttendanceDashboard() {
                   <Input
                     placeholder="Search employee..."
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value)
+                    }}
                     className="bg-white border-2 border-[#FFE5EC] text-slate-700 placeholder:text-slate-400 pl-10 h-10 w-full focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A] shadow-sm rounded-lg transition-all"
                   />
                 </div>
@@ -1502,29 +1556,62 @@ export default function AttendanceDashboard() {
         {/* ----- CUTOFF TABLES - WITH SUMMARY BUTTONS ----- */}
         <div className={`grid ${showCutoff === 'both' ? 'grid-cols-1 lg:grid-cols-2 gap-4' : 'grid-cols-1'} w-full`}>
           {isLoading ? (
-            <div className="flex items-center justify-center p-12 col-span-full">
-              <Loader2 className="w-8 h-8 animate-spin text-[#A0153E]" />
-              <span className="ml-3 text-slate-500 font-medium">Loading attendance records...</span>
-            </div>
+            <>
+              {(showCutoff === 'first' || showCutoff === 'both') && (
+                <div className="bg-white border-2 border-[#FFE5EC] shadow-md rounded-xl overflow-hidden h-full flex flex-col">
+                  <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4 flex justify-between items-center">
+                    <div className="space-y-2">
+                      <Skeleton className="h-6 w-32 bg-stone-200" />
+                      <Skeleton className="h-4 w-48 bg-stone-100" />
+                    </div>
+                    <Skeleton className="h-9 w-24 bg-stone-200" />
+                  </div>
+                  <div className="p-4 space-y-6 mt-2">
+                    {Array(5).fill(0).map((_, i) => (
+                      <div key={i} className="flex gap-4">
+                        <Skeleton className="h-10 w-1/3 bg-stone-100" />
+                        <Skeleton className="h-10 w-1/5 bg-stone-100" />
+                        <Skeleton className="h-10 w-1/5 bg-stone-100" />
+                        <Skeleton className="h-10 w-1/5 bg-stone-100" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {(showCutoff === 'second' || showCutoff === 'both') && (
+                <div className="bg-white border-2 border-[#FFE5EC] shadow-md rounded-xl overflow-hidden h-full flex flex-col">
+                  <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4 flex justify-between items-center">
+                    <div className="space-y-2">
+                      <Skeleton className="h-6 w-32 bg-stone-200" />
+                      <Skeleton className="h-4 w-48 bg-stone-100" />
+                    </div>
+                    <Skeleton className="h-9 w-24 bg-stone-200" />
+                  </div>
+                  <div className="p-4 space-y-6 mt-2">
+                    {Array(5).fill(0).map((_, i) => (
+                      <div key={i} className="flex gap-4">
+                        <Skeleton className="h-10 w-1/3 bg-stone-100" />
+                        <Skeleton className="h-10 w-1/5 bg-stone-100" />
+                        <Skeleton className="h-10 w-1/5 bg-stone-100" />
+                        <Skeleton className="h-10 w-1/5 bg-stone-100" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
             <>
               {(showCutoff === 'first' || showCutoff === 'both') && (
                 <CutoffTable
                   title={`${selectedMonth} ${selectedYear} – 1-15`}
-                  entries={firstPagination.paginatedItems}
+                  entries={filteredFirstEntries}
                   onUpdateTime={updateFirstCutoffTime}
                   onSummaryClick={() => handleSummaryClick(
                     `${selectedMonth} ${selectedYear} – 1-15`,
                     firstCutoffEntries
                   )}
-                  totalRecords={firstCutoffEntries.length}
-                  pagination={{
-                    currentPage: firstPagination.currentPage,
-                    totalPages: firstPagination.totalPages,
-                    setPage: firstPagination.setCurrentPage,
-                    hasNext: firstPagination.hasNext,
-                    hasPrev: firstPagination.hasPrev
-                  }}
+                  totalRecords={filteredFirstEntries.length}
                 />
               )}
 
@@ -1532,20 +1619,13 @@ export default function AttendanceDashboard() {
               {(showCutoff === 'second' || showCutoff === 'both') && (
                 <CutoffTable
                   title={`${selectedMonth} ${selectedYear} – ${selectedMonth === 'February' ? '16-28/29' : '16-30/31'}`}
-                  entries={secondPagination.paginatedItems}
+                  entries={filteredSecondEntries}
                   onUpdateTime={updateSecondCutoffTime}
                   onSummaryClick={() => handleSummaryClick(
                     `${selectedMonth} ${selectedYear} – ${selectedMonth === 'February' ? '16-28/29' : '16-30/31'}`,
                     secondCutoffEntries
                   )}
-                  totalRecords={secondCutoffEntries.length}
-                  pagination={{
-                    currentPage: secondPagination.currentPage,
-                    totalPages: secondPagination.totalPages,
-                    setPage: secondPagination.setCurrentPage,
-                    hasNext: secondPagination.hasNext,
-                    hasPrev: secondPagination.hasPrev
-                  }}
+                  totalRecords={filteredSecondEntries.length}
                 />
               )}
             </>
@@ -1657,20 +1737,12 @@ function CutoffTable({
   onUpdateTime,
   onSummaryClick,
   totalRecords,
-  pagination,
 }: {
   title: string
   entries: LateEntry[]
   onUpdateTime: (id: string | number, newTime: string) => void
   onSummaryClick: () => void
   totalRecords: number
-  pagination: {
-    currentPage: number
-    totalPages: number
-    setPage: (page: number) => void
-    hasNext: boolean
-    hasPrev: boolean
-  }
 }) {
   return (
     <Card className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden h-full flex flex-col">
@@ -1765,49 +1837,12 @@ function CutoffTable({
                   </td>
                 </tr>
               ))}
-              {/* Fill empty rows to maintain 15 rows */}
-              {entries.length < 15 && Array.from({ length: 15 - entries.length }).map((_, i) => (
-                <tr key={`empty-${i}`} className="bg-stone-50/30">
-                  <td className="px-2.5 py-1">&nbsp;</td>
-                  <td className="px-2.5 py-1">&nbsp;</td>
-                  <td className="px-2.5 py-1">&nbsp;</td>
-                  <td className="px-2.5 py-1">&nbsp;</td>
-                  <td className="px-2.5 py-1">&nbsp;</td>
-                </tr>
-              ))}
+
             </tbody>
           </table>
         </div>
 
 
-        {/* Pagination controls */}
-        {pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-stone-200 bg-stone-50">
-            <div className="text-xs text-stone-500 font-medium">
-              Page {pagination.currentPage} of {pagination.totalPages}
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => pagination.setPage(pagination.currentPage - 1)}
-                disabled={!pagination.hasPrev}
-                className="bg-white border-stone-200 text-stone-700 hover:bg-stone-100 disabled:opacity-50 text-xs h-8 px-3 shadow-sm"
-              >
-                <ChevronLeft className="w-3 h-3 mr-1" /> Prev
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => pagination.setPage(pagination.currentPage + 1)}
-                disabled={!pagination.hasNext}
-                className="bg-white border-stone-200 text-stone-700 hover:bg-stone-100 disabled:opacity-50 text-xs h-8 px-3 shadow-sm"
-              >
-                Next <ChevronRight className="w-3 h-3 ml-1" />
-              </Button>
-            </div>
-          </div>
-        )}
       </CardContent>
     </Card>
 
