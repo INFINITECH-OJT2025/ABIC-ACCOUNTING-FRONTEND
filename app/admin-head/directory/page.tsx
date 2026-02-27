@@ -4,13 +4,21 @@
 "use client"
 
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { CldUploadWidget } from 'next-cloudinary'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { TextFieldStatus } from '@/components/ui/text-field-status'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -29,6 +37,12 @@ import {
 } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { getApiUrl } from '@/lib/api'
+import { ensureOkResponse } from '@/lib/api/error-message'
+import { VALIDATION_CONSTRAINTS } from '@/lib/validation/constraints'
+import { directoryDraftSchema, generalContactsSchema } from '@/lib/validation/schemas'
+import { buttonTokens, modalTokens } from '@/lib/ui/tokens'
+import { PageEmptyState, PageErrorState } from '@/components/state/page-feedback'
+import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
   Building2,
@@ -56,7 +70,8 @@ import {
   Users,
   Eye,
   Image as ImageIcon,
-  MoreVertical
+  MoreVertical,
+  TriangleAlert
 } from 'lucide-react'
 
 
@@ -147,6 +162,7 @@ type GeneralContact = {
 }
 
 type EditableGeneralContact = {
+  id?: number
   type: string
   label: string
   establishment_name: string
@@ -263,11 +279,11 @@ const parseBackendDateMs = (value: string | null | undefined): number => {
 
 
 export default function GovernmentDirectoryPage() {
+  const deleteDialogTitleRef = useRef<HTMLHeadingElement | null>(null)
   const [activeAgency, setActiveAgency] = useState<string>('')
   const [activeProcess, setActiveProcess] = useState<ProcessType>('Adding')
   const [imageError, setImageError] = useState<Record<string, boolean>>({})
   const [agenciesByCode, setAgenciesByCode] = useState<Record<string, BackendAgency>>({})
-  const [loadingDirectory, setLoadingDirectory] = useState(true)
   const [updatingImage, setUpdatingImage] = useState(false)
   const [cloudinaryPickerOpen, setCloudinaryPickerOpen] = useState(false)
   const [cloudinaryPickerTarget, setCloudinaryPickerTarget] = useState<CloudinaryPickerTarget | null>(null)
@@ -303,51 +319,56 @@ export default function GovernmentDirectoryPage() {
     })
   }, [generalContacts, generalContactsSearch, generalContactsSort])
 
+  const filteredGeneralContactsDraft = useMemo(() => {
+    const term = generalContactsSearch.trim().toLowerCase()
+    const indexed = generalContactsDraft.map((row, index) => ({ row, index }))
+    const filtered = !term
+      ? indexed
+      : indexed.filter(({ row }) => {
+          const establishment = String(row.establishment_name || '').toLowerCase()
+          const services = String(row.services || '').toLowerCase()
+          const contactPerson = String(row.contact_person || '').toLowerCase()
+          return establishment.includes(term) || services.includes(term) || contactPerson.includes(term)
+        })
+
+    const direction = generalContactsSort === 'EST_ASC' ? 1 : -1
+    return [...filtered].sort((a, b) => {
+      const left = String(a.row.establishment_name || '').toLowerCase()
+      const right = String(b.row.establishment_name || '').toLowerCase()
+      return left.localeCompare(right) * direction
+    })
+  }, [generalContactsDraft, generalContactsSearch, generalContactsSort])
+
+  const directoryQuery = useQuery({
+    queryKey: ['directory-agencies'],
+    queryFn: async (): Promise<Record<string, BackendAgency>> => {
+      const response = await fetch(`${getApiUrl()}/api/directory/agencies`, {
+        headers: { Accept: 'application/json' },
+      })
+      await ensureOkResponse(response, 'Unable to load directory data right now.')
+      const result = await response.json()
+      const rows = Array.isArray(result?.data) ? result.data : []
+      const mapped: Record<string, BackendAgency> = {}
+      rows.forEach((row: BackendAgency) => {
+        const code = normalizeCode(row?.code)
+        if (code) mapped[code] = row
+      })
+      return mapped
+    },
+  })
 
   useEffect(() => {
-    const fetchDirectory = async () => {
-      try {
-        setLoadingDirectory(true)
-        const response = await fetch(`${getApiUrl()}/api/directory/agencies`, {
-          headers: { Accept: 'application/json' },
-        })
-
-
-        if (!response.ok) throw new Error(`HTTP ${response.status}`)
-
-
-        const result = await response.json()
-        const rows = Array.isArray(result?.data) ? result.data : []
-
-
-        const mapped: Record<string, BackendAgency> = {}
-        rows.forEach((row: BackendAgency) => {
-          const code = normalizeCode(row?.code)
-          if (code) mapped[code] = row
-        })
-
-
-        setAgenciesByCode(mapped)
-        if (!activeAgency) {
-          // Default to PhilHealth if present, else first available
-          if (mapped['philhealth']) {
-            setActiveAgency('philhealth')
-          } else {
-            const firstCode = Object.keys(mapped)[0] ?? ''
-            if (firstCode) setActiveAgency(firstCode)
-          }
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to load directory data'
-        toast.error('Directory Load Failed', { description: message })
-      } finally {
-        setLoadingDirectory(false)
+    if (!directoryQuery.data) return
+    setAgenciesByCode(directoryQuery.data)
+    if (!activeAgency) {
+      if (directoryQuery.data['philhealth']) {
+        setActiveAgency('philhealth')
+      } else {
+        const firstCode = Object.keys(directoryQuery.data)[0] ?? ''
+        if (firstCode) setActiveAgency(firstCode)
       }
     }
-
-
-    fetchDirectory()
-  }, [])
+  }, [directoryQuery.data, activeAgency])
 
 
   const mergedAgencies = useMemo(() => {
@@ -607,15 +628,11 @@ export default function GovernmentDirectoryPage() {
       setSavingChanges(true)
       setShowValidation(true)
 
-
-      const hasInvalidAgencyName = draft.name.trim().length === 0
-      const hasInvalidContacts = draft.contacts.some((row) => row.type.trim().length === 0 || row.value.trim().length === 0)
-      const hasInvalidProcesses = draft.processes.some((row) => row.process.trim().length === 0)
-
-
-      if (hasInvalidAgencyName || hasInvalidContacts || hasInvalidProcesses) {
+      const draftValidation = directoryDraftSchema.safeParse(draft)
+      if (!draftValidation.success) {
+        const message = draftValidation.error.issues[0]?.message || 'Please review your directory entries.'
         toast.error('Validation Failed', {
-          description: 'Please complete all required fields before saving.',
+          description: message,
         })
         return
       }
@@ -659,15 +676,7 @@ export default function GovernmentDirectoryPage() {
       })
 
 
-      if (!response.ok) {
-        let backendMessage = `HTTP ${response.status}`
-        try {
-          const errorBody = await response.json()
-          if (errorBody?.message) backendMessage = `${errorBody.message} (HTTP ${response.status})`
-        } catch {
-        }
-        throw new Error(backendMessage)
-      }
+      await ensureOkResponse(response, 'Unable to save directory changes.')
 
 
       const result = await response.json()
@@ -710,9 +719,7 @@ export default function GovernmentDirectoryPage() {
     })
 
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`)
-    }
+    await ensureOkResponse(response, 'Unable to update agency image.')
 
 
     const result = await response.json()
@@ -732,15 +739,7 @@ export default function GovernmentDirectoryPage() {
       const response = await fetch(`${getApiUrl()}/api/directory/cloudinary-images?prefix=directory/&max_results=60`, {
         headers: { Accept: 'application/json' },
       })
-      if (!response.ok) {
-        let backendMessage = `HTTP ${response.status}`
-        try {
-          const errorBody = await response.json()
-          if (errorBody?.message) backendMessage = `${errorBody.message} (HTTP ${response.status})`
-        } catch {
-        }
-        throw new Error(backendMessage)
-      }
+      await ensureOkResponse(response, 'Unable to load images from Cloudinary.')
       const result = await response.json()
       const rows = Array.isArray(result?.data) ? result.data : []
       setCloudinaryImages(rows)
@@ -760,15 +759,7 @@ export default function GovernmentDirectoryPage() {
         headers: { Accept: 'application/json' },
       })
 
-      if (!response.ok) {
-        let backendMessage = `HTTP ${response.status}`
-        try {
-          const errorBody = await response.json()
-          if (errorBody?.message) backendMessage = `${errorBody.message} (HTTP ${response.status})`
-        } catch {
-        }
-        throw new Error(backendMessage)
-      }
+      await ensureOkResponse(response, 'Unable to load general contacts.')
 
       const result = await response.json()
       const rows = Array.isArray(result?.data) ? result.data : []
@@ -776,6 +767,7 @@ export default function GovernmentDirectoryPage() {
       setGeneralContacts(sorted)
       if (!editingGeneralContacts) {
         setGeneralContactsDraft(sorted.map((row) => ({
+          id: row.id,
           type: row.type || 'phone',
           label: row.label || '',
           establishment_name: row.establishment_name || row.label || '',
@@ -807,6 +799,7 @@ export default function GovernmentDirectoryPage() {
   const startGeneralContactsEdit = () => {
     setGeneralContactsDraft(
       generalContacts.map((row, index) => ({
+        id: row.id,
         type: row.type || 'phone',
         label: row.label || '',
         establishment_name: row.establishment_name || row.label || '',
@@ -825,6 +818,7 @@ export default function GovernmentDirectoryPage() {
     setEditingGeneralContacts(false)
     setGeneralContactsDraft(
       generalContacts.map((row, index) => ({
+        id: row.id,
         type: row.type || 'phone',
         label: row.label || '',
         establishment_name: row.establishment_name || row.label || '',
@@ -926,16 +920,18 @@ export default function GovernmentDirectoryPage() {
 
   const saveGeneralContacts = async () => {
     try {
-      const hasInvalidRows = generalContactsDraft.some((row) => row.establishment_name.trim().length === 0 || row.value.trim().length === 0)
-      if (hasInvalidRows) {
+      const contactsValidation = generalContactsSchema.safeParse(generalContactsDraft)
+      if (!contactsValidation.success) {
+        const message = contactsValidation.error.issues[0]?.message || 'Please review all general contact fields.'
         toast.error('Validation Failed', {
-          description: 'Establishment name and value are required for each general contact row.',
+          description: message,
         })
         return
       }
 
       setSavingGeneralContacts(true)
       const payload = generalContactsDraft.map((row, index) => ({
+        id: row.id ?? null,
         type: row.type.trim() || 'phone',
         label: row.establishment_name.trim() || null,
         establishment_name: row.establishment_name.trim(),
@@ -956,21 +952,14 @@ export default function GovernmentDirectoryPage() {
         body: JSON.stringify({ contacts: payload }),
       })
 
-      if (!response.ok) {
-        let backendMessage = `HTTP ${response.status}`
-        try {
-          const errorBody = await response.json()
-          if (errorBody?.message) backendMessage = `${errorBody.message} (HTTP ${response.status})`
-        } catch {
-        }
-        throw new Error(backendMessage)
-      }
+      await ensureOkResponse(response, 'Unable to save general contacts.')
 
       const result = await response.json()
       const rows = Array.isArray(result?.data) ? result.data : []
       const sorted = [...rows].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
       setGeneralContacts(sorted)
       setGeneralContactsDraft(sorted.map((row, index) => ({
+        id: row.id,
         type: row.type || 'phone',
         label: row.label || '',
         establishment_name: row.establishment_name || row.label || '',
@@ -1048,7 +1037,7 @@ export default function GovernmentDirectoryPage() {
   // --- RENDERING ---
 
 
-  if (loadingDirectory && !agency) {
+  if (directoryQuery.isLoading && !agency) {
     return (
       <div className="min-h-screen bg-[#F0F2F5] p-6 md:p-8">
         <div className="rounded-2xl overflow-hidden shadow-xl border border-slate-200 bg-white">
@@ -1076,16 +1065,26 @@ export default function GovernmentDirectoryPage() {
     )
   }
 
-
-  if (!loadingDirectory && !agency) {
+  if (directoryQuery.error) {
+    const message = directoryQuery.error instanceof Error ? directoryQuery.error.message : 'Failed to load directory data.'
     return (
-      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
-        <div className="text-center max-w-md p-8 bg-white rounded-xl shadow-xl">
-          <Building2 className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">No Agencies Found</h2>
-          <p className="text-slate-600">The directory database is empty. Please verify the backend data.</p>
-        </div>
-      </div>
+      <PageErrorState
+        title="Directory Load Failed"
+        description={message}
+        onRetry={() => void directoryQuery.refetch()}
+      />
+    )
+  }
+
+
+  if (!directoryQuery.isLoading && !agency) {
+    return (
+      <PageEmptyState
+        title="No agencies found"
+        description="The directory database is empty. Seed agencies or create records in the backend."
+        actionLabel="Reload"
+        onAction={() => void directoryQuery.refetch()}
+      />
     )
   }
 
@@ -1236,25 +1235,21 @@ export default function GovernmentDirectoryPage() {
                   <p className="text-sm text-slate-600 mt-1">Shared contact information not tied to a specific agency.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {!editingGeneralContacts && (
-                    <Input
-                      value={generalContactsSearch}
-                      onChange={(e) => setGeneralContactsSearch(e.target.value)}
-                      placeholder="Search establishment, services, contact person..."
-                      className="w-[360px] max-w-full h-10 rounded-sm"
-                    />
-                  )}
-                  {!editingGeneralContacts && (
-                    <Select value={generalContactsSort} onValueChange={(value) => setGeneralContactsSort(value as GeneralContactsSort)}>
-                      <SelectTrigger className="w-[220px] h-10 rounded-lg bg-white border-slate-200">
-                        <SelectValue placeholder="Sort by establishment" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="EST_ASC">Establishment: A to Z</SelectItem>
-                        <SelectItem value="EST_DESC">Establishment: Z to A</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
+                  <Input
+                    value={generalContactsSearch}
+                    onChange={(e) => setGeneralContactsSearch(e.target.value)}
+                    placeholder="Search establishment, services, contact person..."
+                    className="w-[360px] max-w-full h-10 rounded-sm"
+                  />
+                  <Select value={generalContactsSort} onValueChange={(value) => setGeneralContactsSort(value as GeneralContactsSort)}>
+                    <SelectTrigger className="w-[220px] h-10 rounded-lg bg-white border-slate-200">
+                      <SelectValue placeholder="Sort by establishment" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="EST_ASC">Establishment: A to Z</SelectItem>
+                      <SelectItem value="EST_DESC">Establishment: Z to A</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <Button
                     variant="outline"
                     className="rounded-lg"
@@ -1325,6 +1320,262 @@ export default function GovernmentDirectoryPage() {
                       variant="outline"
                       className="text-[#A4163A] border-[#A4163A]/30"
                       onClick={addGeneralContactRow}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Row
+                    </Button>
+                  </div>
+                  {generalContactsDraft.length === 0 ? (
+                    <p className="text-sm text-slate-500">No rows yet. Click Add Row to create one.</p>
+                  ) : (
+                    <>
+                    <p className="text-[11px] font-semibold text-slate-500">
+                      Constraints: Establishment {VALIDATION_CONSTRAINTS.directory.generalEstablishment.min}-{VALIDATION_CONSTRAINTS.directory.generalEstablishment.max} chars, Services up to {VALIDATION_CONSTRAINTS.directory.generalServices.max}, Contact Person up to {VALIDATION_CONSTRAINTS.directory.generalContactPerson.max}, Contact Value {VALIDATION_CONSTRAINTS.directory.generalValue.min}-{VALIDATION_CONSTRAINTS.directory.generalValue.max}.
+                    </p>
+                    {filteredGeneralContactsDraft.map(({ row, index }) => (
+                      <div key={`general-contact-draft-${index}`} className="border border-slate-200 rounded-md p-3 space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="h-10 w-10 rounded-full overflow-hidden border border-slate-200 bg-slate-100 shrink-0 flex items-center justify-center">
+                              {row.avatar_url ? (
+                                <img src={row.avatar_url} alt={row.establishment_name || 'Avatar'} className="h-full w-full object-cover" />
+                              ) : (
+                                <span className="text-xs font-black text-slate-600">
+                                  {getLabelInitials(row.establishment_name)}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs font-semibold text-slate-500 truncate">
+                              {row.avatar_url ? 'Avatar selected' : 'No avatar selected'}
+                            </p>
+                          </div>
+
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="sm" variant="outline" className="h-8 px-2">
+                                <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
+                                Avatar
+                                <MoreVertical className="h-3.5 w-3.5 ml-1.5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56">
+                              <DropdownMenuItem
+                                disabled={!row.avatar_url}
+                                onSelect={(e) => {
+                                  e.preventDefault()
+                                  if (!row.avatar_url) return
+                                  setAvatarPreview({
+                                    url: row.avatar_url,
+                                    title: row.establishment_name || 'General Contact Avatar',
+                                  })
+                                }}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                See avatar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onSelect={(e) => {
+                                  e.preventDefault()
+                                  openGeneralContactCloudinaryPicker(index)
+                                }}
+                              >
+                                <Images className="h-4 w-4 mr-2" />
+                                Select from uploaded images
+                              </DropdownMenuItem>
+                              {uploadPreset ? (
+                                <CldUploadWidget
+                                  uploadPreset={uploadPreset}
+                                  options={{
+                                    multiple: false,
+                                    maxFiles: 1,
+                                    resourceType: 'image',
+                                    sources: ['local'],
+                                    folder: 'directory/general-contacts',
+                                    maxFileSize: MAX_IMAGE_BYTES,
+                                    clientAllowedFormats: [...ALLOWED_UPLOAD_FORMATS],
+                                  }}
+                                  onSuccess={(result) => void uploadGeneralContactAvatar(index, result)}
+                                >
+                                  {({ open }) => (
+                                    <DropdownMenuItem
+                                      onSelect={(e) => {
+                                        // Let Radix close the dropdown first, then open Cloudinary.
+                                        // This prevents the uploader modal from being dismissed when clicking "Browse".
+                                        window.setTimeout(() => open(), 0)
+                                      }}
+                                    >
+                                      <ImageUp className="h-4 w-4 mr-2" />
+                                      Upload image
+                                    </DropdownMenuItem>
+                                  )}
+                                </CldUploadWidget>
+                              ) : (
+                                <DropdownMenuItem disabled>
+                                  <ImageUp className="h-4 w-4 mr-2" />
+                                  Upload image
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem
+                                disabled={!row.avatar_url}
+                                onSelect={(e) => {
+                                  e.preventDefault()
+                                  updateGeneralContactField(index, 'avatar_url', '')
+                                  updateGeneralContactField(index, 'avatar_public_id', '')
+                                  toast.success('Avatar cleared. Save contacts to apply changes.')
+                                }}
+                              >
+                                <X className="h-4 w-4 mr-2" />
+                                Clear avatar
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                        <div className="flex gap-2">
+                          <Input
+                            value={row.establishment_name}
+                            onChange={(e) => updateGeneralContactField(index, 'establishment_name', e.target.value)}
+                            minLength={VALIDATION_CONSTRAINTS.directory.generalEstablishment.min}
+                            maxLength={VALIDATION_CONSTRAINTS.directory.generalEstablishment.max}
+                            title={`Establishment name must be ${VALIDATION_CONSTRAINTS.directory.generalEstablishment.min} to ${VALIDATION_CONSTRAINTS.directory.generalEstablishment.max} characters.`}
+                            placeholder="Establishment Name (Required)"
+                            className="h-9 rounded-sm"
+                          />
+                          <Input
+                            value={row.services}
+                            onChange={(e) => updateGeneralContactField(index, 'services', e.target.value)}
+                            maxLength={VALIDATION_CONSTRAINTS.directory.generalServices.max}
+                            title={`Services can be up to ${VALIDATION_CONSTRAINTS.directory.generalServices.max} characters.`}
+                            placeholder="Services (Optional)"
+                            className="h-9 rounded-sm"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Input
+                            value={row.contact_person}
+                            onChange={(e) => updateGeneralContactField(index, 'contact_person', e.target.value)}
+                            maxLength={VALIDATION_CONSTRAINTS.directory.generalContactPerson.max}
+                            title={`Contact person can be up to ${VALIDATION_CONSTRAINTS.directory.generalContactPerson.max} characters.`}
+                            placeholder="Contact Person (Optional)"
+                            className="h-9 rounded-sm"
+                          />
+                          <Input
+                            value={row.value}
+                            onChange={(e) => updateGeneralContactField(index, 'value', e.target.value)}
+                            minLength={VALIDATION_CONSTRAINTS.directory.generalValue.min}
+                            maxLength={VALIDATION_CONSTRAINTS.directory.generalValue.max}
+                            title={`Contact value must be ${VALIDATION_CONSTRAINTS.directory.generalValue.min} to ${VALIDATION_CONSTRAINTS.directory.generalValue.max} characters.`}
+                            placeholder="Contact Number / Value (Required)"
+                            className="h-9 rounded-sm"
+                          />
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => removeGeneralContactRow(index)}
+                            className="text-rose-500 hover:bg-rose-50 hover:text-rose-600 h-9 w-9 rounded-lg"
+                            aria-label="Remove row"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                        <TextFieldStatus value={row.establishment_name} min={VALIDATION_CONSTRAINTS.directory.generalEstablishment.min} max={VALIDATION_CONSTRAINTS.directory.generalEstablishment.max} />
+                        <TextFieldStatus value={row.services} max={VALIDATION_CONSTRAINTS.directory.generalServices.max} />
+                        <TextFieldStatus value={row.contact_person} max={VALIDATION_CONSTRAINTS.directory.generalContactPerson.max} />
+                        <TextFieldStatus value={row.value} min={VALIDATION_CONSTRAINTS.directory.generalValue.min} max={VALIDATION_CONSTRAINTS.directory.generalValue.max} />
+                      </div>
+                    ))}
+                    </>
+                  )}
+                </div>
+              ) : filteredGeneralContacts.length === 0 ? (
+                <p className="text-sm text-slate-500">
+                  {generalContacts.length === 0 ? 'No general contacts yet.' : 'No contacts match your search.'}
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  {filteredGeneralContacts.map((contact) => {
+                    return (
+                      <div key={contact.id} className="flex items-start gap-3 rounded-md border border-slate-100 p-3 min-w-0">
+                        {contact.avatar_url ? (
+                          <div className="mt-0.5 h-8 w-8 rounded-full overflow-hidden border border-slate-200 shrink-0">
+                            <img src={contact.avatar_url} alt={contact.establishment_name || contact.label || contact.type} className="h-full w-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className="mt-0.5 h-8 w-8 rounded-full bg-slate-100 text-[#A4163A] flex items-center justify-center shrink-0">
+                            <span className="text-[10px] font-black text-slate-700">
+                              {getLabelInitials(contact.establishment_name)}
+                            </span>
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-black text-slate-500 uppercase tracking-wider">{contact.establishment_name || contact.label || contact.type}</p>
+                          {contact.services ? (
+                            <p className="text-[11px] text-slate-500 mt-0.5 break-words">{contact.services}</p>
+                          ) : null}
+                          {contact.contact_person ? (
+                            <p className="text-[11px] text-slate-500 break-words">Contact: {contact.contact_person}</p>
+                          ) : null}
+                          <p className="text-sm font-semibold text-slate-800 break-words">{contact.value}</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 px-2 text-slate-500 hover:text-[#A4163A] hover:bg-rose-50"
+                          onClick={() => void handleCopyText(contact.establishment_name || contact.label || contact.type, contact.value)}
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </Card>
+        ) : (
+          <>
+        {/* COMBINED HERO & PROCESS SECTION */}
+        <div className="flex flex-col shadow-xl border border-slate-200 rounded-sm overflow-hidden mb-8">
+
+
+          {/* 1. HERO BANNER */}
+          <div className="relative w-full h-[400px] bg-white group">
+            {!imageError[agency.key] ? (
+              <img
+                src={agency.image}
+                alt={agency.shortName}
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                onError={() => setImageError(p => ({ ...p, [agency.key]: true }))}
+              />
+            ) : (
+              <div className="w-full h-full bg-slate-200 flex items-center justify-center">
+                <agency.icon className="w-24 h-24 text-slate-400" />
+              </div>
+            </div>
+
+            <div className="px-6 md:px-8 py-6">
+              {loadingGeneralContacts ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  {Array.from({ length: 8 }).map((_, idx) => (
+                    <div key={`general-contact-skeleton-${idx}`} className="border border-slate-100 rounded-md p-3">
+                      <div className="flex items-start gap-3">
+                        <Skeleton className="h-8 w-8 rounded-full shrink-0" />
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <Skeleton className="h-3 w-3/4" />
+                          <Skeleton className="h-3 w-2/3" />
+                          <Skeleton className="h-4 w-1/2" />
+                        </div>
+                        <Skeleton className="h-8 w-8 rounded-md" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : editingGeneralContacts ? (
+                <div className="space-y-3">
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={() => open()}
+                      disabled={updatingImage}
+                      className="bg-[#A4163A] hover:bg-[#8a1230] text-white border-none rounded-lg px-6 shadow-lg shadow-red-900/20 font-bold"
                     >
                       <Plus className="w-4 h-4 mr-2" />
                       Add Row
@@ -1476,43 +1727,7 @@ export default function GovernmentDirectoryPage() {
                   {generalContacts.length === 0 ? 'No general contacts yet.' : 'No contacts match your search.'}
                 </p>
               ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                  {filteredGeneralContacts.map((contact) => {
-                    return (
-                      <div key={contact.id} className="flex items-start gap-3 rounded-md border border-slate-100 p-3 min-w-0">
-                        {contact.avatar_url ? (
-                          <div className="mt-0.5 h-8 w-8 rounded-full overflow-hidden border border-slate-200 shrink-0">
-                            <img src={contact.avatar_url} alt={contact.establishment_name || contact.label || contact.type} className="h-full w-full object-cover" />
-                          </div>
-                        ) : (
-                          <div className="mt-0.5 h-8 w-8 rounded-full bg-slate-100 text-[#A4163A] flex items-center justify-center shrink-0">
-                            <span className="text-[10px] font-black text-slate-700">
-                              {getLabelInitials(contact.establishment_name)}
-                            </span>
-                          </div>
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[11px] font-black text-slate-500 uppercase tracking-wider">{contact.establishment_name || contact.label || contact.type}</p>
-                          {contact.services ? (
-                            <p className="text-[11px] text-slate-500 mt-0.5 break-words">{contact.services}</p>
-                          ) : null}
-                          {contact.contact_person ? (
-                            <p className="text-[11px] text-slate-500 break-words">Contact: {contact.contact_person}</p>
-                          ) : null}
-                          <p className="text-sm font-semibold text-slate-800 break-words">{contact.value}</p>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 px-2 text-slate-500 hover:text-[#A4163A] hover:bg-rose-50"
-                          onClick={() => void handleCopyText(contact.establishment_name || contact.label || contact.type, contact.value)}
-                        >
-                          <Copy className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    )
-                  })}
-                </div>
+                <Button disabled className="bg-slate-800 text-white rounded-lg">Config Error</Button>
               )}
             </div>
           </Card>
@@ -1538,8 +1753,18 @@ export default function GovernmentDirectoryPage() {
                 )}
 
 
-                {/* Banner Overlays */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+              <Button
+                onClick={() => void loadCloudinaryImages({ type: 'agency' })}
+                disabled={loadingCloudinaryImages || updatingImage}
+                className="bg-[#A4163A] hover:bg-[#8a1230] text-white border-none rounded-lg px-6 shadow-lg shadow-red-900/20 font-bold"
+              >
+                {loadingCloudinaryImages ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Images className="mr-2 h-4 w-4" />}
+                Select from Image uploads
+              </Button>
+              <p className="text-[10px] font-bold text-white/80 text-right mt-1 drop-shadow-md">
+                Max 20MB - JPG, JPEG, PNG, GIF, WebP, HEIC, HEIF
+              </p>
+            </div>
 
 
                 <div className="absolute top-6 right-6 flex flex-col gap-3">
@@ -1574,16 +1799,38 @@ export default function GovernmentDirectoryPage() {
                   )}
 
 
-                  <Button
-                    onClick={() => void loadCloudinaryImages({ type: 'agency' })}
-                    disabled={loadingCloudinaryImages || updatingImage}
-                    className="bg-[#A4163A] hover:bg-[#8a1230] text-white border-none rounded-lg px-6 shadow-lg shadow-red-900/20 font-bold"
-                  >
-                    {loadingCloudinaryImages ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Images className="mr-2 h-4 w-4" />}
-                    Select from Image uploads
-                  </Button>
-                  <p className="text-[10px] font-bold text-white/80 text-right mt-1 drop-shadow-md">
-                    Max 20MB - JPG, JPEG, PNG, GIF, WebP, HEIC, HEIF
+              {editMode && draft ? (
+                <div className="space-y-3">
+                  <p className="text-[11px] font-semibold text-white/80">
+                    Constraints: Short Name {VALIDATION_CONSTRAINTS.directory.agencyName.min}-{VALIDATION_CONSTRAINTS.directory.agencyName.max} chars, Full Name up to {VALIDATION_CONSTRAINTS.directory.agencyFullName.max} chars.
+                  </p>
+                  <Input
+                    value={draft.name}
+                    onChange={e => setDraft({ ...draft, name: e.target.value })}
+                    minLength={VALIDATION_CONSTRAINTS.directory.agencyName.min}
+                    maxLength={VALIDATION_CONSTRAINTS.directory.agencyName.max}
+                    title={`Short name must be ${VALIDATION_CONSTRAINTS.directory.agencyName.min} to ${VALIDATION_CONSTRAINTS.directory.agencyName.max} characters.`}
+                    className="text-4xl md:text-6xl font-black text-white bg-transparent border-b border-white/40 rounded-none px-0 h-auto focus-visible:ring-0 focus-visible:border-white placeholder:text-white/30"
+                    placeholder="SHORT NAME"
+                  />
+                  <TextFieldStatus value={draft.name} min={VALIDATION_CONSTRAINTS.directory.agencyName.min} max={VALIDATION_CONSTRAINTS.directory.agencyName.max} className="text-white/85" />
+                  <Input
+                    value={draft.full_name}
+                    onChange={e => setDraft({ ...draft, full_name: e.target.value })}
+                    maxLength={VALIDATION_CONSTRAINTS.directory.agencyFullName.max}
+                    title={`Full name can be up to ${VALIDATION_CONSTRAINTS.directory.agencyFullName.max} characters.`}
+                    className="text-xl md:text-2xl font-medium text-white/90 bg-transparent border-b border-white/40 rounded-none px-0 h-auto focus-visible:ring-0 focus-visible:border-white placeholder:text-white/30"
+                    placeholder="Agency Full Business Name"
+                  />
+                  <TextFieldStatus value={draft.full_name} max={VALIDATION_CONSTRAINTS.directory.agencyFullName.max} className="text-white/85" />
+                </div>
+              ) : (
+                <>
+                  <h2 className="text-4xl md:text-6xl font-black text-white tracking-tight drop-shadow-sm mb-2">
+                    {agency.shortName}
+                  </h2>
+                  <p className="text-lg md:text-2xl font-medium text-white/90 leading-snug max-w-2xl drop-shadow-sm">
+                    {agency.fullName}
                   </p>
                 </div>
 
@@ -1596,148 +1843,40 @@ export default function GovernmentDirectoryPage() {
                   </div>
 
 
-                  {editMode && draft ? (
-                    <div className="space-y-3">
-                      <Input
-                        value={draft.name}
-                        onChange={e => setDraft({ ...draft, name: e.target.value })}
-                        className="text-4xl md:text-6xl font-black text-white bg-transparent border-b border-white/40 rounded-none px-0 h-auto focus-visible:ring-0 focus-visible:border-white placeholder:text-white/30"
-                        placeholder="SHORT NAME"
-                      />
-                      <Input
-                        value={draft.full_name}
-                        onChange={e => setDraft({ ...draft, full_name: e.target.value })}
-                        className="text-xl md:text-2xl font-medium text-white/90 bg-transparent border-b border-white/40 rounded-none px-0 h-auto focus-visible:ring-0 focus-visible:border-white placeholder:text-white/30"
-                        placeholder="Agency Full Business Name"
-                      />
-                    </div>
-                  ) : (
-                    <>
-                      <h2 className="text-4xl md:text-6xl font-black text-white tracking-tight drop-shadow-sm mb-2">
-                        {agency.shortName}
-                      </h2>
-                      <p className="text-lg md:text-2xl font-medium text-white/90 leading-snug max-w-2xl drop-shadow-sm">
-                        {agency.fullName}
-                      </p>
-                    </>
-                  )}
-                </div>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-10 relative z-10">
+              <div>
+                <p className="text-lg font-black text-[#A4163A] uppercase tracking-[0.25em] mb-2">GOVERNMENT CONTRIBUTION</p>
+                <h3 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Process Steps</h3>
+                {editMode && draft && (
+                  <>
+                    <p className="text-[11px] font-semibold text-slate-500 mt-3">Summary: up to {VALIDATION_CONSTRAINTS.directory.agencySummary.max} characters.</p>
+                    <Textarea
+                      value={draft.summary}
+                      onChange={e => {
+                        setDraft({ ...draft, summary: e.target.value })
+                      }}
+                      maxLength={VALIDATION_CONSTRAINTS.directory.agencySummary.max}
+                      title={`Summary can be up to ${VALIDATION_CONSTRAINTS.directory.agencySummary.max} characters.`}
+                      className="mt-2 max-w-2xl rounded-sm"
+                      placeholder="Agency summary or additional notes..."
+                    />
+                    <TextFieldStatus value={draft.summary} max={VALIDATION_CONSTRAINTS.directory.agencySummary.max} />
+                  </>
+                )}
               </div>
 
 
-              {/* 2. PROCESS STEPS */}
-              <div className="bg-white p-8 md:p-10 relative overflow-hidden">
-                {/* Background decoration */}
-                <div className="absolute -top-24 -right-24 w-64 h-64 bg-red-50 rounded-full blur-3xl opacity-50 pointer-events-none" />
-
-
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-10 relative z-10">
-                  <div>
-                    <p className="text-lg font-black text-[#A4163A] uppercase tracking-[0.25em] mb-2">GOVERNMENT CONTRIBUTION</p>
-                    <h3 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Process Steps</h3>
-                    {editMode && draft && (
-                      <Textarea
-                        value={draft.summary}
-                        onChange={e => {
-                          setDraft({ ...draft, summary: e.target.value })
-                        }}
-                        className="mt-4 max-w-2xl rounded-sm"
-                        placeholder="Agency summary or additional notes..."
-                      />
-                    )}
-                  </div>
-
-
-                  <div className="flex items-center gap-3">
-                    <div className="flex bg-slate-100 p-1.5 rounded-sm border border-slate-200">
-                      {(['Adding', 'Removing'] as ProcessType[]).map((type) => {
-                        const isActive = activeProcess === type
-                        return (
-                          <button
-                            key={type}
-                            onClick={() => setActiveProcess(type)}
-                            className={cn(
-                              "px-6 py-2.5 rounded-lg text-sm font-black transition-all flex items-center gap-2",
-                              isActive ? "bg-[#A4163A] text-white shadow-md transform scale-105" : "text-slate-500 hover:text-slate-900 hover:bg-slate-200"
-                            )}
-                          >
-                            {type === 'Adding' ? <UserPlus className="w-4 h-4" /> : <UserMinus className="w-4 h-4" />}
-                            <span>{type}</span>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-
-                {/* TABLE / LIST */}
-                <div className="relative z-10">
-                  <div className="border rounded-sm overflow-hidden border-slate-100 shadow-sm">
-                    {editMode && (
-                      <div className="bg-slate-50 p-3 border-b border-slate-100 flex justify-end">
-                        <Button onClick={addProcessStep} size="sm" variant="outline" className="text-[#A4163A] border-[#A4163A]/20 bg-[#A4163A]/5 hover:bg-[#A4163A]/10 rounded-lg">
-                          <Plus className="mr-2 h-4 w-4" /> Add Step
-                        </Button>
-                      </div>
-                    )}
-
-
-                    <Table>
-                      <TableHeader className="bg-slate-50/50">
-                        <TableRow className="hover:bg-slate-50/50 border-slate-100">
-                          <TableHead className="w-[80px] text-center font-black text-slate-400 uppercase text-[20px] tracking-widest py-4">Step</TableHead>
-                          <TableHead className="font-black text-slate-400 uppercase text-[20px] tracking-widest py-4">Process Description</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {editMode ? (
-                          currentProcessDraftRows.length > 0 ? (
-                            currentProcessDraftRows.map((step, index) => (
-                              <TableRow key={index} className="border-slate-100 hover:bg-slate-50/50">
-                                <TableCell className="text-center align-top py-6">
-                                  <div className="h-8 w-8 rounded-sm bg-[#A4163A]/10 text-[#A4163A] font-black text-sm flex items-center justify-center mx-auto">
-                                    {index + 1}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="py-6 align-top">
-                                  <div className="flex gap-2">
-                                    <Textarea
-                                      value={step.process}
-                                      onChange={(e) => updateProcessTextAt(index, e.target.value)}
-                                      className="min-h-[60px] resize-y rounded-sm"
-                                    />
-                                    <Button size="icon" variant="ghost" onClick={() => removeProcessAt(index)} className="text-rose-500 hover:bg-rose-50 hover:text-rose-600 shrink-0 h-9 w-9 rounded-lg">
-                                      <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          ) : (
-                            <TableRow>
-                              <TableCell colSpan={2} className="h-32 text-center text-slate-400 italic">No draft steps yet.</TableCell>
-                            </TableRow>
-                          )
-                        ) : (
-                          currentSteps.length > 0 ? (
-                            currentSteps.map((step, index) => (
-                              <TableRow key={index} className="border-slate-100 hover:bg-slate-50/30 transition-colors">
-                                <TableCell className="text-center align-top py-6">
-                                  <div className="h-10 w-10 rounded-sm bg-slate-100 text-slate-600 font-black text-base flex items-center justify-center mx-auto shadow-sm">
-                                    {index + 1}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="py-6 align-top">
-                                  <p className="text-xl font-medium text-slate-800 leading-relaxed pt-1.5">{step}</p>
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          ) : (
-                            <TableRow>
-                              <TableCell colSpan={2} className="h-32 text-center text-slate-400 italic">No process steps found for this category.</TableCell>
-                            </TableRow>
-                          )
+              <div className="flex items-center gap-3">
+                <div className="flex bg-slate-100 p-1.5 rounded-sm border border-slate-200">
+                  {(['Adding', 'Removing'] as ProcessType[]).map((type) => {
+                    const isActive = activeProcess === type
+                    return (
+                      <button
+                        key={type}
+                        onClick={() => setActiveProcess(type)}
+                        className={cn(
+                          "px-6 py-2.5 rounded-lg text-sm font-black transition-all flex items-center gap-2",
+                          isActive ? "bg-[#A4163A] text-white shadow-md transform scale-105" : "text-slate-500 hover:text-slate-900 hover:bg-slate-200"
                         )}
                       </TableBody>
                     </Table>
@@ -1765,22 +1904,16 @@ export default function GovernmentDirectoryPage() {
               )}
 
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {(editMode && draft
-                  ? draft.contacts
-                  : agency.details
-                ).filter(row => {
-                  if (editMode) return true
-                  // In view mode, only show if value exists
-                  return row.value && row.value.trim().length > 0
-                })
-                  .map((row, idx) => {
-                    const isEditable = editMode && draft
-                    const actualRow = isEditable ? row : row
-                    // Note: agency.details already has icon, but draft doesn't.
-                    const Icon = isEditable
-                      ? getDetailIcon(row.type, row.label)
-                      : (row as any).icon
+            {/* TABLE / LIST */}
+            <div className="relative z-10">
+              <div className="border rounded-sm overflow-hidden border-slate-100 shadow-sm">
+                {editMode && (
+                  <div className="bg-slate-50 p-3 border-b border-slate-100 flex justify-end">
+                    <Button onClick={addProcessStep} size="sm" variant="outline" className="text-[#A4163A] border-[#A4163A]/20 bg-[#A4163A]/5 hover:bg-[#A4163A]/10 rounded-lg">
+                      <Plus className="mr-2 h-4 w-4" /> Add Step
+                    </Button>
+                  </div>
+                )}
 
 
                     return (
@@ -1817,13 +1950,21 @@ export default function GovernmentDirectoryPage() {
                               <div className="h-10 w-10 rounded-full bg-slate-50 text-[#A4163A] flex items-center justify-center shrink-0 border border-slate-100">
                                 <Icon className="h-5 w-5" />
                               </div>
-                              <div className="flex flex-col min-w-0">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-0.5">
-                                  {row.label || row.type}
-                                </p>
-                                <p className="text-sm md:text-base font-bold text-slate-800 truncate leading-none pb-0.5">
-                                  {row.value}
-                                </p>
+                            </TableCell>
+                            <TableCell className="py-6 align-top">
+                              <div className="flex gap-2">
+                                <Textarea
+                                  value={step.process}
+                                  onChange={(e) => updateProcessTextAt(index, e.target.value)}
+                                  minLength={VALIDATION_CONSTRAINTS.directory.processStep.min}
+                                  maxLength={VALIDATION_CONSTRAINTS.directory.processStep.max}
+                                  title={`Process description must be ${VALIDATION_CONSTRAINTS.directory.processStep.min} to ${VALIDATION_CONSTRAINTS.directory.processStep.max} characters.`}
+                                  className="min-h-[60px] resize-y rounded-sm"
+                                />
+                                <TextFieldStatus value={step.process} min={VALIDATION_CONSTRAINTS.directory.processStep.min} max={VALIDATION_CONSTRAINTS.directory.processStep.max} />
+                                <Button size="icon" variant="ghost" onClick={() => removeProcessAt(index)} className="text-rose-500 hover:bg-rose-50 hover:text-rose-600 shrink-0 h-9 w-9 rounded-lg">
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
                               </div>
                             </div>
 
@@ -1844,6 +1985,122 @@ export default function GovernmentDirectoryPage() {
                   })}
               </div>
             </div>
+          </div>
+        </div>
+        {/* 3. CONTACT GRIDS */}
+        <div>
+          <div className="mt-8 mb-4 border-b border-slate-200 pb-2">
+            <h3 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+              <Phone className="w-5 h-5 text-[#A4163A]" />
+              Contact Information
+            </h3>
+            <p className="text-slate-500 font-medium text-sm mt-1">
+              24/7 hotline, mobile support, callback service, and main office details.
+            </p>
+            {editMode && (
+              <p className="text-[11px] font-semibold text-slate-500 mt-1">
+                Constraints: Type up to {VALIDATION_CONSTRAINTS.directory.contactType.max} chars, Label up to {VALIDATION_CONSTRAINTS.directory.contactLabel.max} chars, Value {VALIDATION_CONSTRAINTS.directory.contactValue.min}-{VALIDATION_CONSTRAINTS.directory.contactValue.max} chars.
+              </p>
+            )}
+          </div>
+          {editMode && (
+            <div className="mb-4 flex justify-end">
+              <Button onClick={addContact} variant="outline" className="text-[#A4163A] border-[#A4163A]/20 bg-white shadow-sm rounded-lg">
+                <Plus className="mr-2 h-4 w-4" /> Add Contact Field
+              </Button>
+            </div>
+          )}
+
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {(editMode && draft
+              ? draft.contacts
+              : agency.details
+            ).filter(row => {
+              if (editMode) return true
+              // In view mode, only show if value exists
+              return row.value && row.value.trim().length > 0
+            })
+              .map((row, idx) => {
+                const isEditable = editMode && draft
+                const actualRow = isEditable ? row : row
+                // Note: agency.details already has icon, but draft doesn't.
+                const Icon = isEditable
+                  ? getDetailIcon(row.type, row.label)
+                  : (row as any).icon
+
+
+                return (
+                  <div key={idx} className="group bg-white rounded-sm p-3 border border-slate-200 hover:border-[#A4163A] transition-colors flex items-center justify-between gap-4 shadow-sm hover:shadow-md">
+                    {isEditable ? (
+                      <div className="flex-1 space-y-2 relative z-10 w-full">
+                        <div className="flex gap-2">
+                          <Input
+                            value={row.type}
+                            onChange={(e) => updateContactAt(idx, 'type', e.target.value)}
+                            maxLength={VALIDATION_CONSTRAINTS.directory.contactType.max}
+                            title={`Type can be up to ${VALIDATION_CONSTRAINTS.directory.contactType.max} characters.`}
+                            placeholder="Type (e.g. Hotline)"
+                            className="font-bold text-xs uppercase rounded-sm h-8"
+                          />
+                          <Input
+                            value={row.label}
+                            onChange={(e) => updateContactAt(idx, 'label', e.target.value)}
+                            maxLength={VALIDATION_CONSTRAINTS.directory.contactLabel.max}
+                            title={`Label can be up to ${VALIDATION_CONSTRAINTS.directory.contactLabel.max} characters.`}
+                            placeholder="Label"
+                            className="font-bold text-xs uppercase rounded-sm h-8"
+                          />
+                        </div>
+                        <Input
+                          value={row.value}
+                          onChange={(e) => updateContactAt(idx, 'value', e.target.value)}
+                          minLength={VALIDATION_CONSTRAINTS.directory.contactValue.min}
+                          maxLength={VALIDATION_CONSTRAINTS.directory.contactValue.max}
+                          title={`Value must be ${VALIDATION_CONSTRAINTS.directory.contactValue.min} to ${VALIDATION_CONSTRAINTS.directory.contactValue.max} characters.`}
+                          placeholder="Value"
+                          className="rounded-sm h-9"
+                        />
+                        <TextFieldStatus value={row.type} max={VALIDATION_CONSTRAINTS.directory.contactType.max} />
+                        <TextFieldStatus value={row.label} max={VALIDATION_CONSTRAINTS.directory.contactLabel.max} />
+                        <TextFieldStatus value={row.value} min={VALIDATION_CONSTRAINTS.directory.contactValue.min} max={VALIDATION_CONSTRAINTS.directory.contactValue.max} />
+                        <Button size="sm" variant="ghost" onClick={() => removeContactAt(idx)} className="text-rose-500 w-full hover:bg-rose-50 rounded-lg h-8">
+                          <Trash2 className="w-4 h-4 mr-2" /> Remove
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <div className="h-10 w-10 rounded-full bg-slate-50 text-[#A4163A] flex items-center justify-center shrink-0 border border-slate-100">
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-0.5">
+                              {row.label || row.type}
+                            </p>
+                            <p className="text-sm md:text-base font-bold text-slate-800 truncate leading-none pb-0.5">
+                              {row.value}
+                            </p>
+                          </div>
+                        </div>
+
+
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 px-3 text-slate-400 hover:text-[#A4163A] hover:bg-rose-50 rounded-lg font-bold text-xs tracking-wider"
+                          onClick={() => void handleCopyText(row.label || row.type, row.value)}
+                        >
+                          <Copy className="h-3.5 w-3.5 mr-2" />
+                          COPY
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                )
+              })}
+          </div>
+        </div>
           </>
         )}
       </main>
@@ -1883,6 +2140,25 @@ export default function GovernmentDirectoryPage() {
                 <img src={avatarPreview.url} alt={avatarPreview.title} className="w-full h-auto object-cover" />
               </div>
             ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={loadingCloudinaryImages && !cloudinaryPickerOpen} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6">
+            <DialogTitle className="flex items-center gap-2">
+              <Loader2 className="h-5 w-5 animate-spin text-[#A4163A]" />
+              Loading Uploaded Images
+            </DialogTitle>
+            <DialogDescription>
+              Fetching your uploaded images from Cloudinary. Please wait...
+            </DialogDescription>
+          </DialogHeader>
+          <div className="px-6 pb-6">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              This may take a few seconds depending on network speed.
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -1976,17 +2252,29 @@ export default function GovernmentDirectoryPage() {
 
 
       <AlertDialog open={deleteCandidate !== null} onOpenChange={(open) => { if (!open) setDeleteCandidate(null) }}>
-        <AlertDialogContent className="border-2 border-rose-200">
+        <AlertDialogContent
+          className={modalTokens.container}
+          onOpenAutoFocus={(event) => {
+            event.preventDefault()
+            deleteDialogTitleRef.current?.focus()
+          }}
+          onEscapeKeyDown={() => setDeleteCandidate(null)}
+        >
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this Cloudinary image?</AlertDialogTitle>
-            <AlertDialogDescription>
+            <div className={modalTokens.iconWrap}>
+              <TriangleAlert className="h-6 w-6" />
+            </div>
+            <AlertDialogTitle ref={deleteDialogTitleRef} tabIndex={-1} className={modalTokens.title}>
+              Delete this Cloudinary image?
+            </AlertDialogTitle>
+            <AlertDialogDescription className={modalTokens.description}>
               This will permanently delete the selected image file from Cloudinary.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeleteCandidate(null)}>Cancel</AlertDialogCancel>
+          <AlertDialogFooter className={modalTokens.footer}>
+            <AlertDialogCancel onClick={() => setDeleteCandidate(null)} className={buttonTokens.neutral}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-rose-600 text-white hover:bg-rose-700"
+              className={buttonTokens.danger}
               onClick={async () => {
                 if (!deleteCandidate) return
                 try {
@@ -2001,15 +2289,7 @@ export default function GovernmentDirectoryPage() {
                   })
 
 
-                  if (!response.ok) {
-                    let backendMessage = `HTTP ${response.status}`
-                    try {
-                      const errorBody = await response.json()
-                      if (errorBody?.message) backendMessage = `${errorBody.message} (HTTP ${response.status})`
-                    } catch {
-                    }
-                    throw new Error(backendMessage)
-                  }
+                  await ensureOkResponse(response, 'Unable to delete the selected image.')
 
 
                   setCloudinaryImages((prev) => prev.filter((item) => item.public_id !== deleteCandidate.public_id))

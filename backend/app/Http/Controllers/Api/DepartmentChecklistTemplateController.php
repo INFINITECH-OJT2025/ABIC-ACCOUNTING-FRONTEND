@@ -3,117 +3,148 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Department;
 use App\Models\DepartmentChecklistTemplate;
-use App\Models\DepartmentChecklistTemplateTask;
+use App\Support\Validation\AppLimits;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class DepartmentChecklistTemplateController extends Controller
 {
-    /**
-     * GET /api/department-checklist-templates?checklist_type=ONBOARDING
-     * Returns all templates (optionally filtered by type) with their tasks.
-     */
     public function index(Request $request)
     {
-        try {
-            $query = DepartmentChecklistTemplate::with(['department', 'tasks' => function ($q) {
-                $q->where('is_active', true)->orderBy('sort_order');
-            }]);
-
-            if ($request->filled('checklist_type')) {
-                $query->where('checklist_type', strtoupper($request->checklist_type));
-            }
-
-            $templates = $query->get();
-
-            $data = $templates->map(fn($t) => $this->transform($t));
-
-            return response()->json(['data' => $data]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error fetching templates: ' . $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    /**
-     * PUT /api/department-checklist-templates
-     * Upserts a template for a department + checklist_type and replaces its tasks.
-     *
-     * Body:
-     *   department_id  integer  required
-     *   checklist_type string   required (ONBOARDING | CLEARANCE)
-     *   tasks          array    required  [{task, sort_order, is_active}]
-     */
-    public function upsert(Request $request)
-    {
         $validated = $request->validate([
-            'department_id'  => 'required|integer|exists:departments,id',
             'checklist_type' => 'required|string|in:ONBOARDING,CLEARANCE',
-            'tasks'          => 'required|array',
-            'tasks.*.task'       => 'required|string|max:500',
-            'tasks.*.sort_order' => 'nullable|integer',
-            'tasks.*.is_active'  => 'nullable|boolean',
+            'department_id' => 'nullable|integer|exists:departments,id',
+        ], [
+            'checklist_type.required' => 'Please specify which checklist to load (ONBOARDING or CLEARANCE).',
+            'checklist_type.in' => 'Checklist type must be either ONBOARDING or CLEARANCE.',
+            'department_id.integer' => 'Department selection is invalid.',
+            'department_id.exists' => 'The selected department does not exist anymore.',
         ]);
 
-        try {
-            // Find or create the template record
-            $template = DepartmentChecklistTemplate::firstOrCreate(
+        $query = DepartmentChecklistTemplate::query()
+            ->with(['department:id,name', 'tasks'])
+            ->where('checklist_type', $validated['checklist_type']);
+
+        if (isset($validated['department_id'])) {
+            $query->where('department_id', $validated['department_id']);
+        }
+
+        $rows = $query->orderBy('updated_at', 'desc')->get();
+
+        $data = $rows->map(fn ($template) => $this->transform($template));
+
+        return response()->json(['data' => $data]);
+    }
+
+    public function upsert(Request $request)
+    {
+        $forbiddenTextRule = function (string $fieldLabel) {
+            return function ($attribute, $value, $fail) use ($fieldLabel): void {
+                if (preg_match(AppLimits::FORBIDDEN_TEXT_REGEX, (string) $value)) {
+                    $fail($fieldLabel . ' contains unsupported special characters (' . AppLimits::FORBIDDEN_TEXT_LABEL . ').');
+                }
+            };
+        };
+
+        $validated = $request->validate([
+            'department_id' => 'required|integer|exists:departments,id',
+            'checklist_type' => 'required|string|in:ONBOARDING,CLEARANCE',
+            'tasks' => 'required|array|min:1|max:' . AppLimits::CHECKLIST_TASK_ROWS_APP_MAX,
+            'tasks.*.task' => [
+                'required',
+                'string',
+                'min:' . AppLimits::CHECKLIST_TASK_APP_MIN,
+                'max:' . AppLimits::CHECKLIST_TASK_APP_MAX,
+                $forbiddenTextRule('Task text'),
+            ],
+            'tasks.*.sort_order' => 'nullable|integer|min:' . AppLimits::CHECKLIST_SORT_ORDER_APP_MIN . '|max:' . AppLimits::CHECKLIST_SORT_ORDER_APP_MAX,
+            'tasks.*.is_active' => 'nullable|boolean',
+        ], [
+            'department_id.required' => 'Please choose a department before saving.',
+            'department_id.exists' => 'The selected department is no longer available. Please refresh and try again.',
+            'checklist_type.required' => 'Checklist type is required.',
+            'checklist_type.in' => 'Checklist type must be either ONBOARDING or CLEARANCE.',
+            'tasks.required' => 'Please add at least one checklist task before saving.',
+            'tasks.array' => 'Checklist tasks must be sent as a list.',
+            'tasks.min' => 'Please add at least one checklist task before saving.',
+            'tasks.max' => 'You can save up to ' . AppLimits::CHECKLIST_TASK_ROWS_APP_MAX . ' tasks per checklist template.',
+            'tasks.*.task.required' => 'Each task row must include a task description.',
+            'tasks.*.task.min' => 'Each task must be at least ' . AppLimits::CHECKLIST_TASK_APP_MIN . ' characters long.',
+            'tasks.*.task.max' => 'Each task must be ' . AppLimits::CHECKLIST_TASK_APP_MAX . ' characters or less.',
+            'tasks.*.sort_order.integer' => 'Task order values must be whole numbers.',
+            'tasks.*.sort_order.min' => 'Task order must start at ' . AppLimits::CHECKLIST_SORT_ORDER_APP_MIN . '.',
+            'tasks.*.sort_order.max' => 'Task order is too large.',
+        ]);
+
+        $normalizedTasks = collect($validated['tasks'] ?? [])
+            ->map(fn ($row) => mb_strtolower(trim((string) ($row['task'] ?? ''))))
+            ->filter(fn ($task) => $task !== '');
+
+        if ($normalizedTasks->duplicates()->isNotEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Some tasks are duplicated. Please keep each task name unique.',
+                'errors' => [
+                    'tasks' => ['Some tasks are duplicated. Please keep each task name unique.'],
+                ],
+            ], 422);
+        }
+
+        $template = DB::transaction(function () use ($validated) {
+            $template = DepartmentChecklistTemplate::query()->updateOrCreate(
                 [
-                    'department_id'  => $validated['department_id'],
+                    'department_id' => $validated['department_id'],
                     'checklist_type' => $validated['checklist_type'],
                 ],
-                ['updated_by' => null]
+                [
+                    'updated_by' => null,
+                ]
             );
 
-            $template->touch(); // update updated_at on every save
-
-            // Replace all tasks for this template
             $template->tasks()->delete();
 
-            foreach ($validated['tasks'] as $index => $taskData) {
-                DepartmentChecklistTemplateTask::create([
-                    'template_id' => $template->id,
-                    'task'        => $taskData['task'],
-                    'sort_order'  => $taskData['sort_order'] ?? ($index + 1),
-                    'is_active'   => $taskData['is_active'] ?? true,
+            foreach ($validated['tasks'] as $index => $row) {
+                $task = trim((string) ($row['task'] ?? ''));
+                if ($task === '') {
+                    continue;
+                }
+
+                $template->tasks()->create([
+                    'task' => $task,
+                    'sort_order' => isset($row['sort_order']) ? (int) $row['sort_order'] : ($index + 1),
+                    'is_active' => array_key_exists('is_active', $row) ? (bool) $row['is_active'] : true,
                 ]);
             }
 
-            // Reload with fresh tasks
-            $template->load(['department', 'tasks' => function ($q) {
-                $q->where('is_active', true)->orderBy('sort_order');
-            }]);
+            // Always refresh template updated_at when tasks are saved, even if base fields are unchanged.
+            $template->touch();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Template saved successfully',
-                'data'    => $this->transform($template),
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error saving template: ' . $e->getMessage(),
-            ], 500);
-        }
+            return $template->load(['department:id,name', 'tasks']);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Department checklist template updated successfully',
+            'data' => $this->transform($template),
+        ]);
     }
 
     private function transform(DepartmentChecklistTemplate $template): array
     {
         return [
-            'id'             => $template->id,
-            'department_id'  => $template->department_id,
-            'department_name'=> $template->department?->name ?? '',
+            'id' => $template->id,
+            'department_id' => $template->department_id,
+            'department_name' => $template->department?->name,
             'checklist_type' => $template->checklist_type,
-            'updated_at'     => $template->updated_at,
-            'tasks'          => $template->tasks->map(fn($t) => [
-                'id'         => $t->id,
-                'task'       => $t->task,
-                'sort_order' => $t->sort_order,
-                'is_active'  => $t->is_active,
-            ])->values()->all(),
+            'updated_at' => $template->updated_at,
+            'created_at' => $template->created_at,
+            'tasks' => $template->tasks->map(fn ($task) => [
+                'id' => $task->id,
+                'task' => $task->task,
+                'sort_order' => $task->sort_order,
+                'is_active' => (bool) $task->is_active,
+            ])->values(),
         ];
     }
 }

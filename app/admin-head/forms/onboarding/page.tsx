@@ -5,13 +5,14 @@
 
 
 import React, { useEffect, useMemo, useState, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table"
 import { Card } from "@/components/ui/card"
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { TextFieldStatus } from '@/components/ui/text-field-status'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -32,11 +33,18 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
-  Save, Lock, ChevronLeft, ChevronRight, Check, Trash2, Plus, LayoutDashboard, ClipboardList, TriangleAlert, FolderPlus, Filter, ArrowUpDown, ListFilter, CheckCircle2, CircleDashed, Clock3, History, ArrowUpAZ, ArrowDownAZ, ChevronDown, Users, Loader2, X
+  Save, Lock, ChevronLeft, ChevronRight, Check, Trash2, Plus, LayoutDashboard, ClipboardList, FolderPlus, Filter, ArrowUpDown, ListFilter, CheckCircle2, CircleDashed, Clock3, History, ArrowUpAZ, ArrowDownAZ, ChevronDown, Users, Loader2, X, GripVertical
 } from 'lucide-react'
 import { Label } from '@/components/ui/label'
 import { cn } from "@/lib/utils"
 import { getApiUrl } from '@/lib/api'
+import { ensureOkResponse } from '@/lib/api/error-message'
+import { VALIDATION_CONSTRAINTS } from '@/lib/validation/constraints'
+import { checklistTemplateTasksSchema, onboardingRecordSchema } from '@/lib/validation/schemas'
+import { DeleteTaskDialog, UnsavedChangesDialog } from '@/components/checklist/confirm-dialogs'
+import { useChecklistTemplateSetup } from '@/lib/hooks/use-checklist-template-setup'
+import { PageEmptyState, PageErrorState } from '@/components/state/page-feedback'
+import { ChecklistPageSkeleton } from '@/components/state/checklist-page-skeleton'
 import { toast } from 'sonner'
 
 
@@ -65,9 +73,16 @@ interface OnboardingRecord {
 }
 
 
-interface NamedOption {
-  name: string
-}
+const buildBlankRecord = (departmentName: string): OnboardingRecord => ({
+  id: '',
+  name: '',
+  startDate: '',
+  position: '',
+  department: departmentName,
+  status: 'PENDING',
+  updatedAt: '',
+  tasks: [],
+})
 
 interface DepartmentOption {
   id: number
@@ -166,129 +181,53 @@ export default function OnboardingChecklistPage() {
 
 
 function OnboardingChecklistPageContent() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const targetName = searchParams.get('name')
   const editMode = true
   const [saving, setSaving] = useState(false)
   const [creatingRecord, setCreatingRecord] = useState(false)
   const [addRecordOpen, setAddRecordOpen] = useState(false)
-  const [tasks, setTasks] = useState<ChecklistTask[]>([])
   const [taskIdToDelete, setTaskIdToDelete] = useState<number | null>(null)
+  const [dragTaskId, setDragTaskId] = useState<number | null>(null)
+  const [dragOverTaskId, setDragOverTaskId] = useState<number | null>(null)
+  const [recentlyMovedTaskId, setRecentlyMovedTaskId] = useState<number | null>(null)
   const [open, setOpen] = useState(false)
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [records, setRecords] = useState<OnboardingRecord[]>([])
-  const [employeeInfo, setEmployeeInfo] = useState<OnboardingRecord | null>(null)
-  const [departmentsData, setDepartmentsData] = useState<DepartmentOption[]>([])
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | null>(null)
-  const [positionOptions, setPositionOptions] = useState<string[]>([])
-  const [departmentOptions, setDepartmentOptions] = useState<string[]>([])
   const [newRecord, setNewRecord] = useState({
     name: '',
     position: '',
     department: '',
     startDate: '',
   })
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [recordStatusFilter, setRecordStatusFilter] = useState<RecordStatusFilter>('ALL')
   const [recordSort, setRecordSort] = useState<RecordSort>('UPDATED_DESC')
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false)
   const [unsavedPromptOpen, setUnsavedPromptOpen] = useState(false)
   const [pendingDepartmentSelection, setPendingDepartmentSelection] = useState<string | null>(null)
   const [pendingNavigationUrl, setPendingNavigationUrl] = useState<string | null>(null)
-
-
-  useEffect(() => {
-    const fetchChecklists = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        const response = await fetch(`${getApiUrl()}/api/department-checklist-templates?checklist_type=ONBOARDING`, {
-          headers: { Accept: 'application/json' },
-        })
-
-
-        if (!response.ok) throw new Error(`HTTP ${response.status}`)
-
-
-        const result = await response.json()
-        const data = Array.isArray(result?.data) ? result.data.map(normalizeTemplateRecord) : []
-        setRecords(data)
-
-
-        if (data.length > 0) {
-          let indexToSelect = 0
-
-
-          // Auto-select based on search param
-          if (targetName) {
-            const target = targetName.toLowerCase()
-            const matchingIndex = data.findIndex((r: OnboardingRecord) =>
-              r.name.toLowerCase() === target || String(r.department || '').toLowerCase() === target
-            )
-            if (matchingIndex !== -1) {
-              indexToSelect = matchingIndex
-            }
-          }
-
-
-          const selected = data[indexToSelect]
-          setCurrentIndex(indexToSelect)
-          setEmployeeInfo(selected)
-          setTasks(selected.tasks)
-          if (selected?.department) {
-            const departmentMatch = departmentsData.find((item) => item.name === selected.department)
-            setSelectedDepartmentId(departmentMatch?.id ?? null)
-          }
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to load checklists'
-        setError(message)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-
-    fetchChecklists()
-  }, [])
-
-
-  useEffect(() => {
-    const fetchOptions = async () => {
-      try {
-        const [positionsResponse, departmentsResponse] = await Promise.all([
-          fetch(`${getApiUrl()}/api/positions`, { headers: { Accept: 'application/json' } }),
-          fetch(`${getApiUrl()}/api/departments`, { headers: { Accept: 'application/json' } }),
-        ])
-
-
-        if (positionsResponse.ok) {
-          const positionsData = await positionsResponse.json()
-          const names = Array.isArray(positionsData?.data)
-            ? (positionsData.data as NamedOption[]).map((item) => item.name).filter((name): name is string => !!name)
-            : []
-          setPositionOptions([...new Set(names)])
-        }
-
-
-        if (departmentsResponse.ok) {
-          const departmentsData = await departmentsResponse.json()
-          const rows = Array.isArray(departmentsData?.data)
-            ? (departmentsData.data as DepartmentOption[])
-              .filter((item): item is DepartmentOption => Number.isFinite(Number(item?.id)) && typeof item?.name === 'string')
-            : []
-          const sortedRows = [...rows].sort((a, b) => a.name.localeCompare(b.name))
-          setDepartmentsData(sortedRows)
-          setDepartmentOptions(sortedRows.map((item) => item.name))
-        }
-      } catch {
-      }
-    }
-
-
-    fetchOptions()
-  }, [])
+  const {
+    records,
+    setRecords,
+    employeeInfo,
+    setEmployeeInfo,
+    tasks,
+    setTasks,
+    currentIndex,
+    setCurrentIndex,
+    departmentsData,
+    selectedDepartmentId,
+    setSelectedDepartmentId,
+    positionOptions,
+    departmentOptions,
+    loading,
+    error,
+    setReloadToken,
+  } = useChecklistTemplateSetup<ChecklistTask, OnboardingRecord>({
+    checklistType: 'ONBOARDING',
+    normalizeTemplateRecord,
+    buildBlankRecord,
+    targetName,
+  })
 
   useEffect(() => {
     if (!employeeInfo?.department) return
@@ -439,7 +378,7 @@ function OnboardingChecklistPageContent() {
       return
     }
     if (route) {
-      window.location.href = route
+      router.push(route)
     }
   }
 
@@ -452,6 +391,7 @@ function OnboardingChecklistPageContent() {
   }, [employeeInfo?.department, records])
 
   const hasUnsavedChanges = useMemo(() => {
+    if (String(employeeInfo?.id || '') === '' && tasks.length === 0) return false
     const departmentName = String(employeeInfo?.department || '').trim()
     if (!departmentName) return false
     const savedRecord = records.find((record) => String(record.department || '').trim() === departmentName)
@@ -520,6 +460,27 @@ function OnboardingChecklistPageContent() {
     setTasks(tasks.map(t => t.id === id ? { ...t, task: text } : t));
   };
 
+  const reorderTasksById = (sourceId: number, targetId: number) => {
+    if (sourceId === targetId) return
+    setTasks((prev) => {
+      const sourceIndex = prev.findIndex((row) => row.id === sourceId)
+      const targetIndex = prev.findIndex((row) => row.id === targetId)
+      if (sourceIndex === -1 || targetIndex === -1) return prev
+
+      const next = [...prev]
+      const [moved] = next.splice(sourceIndex, 1)
+      next.splice(targetIndex, 0, moved)
+      setRecentlyMovedTaskId(moved.id)
+      return next
+    })
+  }
+
+  useEffect(() => {
+    if (recentlyMovedTaskId === null) return
+    const timer = setTimeout(() => setRecentlyMovedTaskId(null), 220)
+    return () => clearTimeout(timer)
+  }, [recentlyMovedTaskId])
+
 
   const persistTaskStatus = async (updatedTasks: ChecklistTask[], previousTasks: ChecklistTask[]) => {
     if (!employeeInfo) return
@@ -536,7 +497,7 @@ function OnboardingChecklistPageContent() {
       })
 
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      await ensureOkResponse(response, 'Unable to update this task status right now.')
 
 
       const result = await response.json()
@@ -581,16 +542,42 @@ function OnboardingChecklistPageContent() {
         throw new Error('Please select a valid department before saving.')
       }
 
+      const payloadTasks = tasks
+        .map((row, index) => ({
+          task: row.task.trim(),
+          sort_order: index + 1,
+          is_active: true,
+        }))
+        .filter((row) => row.task.length > 0)
+
+      if (payloadTasks.length === 0) {
+        throw new Error('Please add at least one checklist task before saving.')
+      }
+
+      const tasksValidation = checklistTemplateTasksSchema.safeParse(payloadTasks)
+      if (!tasksValidation.success) {
+        const message = tasksValidation.error.issues[0]?.message || 'Some checklist tasks are invalid.'
+        throw new Error(message)
+      }
+
+      const duplicateTask = (() => {
+        const seen = new Set<string>()
+        for (const row of payloadTasks) {
+          const normalized = row.task.toLowerCase()
+          if (seen.has(normalized)) return row.task
+          seen.add(normalized)
+        }
+        return null
+      })()
+
+      if (duplicateTask) {
+        throw new Error(`The task "${duplicateTask}" is duplicated. Please keep task names unique.`)
+      }
+
       const payload = {
         department_id: departmentId,
         checklist_type: 'ONBOARDING',
-        tasks: tasks
-          .map((row, index) => ({
-            task: row.task.trim(),
-            sort_order: index + 1,
-            is_active: true,
-          }))
-          .filter((row) => row.task.length > 0),
+        tasks: payloadTasks,
       }
 
 
@@ -604,7 +591,7 @@ function OnboardingChecklistPageContent() {
       })
 
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      await ensureOkResponse(response, 'Unable to save the checklist template.')
 
 
       const result = await response.json()
@@ -643,7 +630,7 @@ function OnboardingChecklistPageContent() {
       return
     }
     if (route) {
-      window.location.href = route
+      router.push(route)
     }
   }
 
@@ -665,20 +652,22 @@ function OnboardingChecklistPageContent() {
       if (current === next) return
 
       event.preventDefault()
-      setPendingNavigationUrl(url.toString())
+      setPendingNavigationUrl(next)
       setPendingDepartmentSelection(null)
       setUnsavedPromptOpen(true)
     }
 
     document.addEventListener('click', handleDocumentClick, true)
     return () => document.removeEventListener('click', handleDocumentClick, true)
-  }, [hasUnsavedChanges])
+  }, [hasUnsavedChanges, router])
 
 
   const handleCreateRecord = async () => {
-    if (!newRecord.name.trim() || !newRecord.startDate) {
+    const formValidation = onboardingRecordSchema.safeParse(newRecord)
+    if (!formValidation.success) {
+      const message = formValidation.error.issues[0]?.message || 'Please complete all required fields.'
       toast.warning('Incomplete Form', {
-        description: 'Name and start date are required.',
+        description: message,
       })
       return
     }
@@ -705,7 +694,7 @@ function OnboardingChecklistPageContent() {
       })
 
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      await ensureOkResponse(response, 'Unable to create the onboarding record.')
 
 
       const result = await response.json()
@@ -731,51 +720,30 @@ function OnboardingChecklistPageContent() {
 
 
   if (loading) {
-    return (
-      <div className="min-h-screen w-full bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-12">
-        <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md mb-8">
-          <div className="w-full px-4 md:px-8 py-6">
-            <Skeleton className="h-8 w-72 bg-white/25" />
-            <Skeleton className="h-4 w-56 mt-3 bg-white/20" />
-          </div>
-          <div className="border-t border-white/10 bg-white/5 backdrop-blur-sm">
-            <div className="w-full px-4 md:px-8 py-3">
-              <Skeleton className="h-10 w-[320px] bg-white/20" />
-            </div>
-          </div>
-        </div>
-        <main className="w-full px-4 md:px-8 relative mb-20">
-          <Card className="rounded-2xl border-2 border-[#FFE5EC] shadow-lg overflow-hidden bg-white mb-6">
-            <div className="p-5">
-              <Skeleton className="h-4 w-40 mb-3" />
-              <Skeleton className="h-8 w-72" />
-            </div>
-          </Card>
-          <Card className="rounded-2xl border-2 border-[#FFE5EC] shadow-2xl bg-white overflow-hidden mb-12">
-            <div className="p-5 border-b border-[#FFE5EC]">
-              <Skeleton className="h-4 w-56" />
-            </div>
-            <div className="p-5 space-y-4">
-              {Array.from({ length: 6 }).map((_, idx) => (
-                <div key={`onboarding-task-skeleton-${idx}`} className="flex items-center gap-4">
-                  <Skeleton className="h-8 flex-1" />
-                  <Skeleton className="h-8 w-8" />
-                </div>
-              ))}
-            </div>
-            <div className="p-4 border-t border-[#FFE5EC] flex items-center justify-between">
-              <Skeleton className="h-9 w-28" />
-              <Skeleton className="h-9 w-40" />
-            </div>
-          </Card>
-        </main>
-      </div>
-    )
+    return <ChecklistPageSkeleton />
   }
 
 
   if (error) {
-    return <div className="p-8 text-rose-600">Failed to load onboarding checklist: {error}</div>
+    return (
+      <PageErrorState
+        title="Failed to load onboarding checklist"
+        description={error}
+        onRetry={() => setReloadToken((prev) => prev + 1)}
+        onBack={() => router.back()}
+      />
+    )
+  }
+
+  if (!employeeInfo) {
+    return (
+      <PageEmptyState
+        title="No onboarding template available"
+        description="Create or seed department checklist templates to start onboarding workflows."
+        actionLabel="Reload"
+        onAction={() => setReloadToken((prev) => prev + 1)}
+      />
+    )
   }
 
 
@@ -807,7 +775,7 @@ function OnboardingChecklistPageContent() {
             <div className="flex flex-wrap items-center gap-4">
 
 
-
+              
 
 
               {/* Department Selector */}
@@ -831,7 +799,7 @@ function OnboardingChecklistPageContent() {
               </div>
 
 
-
+              
 
 
               {/* Updated At */}
@@ -883,24 +851,87 @@ function OnboardingChecklistPageContent() {
               <TableRow className="border-b border-[#FFE5EC] hover:bg-transparent">
                 <TableHead className="font-black text-[#800020] uppercase tracking-[0.12em] text-[12px] py-3">
                   <span>Required Onboarding Tasks</span>
+                  <p className="mt-1 text-[10px] normal-case font-semibold tracking-normal text-[#800020]/70">
+                    Task length: {VALIDATION_CONSTRAINTS.checklistTemplate.task.min} to {VALIDATION_CONSTRAINTS.checklistTemplate.task.max} characters.
+                  </p>
                 </TableHead>
                 <TableHead className="w-[80px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[12px] py-3">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {tasks.map((item) => (
-                <TableRow key={item.id} className="border-b border-rose-50/30 last:border-0 hover:bg-[#FFE5EC]/5 transition-colors group">
+                <TableRow
+                  key={item.id}
+                  onDragOver={(event) => {
+                    if (!editMode || tasks.length <= 1) return
+                    event.preventDefault()
+                    event.dataTransfer.dropEffect = 'move'
+                  }}
+                  onDragEnter={(event) => {
+                    if (!editMode || tasks.length <= 1) return
+                    event.preventDefault()
+                    setDragOverTaskId(item.id)
+                    if (dragTaskId !== null && dragTaskId !== item.id) {
+                      reorderTasksById(dragTaskId, item.id)
+                    }
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault()
+                    if (!editMode || tasks.length <= 1) return
+                    const sourceId = dragTaskId ?? Number(event.dataTransfer.getData('text/plain'))
+                    if (!Number.isFinite(sourceId)) return
+                    reorderTasksById(sourceId, item.id)
+                    setDragOverTaskId(null)
+                    setDragTaskId(null)
+                  }}
+                  onDragEnd={() => {
+                    setDragTaskId(null)
+                    setDragOverTaskId(null)
+                  }}
+                  className={cn(
+                    "border-b border-rose-50/30 last:border-0 hover:bg-[#FFE5EC]/5 transition-all duration-200 ease-out group",
+                    dragTaskId === item.id ? "opacity-45" : "",
+                    dragOverTaskId === item.id && dragTaskId !== item.id ? "bg-rose-50/60 ring-1 ring-rose-200" : "",
+                    recentlyMovedTaskId === item.id ? "bg-rose-50/40" : ""
+                  )}
+                >
                   <TableCell className="py-2.5">
                     {editMode ? (
-                      <Input
-                        value={item.task}
-                        onChange={(e) => updateTaskText(item.id, e.target.value)}
-                        className={cn(
-                          "h-8 border-transparent bg-transparent hover:border-[#FFE5EC]/50 focus:border-[#A4163A] focus-visible:ring-0 transition-all font-bold px-0 text-lg",
-                          item.status === 'DONE' ? "text-slate-300 line-through" : "text-slate-700"
-                        )}
-                        placeholder="Define onboarding task..."
-                      />
+                      <div className="flex items-start gap-2">
+                        <button
+                          type="button"
+                          draggable={tasks.length > 1}
+                          onDragStart={(event) => {
+                            setDragTaskId(item.id)
+                            event.dataTransfer.effectAllowed = 'move'
+                            event.dataTransfer.setData('text/plain', String(item.id))
+                          }}
+                          aria-label="Drag to reorder task"
+                          title="Drag to reorder"
+                          className="mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-md border border-rose-100 bg-rose-50/70 text-[#A4163A] shadow-sm transition-all hover:scale-105 hover:bg-rose-100 cursor-grab active:cursor-grabbing"
+                        >
+                          <GripVertical className="h-3.5 w-3.5" />
+                        </button>
+                        <div className="flex-1">
+                        <Input
+                          value={item.task}
+                          onChange={(e) => updateTaskText(item.id, e.target.value)}
+                          minLength={VALIDATION_CONSTRAINTS.checklistTemplate.task.min}
+                          maxLength={VALIDATION_CONSTRAINTS.checklistTemplate.task.max}
+                          title={`Task must be ${VALIDATION_CONSTRAINTS.checklistTemplate.task.min} to ${VALIDATION_CONSTRAINTS.checklistTemplate.task.max} characters.`}
+                          className={cn(
+                            "h-8 border-transparent bg-transparent hover:border-[#FFE5EC]/50 focus:border-[#A4163A] focus-visible:ring-0 transition-all font-bold px-0 text-lg",
+                            item.status === 'DONE' ? "text-slate-300 line-through" : "text-slate-700"
+                          )}
+                          placeholder="Define onboarding task..."
+                        />
+                        <TextFieldStatus
+                          value={item.task}
+                          min={VALIDATION_CONSTRAINTS.checklistTemplate.task.min}
+                          max={VALIDATION_CONSTRAINTS.checklistTemplate.task.max}
+                        />
+                        </div>
+                      </div>
                     ) : (
                       <span className={cn(
                         "text-sm font-bold transition-all duration-300",
@@ -987,9 +1018,14 @@ function OnboardingChecklistPageContent() {
               <Input
                 value={newRecord.name}
                 onChange={(e) => setNewRecord(prev => ({ ...prev, name: e.target.value }))}
+                minLength={VALIDATION_CONSTRAINTS.onboardingRecord.name.min}
+                maxLength={VALIDATION_CONSTRAINTS.onboardingRecord.name.max}
+                title={`Name must be ${VALIDATION_CONSTRAINTS.onboardingRecord.name.min} to ${VALIDATION_CONSTRAINTS.onboardingRecord.name.max} characters.`}
                 placeholder="Ex. Juan Dela Cruz"
                 className="rounded-xl border-[#FFE5EC] border-2 h-14 text-lg font-bold focus:ring-[#800020]/10 focus:border-[#800020]"
               />
+              <TextFieldStatus value={newRecord.name} min={VALIDATION_CONSTRAINTS.onboardingRecord.name.min} max={VALIDATION_CONSTRAINTS.onboardingRecord.name.max} />
+              <p className="text-[11px] font-semibold text-slate-500">Minimum {VALIDATION_CONSTRAINTS.onboardingRecord.name.min}, maximum {VALIDATION_CONSTRAINTS.onboardingRecord.name.max} characters.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
@@ -997,18 +1033,28 @@ function OnboardingChecklistPageContent() {
                 <Input
                   value={newRecord.position}
                   onChange={(e) => setNewRecord(prev => ({ ...prev, position: e.target.value }))}
+                  minLength={VALIDATION_CONSTRAINTS.onboardingRecord.position.min}
+                  maxLength={VALIDATION_CONSTRAINTS.onboardingRecord.position.max}
+                  title={`Position must be ${VALIDATION_CONSTRAINTS.onboardingRecord.position.min} to ${VALIDATION_CONSTRAINTS.onboardingRecord.position.max} characters.`}
                   placeholder="Ex. Senior Accountant"
                   className="rounded-xl border-[#FFE5EC] border-2 h-14 text-lg font-bold focus:ring-[#800020]/10 focus:border-[#800020]"
                 />
+                <TextFieldStatus value={newRecord.position} min={VALIDATION_CONSTRAINTS.onboardingRecord.position.min} max={VALIDATION_CONSTRAINTS.onboardingRecord.position.max} />
+                <p className="text-[11px] font-semibold text-slate-500">Minimum {VALIDATION_CONSTRAINTS.onboardingRecord.position.min}, maximum {VALIDATION_CONSTRAINTS.onboardingRecord.position.max} characters.</p>
               </div>
               <div className="space-y-2">
                 <Label className="text-[11px] font-black text-[#800020] uppercase tracking-[0.2em]">Department</Label>
                 <Input
                   value={newRecord.department}
                   onChange={(e) => setNewRecord(prev => ({ ...prev, department: e.target.value }))}
+                  minLength={VALIDATION_CONSTRAINTS.onboardingRecord.department.min}
+                  maxLength={VALIDATION_CONSTRAINTS.onboardingRecord.department.max}
+                  title={`Department must be ${VALIDATION_CONSTRAINTS.onboardingRecord.department.min} to ${VALIDATION_CONSTRAINTS.onboardingRecord.department.max} characters.`}
                   placeholder="Ex. Finance"
                   className="rounded-xl border-[#FFE5EC] border-2 h-14 text-lg font-bold focus:ring-[#800020]/10 focus:border-[#800020]"
                 />
+                <TextFieldStatus value={newRecord.department} min={VALIDATION_CONSTRAINTS.onboardingRecord.department.min} max={VALIDATION_CONSTRAINTS.onboardingRecord.department.max} />
+                <p className="text-[11px] font-semibold text-slate-500">Minimum {VALIDATION_CONSTRAINTS.onboardingRecord.department.min}, maximum {VALIDATION_CONSTRAINTS.onboardingRecord.department.max} characters.</p>
               </div>
             </div>
             <div className="space-y-2">
@@ -1060,69 +1106,28 @@ function OnboardingChecklistPageContent() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={unsavedPromptOpen} onOpenChange={setUnsavedPromptOpen}>
-        <AlertDialogContent className="max-w-2xl border-4 border-amber-300 rounded-3xl p-0 bg-white shadow-2xl overflow-hidden">
-          <div className="h-2 w-full bg-gradient-to-r from-amber-300 via-amber-400 to-amber-300" />
-          <div className="p-8">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="text-3xl font-black text-slate-900 tracking-tight">Unsaved Changes Detected</AlertDialogTitle>
-              <AlertDialogDescription className="text-slate-600 text-base leading-relaxed mt-2">
-                You have unsaved changes. You can save first, or continue without saving.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter className="flex-col sm:flex-row gap-3 mt-6">
-              <AlertDialogCancel
-                className="h-12 rounded-xl border border-slate-300 text-slate-700 font-semibold hover:bg-slate-100"
-                onClick={() => {
-                  setUnsavedPromptOpen(false)
-                  clearUnsavedIntents()
-                }}
-              >
-                Stay
-              </AlertDialogCancel>
-              <AlertDialogAction
-                className="h-12 rounded-xl bg-[#A4163A] text-white hover:bg-[#800020] font-bold shadow-md"
-                onClick={proceedWithoutSaving}
-              >
-                Proceed Without Saving
-              </AlertDialogAction>
-              <AlertDialogAction
-                className="h-12 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 font-bold shadow-md"
-                onClick={() => void handleSaveAndContinue()}
-              >
-                Save and Continue
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </div>
-        </AlertDialogContent>
-      </AlertDialog>
+      <UnsavedChangesDialog
+        open={unsavedPromptOpen}
+        onOpenChange={setUnsavedPromptOpen}
+        onStay={() => {
+          setUnsavedPromptOpen(false)
+          clearUnsavedIntents()
+        }}
+        onProceedWithoutSaving={proceedWithoutSaving}
+        onSaveAndContinue={() => void handleSaveAndContinue()}
+      />
 
-
-      <AlertDialog open={taskIdToDelete !== null} onOpenChange={(open) => { if (!open) setTaskIdToDelete(null) }}>
-        <AlertDialogContent className="border-4 border-[#FFE5EC] rounded-3xl p-8 bg-white shadow-2xl">
-          <AlertDialogHeader>
-            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-rose-50 text-[#A4163A] border-4 border-[#FFE5EC]">
-              <TriangleAlert className="h-8 w-8" />
-            </div>
-            <AlertDialogTitle className="text-2xl font-black text-center text-slate-900">Confirm Deletion</AlertDialogTitle>
-            <AlertDialogDescription className="text-center text-lg text-slate-500 font-medium">
-              You are about to remove this task from the checklist. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-4 mt-8">
-            <AlertDialogCancel onClick={() => setTaskIdToDelete(null)} className="h-12 rounded-xl font-bold border-2 border-[#FFE5EC] hover:bg-rose-50 text-slate-600">Retain Task</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-[#A4163A] text-white hover:bg-[#800020] h-12 rounded-xl font-bold px-8 shadow-lg transition-all active:scale-95 uppercase tracking-widest text-xs"
-              onClick={() => {
-                if (taskIdToDelete !== null) removeTask(taskIdToDelete)
-                setTaskIdToDelete(null)
-              }}
-            >
-              Confirm Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteTaskDialog
+        open={taskIdToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setTaskIdToDelete(null)
+        }}
+        onCancel={() => setTaskIdToDelete(null)}
+        onDelete={() => {
+          if (taskIdToDelete !== null) removeTask(taskIdToDelete)
+          setTaskIdToDelete(null)
+        }}
+      />
     </div>
   )
 }
