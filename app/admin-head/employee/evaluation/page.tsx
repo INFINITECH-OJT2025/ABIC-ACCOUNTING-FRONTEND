@@ -4,12 +4,12 @@ import React, { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { X, Calendar, UserCheck, TrendingUp, MessageSquare, PieChart, Search, Download } from 'lucide-react'
+import { X, Calendar, UserCheck, TrendingUp, PieChart, Search, Download } from 'lucide-react'
 import { Skeleton } from "@/components/ui/skeleton"
 import { getApiUrl } from '@/lib/api'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { format, addMonths, isAfter, differenceInMonths } from 'date-fns'
+import { format, addMonths } from 'date-fns'
 
 interface Employee {
   id: string
@@ -36,6 +36,8 @@ export default function EvaluationPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [evaluations, setEvaluations] = useState<Record<string, Evaluation>>({})
   const [persistedEvaluations, setPersistedEvaluations] = useState<Record<string, Evaluation>>({})
+  const [lockedScores, setLockedScores] = useState<Record<string, boolean>>({})
+  const [editingScores, setEditingScores] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(true)
   const [isActionLoading, setIsActionLoading] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
@@ -45,6 +47,17 @@ export default function EvaluationPage() {
   useEffect(() => {
     fetchData()
   }, [])
+
+  const deriveStatusFromRemarks = (evalData?: Partial<Evaluation>) => {
+    const remarks1 = String(evalData?.remarks_1 ?? '').toLowerCase()
+    const remarks2 = String(evalData?.remarks_2 ?? '').toLowerCase()
+    const hasFailed = remarks1 === 'failed' || remarks2 === 'failed'
+    const hasPassed = remarks1 === 'passed' || remarks2 === 'passed'
+
+    if (hasFailed) return 'Failed'
+    if (hasPassed) return 'For Recommendation'
+    return 'Probee'
+  }
 
   const fetchData = async () => {
     await Promise.all([fetchEmployees(), fetchEvaluations()])
@@ -90,26 +103,32 @@ export default function EvaluationPage() {
     }
   }
 
-  const calculateEvaluationDates = (dateHired: string, employee?: Employee) => {
+  const calculateEvaluationDates = (dateHired: string, employee?: (Employee & Partial<Evaluation>)) => {
     if (!dateHired) return null
     const hiredDate = new Date(dateHired)
     
-    const evaluation = evaluations[employee?.id || '']
+    const liveEvaluation = evaluations[employee?.id || '']
+    const fallbackEvaluation = employee || ({} as Partial<Employee & Evaluation>)
+    const evaluation = (liveEvaluation || fallbackEvaluation) as Partial<Evaluation>
     
     const firstEval = addMonths(hiredDate, 3)
     const secondEval = addMonths(hiredDate, 5)
     
+    const rawStatus = String(evaluation?.status ?? '').trim().toLowerCase()
+    let normalizedStatus = ''
+    if (rawStatus === 'regular' || rawStatus === 'regularized') normalizedStatus = 'Regular'
+    else if (rawStatus === 'for recommendation') normalizedStatus = 'For Recommendation'
+    else if (rawStatus === 'failed') normalizedStatus = 'Failed'
+    else if (rawStatus === 'probee') normalizedStatus = 'Probee'
+
     let regularizationDate = null
-    if (evaluation?.regularization_date) {
+    if (normalizedStatus === 'Regular' && evaluation?.regularization_date) {
       regularizationDate = new Date(evaluation.regularization_date)
-    } else if ((evaluation?.status === 'Regular' || evaluation?.status === 'Regularized') && evaluation?.updated_at) {
+    } else if (normalizedStatus === 'Regular' && evaluation?.updated_at) {
       regularizationDate = new Date(evaluation.updated_at)
     }
-    
-    const monthsEmployed = differenceInMonths(new Date(), hiredDate)
-    
-    // Prioritize status from evaluation record if it exists
-    const status = evaluation?.status || (monthsEmployed >= 6 ? 'Regular' : 'Probee')
+
+    const status = normalizedStatus || 'Probee'
     
     return {
       firstEval: format(firstEval, 'MMMM d, yyyy'),
@@ -121,6 +140,10 @@ export default function EvaluationPage() {
 
   // Helper to calculate dates for an employee
   const getDatesForEmployee = (emp: Employee) => {
+    const evalRecord = evaluations[emp.id] || persistedEvaluations[emp.id]
+    if (evalRecord) {
+      return calculateEvaluationDates(emp.date_hired, { ...emp, ...evalRecord })
+    }
     return calculateEvaluationDates(emp.date_hired, emp)
   }
 
@@ -176,11 +199,21 @@ export default function EvaluationPage() {
     if (!currentEval) return
 
     const evalData = { ...currentEval }
-    if (isRecommend) {
+    const remarks1 = String(evalData.remarks_1 ?? '').toLowerCase()
+    const remarks2 = String(evalData.remarks_2 ?? '').toLowerCase()
+    const hasPassed = remarks1 === 'passed' || remarks2 === 'passed'
+    const hasFailed = remarks1 === 'failed' || remarks2 === 'failed'
+
+    if (isRecommend || hasPassed) {
       evalData.status = 'Regular'
-      // Determine the regularization date: use current date
-      const today = new Date();
-      evalData.regularization_date = format(today, 'yyyy-MM-dd');
+      const today = new Date()
+      evalData.regularization_date = format(today, 'yyyy-MM-dd')
+    } else if (hasFailed) {
+      evalData.status = 'Failed'
+      evalData.regularization_date = undefined
+    } else {
+      evalData.status = 'Probee'
+      evalData.regularization_date = undefined
     }
 
     setIsActionLoading(true)
@@ -193,6 +226,8 @@ export default function EvaluationPage() {
       const data = await response.json()
       if (data.success) {
         toast.success(isRecommend ? 'Employee recommended to Regular status' : 'Evaluation saved successfully')
+        setLockedScores(prev => ({ ...prev, [employeeId]: true }))
+        setEditingScores(prev => ({ ...prev, [employeeId]: false }))
         fetchData() // Refresh to get updated regularization dates and status
       } else {
         toast.error(data.message || 'Failed to save evaluation')
@@ -279,10 +314,6 @@ export default function EvaluationPage() {
               <Download className="w-5 h-5" />
               Export Report
             </Button>
-            <Button className="bg-white text-[#630C22] hover:bg-rose-50 px-6 h-12 rounded-xl font-bold shadow-lg transition-all flex items-center gap-2">
-              <UserCheck className="w-5 h-5" />
-              New Evaluation
-            </Button>
           </div>
         </div>
       </div>
@@ -294,7 +325,7 @@ export default function EvaluationPage() {
             { label: 'Total Employed', value: employees.length, icon: UserCheck, color: 'text-blue-600', bg: 'bg-blue-50' },
             { label: 'Under Probation', value: employees.filter(e => getDatesForEmployee(e)?.status === 'Probee').length, icon: Calendar, color: 'text-amber-600', bg: 'bg-amber-50' },
             { label: 'Regular Employees', value: employees.filter(e => ['Regular', 'Regularized'].includes(getDatesForEmployee(e)?.status || '')).length, icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-            { label: 'Pending Reviews', value: 0, icon: MessageSquare, color: 'text-rose-600', bg: 'bg-rose-50' },
+            { label: 'Failed Employees', value: employees.filter(e => getDatesForEmployee(e)?.status === 'Failed').length, icon: X, color: 'text-rose-600', bg: 'bg-rose-50' },
           ].map((stat, i) => (
             <Card key={i} className="border-none shadow-sm overflow-hidden">
               <CardContent className="p-6 flex items-center gap-4">
@@ -364,9 +395,12 @@ export default function EvaluationPage() {
                 ) : (
                   filteredEmployees.map((emp) => {
                     const dates = getDatesForEmployee(emp)
-                    const isRecommended = dates?.status === 'Regular' || dates?.status === 'Regularized'
-                    const isScore1Saved = persistedEvaluations[emp.id]?.score_1 !== null && persistedEvaluations[emp.id]?.score_1 !== undefined
-                    const isScore2Saved = persistedEvaluations[emp.id]?.score_2 !== null && persistedEvaluations[emp.id]?.score_2 !== undefined
+                    const currentEvalStatus = String(evaluations[emp.id]?.status ?? persistedEvaluations[emp.id]?.status ?? dates?.status ?? '')
+                    const persistedStatus = String(persistedEvaluations[emp.id]?.status ?? '').trim()
+                    const hasPersistedDecision = persistedStatus.length > 0
+                    const isRecommended = currentEvalStatus === 'Regular' || currentEvalStatus === 'Regularized'
+                    const isEditing = Boolean(editingScores[emp.id])
+                    const isLocked = (isRecommended || hasPersistedDecision || Boolean(lockedScores[emp.id])) && !isEditing
 
                     return (
                       <tr key={emp.id} className="hover:bg-[#FFE5EC] border-b border-rose-50 transition-colors duration-200 group">
@@ -400,7 +434,7 @@ export default function EvaluationPage() {
                             placeholder="0"
                             value={evaluations[emp.id]?.score_1 ?? ''}
                             onChange={(e) => handleScoreChange(emp.id, 'score_1', e.target.value)}
-                            disabled={isRecommended}
+                            disabled={isLocked}
                           />
                         </td>
                         <td className="px-6 py-4 border-r border-rose-50/30 text-center">
@@ -425,7 +459,7 @@ export default function EvaluationPage() {
                             placeholder="0"
                             value={evaluations[emp.id]?.score_2 ?? ''}
                             onChange={(e) => handleScoreChange(emp.id, 'score_2', e.target.value)}
-                            disabled={isRecommended}
+                            disabled={isLocked}
                           />
                         </td>
                         <td className="px-6 py-4 border-r border-rose-50/30 text-center">
@@ -443,36 +477,72 @@ export default function EvaluationPage() {
                            {dates?.regularization || '-'}
                          </td>
                          <td className="px-6 py-4 border-r border-rose-50/30 text-center">
-                           {dates?.status === 'Regular' || dates?.status === 'Regularized' ? null : (evaluations[emp.id]?.remarks_1 === 'Passed' || evaluations[emp.id]?.remarks_2 === 'Passed') ? (
-                             <Badge variant="outline" className="border-blue-200 text-blue-700 bg-blue-50 font-bold px-2 py-0.5 uppercase text-[9px] rounded-md whitespace-nowrap">
-                               For Recommendation
+                           {currentEvalStatus === 'Regular' || currentEvalStatus === 'Regularized' ? (
+                             <Badge variant="outline" className="border-emerald-200 text-emerald-700 bg-emerald-50 font-bold px-2 py-0.5 uppercase text-[9px] rounded-md whitespace-nowrap">
+                               Recommended
                              </Badge>
-                           ) : evaluations[emp.id]?.status ? (
-                             <Badge variant="outline" className="border-rose-200 text-rose-700 bg-rose-50 font-bold px-2 py-0.5 uppercase text-[9px] rounded-md">
-                               {evaluations[emp.id]?.status}
+                           ) : currentEvalStatus ? (
+                             <Badge variant="outline" className={`font-bold px-2 py-0.5 uppercase text-[9px] rounded-md ${
+                               currentEvalStatus === 'Failed'
+                                 ? 'border-rose-200 text-rose-700 bg-rose-50'
+                                 : 'border-blue-200 text-blue-700 bg-blue-50'
+                             }`}>
+                               {currentEvalStatus}
                              </Badge>
                            ) : <span className="text-slate-300 italic text-[10px]">None</span>}
                          </td>
                         <td className="px-6 py-4 text-center">
                           {(() => {
                             const isForRecommendation = evaluations[emp.id]?.remarks_1 === 'Passed' || evaluations[emp.id]?.remarks_2 === 'Passed';
-                            const isRecommended = dates?.status === 'Regular' || dates?.status === 'Regularized';
+                            const isRecommendedStatus = currentEvalStatus === 'Regular' || currentEvalStatus === 'Regularized';
+                            const isEditing = Boolean(editingScores[emp.id]);
+                            const persistedStatus = String(persistedEvaluations[emp.id]?.status ?? '').trim();
+                            const hasPersistedDecision = persistedStatus.length > 0;
+                            const isLocked = (isRecommendedStatus || hasPersistedDecision || Boolean(lockedScores[emp.id])) && !isEditing;
                             
-                            if (isRecommended) return null;
+                            if (isLocked) {
+                              return (
+                                <div className="flex items-center justify-center gap-2">
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    className={`rounded-lg font-bold cursor-not-allowed ${
+                                      isRecommendedStatus
+                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                        : 'bg-slate-100 text-slate-500 border-slate-200'
+                                    }`}
+                                    disabled
+                                  >
+                                    {isRecommendedStatus ? 'Recommended' : 'Saved'}
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="rounded-lg font-bold text-[#630C22] border-[#630C22] hover:bg-[#630C22] hover:text-white"
+                                    onClick={() => {
+                                      setEditingScores(prev => ({ ...prev, [emp.id]: true }))
+                                      setLockedScores(prev => ({ ...prev, [emp.id]: false }))
+                                    }}
+                                  >
+                                    Edit
+                                  </Button>
+                                </div>
+                              );
+                            }
 
                             return (
                               <Button 
                                 variant="outline" 
                                 size="sm"
                                 className={`rounded-lg font-bold transition-all ${
-                                  isForRecommendation && !isRecommended
+                                  isForRecommendation && !isRecommendedStatus
                                     ? 'bg-blue-600 text-white hover:bg-blue-700 border-none px-4 shadow-sm'
                                     : 'text-[#630C22] border-[#630C22] hover:bg-[#630C22] hover:text-white'
                                 } disabled:opacity-50 disabled:cursor-not-allowed`}
-                                onClick={() => saveEvaluation(emp.id, isForRecommendation && !isRecommended)}
-                                disabled={isRecommended || (isScore1Saved && isScore2Saved && !isForRecommendation)}
+                                onClick={() => saveEvaluation(emp.id, isForRecommendation && !isRecommendedStatus)}
+                                disabled={isRecommendedStatus && !isEditing}
                               >
-                                {isForRecommendation && !isRecommended ? 'Recommend' : (isRecommended ? 'Recommended' : 'Save')}
+                                {isEditing ? 'Save' : isForRecommendation && !isRecommendedStatus ? 'Recommend' : (isRecommendedStatus ? 'Recommended' : 'Save')}
                               </Button>
                             );
                           })()}
