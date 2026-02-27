@@ -1184,7 +1184,9 @@ export default function MasterfilePage() {
                                   {employee.onboarding_tasks && (
                                     <span className="text-[9px] font-medium text-slate-400 mt-1 pl-1">
                                       {isRehirePending
-                                        ? `Batch ${displayBatchId}: ${batchLabel}`
+                                        ? (checklistTasksComplete
+                                            ? `Batch ${displayBatchId}: ${batchLabel}`
+                                            : `Tasks: ${employee.onboarding_tasks.done}/${employee.onboarding_tasks.total}`)
                                         : `Tasks: ${employee.onboarding_tasks.done}/${employee.onboarding_tasks.total}`}
                                     </span>
                                   )}

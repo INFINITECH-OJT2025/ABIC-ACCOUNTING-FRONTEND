@@ -143,6 +143,17 @@ function TerminatePageContent() {
     try {
       const empName = `${employeeRec.employee?.first_name} ${employeeRec.employee?.last_name}`
       const department = employeeRec.employee?.department || ''
+      const targetEmployeeId = String(employeeRec.employee_id ?? '').trim()
+      const normalizeDateOnly = (value: unknown) => {
+        const raw = String(value ?? '').trim()
+        if (!raw) return ''
+        const parsed = new Date(raw)
+        if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10)
+        const datePart = raw.includes('T') ? raw.split('T')[0] : raw
+        if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return datePart
+        return ''
+      }
+      const targetLastDay = normalizeDateOnly(employeeRec.termination_date)
 
       // 1. Fetch Template Tasks per department
       let tasksArray: string[] = []
@@ -167,7 +178,28 @@ function TerminatePageContent() {
         const recordData = await recordRes.json()
         const list = Array.isArray(recordData?.data) ? recordData.data : []
         const normalizeName = (value: unknown) => String(value || '').toLowerCase().replace(/\s+/g, ' ').trim()
-        const match = list.find((item: any) => normalizeName(item.name) === normalizeName(empName))
+        const candidates = list
+          .filter((item: any) => normalizeName(item?.name) === normalizeName(empName))
+          .filter((item: any) => {
+            const recordEmployeeId = String(item?.employeeId ?? item?.employee_id ?? '').trim()
+            if (recordEmployeeId && targetEmployeeId) {
+              return recordEmployeeId === targetEmployeeId
+            }
+            return true
+          })
+
+        const sameDayMatches = candidates.filter((item: any) => {
+          const recordLastDay = normalizeDateOnly(item?.lastDay ?? item?.last_day ?? item?.termination_date ?? item?.resignationDate ?? item?.resignation_date)
+          return Boolean(targetLastDay) && recordLastDay === targetLastDay
+        })
+
+        const sortedByLatest = [...(sameDayMatches.length > 0 ? sameDayMatches : [])].sort((a: any, b: any) => {
+          const aTs = new Date(a?.updated_at ?? a?.created_at ?? 0).getTime()
+          const bTs = new Date(b?.updated_at ?? b?.created_at ?? 0).getTime()
+          return bTs - aTs
+        })
+
+        const match = sortedByLatest[0]
         
         if (match) {
           setChecklistRecordId(String(match.id))
@@ -267,8 +299,8 @@ function TerminatePageContent() {
 
   const toggleClearanceTask = (task: string) => {
     if (savedClearanceTasks.has(task)) {
-       // Optional: Decide if we want to allow unchecking previously saved tasks
-       // Let's allow it but we keep it saved in the Set until they hit "Save" again.
+       toast.error('Saved progress cannot be undone')
+       return
     }
     setCompletedClearanceTasks(prev => {
       const next = { ...prev }
@@ -281,9 +313,21 @@ function TerminatePageContent() {
   const toggleAllClearanceTasks = () => {
     const allDone = clearanceTasks.every(t => completedClearanceTasks[t])
     if (allDone) {
-      setCompletedClearanceTasks({})
+      const next = { ...completedClearanceTasks }
+      let removed = 0
+      clearanceTasks.forEach((task) => {
+        if (!savedClearanceTasks.has(task) && next[task]) {
+          delete next[task]
+          removed++
+        }
+      })
+      if (removed === 0) {
+        toast.error('Saved progress cannot be undone')
+        return
+      }
+      setCompletedClearanceTasks(next)
     } else {
-      const all: Record<string, string> = {}
+      const all: Record<string, string> = { ...completedClearanceTasks }
       const today = new Date().toLocaleDateString('en-CA')
       clearanceTasks.forEach(t => all[t] = today)
       setCompletedClearanceTasks(all)
@@ -306,7 +350,21 @@ function TerminatePageContent() {
     return Array.from(latestMap.values())
   }
 
-  const isRehiredRecord = (record: TerminationRecord) => Boolean(record.rehired_at)
+  const isRehiredRecord = (record: TerminationRecord) => {
+    if (record.rehired_at) return true
+    const normalizedStatuses = [record.status, record.employee?.status]
+      .map((value) => String(value ?? '').toLowerCase().trim())
+      .filter(Boolean)
+    return normalizedStatuses.includes('rehired_employee') || normalizedStatuses.includes('rehired')
+  }
+  const canShowRehireAction = (record: TerminationRecord) => {
+    if (record.rehired_at) return false
+    const normalizedStatuses = [record.status, record.employee?.status]
+      .map((value) => String(value ?? '').toLowerCase().trim())
+      .filter(Boolean)
+    if (normalizedStatuses.includes('rehire_pending')) return false
+    return normalizedStatuses.includes('terminated') || normalizedStatuses.includes('resigned')
+  }
 
   const matchesActiveTab = (record: TerminationRecord) => {
     if (isHistoryView) return true
@@ -1424,7 +1482,7 @@ function TerminatePageContent() {
                                 >
                                   Review
                                 </Button>
-                                {!record.rehired_at && (
+                                {canShowRehireAction(record) && (
                                   <Button
                                     size="sm"
                                     variant="outline"
@@ -1592,7 +1650,7 @@ function TerminatePageContent() {
                                   >
                                     Review
                                   </Button>
-                                  {!record.rehired_at && (
+                                  {canShowRehireAction(record) && (
                                     <Button
                                       size="sm"
                                       variant="outline"
@@ -1874,7 +1932,7 @@ function TerminatePageContent() {
           </div>
 
           <div className="p-6 bg-slate-50 border-t border-slate-100 flex flex-col gap-4">
-            {!selectedTermination?.rehired_at && (
+            {selectedTermination && canShowRehireAction(selectedTermination) && (
               <div className="flex items-center gap-4 bg-white p-3 rounded-lg border border-slate-200">
                 <div className="flex flex-col gap-1 shrink-0">
                   <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Re-hire Date & Time</Label>
@@ -1896,7 +1954,7 @@ function TerminatePageContent() {
               <Button variant="ghost" onClick={() => setShowDetailDialog(false)} className="font-bold text-slate-600">
                 Back to List
               </Button>
-              {!selectedTermination?.rehired_at && (
+              {selectedTermination && canShowRehireAction(selectedTermination) && (
                 <Button
                   className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all font-bold px-6"
                   onClick={() => {
