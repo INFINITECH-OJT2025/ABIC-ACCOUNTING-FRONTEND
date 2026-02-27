@@ -165,6 +165,10 @@ export default function EvaluationPage() {
         [scoreType]: score,
         [scoreType === 'score_1' ? 'remarks_1' : 'remarks_2']: remarks
       };
+      if (scoreType === 'score_1' && remarks === 'Passed') {
+        updated.score_2 = 0
+        updated.remarks_2 = 'Failed'
+      }
       updated.status = deriveStatusFromRemarks(updated);
       
       return {
@@ -221,8 +225,8 @@ export default function EvaluationPage() {
     const matchesStatus = statusFilter === 'All' ? true : status === statusFilter
     return matchesSearch && matchesStatus
   }).sort((a, b) => {
-    const statusA = getDatesForEmployee(a)?.status || ''
-    const statusB = getDatesForEmployee(b)?.status || ''
+    const statusA = getStatusForFilter(a)
+    const statusB = getStatusForFilter(b)
     
     // Probee first, then Regular
     const order: Record<string, number> = { 'Probee': 0, 'Regular': 1, 'Regularized': 1 }
