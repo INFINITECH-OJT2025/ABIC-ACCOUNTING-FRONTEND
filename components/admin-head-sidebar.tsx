@@ -93,23 +93,23 @@ export default function AdminHeadSidebar() {
 
       {/* Logo */}
       {!isCollapsed ? (
-        <div className="flex justify-center mb-4 mt-8">
+        <div className="flex justify-center mb-4 mt-8 px-2">
           <Image
             src="/logo.webp"
             alt="ABIC Logo"
-            width={110}
-            height={110}
-            className="object-contain drop-shadow-lg"
+            width={160}
+            height={160}
+            className="object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] hover:scale-105 transition-transform duration-300"
           />
         </div>
       ) : (
-        <div className="flex justify-center mb-3 mt-8">
+        <div className="flex justify-center mb-3 mt-8 px-1">
           <Image
             src="/logo.webp"
             alt="ABIC Logo"
-            width={44}
-            height={44}
-            className="object-contain drop-shadow-md"
+            width={60}
+            height={60}
+            className="object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.2)] hover:scale-110 transition-transform duration-300"
           />
         </div>
       )}

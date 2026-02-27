@@ -1985,5 +1985,3 @@ function TerminatePageContent() {
     </div>
   )
 }
-
-
