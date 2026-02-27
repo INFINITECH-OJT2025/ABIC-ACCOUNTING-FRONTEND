@@ -42,7 +42,6 @@ export default function EvaluationPage() {
   const [isActionLoading, setIsActionLoading] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const saveTimeoutRef = React.useRef<Record<string, NodeJS.Timeout>>({})
 
   useEffect(() => {
     fetchData()
@@ -55,7 +54,6 @@ export default function EvaluationPage() {
     const hasPassed = remarks1 === 'passed' || remarks2 === 'passed'
 
     if (hasFailed) return 'Failed'
-    if (hasPassed) return 'For Recommendation'
     return 'Probee'
   }
 
@@ -158,17 +156,8 @@ export default function EvaluationPage() {
         [scoreType]: score,
         [scoreType === 'score_1' ? 'remarks_1' : 'remarks_2']: remarks
       };
+      updated.status = deriveStatusFromRemarks(updated);
       
-      // Debounced auto-save
-      const key = `${employeeId}-${scoreType}`;
-      if (saveTimeoutRef.current[key]) {
-        clearTimeout(saveTimeoutRef.current[key]);
-      }
-      
-      saveTimeoutRef.current[key] = setTimeout(() => {
-        saveEvaluationForAuto(employeeId, updated);
-      }, 1000); // Save after 1 second of inactivity
-
       return {
         ...prev,
         [employeeId]: updated
@@ -176,42 +165,18 @@ export default function EvaluationPage() {
     })
   }
 
-  const saveEvaluationForAuto = async (employeeId: string, evalData: Evaluation) => {
-    try {
-      await fetch(`${getApiUrl()}/api/evaluations`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(evalData)
-      });
-      // Silent refresh of persisted state
-      setPersistedEvaluations(prev => ({
-        ...prev,
-        [employeeId]: JSON.parse(JSON.stringify(evalData))
-      }));
-    } catch (error) {
-      console.error('Auto-save failed:', error);
-    }
-  }
-
   const saveEvaluation = async (employeeId: string, isRecommend = false) => {
     const currentEval = evaluations[employeeId]
     if (!currentEval) return
 
     const evalData = { ...currentEval }
-    const remarks1 = String(evalData.remarks_1 ?? '').toLowerCase()
-    const remarks2 = String(evalData.remarks_2 ?? '').toLowerCase()
-    const hasPassed = remarks1 === 'passed' || remarks2 === 'passed'
-    const hasFailed = remarks1 === 'failed' || remarks2 === 'failed'
-
-    if (isRecommend || hasPassed) {
+    const derivedStatus = deriveStatusFromRemarks(evalData)
+    if (isRecommend) {
       evalData.status = 'Regular'
       const today = new Date()
       evalData.regularization_date = format(today, 'yyyy-MM-dd')
-    } else if (hasFailed) {
-      evalData.status = 'Failed'
-      evalData.regularization_date = undefined
     } else {
-      evalData.status = 'Probee'
+      evalData.status = derivedStatus
       evalData.regularization_date = undefined
     }
 
@@ -400,6 +365,10 @@ export default function EvaluationPage() {
                     const isRecommended = currentEvalStatus === 'Regular' || currentEvalStatus === 'Regularized'
                     const isEditing = Boolean(editingScores[emp.id])
                     const isLocked = (isRecommended || hasPersistedDecision || Boolean(lockedScores[emp.id])) && !isEditing
+                    const remarks1 = evaluations[emp.id]?.remarks_1 ?? persistedEvaluations[emp.id]?.remarks_1
+                    const isFirstPassed = remarks1 === 'Passed'
+                    const remarks2 = evaluations[emp.id]?.remarks_2 ?? persistedEvaluations[emp.id]?.remarks_2
+                    const isForRecommendation = remarks1 === 'Passed' || remarks2 === 'Passed'
 
                     return (
                       <tr key={emp.id} className="hover:bg-[#FFE5EC] border-b border-rose-50 transition-colors duration-200 group">
@@ -458,7 +427,7 @@ export default function EvaluationPage() {
                             placeholder="0"
                             value={evaluations[emp.id]?.score_2 ?? ''}
                             onChange={(e) => handleScoreChange(emp.id, 'score_2', e.target.value)}
-                            disabled={isLocked}
+                            disabled={isLocked || isFirstPassed}
                           />
                         </td>
                         <td className="px-6 py-4 border-r border-rose-50/30 text-center">
@@ -480,11 +449,15 @@ export default function EvaluationPage() {
                              <Badge variant="outline" className="border-emerald-200 text-emerald-700 bg-emerald-50 font-bold px-2 py-0.5 uppercase text-[9px] rounded-md whitespace-nowrap">
                                Recommended
                              </Badge>
+                           ) : isForRecommendation ? (
+                             <Badge variant="outline" className="border-blue-200 text-blue-700 bg-blue-50 font-bold px-2 py-0.5 uppercase text-[9px] rounded-md">
+                               For Recommendation
+                             </Badge>
                            ) : currentEvalStatus ? (
                              <Badge variant="outline" className={`font-bold px-2 py-0.5 uppercase text-[9px] rounded-md ${
                                currentEvalStatus === 'Failed'
                                  ? 'border-rose-200 text-rose-700 bg-rose-50'
-                                 : 'border-blue-200 text-blue-700 bg-blue-50'
+                                 : 'border-amber-200 text-amber-700 bg-amber-50'
                              }`}>
                                {currentEvalStatus}
                              </Badge>
