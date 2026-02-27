@@ -36,13 +36,19 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { Users, FileText, Check, ChevronsUpDown, X, Search, ArrowUpDown, History, Clock3, ArrowUpAZ, ArrowDownAZ } from 'lucide-react'
+import { Users, FileText, Check, ChevronsUpDown, X, Search, ArrowUpDown, History, Clock3, ArrowUpAZ, ArrowDownAZ, ChevronDown } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from '@/components/ui/input'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select"
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu'
 
 interface Employee {
   id: string
@@ -701,155 +707,189 @@ function TerminatePageContent() {
           </div>
         </div>
       )}
-      {/* Masterfile-style maroon header */}
-      <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md mb-6">
+      {/* ----- INTEGRATED HEADER & TOOLBAR ----- */}
+      <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md mb-6 sticky top-0 z-50">
         {/* Main Header Row */}
         <div className="w-full px-4 md:px-8 py-6">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold mb-1">Terminate / Resign Employee</h1>
-              <p className="text-white/80 text-sm flex items-center gap-2">
+              <h1 className="text-2xl md:text-3xl font-bold mb-2">Terminate / Resign Employee</h1>
+              <p className="text-white/80 text-sm md:text-base flex items-center gap-2">
                 <Users className="w-4 h-4" />
-                Process employee exit and manage records
+                ABIC REALTY & CONSULTANCY
               </p>
             </div>
-            <div className="w-full lg:w-auto flex flex-col items-start lg:items-end gap-2">
+            <div className="flex items-center gap-3 mt-4 lg:mt-0">
               {isRequestFormOpen ? (
                 <Button
                   onClick={() => setIsRequestFormOpen(false)}
-                  className="font-bold px-5 py-2.5 rounded-lg transition-all duration-300 shadow-lg flex items-center gap-2 h-auto border text-sm uppercase tracking-wider bg-white text-[#A4163A] hover:bg-rose-50 border-white"
+                  variant="outline"
+                  className="bg-white border-transparent text-[#7B0F2B] hover:bg-rose-50 hover:text-[#4A081A] shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg flex items-center gap-2"
                 >
-                  <X className="h-4 w-4" />
-                  <span>Close</span>
+                  <X className="w-4 h-4" />
+                  <span>CLOSE</span>
                 </Button>
               ) : (
-                <div className="flex items-center gap-2">
+                <>
                   <Button
                     onClick={() => {
                       setExitActionType('terminate')
                       setIsRequestFormOpen(true)
                     }}
-                    className="font-bold px-5 py-2.5 rounded-lg transition-all duration-300 shadow-lg flex items-center gap-2 h-auto border text-sm uppercase tracking-wider bg-white/10 text-white hover:bg-white/20 border-white/20 backdrop-blur-sm"
+                    variant="outline"
+                    className="bg-white border-transparent text-[#7B0F2B] hover:bg-rose-50 hover:text-[#4A081A] shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg flex items-center gap-2"
                   >
-                    <Users className="h-4 w-4" />
-                    <span>Terminate Employee</span>
+                    <Users className="w-4 h-4 hidden sm:block" />
+                    <span>TERMINATE</span>
                   </Button>
                   <Button
                     onClick={() => {
                       setExitActionType('resigned')
                       setIsRequestFormOpen(true)
                     }}
-                    className="font-bold px-5 py-2.5 rounded-lg transition-all duration-300 shadow-lg flex items-center gap-2 h-auto border text-sm uppercase tracking-wider bg-white text-[#A4163A] hover:bg-rose-50 border-white"
+                    variant="outline"
+                    className="bg-white border-transparent text-[#7B0F2B] hover:bg-rose-50 hover:text-[#4A081A] shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg flex items-center gap-2"
                   >
-                    <Users className="h-4 w-4" />
-                    <span>Resigned Employee</span>
+                    <Users className="w-4 h-4 hidden sm:block" />
+                    <span>RESIGN</span>
                   </Button>
-                </div>
+                </>
               )}
             </div>
           </div>
         </div>
 
-        {/* Secondary Toolbar — matches masterfile */}
+        {/* Secondary Toolbar — matches tardiness */}
         <div className="border-t border-white/10 bg-white/5 backdrop-blur-sm">
           <div className="w-full px-4 md:px-8 py-3">
-            <div className="flex flex-wrap items-center gap-4 lg:gap-8">
+            <div className="flex flex-wrap items-center gap-3 md:gap-4">
+
               {/* Status Count Tabs */}
               {!isHistoryView && (
-                <div className="flex items-center bg-white/10 p-1 rounded-lg backdrop-blur-md border border-white/10">
-                  <button
-                    onClick={() => { setActiveTab('all'); setCurrentPage(1); setCurrentResignedPage(1) }}
-                    className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-200 uppercase tracking-wider ${
-                      activeTab === 'all' ? 'bg-white text-[#A4163A] shadow-md' : 'text-white/70 hover:text-white hover:bg-white/5'
-                    }`}
-                  >
-                    All ({allCount})
-                  </button>
-                  <button
-                    onClick={() => { setActiveTab('terminated'); setCurrentPage(1); setCurrentResignedPage(1) }}
-                    className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-200 uppercase tracking-wider ${
-                      activeTab === 'terminated' ? 'bg-white text-[#A4163A] shadow-md' : 'text-white/70 hover:text-white hover:bg-white/5'
-                    }`}
-                  >
-                    Terminated ({terminatedCount})
-                  </button>
-                  <button
-                    onClick={() => { setActiveTab('rehired'); setCurrentPage(1); setCurrentResignedPage(1) }}
-                    className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-200 uppercase tracking-wider ${
-                      activeTab === 'rehired' ? 'bg-white text-[#A4163A] shadow-md' : 'text-white/70 hover:text-white hover:bg-white/5'
-                    }`}
-                  >
-                    Rehired ({rehiredCount})
-                  </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-white/70 uppercase tracking-wider hidden sm:block mr-1">Status</span>
+                  <div className="flex items-center bg-white/10 p-1 rounded-lg backdrop-blur-md border border-white/10 overflow-x-auto whitespace-nowrap hide-scrollbar">
+                    <button
+                      onClick={() => { setActiveTab('all'); setCurrentPage(1); setCurrentResignedPage(1) }}
+                      className={`px-4 py-1.5 rounded-md text-[11px] md:text-xs font-bold transition-all duration-200 uppercase tracking-wider ${activeTab === 'all' ? 'bg-white text-[#A4163A] shadow-md' : 'text-white/70 hover:text-white hover:bg-white/5'
+                        }`}
+                    >
+                      All ({allCount})
+                    </button>
+                    <button
+                      onClick={() => { setActiveTab('terminated'); setCurrentPage(1); setCurrentResignedPage(1) }}
+                      className={`px-4 py-1.5 rounded-md text-[11px] md:text-xs font-bold transition-all duration-200 uppercase tracking-wider ${activeTab === 'terminated' ? 'bg-white text-[#A4163A] shadow-md' : 'text-white/70 hover:text-white hover:bg-white/5'
+                        }`}
+                    >
+                      Terminated ({terminatedCount})
+                    </button>
+                    <button
+                      onClick={() => { setActiveTab('rehired'); setCurrentPage(1); setCurrentResignedPage(1) }}
+                      className={`px-4 py-1.5 rounded-md text-[11px] md:text-xs font-bold transition-all duration-200 uppercase tracking-wider ${activeTab === 'rehired' ? 'bg-white text-[#A4163A] shadow-md' : 'text-white/70 hover:text-white hover:bg-white/5'
+                        }`}
+                    >
+                      Rehired ({rehiredCount})
+                    </button>
+                  </div>
                 </div>
               )}
-              {/* Search and Sort */}
-              <div className="flex flex-1 flex-wrap items-center gap-3">
-                <div className="relative w-full md:w-[300px]">
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-[#A0153E]" />
-                  <Input
-                    placeholder="Search employee..."
-                    value={searchInput}
-                    onChange={(e) => {
-                      setSearchInput(e.target.value)
-                      setSearchQuery(e.target.value)
-                      setCurrentPage(1)
-                      setCurrentResignedPage(1)
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        setSearchQuery(searchInput)
-                        setCurrentPage(1)
-                        setCurrentResignedPage(1)
-                      }
-                    }}
-                    className="bg-white border-2 border-[#FFE5EC] text-slate-700 placeholder:text-slate-400 pl-10 h-9 w-full focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A] shadow-sm rounded-lg transition-all"
-                  />
+
+              {/* History Filter */}
+              {isHistoryView && (
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-bold text-white/70 uppercase tracking-wider hidden sm:block">Filter</span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <div className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 min-w-[140px] justify-between shadow-sm font-bold inline-flex items-center whitespace-nowrap rounded-lg cursor-pointer group border-2">
+                        {historyFilter === 'all' ? 'All History' : historyFilter === 'terminated' ? 'Terminated' : historyFilter === 'rehired' ? 'Rehired' : 'Resigned'}
+                        <ChevronDown className="w-4 h-4 ml-2 opacity-50 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-48 bg-white border-stone-200 shadow-xl rounded-xl p-1.5" align="start">
+                      {['all', 'terminated', 'rehired', 'resigned'].map((val) => (
+                        <DropdownMenuItem
+                          key={val}
+                          onClick={() => {
+                            setHistoryFilter(val as any)
+                            setCurrentPage(1)
+                            setCurrentResignedPage(1)
+                          }}
+                          className={cn(
+                            "flex items-center justify-between rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors uppercase tracking-wider font-bold",
+                            historyFilter === val ? "bg-red-50 text-red-900" : "text-stone-600 hover:bg-stone-50"
+                          )}
+                        >
+                          {val === 'all' ? 'All History' : val === 'terminated' ? 'Terminated' : val === 'rehired' ? 'Rehired' : 'Resigned'}
+                          {historyFilter === val && <Check className="w-4 h-4 text-red-600" />}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
-                {isHistoryView && (
-                  <Select value={historyFilter} onValueChange={(value: 'all' | 'terminated' | 'rehired' | 'resigned') => {
-                    setHistoryFilter(value)
+              )}
+
+              {/* Sort Order */}
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-bold text-white/70 uppercase tracking-wider hidden sm:block">Sort</span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <div className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 min-w-[170px] justify-between shadow-sm font-bold inline-flex items-center whitespace-nowrap rounded-lg cursor-pointer group border-2">
+                      {sortOrder === 'recent' ? 'Recent First' : sortOrder === 'oldest' ? 'Oldest First' : sortOrder === 'az' ? 'Alphabet (A-Z)' : 'Alphabet (Z-A)'}
+                      <ChevronDown className="w-4 h-4 ml-2 opacity-50 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56 bg-white border-stone-200 shadow-xl rounded-xl p-1.5" align="start">
+                    {[
+                      { val: 'recent', label: 'Recent First', icon: History },
+                      { val: 'oldest', label: 'Oldest First', icon: Clock3 },
+                      { val: 'az', label: 'Alphabet (A-Z)', icon: ArrowUpAZ },
+                      { val: 'za', label: 'Alphabet (Z-A)', icon: ArrowDownAZ },
+                    ].map(({ val, label, icon: Icon }) => (
+                      <DropdownMenuItem
+                        key={val}
+                        onClick={() => {
+                          setSortOrder(val as any)
+                          setCurrentPage(1)
+                          setCurrentResignedPage(1)
+                        }}
+                        className={cn(
+                          "flex items-center justify-between rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors uppercase tracking-wider font-bold border-b border-slate-50 last:border-0",
+                          sortOrder === val ? "bg-red-50 text-[#630C22]" : "text-stone-600 hover:bg-stone-50"
+                        )}
+                      >
+                        <div className="flex items-center gap-3"><Icon className="h-4 w-4" /><span>{label}</span></div>
+                        {sortOrder === val && <Check className="w-4 h-4 text-red-600" />}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              {/* Global Search Input */}
+              <div className="flex-1 min-w-[200px] relative">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-[#A0153E]" />
+                <Input
+                  placeholder="Search employee..."
+                  value={searchInput}
+                  onChange={(e) => {
+                    setSearchInput(e.target.value)
+                    setSearchQuery(e.target.value)
                     setCurrentPage(1)
                     setCurrentResignedPage(1)
-                  }}>
-                    <SelectTrigger className="w-full sm:w-[210px] bg-white border-2 border-[#FFE5EC] h-9 rounded-lg shadow-sm focus:ring-[#A0153E] text-[#800020] font-bold">
-                      <div className="flex items-center gap-2 text-xs uppercase tracking-wider">
-                        <SelectValue placeholder="Filter records" />
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl border-stone-200 shadow-xl overflow-hidden">
-                      <SelectItem value="all" className="font-bold text-xs py-2 uppercase tracking-wider cursor-pointer">All History</SelectItem>
-                      <SelectItem value="terminated" className="font-bold text-xs py-2 uppercase tracking-wider cursor-pointer">Terminated</SelectItem>
-                      <SelectItem value="rehired" className="font-bold text-xs py-2 uppercase tracking-wider cursor-pointer">Rehired</SelectItem>
-                      <SelectItem value="resigned" className="font-bold text-xs py-2 uppercase tracking-wider cursor-pointer">Resigned</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-
-                <Select value={sortOrder} onValueChange={(value: any) => { setSortOrder(value); setCurrentPage(1); setCurrentResignedPage(1) }}>
-                  <SelectTrigger className="w-full sm:w-[180px] bg-white border-2 border-[#FFE5EC] h-9 rounded-lg shadow-sm focus:ring-[#A0153E] text-[#800020] font-bold">
-                    <div className="flex items-center gap-2 text-xs uppercase tracking-wider">
-                      <ArrowUpDown className="h-3.5 w-3.5 opacity-50" />
-                      <SelectValue placeholder="Sort by" />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-stone-200 shadow-xl overflow-hidden">
-                    <SelectItem value="recent" className="focus:bg-red-50 focus:text-[#630C22] font-bold text-xs py-2 uppercase tracking-wider cursor-pointer border-b border-slate-50 last:border-0">
-                      <div className="flex items-center gap-3"><History className="h-4 w-4" /><span>Recent First</span></div>
-                    </SelectItem>
-                    <SelectItem value="oldest" className="focus:bg-red-50 focus:text-[#630C22] font-bold text-xs py-2 uppercase tracking-wider cursor-pointer border-b border-slate-50 last:border-0">
-                      <div className="flex items-center gap-3"><Clock3 className="h-4 w-4" /><span>Oldest First</span></div>
-                    </SelectItem>
-                    <SelectItem value="az" className="focus:bg-red-50 focus:text-[#630C22] font-bold text-xs py-2 uppercase tracking-wider cursor-pointer border-b border-slate-50 last:border-0">
-                      <div className="flex items-center gap-3"><ArrowUpAZ className="h-4 w-4" /><span>Alphabet (A-Z)</span></div>
-                    </SelectItem>
-                    <SelectItem value="za" className="focus:bg-red-50 focus:text-[#630C22] font-bold text-xs py-2 uppercase tracking-wider cursor-pointer border-b border-slate-50 last:border-0">
-                      <div className="flex items-center gap-3"><ArrowDownAZ className="h-4 w-4" /><span>Alphabet (Z-A)</span></div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      setSearchQuery(searchInput)
+                      setCurrentPage(1)
+                      setCurrentResignedPage(1)
+                    }
+                  }}
+                  className="bg-white border-2 border-[#FFE5EC] text-slate-700 placeholder:text-slate-400 pl-10 h-10 w-full focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A] shadow-sm rounded-lg transition-all font-medium"
+                />
               </div>
+
+              {/* View History Button */}
               <Button
                 type="button"
                 onClick={() => {
@@ -861,10 +901,11 @@ function TerminatePageContent() {
                     router.push(`${pathname}?view=history`)
                   }
                 }}
-                className="h-9 px-4 rounded-lg text-xs font-bold uppercase tracking-wider bg-white text-[#A4163A] hover:bg-rose-50 border border-white/80 ml-auto"
+                className="h-9 px-4 rounded-lg text-xs font-bold uppercase tracking-wider bg-white text-[#A4163A] hover:bg-rose-50 border border-[#FFE5EC] border-2 shadow-sm focus:ring-2 focus:ring-[#A0153E] ml-auto"
               >
                 {isHistoryView ? 'Back To Current Records' : 'View All History'}
               </Button>
+
             </div>
           </div>
         </div>
@@ -1176,71 +1217,71 @@ function TerminatePageContent() {
                         {filteredTerminations
                           .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                           .map((record) => (
-                          <TableRow key={record.id} className="hover:bg-slate-50/80 transition-colors border-b border-slate-50">
-                            <TableCell className="py-4 pl-8 font-medium text-slate-900">
-                              <div className="flex flex-col">
-                                <span className="text-base">{record.employee?.last_name}, {record.employee?.first_name}</span>
-                                <span className="text-xs text-slate-500 font-normal mt-0.5">{record.employee?.position}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-slate-600 text-sm font-medium">
-                              {record.termination_date ? (
+                            <TableRow key={record.id} className="hover:bg-slate-50/80 transition-colors border-b border-slate-50">
+                              <TableCell className="py-4 pl-8 font-medium text-slate-900">
                                 <div className="flex flex-col">
-                                  <span className="font-semibold text-rose-700">{new Date(record.termination_date).toLocaleDateString()}</span>
-                                  <span className="text-xs text-slate-400 mt-0.5">{new Date(record.termination_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                  <span className="text-base">{record.employee?.last_name}, {record.employee?.first_name}</span>
+                                  <span className="text-xs text-slate-500 font-normal mt-0.5">{record.employee?.position}</span>
                                 </div>
-                              ) : 'N/A'}
-                            </TableCell>
-                            {(isHistoryView || activeTab !== 'terminated') && (
-                              <TableCell className="text-slate-600 text-sm font-medium">
-                                {record.rehired_at ? (
-                                  <div className="flex flex-col">
-                                    <span className="font-semibold text-emerald-700">{new Date(record.rehired_at).toLocaleDateString()}</span>
-                                    <span className="text-xs text-slate-400 mt-0.5">{new Date(record.rehired_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                  </div>
-                                ) : (
-                                  <span className="text-slate-300 italic text-xs">—</span>
-                                )}
                               </TableCell>
-                            )}
-                            <TableCell className="max-w-[300px] truncate text-slate-500 text-sm italic">
-                              &quot;{record.reason}&quot;
-                            </TableCell>
-                            <TableCell className="py-4 pr-8 text-right">
-                              <div className="flex items-center justify-end gap-3">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-[#800020] font-bold hover:text-[#A0153E] hover:bg-rose-50 rounded-lg px-4"
-                                  onClick={() => {
-                                    setSelectedTermination(record)
-                                    setShowDetailDialog(true)
-                                  }}
-                                >
-                                  Review
-                                </Button>
-                                {!record.rehired_at && (
+                              <TableCell className="text-slate-600 text-sm font-medium">
+                                {record.termination_date ? (
+                                  <div className="flex flex-col">
+                                    <span className="font-semibold text-rose-700">{new Date(record.termination_date).toLocaleDateString()}</span>
+                                    <span className="text-xs text-slate-400 mt-0.5">{new Date(record.termination_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                  </div>
+                                ) : 'N/A'}
+                              </TableCell>
+                              {(isHistoryView || activeTab !== 'terminated') && (
+                                <TableCell className="text-slate-600 text-sm font-medium">
+                                  {record.rehired_at ? (
+                                    <div className="flex flex-col">
+                                      <span className="font-semibold text-emerald-700">{new Date(record.rehired_at).toLocaleDateString()}</span>
+                                      <span className="text-xs text-slate-400 mt-0.5">{new Date(record.rehired_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-300 italic text-xs">—</span>
+                                  )}
+                                </TableCell>
+                              )}
+                              <TableCell className="max-w-[300px] truncate text-slate-500 text-sm italic">
+                                &quot;{record.reason}&quot;
+                              </TableCell>
+                              <TableCell className="py-4 pr-8 text-right">
+                                <div className="flex items-center justify-end gap-3">
                                   <Button
+                                    variant="ghost"
                                     size="sm"
-                                    variant="outline"
-                                    className="h-9 border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300 transition-all font-bold px-4 rounded-lg shadow-sm"
+                                    className="text-[#800020] font-bold hover:text-[#A0153E] hover:bg-rose-50 rounded-lg px-4"
                                     onClick={() => {
                                       setSelectedTermination(record)
-                                      setFormData((prev) => ({
-                                        ...prev,
-                                        rehire_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
-                                      }))
                                       setShowDetailDialog(true)
                                     }}
-                                    disabled={rehireLoading === record.employee_id}
                                   >
-                                    {rehireLoading === record.employee_id ? 'Wait...' : 'Re-hire'}
+                                    Review
                                   </Button>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                                  {!record.rehired_at && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-9 border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300 transition-all font-bold px-4 rounded-lg shadow-sm"
+                                      onClick={() => {
+                                        setSelectedTermination(record)
+                                        setFormData((prev) => ({
+                                          ...prev,
+                                          rehire_date: new Date().toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16),
+                                        }))
+                                        setShowDetailDialog(true)
+                                      }}
+                                      disabled={rehireLoading === record.employee_id}
+                                    >
+                                      {rehireLoading === record.employee_id ? 'Wait...' : 'Re-hire'}
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
                       </TableBody>
                     </Table>
                     {/* Pagination */}

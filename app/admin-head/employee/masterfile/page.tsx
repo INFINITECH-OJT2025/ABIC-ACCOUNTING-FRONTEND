@@ -82,7 +82,7 @@ export default function MasterfilePage() {
   const [isActionLoading, setIsActionLoading] = useState(false)
   const [isDetailLoading, setIsDetailLoading] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
-  
+
   // Editing States
   const [isEditingContact, setIsEditingContact] = useState(false)
   const [isEditingCurrent, setIsEditingCurrent] = useState(false)
@@ -133,7 +133,7 @@ export default function MasterfilePage() {
         code: region.region_code || region.code,
         name: region.region_name || region.name
       }))
-      
+
       // Deduplicate by code
       const uniqueRegions = Array.from(
         new Map(regionsArray.map(r => [r.code, r])).values()
@@ -261,7 +261,7 @@ export default function MasterfilePage() {
       if (selectedCity) fetchBarangays(selectedCity.code)
       setEditFormData(prev => ({ ...prev, barangay: '' }))
     }
-    
+
     // PSGC logic for Permanent Address
     else if (name === 'perm_region') {
       const selectedRegion = regions.find(r => r.name === value)
@@ -544,10 +544,10 @@ export default function MasterfilePage() {
       }
     }
 
-    return { 
-      isComplete: true, 
-      status: emp.status === 'rehire_pending' ? 'READY TO RE-HIRE' : 'READY TO EMPLOY', 
-      batchId: 1 
+    return {
+      isComplete: true,
+      status: emp.status === 'rehire_pending' ? 'READY TO RE-HIRE' : 'READY TO EMPLOY',
+      batchId: 1
     }
   }
 
@@ -556,7 +556,7 @@ export default function MasterfilePage() {
 
     const { isComplete } = checkCompleteness(selectedEmployee)
     const isRehire = selectedEmployee.status === 'rehire_pending'
-    
+
     if (!isComplete) {
       setConfirmModal({
         isOpen: true,
@@ -582,7 +582,7 @@ export default function MasterfilePage() {
         try {
           const apiUrl = getApiUrl()
           const finalStatus = isRehire ? 'rehired_employee' : 'employed'
-          
+
           const response = await fetch(`${apiUrl}/api/employees/${selectedEmployee.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -826,9 +826,9 @@ export default function MasterfilePage() {
                   <Button
                     onClick={() => router.push('/admin-head/employee/onboard')}
                     variant="outline"
-                    className="border-white/30 text-white hover:bg-white/20 hover:text-white bg-transparent backdrop-blur-sm shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg flex items-center gap-2"
+                    className="bg-white border-transparent text-[#7B0F2B] hover:bg-rose-50 hover:text-[#4A081A] shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg"
                   >
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-4 h-4 mr-2" />
                     <span>ONBOARD NEW EMPLOYEE</span>
                   </Button>
                 </div>
@@ -1123,533 +1123,532 @@ export default function MasterfilePage() {
       ) : (
         /* DETAIL VIEW (Replaces Modal) */
         <div className="max-w-5xl mx-auto animate-in slide-in-from-bottom-8 duration-500">
-          
+
 
           {isDetailLoading ? (
             <DetailSkeleton />
           ) : (
             //employee information REVIEW 
 
-<div className="min-h-screen w-full bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-12">
-  <div className="relative w-full">
-    {/* ----- INTEGRATED HEADER & TOOLBAR ----- */}
-    <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md mb-6">
-      {/* Main Header Row */}
-      <div className="w-full px-4 md:px-8 py-6">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold mb-2">Employee Information</h1>
-            <p className="text-white/80 text-sm md:text-base flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-              ABIC REALTY & CONSULTANCY
-            </p>
-          </div>
-
-          {/* Actions */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setViewMode('list')}
-              disabled={isDetailLoading}
-              className="border border-white/30 text-white hover:bg-white/20 hover:text-white bg-transparent backdrop-blur-sm shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg flex items-center gap-2 disabled:opacity-50"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="m15 18-6-6 6-6"/></svg>
-              <span>BACK TO LIST</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Secondary Toolbar - Employee Status Bar */}
-      {selectedEmployee && (
-        <div className="border-t border-white/10 bg-white/5 backdrop-blur-sm">
-          <div className="w-full px-4 md:px-8 py-3">
-            <div className="flex flex-wrap items-center gap-4 md:gap-6">
-              {/* Employee Badge */}
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center text-lg font-bold">
-                  {selectedEmployee?.first_name?.charAt(0)}{selectedEmployee?.last_name?.charAt(0)}
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-white/70 uppercase tracking-wider">Employee</p>
-                  <p className="text-white font-bold text-base">
-                    {selectedEmployee?.first_name} {selectedEmployee?.last_name}
-                  </p>
-                </div>
-              </div>
-
-              {/* ID Badge */}
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-bold text-white/70 uppercase tracking-wider">ID</span>
-                <div className="bg-white border-2 border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 min-w-[100px] justify-between shadow-sm font-bold inline-flex items-center whitespace-nowrap rounded-lg">
-                  #{selectedEmployee?.id.toString().padStart(4, '0')}
-                </div>
-              </div>
-
-              {/* Status Badge */}
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-bold text-white/70 uppercase tracking-wider">Status</span>
-                <div className="bg-white border-2 border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 justify-between shadow-sm font-bold inline-flex items-center whitespace-nowrap rounded-lg">
-                  {(selectedEmployee?.status === 'pending' || selectedEmployee?.status === 'rehire_pending') ? (
-                    <div className="flex items-center gap-2">
-                      {selectedEmployee.onboarding_tasks?.isComplete ? 
-                        checkCompleteness(selectedEmployee).status : 
-                        "PENDING: ONBOARDING CHECKLIST"}
-                    </div>
-                  ) : (
-                    statusLabels[selectedEmployee?.status || 'pending']
-                  )}
-                </div>
-              </div>
-
-              {/* Position */}
-              {selectedEmployee?.position && (
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-bold text-white/70 uppercase tracking-wider">Position</span>
-                  <div className="bg-white border-2 border-[#FFE5EC] text-[#800020] text-sm h-10 px-4 shadow-sm font-bold inline-flex items-center whitespace-nowrap rounded-lg">
-                    {selectedEmployee.position}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  </div>
-
-  <div className="bg-white p-3 md:p-6 rounded-lg shadow-lg border-b-2 md:border-2 border-[#FFE5EC] max-w-5xl mx-auto">
-    {isDetailLoading ? (
-      <div className="flex items-center justify-center p-12">
-        <svg className="w-8 h-8 animate-spin text-[#A0153E]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        <span className="ml-3 text-slate-500 font-medium">Loading employee details...</span>
-      </div>
-    ) : (
-      <div className="space-y-6">
-        {/* Header Info Card - using div */}
-        <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
-          <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl text-[#4A081A] font-bold">Employee Profile</h2>
-              <p className="text-sm font-bold text-[#630C22]">
-                {selectedEmployee?.first_name} {selectedEmployee?.last_name}
-              </p>
-            </div>
-            <p className="text-[#630C22]/70 text-xs font-medium mt-1">
-              Complete employee information and records
-            </p>
-          </div>
-        </div>
-
-        {selectedEmployee && (
-          <>
-            {/* EMPLOYMENT */}
-            <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
-              <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4">
-                <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
-                  <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
-                  Employment Information
-                </h3>
-              </div>
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                  <DetailItem label="Position" value={selectedEmployee.position} required />
-                  <DetailItem label="Date Hired" value={selectedEmployee.date_hired ? new Date(selectedEmployee.date_hired).toLocaleDateString() : null} required />
-                  <DetailItem label="Department" value={selectedEmployee.department} />
-                  <DetailItem label="Employment Status" value={selectedEmployee.status} />
-                </div>
-              </div>
-            </div>
-
-            {/* PERSONAL */}
-            <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
-              <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4">
-                <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
-                  <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
-                  Personal Information
-                </h3>
-              </div>
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
-                  <DetailItem label="First Name" value={selectedEmployee.first_name} required />
-                  <DetailItem label="Last Name" value={selectedEmployee.last_name} required />
-                  <DetailItem label="Middle Name" value={selectedEmployee.middle_name} />
-                  <DetailItem label="Suffix" value={selectedEmployee.suffix} />
-                  <DetailItem label="Birthday" value={selectedEmployee.birthday ? new Date(selectedEmployee.birthday).toLocaleDateString() : null} required />
-                  <DetailItem label="Birthplace" value={selectedEmployee.birthplace} required />
-                  <DetailItem label="Gender" value={selectedEmployee.gender} required />
-                  <DetailItem label="Civil Status" value={selectedEmployee.civil_status} required />
-                </div>
-              </div>
-            </div>
-
-            {/* CONTACT */}
-            <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
-              <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4 flex justify-between items-center">
-                <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
-                  <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
-                  Contact Information
-                </h3>
-                <div className="flex gap-2">
-                  {isEditingContact ? (
-                    <>
-                      <Button variant="ghost" size="sm" onClick={() => setIsEditingContact(false)} className="h-8 text-slate-500 hover:text-slate-700">
-                        <X className="w-4 h-4 mr-1" /> Cancel
-                      </Button>
-                      <Button size="sm" onClick={() => handleSaveSection('contact')} disabled={isActionLoading} className="h-8 bg-[#630C22] hover:bg-[#800020] text-white">
-                        {isActionLoading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Save className="w-4 h-4 mr-1" />} Save
-                      </Button>
-                    </>
-                  ) : (
-                    <Button variant="ghost" size="sm" onClick={() => toggleEditSection('contact')} className="h-8 text-[#630C22] hover:bg-[#630C22]/10 font-bold">
-                      <Edit2 className="w-4 h-4 mr-1" /> Edit
-                    </Button>
-                  )}
-                </div>
-              </div>
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
-                  {isEditingContact ? (
-                    <>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Email Address</label>
-                        <Input name="email_address" value={editFormData.email_address || editFormData.email || ''} onChange={handleEditChange} className="h-9" />
+            <div className="min-h-screen w-full bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-12">
+              <div className="relative w-full">
+                {/* ----- INTEGRATED HEADER & TOOLBAR ----- */}
+                <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md mb-6">
+                  {/* Main Header Row */}
+                  <div className="w-full px-4 md:px-8 py-6">
+                    <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                      <div>
+                        <h1 className="text-2xl md:text-3xl font-bold mb-2">Employee Information</h1>
+                        <p className="text-white/80 text-sm md:text-base flex items-center gap-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+                          ABIC REALTY & CONSULTANCY
+                        </p>
                       </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Mobile Number</label>
-                        <div className="relative group">
-                          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-[#630C22] pointer-events-none group-focus-within:text-[#800020] transition-colors">
-                            +63
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setViewMode('list')}
+                          disabled={isDetailLoading}
+                          className="border border-white/30 text-white hover:bg-white/20 hover:text-white bg-transparent backdrop-blur-sm shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg flex items-center gap-2 disabled:opacity-50"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="m15 18-6-6 6-6" /></svg>
+                          <span>BACK TO LIST</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Secondary Toolbar - Employee Status Bar */}
+                  {selectedEmployee && (
+                    <div className="border-t border-white/10 bg-white/5 backdrop-blur-sm">
+                      <div className="w-full px-4 md:px-8 py-3">
+                        <div className="flex flex-wrap items-center gap-4 md:gap-6">
+                          {/* Employee Badge */}
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center text-lg font-bold">
+                              {selectedEmployee?.first_name?.charAt(0)}{selectedEmployee?.last_name?.charAt(0)}
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-white/70 uppercase tracking-wider">Employee</p>
+                              <p className="text-white font-bold text-base">
+                                {selectedEmployee?.first_name} {selectedEmployee?.last_name}
+                              </p>
+                            </div>
                           </div>
-                          <Input 
-                            name="mobile_number" 
-                            value={editFormData.mobile_number || ''} 
-                            onChange={handleEditChange} 
-                            className="h-9 pl-11 font-bold" 
-                            placeholder="9XXXXXXXXX"
-                            maxLength={10}
-                          />
+
+                          {/* ID Badge */}
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-bold text-white/70 uppercase tracking-wider">ID</span>
+                            <div className="bg-white border-2 border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 min-w-[100px] justify-between shadow-sm font-bold inline-flex items-center whitespace-nowrap rounded-lg">
+                              #{selectedEmployee?.id.toString().padStart(4, '0')}
+                            </div>
+                          </div>
+
+                          {/* Status Badge */}
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-bold text-white/70 uppercase tracking-wider">Status</span>
+                            <div className="bg-white border-2 border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 justify-between shadow-sm font-bold inline-flex items-center whitespace-nowrap rounded-lg">
+                              {(selectedEmployee?.status === 'pending' || selectedEmployee?.status === 'rehire_pending') ? (
+                                <div className="flex items-center gap-2">
+                                  {selectedEmployee.onboarding_tasks?.isComplete ?
+                                    checkCompleteness(selectedEmployee).status :
+                                    "PENDING: ONBOARDING CHECKLIST"}
+                                </div>
+                              ) : (
+                                statusLabels[selectedEmployee?.status || 'pending']
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Position */}
+                          {selectedEmployee?.position && (
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm font-bold text-white/70 uppercase tracking-wider">Position</span>
+                              <div className="bg-white border-2 border-[#FFE5EC] text-[#800020] text-sm h-10 px-4 shadow-sm font-bold inline-flex items-center whitespace-nowrap rounded-lg">
+                                {selectedEmployee.position}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
-                    </>
-                  ) : (
-                    <>
-                      <DetailItem label="Email Address" value={selectedEmployee.email_address || selectedEmployee.email} required />
-                      <DetailItem label="Mobile Number" value={selectedEmployee.mobile_number ? `+63 ${selectedEmployee.mobile_number}` : ''} required />
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* ADDRESS INFORMATION */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* CURRENT ADDRESS */}
-              <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
-                <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4 flex justify-between items-center">
-                  <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
-                    <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
-                    Current Address
-                  </h3>
-                  <div className="flex gap-2">
-                    {isEditingCurrent ? (
-                      <>
-                        <Button variant="ghost" size="sm" onClick={() => setIsEditingCurrent(false)} className="h-8 text-slate-500 hover:text-slate-700">
-                          <X className="w-4 h-4 mr-1" /> Cancel
-                        </Button>
-                        <Button size="sm" onClick={() => handleSaveSection('current')} disabled={isActionLoading} className="h-8 bg-[#630C22] hover:bg-[#800020] text-white">
-                          {isActionLoading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Save className="w-4 h-4 mr-1" />} Save
-                        </Button>
-                      </>
-                    ) : (
-                      <Button variant="ghost" size="sm" onClick={() => toggleEditSection('current')} className="h-8 text-[#630C22] hover:bg-[#630C22]/10 font-bold">
-                        <Edit2 className="w-4 h-4 mr-1" /> Edit
-                      </Button>
-                    )}
-                  </div>
-                </div>
-                <div className="p-6">
-                  {isEditingCurrent ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">House No.</label>
-                        <Input name="house_number" value={editFormData.house_number || ''} onChange={handleEditChange} className="h-9" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Street <span className="text-red-500">*</span></label>
-                        <Input name="street" value={editFormData.street || ''} onChange={handleEditChange} className="h-9" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Village</label>
-                        <Input name="village" value={editFormData.village || ''} onChange={handleEditChange} className="h-9" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Subdivision</label>
-                        <Input name="subdivision" value={editFormData.subdivision || ''} onChange={handleEditChange} className="h-9" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Region</label>
-                        <select name="region" value={editFormData.region || ''} onChange={handleEditChange} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
-                          <option value="">Select Region...</option>
-                          {regions.map(r => <option key={r.code} value={r.name}>{r.name}</option>)}
-                        </select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Province</label>
-                        <select name="province" value={editFormData.province || ''} onChange={handleEditChange} disabled={!editFormData.region || loadingProvinces} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
-                          <option value="">Select Province...</option>
-                          {provinces.map(p => <option key={p.code} value={p.name}>{p.name}</option>)}
-                        </select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">City / Municipality</label>
-                        <select name="city_municipality" value={editFormData.city_municipality || ''} onChange={handleEditChange} disabled={!editFormData.province || loadingCities} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
-                          <option value="">Select City...</option>
-                          {cities.map(c => <option key={c.code} value={c.name}>{c.name}</option>)}
-                        </select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Barangay</label>
-                        <select name="barangay" value={editFormData.barangay || ''} onChange={handleEditChange} disabled={!editFormData.city_municipality || loadingBarangays} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
-                          <option value="">Select Barangay...</option>
-                          {barangays.map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
-                        </select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Zip Code</label>
-                        <Input name="zip_code" value={editFormData.zip_code || ''} onChange={handleEditChange} className="h-9" />
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
-                      <DetailItem label="House No." value={selectedEmployee.house_number} />
-                      <DetailItem label="Street" value={selectedEmployee.street} required />
-                      <DetailItem label="Village" value={selectedEmployee.village} />
-                      <DetailItem label="Subdivision" value={selectedEmployee.subdivision} />
-                      <DetailItem label="Barangay" value={selectedEmployee.barangay} required />
-                      <DetailItem label="City / Municipality" value={selectedEmployee.city_municipality} required />
-                      <DetailItem label="Province" value={selectedEmployee.province} required />
-                      <DetailItem label="Region" value={selectedEmployee.region} required />
-                      <DetailItem label="Zip Code" value={selectedEmployee.zip_code} required />
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* PERMANENT ADDRESS */}
-              <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
-                <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4 flex justify-between items-center">
-                  <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
-                    <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
-                    Permanent Address
-                  </h3>
-                  <div className="flex gap-2">
-                    {isEditingPermanent ? (
-                      <>
-                        <Button variant="ghost" size="sm" onClick={() => setIsEditingPermanent(false)} className="h-8 text-slate-500 hover:text-slate-700">
-                          <X className="w-4 h-4 mr-1" /> Cancel
-                        </Button>
-                        <Button size="sm" onClick={() => handleSaveSection('permanent')} disabled={isActionLoading} className="h-8 bg-[#630C22] hover:bg-[#800020] text-white">
-                          {isActionLoading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Save className="w-4 h-4 mr-1" />} Save
-                        </Button>
-                      </>
-                    ) : (
-                      <Button variant="ghost" size="sm" onClick={() => toggleEditSection('permanent')} className="h-8 text-[#630C22] hover:bg-[#630C22]/10 font-bold">
-                        <Edit2 className="w-4 h-4 mr-1" /> Edit
-                      </Button>
-                    )}
+              <div className="bg-white p-3 md:p-6 rounded-lg shadow-lg border-b-2 md:border-2 border-[#FFE5EC] max-w-5xl mx-auto">
+                {isDetailLoading ? (
+                  <div className="flex items-center justify-center p-12">
+                    <svg className="w-8 h-8 animate-spin text-[#A0153E]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span className="ml-3 text-slate-500 font-medium">Loading employee details...</span>
                   </div>
-                </div>
-                <div className="p-6">
-                  {isEditingPermanent ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">House No.</label>
-                        <Input name="perm_house_number" value={editFormData.perm_house_number || ''} onChange={handleEditChange} className="h-9" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Street</label>
-                        <Input name="perm_street" value={editFormData.perm_street || ''} onChange={handleEditChange} className="h-9" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Village</label>
-                        <Input name="perm_village" value={editFormData.perm_village || ''} onChange={handleEditChange} className="h-9" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Subdivision</label>
-                        <Input name="perm_subdivision" value={editFormData.perm_subdivision || ''} onChange={handleEditChange} className="h-9" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Region</label>
-                        <select name="perm_region" value={editFormData.perm_region || ''} onChange={handleEditChange} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
-                          <option value="">Select Region...</option>
-                          {regions.map(r => <option key={r.code} value={r.name}>{r.name}</option>)}
-                        </select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Province <span className="text-red-500">*</span></label>
-                        <select name="perm_province" value={editFormData.perm_province || ''} onChange={handleEditChange} disabled={!editFormData.perm_region || loadingProvinces} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
-                          <option value="">Select Province...</option>
-                          {provinces.map(p => <option key={p.code} value={p.name}>{p.name}</option>)}
-                        </select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">City / Municipality <span className="text-red-500">*</span></label>
-                        <select name="perm_city_municipality" value={editFormData.perm_city_municipality || ''} onChange={handleEditChange} disabled={!editFormData.perm_province || loadingCities} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
-                          <option value="">Select City...</option>
-                          {cities.map(c => <option key={c.code} value={c.name}>{c.name}</option>)}
-                        </select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Barangay <span className="text-red-500">*</span></label>
-                        <select name="perm_barangay" value={editFormData.perm_barangay || ''} onChange={handleEditChange} disabled={!editFormData.perm_city_municipality || loadingBarangays} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
-                          <option value="">Select Barangay...</option>
-                          {barangays.map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
-                        </select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Zip Code <span className="text-red-500">*</span></label>
-                        <Input name="perm_zip_code" value={editFormData.perm_zip_code || ''} onChange={handleEditChange} className="h-9" />
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
-                      <DetailItem label="House No." value={selectedEmployee.perm_house_number} />
-                      <DetailItem label="Street" value={selectedEmployee.perm_street} required />
-                      <DetailItem label="Village" value={selectedEmployee.perm_village} />
-                      <DetailItem label="Subdivision" value={selectedEmployee.perm_subdivision} />
-                      <DetailItem label="Barangay" value={selectedEmployee.perm_barangay} required />
-                      <DetailItem label="City / Municipality" value={selectedEmployee.perm_city_municipality} required />
-                      <DetailItem label="Province" value={selectedEmployee.perm_province} required />
-                      <DetailItem label="Region" value={selectedEmployee.perm_region} required />
-                      <DetailItem label="Zip Code" value={selectedEmployee.perm_zip_code} required />
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* TERMINATION DETAILS (If Terminated) */}
-            {selectedEmployee.status === 'terminated' && (
-              <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
-                <div className="bg-gradient-to-r from-[#A4163A]/10 to-transparent pb-3 border-b-2 border-[#A4163A] p-4">
-                  <h3 className="text-lg text-[#A4163A] font-bold flex items-center gap-2">
-                    <span className="w-1 h-5 bg-[#A4163A] rounded-full"></span>
-                    Termination Details
-                  </h3>
-                </div>
-                <div className="p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <p className="text-xs font-bold text-slate-400 mb-2 uppercase">Termination Date</p>
-                      <p className="font-semibold text-slate-800">
-                        {selectedEmployee.termination_date ? new Date(selectedEmployee.termination_date).toLocaleDateString() : 'N/A'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-slate-400 mb-2 uppercase">Reason</p>
-                      <p className="font-medium text-slate-700 italic">
-                        "{selectedEmployee.termination_reason || 'No reason provided'}"
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* FAMILY & GOV */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
-                <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4">
-                  <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
-                    <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
-                    Family Background
-                  </h3>
-                </div>
-                <div className="p-6">
+                ) : (
                   <div className="space-y-6">
-                    <div>
-                      <p className="text-xs font-bold text-slate-400 mb-3 uppercase">Mother's Maiden Name</p>
-                      <div className="grid grid-cols-2 gap-4 pl-3 border-l-2 border-[#FFE5EC]">
-                        <DetailItem label="Last Name" value={selectedEmployee.mlast_name} required />
-                        <DetailItem label="First Name" value={selectedEmployee.mfirst_name} required />
+                    {/* Header Info Card - using div */}
+                    <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
+                      <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4">
+                        <div className="flex justify-between items-center">
+                          <h2 className="text-xl text-[#4A081A] font-bold">Employee Profile</h2>
+                          <p className="text-sm font-bold text-[#630C22]">
+                            {selectedEmployee?.first_name} {selectedEmployee?.last_name}
+                          </p>
+                        </div>
+                        <p className="text-[#630C22]/70 text-xs font-medium mt-1">
+                          Complete employee information and records
+                        </p>
                       </div>
                     </div>
-                    <div>
-                      <p className="text-xs font-bold text-slate-400 mb-3 uppercase">Father's Name</p>
-                      <div className="grid grid-cols-2 gap-4 pl-3 border-l-2 border-[#FFE5EC]">
-                        <DetailItem label="Last Name" value={selectedEmployee.flast_name} />
-                        <DetailItem label="First Name" value={selectedEmployee.ffirst_name} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
 
-              <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
-                <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4">
-                  <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
-                    <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
-                    Government IDs
-                  </h3>
-                </div>
-                <div className="p-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
-                    <DetailItem label="SSS No." value={selectedEmployee.sss_number} />
-                    <DetailItem label="PhilHealth No." value={selectedEmployee.philhealth_number} />
-                    <DetailItem label="Pag-IBIG No." value={selectedEmployee.pagibig_number} />
-                    <DetailItem label="TIN" value={selectedEmployee.tin_number} />
+                    {selectedEmployee && (
+                      <>
+                        {/* EMPLOYMENT */}
+                        <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
+                          <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4">
+                            <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
+                              <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
+                              Employment Information
+                            </h3>
+                          </div>
+                          <div className="p-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                              <DetailItem label="Position" value={selectedEmployee.position} required />
+                              <DetailItem label="Date Hired" value={selectedEmployee.date_hired ? new Date(selectedEmployee.date_hired).toLocaleDateString() : null} required />
+                              <DetailItem label="Department" value={selectedEmployee.department} />
+                              <DetailItem label="Employment Status" value={selectedEmployee.status} />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* PERSONAL */}
+                        <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
+                          <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4">
+                            <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
+                              <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
+                              Personal Information
+                            </h3>
+                          </div>
+                          <div className="p-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+                              <DetailItem label="First Name" value={selectedEmployee.first_name} required />
+                              <DetailItem label="Last Name" value={selectedEmployee.last_name} required />
+                              <DetailItem label="Middle Name" value={selectedEmployee.middle_name} />
+                              <DetailItem label="Suffix" value={selectedEmployee.suffix} />
+                              <DetailItem label="Birthday" value={selectedEmployee.birthday ? new Date(selectedEmployee.birthday).toLocaleDateString() : null} required />
+                              <DetailItem label="Birthplace" value={selectedEmployee.birthplace} required />
+                              <DetailItem label="Gender" value={selectedEmployee.gender} required />
+                              <DetailItem label="Civil Status" value={selectedEmployee.civil_status} required />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* CONTACT */}
+                        <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
+                          <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4 flex justify-between items-center">
+                            <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
+                              <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
+                              Contact Information
+                            </h3>
+                            <div className="flex gap-2">
+                              {isEditingContact ? (
+                                <>
+                                  <Button variant="ghost" size="sm" onClick={() => setIsEditingContact(false)} className="h-8 text-slate-500 hover:text-slate-700">
+                                    <X className="w-4 h-4 mr-1" /> Cancel
+                                  </Button>
+                                  <Button size="sm" onClick={() => handleSaveSection('contact')} disabled={isActionLoading} className="h-8 bg-[#630C22] hover:bg-[#800020] text-white">
+                                    {isActionLoading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Save className="w-4 h-4 mr-1" />} Save
+                                  </Button>
+                                </>
+                              ) : (
+                                <Button variant="ghost" size="sm" onClick={() => toggleEditSection('contact')} className="h-8 text-[#630C22] hover:bg-[#630C22]/10 font-bold">
+                                  <Edit2 className="w-4 h-4 mr-1" /> Edit
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                          <div className="p-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+                              {isEditingContact ? (
+                                <>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Email Address</label>
+                                    <Input name="email_address" value={editFormData.email_address || editFormData.email || ''} onChange={handleEditChange} className="h-9" />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Mobile Number</label>
+                                    <div className="relative group">
+                                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-[#630C22] pointer-events-none group-focus-within:text-[#800020] transition-colors">
+                                        +63
+                                      </div>
+                                      <Input
+                                        name="mobile_number"
+                                        value={editFormData.mobile_number || ''}
+                                        onChange={handleEditChange}
+                                        className="h-9 pl-11 font-bold"
+                                        placeholder="9XXXXXXXXX"
+                                        maxLength={10}
+                                      />
+                                    </div>
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <DetailItem label="Email Address" value={selectedEmployee.email_address || selectedEmployee.email} required />
+                                  <DetailItem label="Mobile Number" value={selectedEmployee.mobile_number ? `+63 ${selectedEmployee.mobile_number}` : ''} required />
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* ADDRESS INFORMATION */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          {/* CURRENT ADDRESS */}
+                          <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
+                            <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4 flex justify-between items-center">
+                              <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
+                                <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
+                                Current Address
+                              </h3>
+                              <div className="flex gap-2">
+                                {isEditingCurrent ? (
+                                  <>
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditingCurrent(false)} className="h-8 text-slate-500 hover:text-slate-700">
+                                      <X className="w-4 h-4 mr-1" /> Cancel
+                                    </Button>
+                                    <Button size="sm" onClick={() => handleSaveSection('current')} disabled={isActionLoading} className="h-8 bg-[#630C22] hover:bg-[#800020] text-white">
+                                      {isActionLoading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Save className="w-4 h-4 mr-1" />} Save
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <Button variant="ghost" size="sm" onClick={() => toggleEditSection('current')} className="h-8 text-[#630C22] hover:bg-[#630C22]/10 font-bold">
+                                    <Edit2 className="w-4 h-4 mr-1" /> Edit
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                            <div className="p-6">
+                              {isEditingCurrent ? (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">House No.</label>
+                                    <Input name="house_number" value={editFormData.house_number || ''} onChange={handleEditChange} className="h-9" />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Street <span className="text-red-500">*</span></label>
+                                    <Input name="street" value={editFormData.street || ''} onChange={handleEditChange} className="h-9" />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Village</label>
+                                    <Input name="village" value={editFormData.village || ''} onChange={handleEditChange} className="h-9" />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Subdivision</label>
+                                    <Input name="subdivision" value={editFormData.subdivision || ''} onChange={handleEditChange} className="h-9" />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Region</label>
+                                    <select name="region" value={editFormData.region || ''} onChange={handleEditChange} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
+                                      <option value="">Select Region...</option>
+                                      {regions.map(r => <option key={r.code} value={r.name}>{r.name}</option>)}
+                                    </select>
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Province</label>
+                                    <select name="province" value={editFormData.province || ''} onChange={handleEditChange} disabled={!editFormData.region || loadingProvinces} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
+                                      <option value="">Select Province...</option>
+                                      {provinces.map(p => <option key={p.code} value={p.name}>{p.name}</option>)}
+                                    </select>
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">City / Municipality</label>
+                                    <select name="city_municipality" value={editFormData.city_municipality || ''} onChange={handleEditChange} disabled={!editFormData.province || loadingCities} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
+                                      <option value="">Select City...</option>
+                                      {cities.map(c => <option key={c.code} value={c.name}>{c.name}</option>)}
+                                    </select>
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Barangay</label>
+                                    <select name="barangay" value={editFormData.barangay || ''} onChange={handleEditChange} disabled={!editFormData.city_municipality || loadingBarangays} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
+                                      <option value="">Select Barangay...</option>
+                                      {barangays.map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
+                                    </select>
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Zip Code</label>
+                                    <Input name="zip_code" value={editFormData.zip_code || ''} onChange={handleEditChange} className="h-9" />
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
+                                  <DetailItem label="House No." value={selectedEmployee.house_number} />
+                                  <DetailItem label="Street" value={selectedEmployee.street} required />
+                                  <DetailItem label="Village" value={selectedEmployee.village} />
+                                  <DetailItem label="Subdivision" value={selectedEmployee.subdivision} />
+                                  <DetailItem label="Barangay" value={selectedEmployee.barangay} required />
+                                  <DetailItem label="City / Municipality" value={selectedEmployee.city_municipality} required />
+                                  <DetailItem label="Province" value={selectedEmployee.province} required />
+                                  <DetailItem label="Region" value={selectedEmployee.region} required />
+                                  <DetailItem label="Zip Code" value={selectedEmployee.zip_code} required />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* PERMANENT ADDRESS */}
+                          <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
+                            <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4 flex justify-between items-center">
+                              <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
+                                <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
+                                Permanent Address
+                              </h3>
+                              <div className="flex gap-2">
+                                {isEditingPermanent ? (
+                                  <>
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditingPermanent(false)} className="h-8 text-slate-500 hover:text-slate-700">
+                                      <X className="w-4 h-4 mr-1" /> Cancel
+                                    </Button>
+                                    <Button size="sm" onClick={() => handleSaveSection('permanent')} disabled={isActionLoading} className="h-8 bg-[#630C22] hover:bg-[#800020] text-white">
+                                      {isActionLoading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Save className="w-4 h-4 mr-1" />} Save
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <Button variant="ghost" size="sm" onClick={() => toggleEditSection('permanent')} className="h-8 text-[#630C22] hover:bg-[#630C22]/10 font-bold">
+                                    <Edit2 className="w-4 h-4 mr-1" /> Edit
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                            <div className="p-6">
+                              {isEditingPermanent ? (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">House No.</label>
+                                    <Input name="perm_house_number" value={editFormData.perm_house_number || ''} onChange={handleEditChange} className="h-9" />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Street</label>
+                                    <Input name="perm_street" value={editFormData.perm_street || ''} onChange={handleEditChange} className="h-9" />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Village</label>
+                                    <Input name="perm_village" value={editFormData.perm_village || ''} onChange={handleEditChange} className="h-9" />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Subdivision</label>
+                                    <Input name="perm_subdivision" value={editFormData.perm_subdivision || ''} onChange={handleEditChange} className="h-9" />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Region</label>
+                                    <select name="perm_region" value={editFormData.perm_region || ''} onChange={handleEditChange} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
+                                      <option value="">Select Region...</option>
+                                      {regions.map(r => <option key={r.code} value={r.name}>{r.name}</option>)}
+                                    </select>
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Province <span className="text-red-500">*</span></label>
+                                    <select name="perm_province" value={editFormData.perm_province || ''} onChange={handleEditChange} disabled={!editFormData.perm_region || loadingProvinces} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
+                                      <option value="">Select Province...</option>
+                                      {provinces.map(p => <option key={p.code} value={p.name}>{p.name}</option>)}
+                                    </select>
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">City / Municipality <span className="text-red-500">*</span></label>
+                                    <select name="perm_city_municipality" value={editFormData.perm_city_municipality || ''} onChange={handleEditChange} disabled={!editFormData.perm_province || loadingCities} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
+                                      <option value="">Select City...</option>
+                                      {cities.map(c => <option key={c.code} value={c.name}>{c.name}</option>)}
+                                    </select>
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Barangay <span className="text-red-500">*</span></label>
+                                    <select name="perm_barangay" value={editFormData.perm_barangay || ''} onChange={handleEditChange} disabled={!editFormData.perm_city_municipality || loadingBarangays} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
+                                      <option value="">Select Barangay...</option>
+                                      {barangays.map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
+                                    </select>
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Zip Code <span className="text-red-500">*</span></label>
+                                    <Input name="perm_zip_code" value={editFormData.perm_zip_code || ''} onChange={handleEditChange} className="h-9" />
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
+                                  <DetailItem label="House No." value={selectedEmployee.perm_house_number} />
+                                  <DetailItem label="Street" value={selectedEmployee.perm_street} required />
+                                  <DetailItem label="Village" value={selectedEmployee.perm_village} />
+                                  <DetailItem label="Subdivision" value={selectedEmployee.perm_subdivision} />
+                                  <DetailItem label="Barangay" value={selectedEmployee.perm_barangay} required />
+                                  <DetailItem label="City / Municipality" value={selectedEmployee.perm_city_municipality} required />
+                                  <DetailItem label="Province" value={selectedEmployee.perm_province} required />
+                                  <DetailItem label="Region" value={selectedEmployee.perm_region} required />
+                                  <DetailItem label="Zip Code" value={selectedEmployee.perm_zip_code} required />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* TERMINATION DETAILS (If Terminated) */}
+                        {selectedEmployee.status === 'terminated' && (
+                          <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
+                            <div className="bg-gradient-to-r from-[#A4163A]/10 to-transparent pb-3 border-b-2 border-[#A4163A] p-4">
+                              <h3 className="text-lg text-[#A4163A] font-bold flex items-center gap-2">
+                                <span className="w-1 h-5 bg-[#A4163A] rounded-full"></span>
+                                Termination Details
+                              </h3>
+                            </div>
+                            <div className="p-6">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                  <p className="text-xs font-bold text-slate-400 mb-2 uppercase">Termination Date</p>
+                                  <p className="font-semibold text-slate-800">
+                                    {selectedEmployee.termination_date ? new Date(selectedEmployee.termination_date).toLocaleDateString() : 'N/A'}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs font-bold text-slate-400 mb-2 uppercase">Reason</p>
+                                  <p className="font-medium text-slate-700 italic">
+                                    "{selectedEmployee.termination_reason || 'No reason provided'}"
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* FAMILY & GOV */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
+                            <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4">
+                              <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
+                                <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
+                                Family Background
+                              </h3>
+                            </div>
+                            <div className="p-6">
+                              <div className="space-y-6">
+                                <div>
+                                  <p className="text-xs font-bold text-slate-400 mb-3 uppercase">Mother's Maiden Name</p>
+                                  <div className="grid grid-cols-2 gap-4 pl-3 border-l-2 border-[#FFE5EC]">
+                                    <DetailItem label="Last Name" value={selectedEmployee.mlast_name} required />
+                                    <DetailItem label="First Name" value={selectedEmployee.mfirst_name} required />
+                                  </div>
+                                </div>
+                                <div>
+                                  <p className="text-xs font-bold text-slate-400 mb-3 uppercase">Father's Name</p>
+                                  <div className="grid grid-cols-2 gap-4 pl-3 border-l-2 border-[#FFE5EC]">
+                                    <DetailItem label="Last Name" value={selectedEmployee.flast_name} />
+                                    <DetailItem label="First Name" value={selectedEmployee.ffirst_name} />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
+                            <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4">
+                              <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
+                                <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
+                                Government IDs
+                              </h3>
+                            </div>
+                            <div className="p-6">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
+                                <DetailItem label="SSS No." value={selectedEmployee.sss_number} />
+                                <DetailItem label="PhilHealth No." value={selectedEmployee.philhealth_number} />
+                                <DetailItem label="Pag-IBIG No." value={selectedEmployee.pagibig_number} />
+                                <DetailItem label="TIN" value={selectedEmployee.tin_number} />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Footer Actions */}
+                    <div className="bg-slate-50 px-6 py-4 rounded-lg border border-[#FFE5EC] flex justify-end gap-3">
+                      {(selectedEmployee?.status === 'pending' || selectedEmployee?.status === 'rehire_pending') ? (
+                        <>
+                          {selectedEmployee.onboarding_tasks?.isComplete && !checkCompleteness(selectedEmployee).isComplete && (
+                            <button
+                              onClick={() => router.push(`/admin-head/employee/onboard?id=${selectedEmployee.id}&batch=${checkCompleteness(selectedEmployee).batchId}`)}
+                              className="h-12 px-8 font-bold rounded-xl text-white transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#800020] hover:from-[#630C22] hover:to-[#A0153E]"
+                            >
+                              Update Profile
+                            </button>
+                          )}
+                          <button
+                            onClick={handleSetAsEmployed}
+                            disabled={!checkCompleteness(selectedEmployee).isComplete || !selectedEmployee.onboarding_tasks?.isComplete || isUpdating}
+                            className={`h-12 px-8 font-bold rounded-xl transition-all shadow-lg ${(!checkCompleteness(selectedEmployee).isComplete || !selectedEmployee.onboarding_tasks?.isComplete)
+                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                : 'bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#800020] hover:from-[#630C22] hover:to-[#A0153E] text-white hover:shadow-xl hover:-translate-y-0.5'
+                              }`}
+                          >
+                            {selectedEmployee.status === 'rehire_pending' ? 'Approve & Re-hire' : 'Approve & Set as Employed'}
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => setViewMode('list')}
+                          className="h-11 px-8 border-2 border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] font-bold rounded-xl transition-all"
+                        >
+                          Back to List
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="text-xs text-stone-500 space-y-1 text-right">
+                      <p>* Employee ID: #{selectedEmployee?.id.toString().padStart(4, '0')}</p>
+                      <p>* Complete profile ensures accurate record keeping</p>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
-          </>
-        )}
-
-        {/* Footer Actions */}
-        <div className="bg-slate-50 px-6 py-4 rounded-lg border border-[#FFE5EC] flex justify-end gap-3">
-          {(selectedEmployee?.status === 'pending' || selectedEmployee?.status === 'rehire_pending') ? (
-            <>
-              {selectedEmployee.onboarding_tasks?.isComplete && !checkCompleteness(selectedEmployee).isComplete && (
-                <button
-                  onClick={() => router.push(`/admin-head/employee/onboard?id=${selectedEmployee.id}&batch=${checkCompleteness(selectedEmployee).batchId}`)}
-                  className="h-12 px-8 font-bold rounded-xl text-white transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#800020] hover:from-[#630C22] hover:to-[#A0153E]"
-                >
-                  Update Profile
-                </button>
-              )}
-              <button
-                onClick={handleSetAsEmployed}
-                disabled={!checkCompleteness(selectedEmployee).isComplete || !selectedEmployee.onboarding_tasks?.isComplete || isUpdating}
-                className={`h-12 px-8 font-bold rounded-xl transition-all shadow-lg ${
-                  (!checkCompleteness(selectedEmployee).isComplete || !selectedEmployee.onboarding_tasks?.isComplete)
-                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#800020] hover:from-[#630C22] hover:to-[#A0153E] text-white hover:shadow-xl hover:-translate-y-0.5'
-                }`}
-              >
-                {selectedEmployee.status === 'rehire_pending' ? 'Approve & Re-hire' : 'Approve & Set as Employed'}
-              </button>
-            </>
-          ) : (
-            <button 
-              onClick={() => setViewMode('list')} 
-              className="h-11 px-8 border-2 border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] font-bold rounded-xl transition-all"
-            >
-              Back to List
-            </button>
-          )}
-        </div>
-
-        <div className="text-xs text-stone-500 space-y-1 text-right">
-          <p>* Employee ID: #{selectedEmployee?.id.toString().padStart(4, '0')}</p>
-          <p>* Complete profile ensures accurate record keeping</p>
-        </div>
-      </div>
-    )}
-  </div>
-</div>
           )}
         </div>
       )

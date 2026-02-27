@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import {
   ChevronLeft, ChevronRight, Plus, X, Calendar, Users, Check, ChevronDown,
-  Pencil, Trash2, Eye
+  Pencil, Trash2, Eye, Search
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -533,9 +533,9 @@ function CalendarView({ year, month, entries, weekOnly = false }: {
       <div className="bg-white rounded-xl shadow border border-rose-100 overflow-hidden">
         {/* Legend */}
         <div className="flex items-center gap-4 px-6 py-3 border-b border-rose-50 justify-end text-md">
-          <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-2 rounded-md bg-orange-400"></span> Pending</span>
-          <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-2 rounded-md bg-green-500"></span> Approved/Completed</span>
-          <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-2 rounded-md bg-red-500"></span> Declined</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-2 rounded-md bg-orange-200 border border-orange-300"></span> Pending</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-2 rounded-md bg-green-200 border border-green-300"></span> Approved/Completed</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-2 rounded-md bg-red-200 border border-red-300"></span> Declined</span>
         </div>
         {/* Weekday headers */}
         <div className="grid grid-cols-7 bg-rose-50 border-b border-rose-100">
@@ -566,9 +566,9 @@ function CalendarView({ year, month, entries, weekOnly = false }: {
                   const isDeclined = e.approved_by === 'Declined'
                   const isPending = e.approved_by === 'Pending'
                   const barColor =
-                    isDeclined ? 'bg-red-500'
-                      : isPending ? 'bg-orange-500'
-                        : 'bg-[#10D14F]' // Using bright green like in the image
+                    isDeclined ? 'bg-red-200 border border-red-300'
+                      : isPending ? 'bg-orange-200 border border-orange-300'
+                        : 'bg-green-200 border border-green-300'
 
                   // Rounded edges only at true entry start/end or week row boundary
                   const entryStartStr = e.start_date.slice(0, 10)
@@ -590,7 +590,7 @@ function CalendarView({ year, month, entries, weekOnly = false }: {
                         borderRadius: `${roundLeft ? 4 : 0}px ${roundRight ? 4 : 0}px ${roundRight ? 4 : 0}px ${roundLeft ? 4 : 0}px`,
                       }}
                       className={cn(
-                        'h-[22px] px-2 text-[11px] leading-[22px] text-white font-semibold tracking-wide truncate overflow-hidden select-none cursor-pointer hover:brightness-110 transition-[filter] mb-[3px] shadow-sm',
+                        'h-[22px] px-2 text-[11px] leading-[20px] text-slate-900 font-bold tracking-wide truncate overflow-hidden select-none cursor-pointer hover:brightness-110 transition-[filter] mb-[3px] shadow-sm',
                         barColor
                       )}
                     >
@@ -614,42 +614,40 @@ function CalendarView({ year, month, entries, weekOnly = false }: {
 
       {/* ── View All Entries for a Day Dialog ── */}
       <Dialog open={viewAllForDay !== null} onOpenChange={() => setViewAllForDay(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-[#4A081A] text-lg font-bold border-b border-rose-100 pb-2">
-              Leave Entries for {MONTHS[month]} {viewAllForDay}, {year}
+        <DialogContent className="max-w-2xl w-[95vw] sm:w-full p-0 overflow-hidden bg-white border-0 shadow-2xl rounded-2xl">
+          <DialogHeader className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] px-6 py-5">
+            <DialogTitle className="text-white text-xl font-bold flex items-center justify-between">
+              <span>Leave Entries for {MONTHS[month]} {viewAllForDay}, {year}</span>
             </DialogTitle>
           </DialogHeader>
-          <div className="mt-4 space-y-2 max-h-[60vh] overflow-y-auto pr-2 no-scrollbar">
+          <div className="p-6 space-y-3 max-h-[65vh] overflow-y-auto bg-slate-50">
             {viewAllForDay !== null && entriesForDay(viewAllForDay).map((e, i) => (
               <div
                 key={e.id}
                 onClick={() => { setSelectedEntry(e); setViewAllForDay(null) }}
-                className="group flex flex-col gap-1 p-3 rounded-lg border border-rose-100 bg-white hover:bg-rose-50 transition-all cursor-pointer shadow-sm active:scale-[0.98]"
+                className="group flex flex-col gap-2 p-4 rounded-xl border border-rose-200 bg-white hover:border-[#630C22] hover:shadow-md transition-all cursor-pointer active:scale-[0.99]"
               >
                 <div className="flex justify-between items-center">
-                  <span className="font-bold text-slate-700 text-sm group-hover:text-[#4A081A]">{e.employee_name}</span>
+                  <span className="font-extrabold text-slate-800 text-base group-hover:text-[#A4163A] transition-colors">{e.employee_name}</span>
                   <span className={cn(
-                    'text-[10px] font-bold px-2 py-0.5 rounded-full uppercase',
-                    e.approved_by === 'Declined' ? 'bg-red-100 text-red-700'
-                      : e.approved_by === 'Pending' ? 'bg-orange-100 text-orange-700'
-                        : 'bg-green-100 text-green-700'
+                    'text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider',
+                    e.approved_by === 'Declined' ? 'bg-red-100 text-red-700 border border-red-200'
+                      : e.approved_by === 'Pending' ? 'bg-orange-100 text-orange-700 border border-orange-200'
+                        : 'bg-green-100 text-green-700 border border-green-200'
                   )}>
                     {e.approved_by === 'Declined' ? 'Declined' : e.approved_by === 'Pending' ? 'Pending' : 'Approved/Completed'}
                   </span>
                 </div>
-                <div className="flex gap-2 text-[11px] text-slate-500 font-medium">
-                  <span className="flex items-center gap-1">
-                    <span className={cn('w-1.5 h-1.5 rounded-full', e.category === 'half-day' ? 'bg-yellow-400' : 'bg-red-500')}></span>
+                <div className="flex flex-wrap items-center gap-3 text-xs font-medium text-slate-600">
+                  <span className="flex items-center gap-1.5 bg-slate-100 px-2 py-1 rounded-md">
+                    <span className={cn('w-2 h-2 rounded-full', e.category === 'half-day' ? 'bg-yellow-400' : 'bg-red-500')}></span>
                     {e.category === 'half-day' ? 'Half-Day' : 'Whole-Day'}
                   </span>
-                  <span>•</span>
-                  <span>{e.remarks}</span>
+                  <span className="bg-slate-100 px-2 py-1 rounded-md text-slate-700">{e.remarks}</span>
                   {e.shift && (
-                    <>
-                      <span>•</span>
-                      <span className="italic text-slate-400">{e.shift}</span>
-                    </>
+                    <span className="italic text-slate-500 bg-slate-100 px-2 py-1 rounded-md">
+                      {e.shift}
+                    </span>
                   )}
                 </div>
               </div>
@@ -664,73 +662,97 @@ function CalendarView({ year, month, entries, weekOnly = false }: {
         if (!se) return null
         return (
           <Dialog open onOpenChange={() => setSelectedEntry(null)}>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle className="text-[#4A081A] text-base font-bold">
-                  {se.employee_name}
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500 font-medium">Status</span>
-                  <span className={cn(
-                    'text-xs font-semibold px-2 py-0.5 rounded-full',
-                    se.approved_by === 'Declined' ? 'bg-red-100 text-red-700'
-                      : se.approved_by === 'Pending' ? 'bg-orange-100 text-orange-700'
-                        : 'bg-green-100 text-green-700'
-                  )}>
-                    {se.approved_by === 'Declined' ? 'Declined' : se.approved_by === 'Pending' ? 'Pending' : 'Approved/Completed'}
-                  </span>
+            <DialogContent className="max-w-3xl w-[95vw] sm:w-full p-0 overflow-hidden bg-white border-0 shadow-2xl rounded-2xl [&>button]:text-white [&>button]:opacity-80 hover:[&>button]:opacity-100 [&>button>svg]:!w-6 [&>button>svg]:!h-6 [&>button]:top-6 [&>button]:right-6">
+              <DialogHeader className="bg-gradient-to-r from-[#800020] to-[#4A081A] px-10 py-8 flex flex-row items-center justify-between">
+                <div>
+                  <h2 className="text-white/80 text-sm font-bold uppercase tracking-widest mb-2">Leave Details For</h2>
+                  <DialogTitle className="text-white text-3xl font-black tracking-wide">
+                    {se.employee_name}
+                  </DialogTitle>
                 </div>
-                <div className="border-t border-rose-50 pt-2 space-y-1.5">
-                  <div className="flex justify-between items-start gap-4">
-                    <span className="text-slate-400 shrink-0">Department</span>
-                    <span className="font-medium text-right">{se.department || '—'}</span>
-                  </div>
-                  <div className="flex justify-between items-start gap-4">
-                    <span className="text-slate-400 shrink-0">Category</span>
+              </DialogHeader>
+
+              <div className="px-10 py-8 bg-slate-50 space-y-8">
+
+                {/* Details Section */}
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <span className="text-slate-500 font-bold uppercase tracking-wider text-sm">Current Status</span>
                     <span className={cn(
-                      'font-semibold text-xs px-2 py-0.5 rounded-full shrink-0',
-                      se.category === 'half-day' ? 'bg-yellow-100 text-yellow-700' : 'bg-rose-100 text-rose-700'
+                      'text-sm font-black px-4 py-2 rounded-full tracking-wide uppercase shadow-sm',
+                      se.approved_by === 'Declined' ? 'bg-red-100 text-red-700 border border-red-200'
+                        : se.approved_by === 'Pending' ? 'bg-orange-100 text-orange-700 border border-orange-200'
+                          : 'bg-green-100 text-green-700 border border-green-200'
                     )}>
-                      {se.category === 'half-day' ? 'Half Day' : 'Whole Day'}
+                      {se.approved_by === 'Declined' ? 'Declined' : se.approved_by === 'Pending' ? 'Pending' : 'Approved/Completed'}
                     </span>
                   </div>
-                  {se.shift && (
-                    <div className="flex justify-between items-start gap-4">
-                      <span className="text-slate-400 shrink-0">Shift</span>
-                      <span className="font-medium text-right">{se.shift}</span>
+
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
+                    <div className="flex flex-col gap-1.5 pb-2 border-b border-slate-100">
+                      <span className="text-slate-400 font-semibold text-xs uppercase tracking-wider">Department</span>
+                      <span className="font-bold text-slate-800 text-lg">{se.department || '—'}</span>
                     </div>
-                  )}
-                  <div className="flex justify-between items-start gap-4">
-                    <span className="text-slate-400 shrink-0">Start Date</span>
-                    <span className="font-medium text-right">{formatDisplayDate(se.start_date)}</span>
+
+                    <div className="flex flex-col gap-1.5 pb-2 border-b border-slate-100">
+                      <span className="text-slate-400 font-semibold text-xs uppercase tracking-wider">Category</span>
+                      <div className="flex items-center">
+                        <span className={cn(
+                          'font-black text-xs px-3 py-1 rounded-full uppercase tracking-wider border',
+                          se.category === 'half-day' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : 'bg-rose-100 text-rose-700 border-rose-200'
+                        )}>
+                          {se.category === 'half-day' ? 'Half Day' : 'Whole Day'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5 pb-2 border-b border-slate-100">
+                      <span className="text-slate-400 font-semibold text-xs uppercase tracking-wider">Start Date</span>
+                      <span className="font-bold text-slate-800 text-lg">{formatDisplayDate(se.start_date)}</span>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5 pb-2 border-b border-slate-100">
+                      <span className="text-slate-400 font-semibold text-xs uppercase tracking-wider">End Date</span>
+                      <span className="font-bold text-slate-800 text-lg">{formatDisplayDate(se.leave_end_date)}</span>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5 pb-2 border-b border-slate-100">
+                      <span className="text-slate-400 font-semibold text-xs uppercase tracking-wider">Duration</span>
+                      <span className="font-black text-[#4A081A] text-lg">{formatDays(se.number_of_days, se.category)}</span>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5 pb-2 border-b border-slate-100">
+                      <span className="text-slate-400 font-semibold text-xs uppercase tracking-wider">Leave Type</span>
+                      <span className="font-bold text-slate-800 text-lg">{se.remarks}</span>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5 pb-2 border-b border-slate-100">
+                      <span className="text-slate-400 font-semibold text-xs uppercase tracking-wider">Processed By</span>
+                      <span className="font-bold text-slate-800 text-lg">{se.approved_by}</span>
+                    </div>
+
+                    {se.shift && (
+                      <div className="flex flex-col gap-1.5 pb-2 border-b border-slate-100">
+                        <span className="text-slate-400 font-semibold text-xs uppercase tracking-wider">Shift</span>
+                        <span className="font-bold text-slate-800 text-lg">{se.shift}</span>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex justify-between items-start gap-4">
-                    <span className="text-slate-400 shrink-0">End Date</span>
-                    <span className="font-medium text-right">{formatDisplayDate(se.leave_end_date)}</span>
-                  </div>
-                  <div className="flex justify-between items-start gap-4">
-                    <span className="text-slate-400 shrink-0">No. of Days</span>
-                    <span className="font-medium text-right">{formatDays(se.number_of_days, se.category)}</span>
-                  </div>
-                  <div className="flex justify-between items-start gap-4">
-                    <span className="text-slate-400 shrink-0">Leave Type</span>
-                    <span className="font-medium text-right">{se.remarks}</span>
-                  </div>
-                  <div className="flex justify-between items-start gap-4">
-                    <span className="text-slate-400 shrink-0">Approved By</span>
-                    <span className="font-medium text-right">{se.approved_by}</span>
-                  </div>
-                  {se.cite_reason && (
-                    <div className="pt-2 border-t border-rose-50">
-                      <span className="text-slate-400 block mb-1">Reason</span>
-                      <p className="text-slate-700 text-sm bg-rose-50 rounded-md p-3 leading-relaxed break-all whitespace-pre-wrap">
+                </div>
+
+                {/* Reason Section */}
+                {se.cite_reason && (
+                  <div className="flex flex-col bg-white rounded-xl border border-rose-200 shadow-sm overflow-hidden">
+                    <div className="bg-rose-50 px-6 py-5 border-b border-rose-100">
+                      <span className="text-[#800020] font-black text-sm uppercase tracking-wider">Leave Reason</span>
+                    </div>
+                    <div className="p-6 bg-white flex-1">
+                      <p className="text-slate-700 text-base leading-relaxed break-all whitespace-pre-wrap font-medium">
                         {se.cite_reason}
                       </p>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </DialogContent>
           </Dialog>
@@ -1047,7 +1069,15 @@ export default function LeavePage() {
   const [filterDept, setFilterDept] = useState('')
   const [filterType, setFilterType] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
+  const [sortOrder, setSortOrder] = useState('date-asc')
+  const [searchQuery, setSearchQuery] = useState('')
 
+  const sortOptions = [
+    { label: 'Ascending (Leave Date)', value: 'date-asc' },
+    { label: 'Descending (Leave Date)', value: 'date-desc' },
+    { label: 'Recent (Inputted)', value: 'input-desc' },
+    { label: 'Oldest (Inputted)', value: 'input-asc' },
+  ]
 
   const calendarEntries = useMemo(() =>
     entries.filter(e => {
@@ -1061,21 +1091,61 @@ export default function LeavePage() {
     [entries, calendarYear, calendarMonth])
 
   // Filtered entries
-  const filtered = useMemo(() => calendarEntries.filter(e => {
-    if (filterDept) {
-      // Find employee to get their current department if the entry itself has no department snapshot
-      const emp = employees.find(emp => emp.id === e.employee_id)
-      const eDept = (e.department || emp?.department || '').toLowerCase()
-      if (!eDept.includes(filterDept.toLowerCase())) return false
-    }
-    if (filterType && e.remarks !== filterType) return false
-    if (filterStatus) {
-      const isApproved = !['Pending', 'Declined'].includes(e.approved_by)
-      if (filterStatus === 'Approved/Completed' && !isApproved) return false
-      if (filterStatus !== 'Approved/Completed' && e.approved_by !== filterStatus) return false
-    }
-    return true
-  }).sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()), [calendarEntries, employees, filterDept, filterType, filterStatus])
+  const filtered = useMemo(() => {
+    const list = calendarEntries.filter(e => {
+      if (filterDept) {
+        // Find employee to get their current department if the entry itself has no department snapshot
+        const emp = employees.find(emp => emp.id === e.employee_id)
+        const eDept = (e.department || emp?.department || '').toLowerCase()
+        if (!eDept.includes(filterDept.toLowerCase())) return false
+      }
+      if (filterType && e.remarks !== filterType) return false
+      if (filterStatus) {
+        const isApproved = !['Pending', 'Declined'].includes(e.approved_by)
+        if (filterStatus === 'Approved/Completed' && !isApproved) return false
+        if (filterStatus !== 'Approved/Completed' && e.approved_by !== filterStatus) return false
+      }
+
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase()
+        const matchesName = String(e.employee_name || '').toLowerCase().includes(query)
+        const matchesId = String(e.employee_id || '').toLowerCase().includes(query)
+        const matchesCategory = String(e.category || '').toLowerCase().includes(query)
+
+        // Match dates - standard string and formatted versions
+        const startDateStr = String(e.start_date || '').toLowerCase()
+        const endDateStr = String(e.leave_end_date || '').toLowerCase()
+        const formattedStart = formatDisplayDate(e.start_date).toLowerCase()
+        const formattedEnd = formatDisplayDate(e.leave_end_date).toLowerCase()
+
+        const matchesDate = startDateStr.includes(query) || endDateStr.includes(query) || formattedStart.includes(query) || formattedEnd.includes(query)
+
+        if (!matchesName && !matchesId && !matchesCategory && !matchesDate) {
+          return false
+        }
+      }
+
+      return true
+    })
+
+    list.sort((a, b) => {
+      if (sortOrder === 'date-asc') {
+        return new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
+      }
+      if (sortOrder === 'date-desc') {
+        return new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
+      }
+      if (sortOrder === 'input-desc') {
+        return b.id - a.id
+      }
+      if (sortOrder === 'input-asc') {
+        return a.id - b.id
+      }
+      return 0
+    })
+
+    return list
+  }, [calendarEntries, employees, filterDept, filterType, filterStatus, sortOrder, searchQuery])
 
   const deptOptions = [
     { label: 'All Departments', value: '' },
@@ -1256,6 +1326,50 @@ export default function LeavePage() {
                     ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
+              </div>
+
+              {/* Sort By */}
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-bold text-white/70 uppercase tracking-wider">Sort By</span>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <div className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 min-w-[220px] justify-between shadow-sm font-bold inline-flex items-center whitespace-nowrap rounded-lg cursor-pointer group border-2">
+                      <span className="truncate max-w-[170px]">{sortOptions.find(o => o.value === sortOrder)?.label || 'Ascending (Leave Date)'}</span>
+                      <ChevronDown className="w-4 h-4 ml-2 opacity-50 group-hover:opacity-100 transition-opacity shrink-0" />
+                    </div>
+                  </DropdownMenuTrigger>
+
+                  <DropdownMenuContent className="w-[240px] bg-white border-stone-200 shadow-xl rounded-xl p-1.5" align="start">
+                    {sortOptions.map(o => (
+                      <DropdownMenuItem
+                        key={o.value}
+                        onClick={() => setSortOrder(o.value)}
+                        className={cn(
+                          "flex items-center justify-between rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors",
+                          sortOrder === o.value ? "bg-red-50 text-red-900 font-semibold" : "text-stone-600 hover:bg-stone-50"
+                        )}
+                      >
+                        {o.label}
+                        {sortOrder === o.value && <Check className="w-4 h-4 text-red-600" />}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              {/* Search Bar */}
+              <div className="flex items-center gap-3 ml-auto">
+                <span className="text-sm font-bold text-white/70 uppercase tracking-wider hidden xl:block">Search</span>
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    placeholder="Search ID, Name, Date, Category..."
+                    className="pl-9 h-10 w-[300px] lg:w-[400px] bg-white border-2 border-[#FFE5EC] text-[#800020] placeholder:text-slate-400 font-medium rounded-lg shadow-sm focus-visible:ring-rose-200 transition-all duration-200 focus:w-[320px] lg:focus:w-[440px]"
+                  />
+                </div>
               </div>
 
             </div>
@@ -1538,7 +1652,7 @@ export default function LeavePage() {
                         className={cn('border-b border-rose-50 hover:bg-rose-50 transition', idx % 2 === 0 ? 'bg-white' : 'bg-rose-50/30')}
                       >
                         <td className="border border-rose-100 px-3 py-3 text-center text-slate-700 font-bold text-lg">{entry.employee_id}</td>
-                        <td className="border border-rose-100 px-3 py-3 font-semibold text-slate-700">{entry.employee_name}</td>
+                        <td className="border border-rose-100 px-3 py-3 font-semibold text-slate-700 text-lg">{entry.employee_name}</td>
                         <td className="border border-rose-100 px-3 py-3 text-center">
                           <span className={cn(
                             'px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-tight',

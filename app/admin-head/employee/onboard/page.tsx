@@ -162,7 +162,7 @@ function OnboardPageContent() {
   const [loadingProvinces, setLoadingProvinces] = useState(false)
   const [loadingCities, setLoadingCities] = useState(false)
   const [loadingBarangays, setLoadingBarangays] = useState(false)
-  
+
   // Email Check States
   const [emailChecking, setEmailChecking] = useState(false)
   const [emailExists, setEmailExists] = useState(false)
@@ -182,7 +182,7 @@ function OnboardPageContent() {
     isOpen: false,
     title: '',
     description: '',
-    onConfirm: () => {},
+    onConfirm: () => { },
     variant: 'default'
   })
 
@@ -391,7 +391,7 @@ function OnboardPageContent() {
     fetchPositions()
     fetchDepartments()
     fetchRegions()
-    
+
     // Override batch if provided in query param
     if (batchParam) {
       const bId = parseInt(batchParam)
@@ -603,13 +603,13 @@ function OnboardPageContent() {
       const fallbackDateRaw = matched?.updated_at ?? matched?.created_at
       const fallbackDate = !Number.isNaN(new Date(fallbackDateRaw).getTime())
         ? new Date(fallbackDateRaw).toLocaleString('en-US', {
-            month: 'short',
-            day: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true
-          })
+          month: 'short',
+          day: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        })
         : 'Completed'
 
       const tasks = Array.isArray(matched?.tasks) ? matched.tasks : []
@@ -1198,13 +1198,13 @@ function OnboardPageContent() {
       if (newTasks[task]) {
         delete newTasks[task]
       } else {
-        newTasks[task] = new Date().toLocaleString('en-US', { 
-          month: 'short', 
-          day: '2-digit', 
-          year: 'numeric', 
-          hour: '2-digit', 
-          minute: '2-digit', 
-          hour12: true 
+        newTasks[task] = new Date().toLocaleString('en-US', {
+          month: 'short',
+          day: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
         })
       }
       return newTasks
@@ -1223,21 +1223,21 @@ function OnboardPageContent() {
           undoCount++
         }
       })
-      
+
       if (undoCount === 0 && onboardingTasks.length > 0) {
         toast.error("Saved progress cannot be undone")
       } else {
         setCompletedTasks(newTasks)
       }
     } else {
-      const newTasks: {[key: string]: string} = {}
-      const now = new Date().toLocaleString('en-US', { 
-        month: 'short', 
-        day: '2-digit', 
-        year: 'numeric', 
-        hour: '2-digit', 
-        minute: '2-digit', 
-        hour12: true 
+      const newTasks: { [key: string]: string } = {}
+      const now = new Date().toLocaleString('en-US', {
+        month: 'short',
+        day: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
       })
       onboardingTasks.forEach(task => {
         newTasks[task] = now
@@ -1531,83 +1531,97 @@ function OnboardPageContent() {
         </div>
       )}
 
-      {/* ----- INTEGRATED PREMIUM HEADER ----- */}
-      <header className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md p-4 md:p-8 mb-4 md:mb-8 relative overflow-hidden">
-        <div className="max-w-[1600px] mx-auto flex flex-wrap items-center gap-6 lg:gap-8 relative z-10">
-          <div className="flex flex-col">
-            <h1 className="text-2xl md:text-4xl font-bold tracking-tight mb-2">
-              {view === 'onboard' ? 'Onboard New Employee' : view === 'checklist' ? 'Onboarding Process' : 'Employee Data Entry'}
-            </h1>
-            <div className="flex items-center gap-2 text-white/80 transition-all duration-500">
-              {view === 'onboard' ? <Briefcase className="w-4 h-4 md:w-5 h-5" /> : <ClipboardList className="w-4 h-4 md:w-5 h-5" />}
-              <p className="text-sm md:text-lg font-bold uppercase tracking-widest leading-none">ABIC REALTY & CONSULTANCY</p>
-            </div>
-            {isRehireFlow && (
-              <div className="mt-2 inline-flex items-center gap-2 rounded-md border border-amber-300/70 bg-amber-100/20 px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-amber-100">
-                <AlertCircle className="h-3.5 w-3.5" />
-                Rehire Employee Process
+      {/* ----- INTEGRATED HEADER & TOOLBAR ----- */}
+      <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md p-4 md:p-8 mb-4 md:mb-8">
+        {/* Main Header Row */}
+        <div className="w-full px-4 md:px-8 py-6 relative overflow-hidden">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 relative z-10">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold mb-2">
+                {view === 'onboard' ? 'Onboard New Employee' : view === 'checklist' ? 'Onboarding Process' : 'Employee Data Entry'}
+              </h1>
+              <div className="flex items-center gap-2 text-white/80 text-sm md:text-base">
+                {view === 'onboard' ? <Briefcase className="w-4 h-4 text-white/80" /> : <ClipboardList className="w-4 h-4 text-white/80" />}
+                <p className="font-bold uppercase tracking-widest leading-none">ABIC REALTY & CONSULTANCY</p>
               </div>
-            )}
+              {isRehireFlow && (
+                <div className="mt-3 inline-flex items-center gap-2 rounded-md border border-amber-300/70 bg-amber-100/20 px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-amber-100">
+                  <AlertCircle className="h-3.5 w-3.5" />
+                  Rehire Employee Process
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
+              {view === 'onboard' && (
+                <Button variant="ghost" onClick={handleCancelOnboarding} className="bg-white border-transparent text-[#7B0F2B] hover:bg-rose-50 hover:text-[#4A081A] shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg">
+                  <ChevronLeft className="mr-2 h-4 w-4" />Back to Masterfile
+                </Button>
+              )}
+            </div>
           </div>
-          <div className="h-10 w-px bg-white/10 hidden lg:block" />
-          {checklistData && view !== 'onboard' && (
-            <div className="flex flex-wrap items-center gap-6 flex-1 animate-in slide-in-from-left-4 duration-500">
-              <div className="flex flex-col">
-                <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Employee</span>
-                <span className="text-sm font-bold text-white leading-none">{checklistData.name}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Position</span>
-                <span className="text-sm font-bold text-white leading-none">{checklistData.position}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Department</span>
-                <span className="text-sm font-bold text-white leading-none">{checklistData.department}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Start Date</span>
-                <span className="text-sm font-bold text-white leading-none">{checklistData.date}</span>
-              </div>
-              <div className="ml-auto hidden xl:flex items-center gap-6 bg-white/5 px-6 py-3 rounded-2xl border border-white/10 backdrop-blur-sm">
-                <div className="flex flex-col items-end">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Overall Progress</span>
-                  <span className="text-xl font-black text-white">{view === 'checklist' ? completionPercentage : calculateProgressionProgress()}%</span>
+        </div>
+
+        {/* Secondary Toolbar */}
+        {checklistData && view !== 'onboard' && (
+          <div className="border-t border-white/10 bg-white/5 backdrop-blur-sm">
+            <div className="w-full px-4 md:px-8 py-3">
+              <div className="flex flex-wrap items-center gap-4 lg:gap-8 animate-in slide-in-from-left-4 duration-500">
+                <div className="flex items-center bg-white/10 p-1 rounded-lg backdrop-blur-md border border-white/10 gap-3 md:gap-4 px-3 md:px-4 py-2 overflow-x-auto whitespace-nowrap hide-scrollbar">
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Employee</span>
+                    <span className="text-sm font-bold text-white leading-none">{checklistData.name}</span>
+                  </div>
+                  <div className="w-px h-6 bg-white/20" />
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Position</span>
+                    <span className="text-sm font-bold text-white leading-none">{checklistData.position}</span>
+                  </div>
+                  <div className="w-px h-6 bg-white/20" />
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Department</span>
+                    <span className="text-sm font-bold text-white leading-none">{checklistData.department}</span>
+                  </div>
+                  <div className="w-px h-6 bg-white/20" />
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Start Date</span>
+                    <span className="text-sm font-bold text-white leading-none">{checklistData.date}</span>
+                  </div>
                 </div>
-                <div className="h-8 w-px bg-white/10" />
-                <div className="flex flex-col">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">
-                    {view === 'checklist' ? 'Last Updated' : `Batch ${currentBatch} of 6`}
-                  </span>
-                  <span className="text-xl font-black text-white tracking-tight">
-                    {view === 'checklist' ? (completionDateText || '—') : batches[currentBatch - 1].title}
-                  </span>
+
+                <div className="flex flex-1 flex-wrap items-center justify-start lg:justify-end gap-3">
+                  <div className="flex items-center gap-4 md:gap-6 bg-white/10 px-4 md:px-6 py-2 rounded-lg border border-white/10 backdrop-blur-sm">
+                    <div className="flex flex-col items-end">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">Overall Progress</span>
+                      <span className="text-lg font-black text-white">{view === 'checklist' ? completionPercentage : calculateProgressionProgress()}%</span>
+                    </div>
+                    <div className="h-6 w-px bg-white/20" />
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-white/40 leading-none mb-1">
+                        {view === 'checklist' ? 'Last Updated' : `Batch ${currentBatch} of 6`}
+                      </span>
+                      <span className="text-lg font-black text-white tracking-tight">
+                        {view === 'checklist' ? (completionDateText || '—') : batches[currentBatch - 1].title}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          )}
-          {view === 'onboard' && (
-            <div className="ml-auto">
-              <Button variant="ghost" onClick={handleCancelOnboarding} className="bg-white/10 hover:bg-white/20 text-white border-white/20 h-11 px-6 font-bold">
-                <ChevronLeft className="mr-2 h-4 w-4" />Back to Masterfile
-              </Button>
-            </div>
-          )}
-        </div>
-        <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none transition-transform duration-700 ease-in-out transform rotate-12">
-          {view === 'onboard' ? <User className="w-48 h-48" /> : view === 'checklist' ? <ClipboardList className="w-48 h-48" /> : <Briefcase className="w-48 h-48" />}
-        </div>
-      </header>
+          </div>
+        )}
+      </div>
 
       {loading ? (
         <div className="max-w-7xl mx-auto py-8 px-8 space-y-12">
-           <div className="bg-white/50 backdrop-blur-sm rounded-3xl p-8 border border-slate-200/60 shadow-xl space-y-12">
-              <div className="flex justify-between items-center">
-                 <div className="space-y-4"><Skeleton className="h-10 w-64" /><Skeleton className="h-4 w-96" /></div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                 {Array(6).fill(0).map((_, i) => (<div key={i} className="space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-12 w-full rounded-xl" /></div>))}
-              </div>
-           </div>
+          <div className="bg-white/50 backdrop-blur-sm rounded-3xl p-8 border border-slate-200/60 shadow-xl space-y-12">
+            <div className="flex justify-between items-center">
+              <div className="space-y-4"><Skeleton className="h-10 w-64" /><Skeleton className="h-4 w-96" /></div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {Array(6).fill(0).map((_, i) => (<div key={i} className="space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-12 w-full rounded-xl" /></div>))}
+            </div>
+          </div>
         </div>
       ) : (
         <>
@@ -1622,10 +1636,10 @@ function OnboardPageContent() {
                         {!isRehireFlow && nameChecking && (<div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium"><Loader2 className="w-3 h-3 animate-spin" />Checking...</div>)}
                         {!isRehireFlow && !nameChecking && nameExists && (<div className="flex items-center gap-1.5 text-xs text-rose-500 font-bold animate-in fade-in slide-in-from-right-2"><AlertCircle className="w-3 h-3" />Name already exists</div>)}
                       </div>
-                      <Input 
-                        value={onboardFormData.first_name} 
-                        onChange={(e) => setOnboardFormData(prev => ({ ...prev, first_name: e.target.value }))} 
-                        placeholder="John" 
+                      <Input
+                        value={onboardFormData.first_name}
+                        onChange={(e) => setOnboardFormData(prev => ({ ...prev, first_name: e.target.value }))}
+                        placeholder="John"
                         className={cn("transition-all duration-300", !isRehireFlow && nameExists && "border-rose-400 focus-visible:ring-rose-400 bg-rose-50/30")}
                       />
                     </div>
@@ -1633,10 +1647,10 @@ function OnboardPageContent() {
                       <div className="flex justify-between items-center mb-2">
                         <label className="block text-sm font-semibold text-slate-700">Last Name <span className="text-red-500">*</span></label>
                       </div>
-                      <Input 
-                        value={onboardFormData.last_name} 
-                        onChange={(e) => setOnboardFormData(prev => ({ ...prev, last_name: e.target.value }))} 
-                        placeholder="Doe" 
+                      <Input
+                        value={onboardFormData.last_name}
+                        onChange={(e) => setOnboardFormData(prev => ({ ...prev, last_name: e.target.value }))}
+                        placeholder="Doe"
                         className={cn("transition-all duration-300", !isRehireFlow && nameExists && "border-rose-400 focus-visible:ring-rose-400 bg-rose-50/30")}
                       />
                     </div>
@@ -1646,7 +1660,7 @@ function OnboardPageContent() {
                         {!isRehireFlow && emailChecking && (<div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium"><Loader2 className="w-3 h-3 animate-spin" />Checking availability...</div>)}
                         {!isRehireFlow && !emailChecking && onboardFormData.email && onboardFormData.email.includes('@') && (
                           emailExists ? (<div className="flex items-center gap-1.5 text-xs text-rose-500 font-bold animate-in fade-in slide-in-from-right-2"><AlertCircle className="w-3 h-3" />Email already exists</div>)
-                          : (<div className="flex items-center gap-1.5 text-xs text-emerald-500 font-bold animate-in fade-in slide-in-from-right-2"><CheckCircle2 className="w-3 h-3" />Email available</div>)
+                            : (<div className="flex items-center gap-1.5 text-xs text-emerald-500 font-bold animate-in fade-in slide-in-from-right-2"><CheckCircle2 className="w-3 h-3" />Email available</div>)
                         )}
                       </div>
                       <div className="relative">
@@ -1715,11 +1729,11 @@ function OnboardPageContent() {
                     </div>
                   </div>
                   <div className="flex gap-4 pt-6 border-t border-slate-100">
-                    <Button 
-                      onClick={handleStartOnboarding} 
-                      disabled={isSaving || (!isRehireFlow && (emailExists || emailChecking || nameExists || nameChecking))} 
+                    <Button
+                      onClick={handleStartOnboarding}
+                      disabled={isSaving || (!isRehireFlow && (emailExists || emailChecking || nameExists || nameChecking))}
                       className={cn(
-                        "flex-1 text-white font-bold h-12 rounded-xl transition-all shadow-md", 
+                        "flex-1 text-white font-bold h-12 rounded-xl transition-all shadow-md",
                         (!isRehireFlow && (emailExists || emailChecking || nameExists || nameChecking)) ? "bg-slate-300 hover:bg-slate-300 cursor-not-allowed" : "bg-[#630C22] hover:bg-[#4A081A]"
                       )}
                     >
@@ -1762,7 +1776,7 @@ function OnboardPageContent() {
                       <TableHead className="font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">
                         <div className="flex items-center justify-between">
                           <span>Tasks</span>
-                          <button 
+                          <button
                             onClick={toggleAllTasks}
                             className="text-[8px] normal-case bg-white/50 hover:bg-rose-50 text-[#800020] px-2 py-1 rounded-md border border-[#FFE5EC] transition-all font-black shadow-sm"
                           >
@@ -1774,8 +1788,8 @@ function OnboardPageContent() {
                   </TableHeader>
                   <TableBody>
                     {onboardingTasks.map((task, index) => (
-                      <TableRow 
-                        key={index} 
+                      <TableRow
+                        key={index}
                         className="border-b border-rose-50/30 last:border-0 hover:bg-[#FFE5EC]/5 transition-colors group cursor-pointer"
                         onClick={() => toggleTask(task)}
                       >
@@ -1786,9 +1800,9 @@ function OnboardPageContent() {
                           <div className="flex justify-center">
                             <div className={cn(
                               "w-5 h-5 rounded flex items-center justify-center transition-all border-2",
-                                completedTasks[task]
-                                  ? (savedTasks.has(task) ? "bg-emerald-700 border-emerald-700 opacity-60 cursor-not-allowed" : "bg-emerald-500 border-emerald-500 text-white shadow-sm")
-                                  : "border-slate-200 bg-white hover:border-[#A4163A]"
+                              completedTasks[task]
+                                ? (savedTasks.has(task) ? "bg-emerald-700 border-emerald-700 opacity-60 cursor-not-allowed" : "bg-emerald-500 border-emerald-500 text-white shadow-sm")
+                                : "border-slate-200 bg-white hover:border-[#A4163A]"
                             )}>
                               {completedTasks[task] && <Check className="h-3.5 w-3.5" />}
                             </div>
@@ -1814,7 +1828,7 @@ function OnboardPageContent() {
                       ADMINISTRATION FRAMEWORK • ABIC HR
                     </p>
                   </div>
-                  
+
                   <div className="flex gap-3">
                     <Button
                       onClick={async () => {
@@ -1826,8 +1840,8 @@ function OnboardPageContent() {
                     >
                       {isSaving ? 'SAVING...' : 'PROCEED TO DATA ENTRY'}
                     </Button>
-                    <Button 
-                      onClick={() => confirmSaveProgress('checklist')} 
+                    <Button
+                      onClick={() => confirmSaveProgress('checklist')}
                       disabled={isSaving}
                       className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-[#A4163A] hover:bg-[#800020] text-white shadow-lg active:scale-95 transition-all rounded-xl"
                     >
@@ -2012,13 +2026,13 @@ function OnboardPageContent() {
                             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-[#A4163A] pointer-events-none group-focus-within:text-[#800020] transition-colors">
                               +63
                             </div>
-                            <Input 
-                              id="mobile_number" 
-                              name="mobile_number" 
-                              value={progressionFormData.mobile_number || ''} 
-                              onChange={handleProgressionChange} 
-                              placeholder="9XXXXXXXXX" 
-                              className="pl-11 font-bold" 
+                            <Input
+                              id="mobile_number"
+                              name="mobile_number"
+                              value={progressionFormData.mobile_number || ''}
+                              onChange={handleProgressionChange}
+                              placeholder="9XXXXXXXXX"
+                              className="pl-11 font-bold"
                               maxLength={10}
                             />
                           </div>
@@ -2202,16 +2216,16 @@ function OnboardPageContent() {
 
                       <div className="flex items-center gap-1.5 p-1.5 bg-slate-100/50 rounded-2xl border border-slate-200/50">
                         {batches.map((b) => (
-                          <div 
-                            key={b.id} 
-                            className={`h-2 transition-all duration-300 rounded-full ${currentBatch === b.id ? 'bg-[#A4163A] w-12 shadow-[0_0_10px_rgba(164,22,58,0.3)]' : b.id < currentBatch ? 'bg-emerald-500 w-3' : 'bg-slate-300 w-3'}`} 
+                          <div
+                            key={b.id}
+                            className={`h-2 transition-all duration-300 rounded-full ${currentBatch === b.id ? 'bg-[#A4163A] w-12 shadow-[0_0_10px_rgba(164,22,58,0.3)]' : b.id < currentBatch ? 'bg-emerald-500 w-3' : 'bg-slate-300 w-3'}`}
                           />
                         ))}
                       </div>
 
                       {currentBatch === 7 ? (
                         <div className="flex gap-3">
-                          <Button 
+                          <Button
                             onClick={() => confirmSaveProgress('partial')}
                             disabled={isSaving}
                             variant="outline"
@@ -2224,7 +2238,7 @@ function OnboardPageContent() {
                             )}
                             Save Progress
                           </Button>
-                          <Button 
+                          <Button
                             onClick={handleProgressionSave}
                             disabled={isSaving || !isCurrentBatchValid()}
                             className="bg-emerald-600 hover:bg-emerald-700 text-white h-11 px-8 font-black uppercase tracking-widest text-[10px] shadow-lg shadow-emerald-200/50 active:scale-95 transition-all rounded-xl disabled:opacity-50"
@@ -2235,7 +2249,7 @@ function OnboardPageContent() {
                         </div>
                       ) : (
                         <div className="flex gap-3">
-                          <Button 
+                          <Button
                             onClick={() => confirmSaveProgress('partial')}
                             disabled={isSaving}
                             variant="outline"
@@ -2248,7 +2262,7 @@ function OnboardPageContent() {
                             )}
                             Save Progress
                           </Button>
-                          <Button 
+                          <Button
                             onClick={nextBatch}
                             disabled={!isCurrentBatchValid()}
                             className="bg-[#A4163A] hover:bg-[#800020] text-white h-11 px-8 font-black uppercase tracking-widest text-[10px] shadow-lg shadow-rose-200/50 active:scale-95 transition-all rounded-xl disabled:opacity-50"
