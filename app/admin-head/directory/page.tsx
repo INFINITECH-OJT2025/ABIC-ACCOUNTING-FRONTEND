@@ -20,6 +20,13 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import {
@@ -1543,43 +1550,207 @@ export default function GovernmentDirectoryPage() {
               <div className="w-full h-full bg-slate-200 flex items-center justify-center">
                 <agency.icon className="w-24 h-24 text-slate-400" />
               </div>
-            )}
+            </div>
 
-
-            {/* Banner Overlays */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
-
-
-            <div className="absolute top-6 right-6 flex flex-col gap-3">
-              {/* Upload Buttons */}
-              {uploadPreset ? (
-                <CldUploadWidget
-                  uploadPreset={uploadPreset}
-                  options={{
-                    multiple: false,
-                    maxFiles: 1,
-                    resourceType: 'image',
-                    sources: ['local'],
-                    folder: `directory/${activeAgency}`,
-                    maxFileSize: MAX_IMAGE_BYTES,
-                    clientAllowedFormats: [...ALLOWED_UPLOAD_FORMATS],
-                  }}
-                  onSuccess={(result) => void handleImageUpdate(result)}
-                >
-                  {({ open }) => (
+            <div className="px-6 md:px-8 py-6">
+              {loadingGeneralContacts ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  {Array.from({ length: 8 }).map((_, idx) => (
+                    <div key={`general-contact-skeleton-${idx}`} className="border border-slate-100 rounded-md p-3">
+                      <div className="flex items-start gap-3">
+                        <Skeleton className="h-8 w-8 rounded-full shrink-0" />
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <Skeleton className="h-3 w-3/4" />
+                          <Skeleton className="h-3 w-2/3" />
+                          <Skeleton className="h-4 w-1/2" />
+                        </div>
+                        <Skeleton className="h-8 w-8 rounded-md" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : editingGeneralContacts ? (
+                <div className="space-y-3">
+                  <div className="flex justify-end">
                     <Button
                       onClick={() => open()}
                       disabled={updatingImage}
                       className="bg-[#A4163A] hover:bg-[#8a1230] text-white border-none rounded-lg px-6 shadow-lg shadow-red-900/20 font-bold"
                     >
-                      {updatingImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImageUp className="mr-2 h-4 w-4" />}
-                      Update Picture
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Row
                     </Button>
+                  </div>
+                  {generalContactsDraft.length === 0 ? (
+                    <p className="text-sm text-slate-500">No rows yet. Click Add Row to create one.</p>
+                  ) : (
+                    generalContactsDraft.map((row, index) => (
+                      <div key={`general-contact-draft-${index}`} className="border border-slate-200 rounded-md p-3 space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="h-10 w-10 rounded-full overflow-hidden border border-slate-200 bg-slate-100 shrink-0 flex items-center justify-center">
+                              {row.avatar_url ? (
+                                <img src={row.avatar_url} alt={row.establishment_name || 'Avatar'} className="h-full w-full object-cover" />
+                              ) : (
+                                <span className="text-xs font-black text-slate-600">
+                                  {getLabelInitials(row.establishment_name)}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs font-semibold text-slate-500 truncate">
+                              {row.avatar_url ? 'Avatar selected' : 'No avatar selected'}
+                            </p>
+                          </div>
+
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="sm" variant="outline" className="h-8 px-2">
+                                <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
+                                Avatar
+                                <MoreVertical className="h-3.5 w-3.5 ml-1.5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56">
+                              <DropdownMenuItem
+                                disabled={!row.avatar_url}
+                                onSelect={(e) => {
+                                  e.preventDefault()
+                                  if (!row.avatar_url) return
+                                  setAvatarPreview({
+                                    url: row.avatar_url,
+                                    title: row.establishment_name || 'General Contact Avatar',
+                                  })
+                                }}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                See avatar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onSelect={(e) => {
+                                  e.preventDefault()
+                                  openGeneralContactCloudinaryPicker(index)
+                                }}
+                              >
+                                <Images className="h-4 w-4 mr-2" />
+                                Select from uploaded images
+                              </DropdownMenuItem>
+                              {uploadPreset ? (
+                                <CldUploadWidget
+                                  uploadPreset={uploadPreset}
+                                  options={{
+                                    multiple: false,
+                                    maxFiles: 1,
+                                    resourceType: 'image',
+                                    sources: ['local'],
+                                    folder: 'directory/general-contacts',
+                                    maxFileSize: MAX_IMAGE_BYTES,
+                                    clientAllowedFormats: [...ALLOWED_UPLOAD_FORMATS],
+                                  }}
+                                  onSuccess={(result) => void uploadGeneralContactAvatar(index, result)}
+                                >
+                                  {({ open }) => (
+                                    <DropdownMenuItem
+                                      onSelect={(e) => {
+                                        e.preventDefault()
+                                        open()
+                                      }}
+                                    >
+                                      <ImageUp className="h-4 w-4 mr-2" />
+                                      Upload image
+                                    </DropdownMenuItem>
+                                  )}
+                                </CldUploadWidget>
+                              ) : (
+                                <DropdownMenuItem disabled>
+                                  <ImageUp className="h-4 w-4 mr-2" />
+                                  Upload image
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem
+                                disabled={!row.avatar_url}
+                                onSelect={(e) => {
+                                  e.preventDefault()
+                                  updateGeneralContactField(index, 'avatar_url', '')
+                                  updateGeneralContactField(index, 'avatar_public_id', '')
+                                  toast.success('Avatar cleared. Save contacts to apply changes.')
+                                }}
+                              >
+                                <X className="h-4 w-4 mr-2" />
+                                Clear avatar
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                        <div className="flex gap-2">
+                          <Input
+                            value={row.establishment_name}
+                            onChange={(e) => updateGeneralContactField(index, 'establishment_name', e.target.value)}
+                            placeholder="Establishment Name (Required)"
+                            className="h-9 rounded-sm"
+                          />
+                          <Input
+                            value={row.services}
+                            onChange={(e) => updateGeneralContactField(index, 'services', e.target.value)}
+                            placeholder="Services (Optional)"
+                            className="h-9 rounded-sm"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Input
+                            value={row.contact_person}
+                            onChange={(e) => updateGeneralContactField(index, 'contact_person', e.target.value)}
+                            placeholder="Contact Person (Optional)"
+                            className="h-9 rounded-sm"
+                          />
+                          <Input
+                            value={row.value}
+                            onChange={(e) => updateGeneralContactField(index, 'value', e.target.value)}
+                            placeholder="Contact Number / Value (Required)"
+                            className="h-9 rounded-sm"
+                          />
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => removeGeneralContactRow(index)}
+                            className="text-rose-500 hover:bg-rose-50 hover:text-rose-600 h-9 w-9 rounded-lg"
+                            aria-label="Remove row"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))
                   )}
-                </CldUploadWidget>
+                </div>
+              ) : filteredGeneralContacts.length === 0 ? (
+                <p className="text-sm text-slate-500">
+                  {generalContacts.length === 0 ? 'No general contacts yet.' : 'No contacts match your search.'}
+                </p>
               ) : (
                 <Button disabled className="bg-slate-800 text-white rounded-lg">Config Error</Button>
               )}
+            </div>
+          </Card>
+        ) : (
+          <>
+            {/* COMBINED HERO & PROCESS SECTION */}
+            <div className="flex flex-col shadow-xl border border-slate-200 rounded-sm overflow-hidden mb-8">
+
+
+              {/* 1. HERO BANNER */}
+              <div className="relative w-full h-[400px] bg-white group">
+                {!imageError[agency.key] ? (
+                  <img
+                    src={agency.image}
+                    alt={agency.shortName}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    onError={() => setImageError(p => ({ ...p, [agency.key]: true }))}
+                  />
+                ) : (
+                  <div className="w-full h-full bg-slate-200 flex items-center justify-center">
+                    <agency.icon className="w-24 h-24 text-slate-400" />
+                  </div>
+                )}
 
 
               <Button
@@ -1596,12 +1767,36 @@ export default function GovernmentDirectoryPage() {
             </div>
 
 
-            <div className="absolute bottom-0 left-0 p-10 w-full max-w-4xl">
-              <div className="flex items-center gap-3 mb-3">
-                <p className="text-xs md:text-sm font-black text-white/80 tracking-[0.3em] uppercase bg-white/10 backdrop-blur-md px-4 py-1.5 rounded-sm inline-block border border-white/20 shadow-sm">
-                  AGENCY DIRECTORY
-                </p>
-              </div>
+                <div className="absolute top-6 right-6 flex flex-col gap-3">
+                  {/* Upload Buttons */}
+                  {uploadPreset ? (
+                    <CldUploadWidget
+                      uploadPreset={uploadPreset}
+                      options={{
+                        multiple: false,
+                        maxFiles: 1,
+                        resourceType: 'image',
+                        sources: ['local'],
+                        folder: `directory/${activeAgency}`,
+                        maxFileSize: MAX_IMAGE_BYTES,
+                        clientAllowedFormats: [...ALLOWED_UPLOAD_FORMATS],
+                      }}
+                      onSuccess={(result) => void handleImageUpdate(result)}
+                    >
+                      {({ open }) => (
+                        <Button
+                          onClick={() => open()}
+                          disabled={updatingImage}
+                          className="bg-[#A4163A] hover:bg-[#8a1230] text-white border-none rounded-lg px-6 shadow-lg shadow-red-900/20 font-bold"
+                        >
+                          {updatingImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImageUp className="mr-2 h-4 w-4" />}
+                          Update Picture
+                        </Button>
+                      )}
+                    </CldUploadWidget>
+                  ) : (
+                    <Button disabled className="bg-slate-800 text-white rounded-lg">Config Error</Button>
+                  )}
 
 
               {editMode && draft ? (
@@ -1637,16 +1832,15 @@ export default function GovernmentDirectoryPage() {
                   <p className="text-lg md:text-2xl font-medium text-white/90 leading-snug max-w-2xl drop-shadow-sm">
                     {agency.fullName}
                   </p>
-                </>
-              )}
-            </div>
-          </div>
+                </div>
 
 
-          {/* 2. PROCESS STEPS */}
-          <div className="bg-white p-8 md:p-10 relative overflow-hidden">
-            {/* Background decoration */}
-            <div className="absolute -top-24 -right-24 w-64 h-64 bg-red-50 rounded-full blur-3xl opacity-50 pointer-events-none" />
+                <div className="absolute bottom-0 left-0 p-10 w-full max-w-4xl">
+                  <div className="flex items-center gap-3 mb-3">
+                    <p className="text-xs md:text-sm font-black text-white/80 tracking-[0.3em] uppercase bg-white/10 backdrop-blur-md px-4 py-1.5 rounded-sm inline-block border border-white/20 shadow-sm">
+                      AGENCY DIRECTORY
+                    </p>
+                  </div>
 
 
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-10 relative z-10">
@@ -1684,15 +1878,30 @@ export default function GovernmentDirectoryPage() {
                           "px-6 py-2.5 rounded-lg text-sm font-black transition-all flex items-center gap-2",
                           isActive ? "bg-[#A4163A] text-white shadow-md transform scale-105" : "text-slate-500 hover:text-slate-900 hover:bg-slate-200"
                         )}
-                      >
-                        {type === 'Adding' ? <UserPlus className="w-4 h-4" /> : <UserMinus className="w-4 h-4" />}
-                        <span>{type}</span>
-                      </button>
-                    )
-                  })}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               </div>
             </div>
+            {/* 3. CONTACT GRIDS */}
+            <div>
+              <div className="mt-8 mb-4 border-b border-slate-200 pb-2">
+                <h3 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+                  <Phone className="w-5 h-5 text-[#A4163A]" />
+                  Contact Information
+                </h3>
+                <p className="text-slate-500 font-medium text-sm mt-1">
+                  24/7 hotline, mobile support, callback service, and main office details.
+                </p>
+              </div>
+              {editMode && (
+                <div className="mb-4 flex justify-end">
+                  <Button onClick={addContact} variant="outline" className="text-[#A4163A] border-[#A4163A]/20 bg-white shadow-sm rounded-lg">
+                    <Plus className="mr-2 h-4 w-4" /> Add Contact Field
+                  </Button>
+                </div>
+              )}
 
 
             {/* TABLE / LIST */}
@@ -1707,21 +1916,39 @@ export default function GovernmentDirectoryPage() {
                 )}
 
 
-                <Table>
-                  <TableHeader className="bg-slate-50/50">
-                    <TableRow className="hover:bg-slate-50/50 border-slate-100">
-                      <TableHead className="w-[80px] text-center font-black text-slate-400 uppercase text-[20px] tracking-widest py-4">Step</TableHead>
-                      <TableHead className="font-black text-slate-400 uppercase text-[20px] tracking-widest py-4">Process Description</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {editMode ? (
-                      currentProcessDraftRows.length > 0 ? (
-                        currentProcessDraftRows.map((step, index) => (
-                          <TableRow key={index} className="border-slate-100 hover:bg-slate-50/50">
-                            <TableCell className="text-center align-top py-6">
-                              <div className="h-8 w-8 rounded-sm bg-[#A4163A]/10 text-[#A4163A] font-black text-sm flex items-center justify-center mx-auto">
-                                {index + 1}
+                    return (
+                      <div key={idx} className="group bg-white rounded-sm p-3 border border-slate-200 hover:border-[#A4163A] transition-colors flex items-center justify-between gap-4 shadow-sm hover:shadow-md">
+                        {isEditable ? (
+                          <div className="flex-1 space-y-2 relative z-10 w-full">
+                            <div className="flex gap-2">
+                              <Input
+                                value={row.type}
+                                onChange={(e) => updateContactAt(idx, 'type', e.target.value)}
+                                placeholder="Type (e.g. Hotline)"
+                                className="font-bold text-xs uppercase rounded-sm h-8"
+                              />
+                              <Input
+                                value={row.label}
+                                onChange={(e) => updateContactAt(idx, 'label', e.target.value)}
+                                placeholder="Label"
+                                className="font-bold text-xs uppercase rounded-sm h-8"
+                              />
+                            </div>
+                            <Input
+                              value={row.value}
+                              onChange={(e) => updateContactAt(idx, 'value', e.target.value)}
+                              placeholder="Value"
+                              className="rounded-sm h-9"
+                            />
+                            <Button size="sm" variant="ghost" onClick={() => removeContactAt(idx)} className="text-rose-500 w-full hover:bg-rose-50 rounded-lg h-8">
+                              <Trash2 className="w-4 h-4 mr-2" /> Remove
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-3 overflow-hidden">
+                              <div className="h-10 w-10 rounded-full bg-slate-50 text-[#A4163A] flex items-center justify-center shrink-0 border border-slate-100">
+                                <Icon className="h-5 w-5" />
                               </div>
                             </TableCell>
                             <TableCell className="py-6 align-top">
@@ -1739,36 +1966,23 @@ export default function GovernmentDirectoryPage() {
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
                               </div>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={2} className="h-32 text-center text-slate-400 italic">No draft steps yet.</TableCell>
-                        </TableRow>
-                      )
-                    ) : (
-                      currentSteps.length > 0 ? (
-                        currentSteps.map((step, index) => (
-                          <TableRow key={index} className="border-slate-100 hover:bg-slate-50/30 transition-colors">
-                            <TableCell className="text-center align-top py-6">
-                              <div className="h-10 w-10 rounded-sm bg-slate-100 text-slate-600 font-black text-base flex items-center justify-center mx-auto shadow-sm">
-                                {index + 1}
-                              </div>
-                            </TableCell>
-                            <TableCell className="py-6 align-top">
-                              <p className="text-xl font-medium text-slate-800 leading-relaxed pt-1.5">{step}</p>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={2} className="h-32 text-center text-slate-400 italic">No process steps found for this category.</TableCell>
-                        </TableRow>
-                      )
-                    )}
-                  </TableBody>
-                </Table>
+                            </div>
+
+
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 px-3 text-slate-400 hover:text-[#A4163A] hover:bg-rose-50 rounded-lg font-bold text-xs tracking-wider"
+                              onClick={() => void handleCopyText(row.label || row.type, row.value)}
+                            >
+                              <Copy className="h-3.5 w-3.5 mr-2" />
+                              COPY
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    )
+                  })}
               </div>
             </div>
           </div>
@@ -2097,4 +2311,3 @@ export default function GovernmentDirectoryPage() {
     </div>
   )
 }
-

@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   try {
     // Concatenate first_name and last_name as name
-    const results = await query("SELECT id, CONCAT(first_name, ' ', last_name) AS name, email, created_at FROM employees ORDER BY created_at DESC")
+    const results = await query("SELECT id, CONCAT(first_name, ' ', last_name) AS name, email, department, created_at FROM employees ORDER BY created_at DESC")
     return NextResponse.json({ success: true, data: results })
   } catch (error: any) {
     console.error('API Error in GET /api/admin-head/employees:', error)

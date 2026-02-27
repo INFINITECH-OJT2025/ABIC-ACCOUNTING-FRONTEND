@@ -1,20 +1,13 @@
 //tardiness
 
-
-//latest tardiness
-
-
-
-
-
-
 'use client'
 
 
 import { useState, useEffect, useRef } from 'react'
 import { ChevronDown, Clock, Plus, Search, Users, ChevronLeft, ChevronRight, FileDown, FileText, Check, AlertTriangle, Loader2, RotateCcw, X, Calendar } from 'lucide-react'
-import * as XLSX from 'xlsx'
+import * as XLSX from "xlsx-js-style";
 import { toast } from 'sonner'
+
 
 
 
@@ -276,60 +269,274 @@ function usePagination<T>(items: T[], itemsPerPage: number = 15) {
 
 
 // ---------- EXCEL EXPORT UTILITY ----------
-function exportToExcel(summaryArray: { name: string; totalMinutes: number; occurrences: number; warnings: number }[], cutoffTitle: string, month: string, year: number) {
-  // Prepare data for Excel
-  const worksheetData = [
-    [`Tardiness Summary Report - ${cutoffTitle}`],
-    [`Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`],
-    [],
-    ['Employee Name', 'Total Lates (minutes)', 'Total Lates (count > 8:05AM)', 'Warnings'],
-    ...summaryArray.map(emp => [emp.name, emp.totalMinutes, emp.occurrences, emp.warnings]),
-    [],
-    ['Summary Statistics'],
-    ['Total Employees with Lates', summaryArray.length],
-    ['Total Late Minutes', summaryArray.reduce((sum, emp) => sum + emp.totalMinutes, 0)],
-    ['Total Lates', summaryArray.reduce((sum, emp) => sum + emp.occurrences, 0)],
-    ['Total Warnings', summaryArray.reduce((sum, emp) => sum + emp.warnings, 0)],
-    ['Average Minutes per Late',
-      summaryArray.length ?
-        (summaryArray.reduce((sum, emp) => sum + emp.totalMinutes, 0) /
-          summaryArray.reduce((sum, emp) => sum + emp.occurrences, 0) || 0).toFixed(1)
-        : 0
-    ],
-    [],
-    ['* Minutes are counted from 8:00 AM'],
-    ['* Total Lates count is based on arrivals after 8:05 AM grace period'],
-    ['* Warnings: 3rd late = 1st warning, 4th = 2nd, 5th = 3rd'],
-    [`* Report for ${month} ${year} - ${cutoffTitle}`]
+function exportToExcel(
+  summaryArray: { name: string; totalMinutes: number; occurrences: number; warnings: number }[],
+  cutoffTitle: string,
+  month: string,
+  year: number
+) {
+  const now = new Date()
+  const generatedLabel = `Generated on: ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`
+  const periodLabel = `Period: ${month} ${year} – ${cutoffTitle}`
+
+  const totalEmployeesWithLates = summaryArray.filter(e => e.occurrences > 0).length
+  const totalLateMinutes = summaryArray.reduce((sum, e) => sum + e.totalMinutes, 0)
+  const totalOccurrences = summaryArray.reduce((sum, e) => sum + e.occurrences, 0)
+  const totalWarnings = summaryArray.reduce((sum, e) => sum + e.warnings, 0)
+
+  // ── Maroon Gradient Palette ────────────────────────────────────────────────
+  // Deep maroon for main header band
+  const NAVY = '4A081A'
+  // Mid maroon for table column header
+  const INDIGO = '7B0F2B'
+  // Soft rose tint for section header / metadata rows
+  const INDIGO_LIGHT = 'FCE8ED'
+  // Light rose for alternating data rows
+  const SLATE_ALT = 'FDF4F6'
+  // Accent for thin borders
+  const BORDER_CLR = 'E2A0B0'
+  const WHITE = 'FFFFFF'
+  const BLACK = '1A0008'
+  const GRAY = '6B2033'
+  const GRAY_LIGHT = '9B4D63'
+
+  const thin = (c = BORDER_CLR) => ({ style: 'thin' as const, color: { rgb: c } })
+  const border = (c = BORDER_CLR) => ({ top: thin(c), bottom: thin(c), left: thin(c), right: thin(c) })
+
+  // ── AOA construction ───────────────────────────────────────────────────────
+  const AOA: any[][] = []
+
+  // R0 – Company banner
+  AOA.push(['ABIC REALTY AND CONSULTANCY', '', '', ''])
+  // R1 – Report type
+  AOA.push(['Tardiness Report', '', '', ''])
+  // R2 – Period | Generated on
+  AOA.push([periodLabel, '', generatedLabel, ''])
+  // R3 – blank spacer
+  AOA.push(['', '', '', ''])
+  // R4 – Table column headings
+  AOA.push(['EMPLOYEE NAME', 'TOTAL LATE (minutes)', 'TOTAL LATES (count > 8:05AM)', 'WARNINGS'])
+
+  // R5… – Employee data rows
+  summaryArray.forEach(emp => {
+    AOA.push([emp.name, emp.totalMinutes, emp.occurrences, emp.warnings])
+  })
+
+  // blank separator
+  AOA.push(['', '', '', ''])
+
+  // Summary Statistics section
+  const summaryHeaderRow = AOA.length
+  AOA.push(['Summary Statistics', '', '', ''])
+
+  const summaryData = [
+    ['Total Employees with Lates', totalEmployeesWithLates],
+    ['Total Late Minutes', totalLateMinutes],
+    ['Total Lates', totalOccurrences],
+    ['Total Warnings', totalWarnings],
   ]
+  summaryData.forEach(([label, val]) => {
+    AOA.push([label, '', val, ''])
+  })
 
+  // Notes block
+  AOA.push(['', '', '', ''])
+  const notesStartRow = AOA.length
+  AOA.push(['Notes:', '', '', ''])
+  AOA.push(['* Minutes are counted from 8:00 AM', '', '', ''])
+  AOA.push(['* Total Lates count is based on arrivals after 8:05 AM grace period', '', '', ''])
+  AOA.push(['* Warnings: 3rd late = 1st warning, 4th = 2nd, 5th = 3rd', '', '', ''])
 
-  // Create workbook and worksheet
+  // Signatory
+  AOA.push(['', '', '', ''])
+  AOA.push(['', '', 'Reviewed by:', ''])
+  AOA.push(['', '', '', ''])
+  AOA.push(['', '', '________________________________', ''])
+  AOA.push(['', '', 'Admin Head', ''])
+
+  // ── Sheet creation ─────────────────────────────────────────────────────────
   const wb = XLSX.utils.book_new()
-  const ws = XLSX.utils.aoa_to_sheet(worksheetData)
+  const ws = XLSX.utils.aoa_to_sheet(AOA)
 
-
-  // Style the worksheet
+  // Column widths
   ws['!cols'] = [
-    { wch: 30 }, // Employee Name
-    { wch: 25 }, // Total Minutes
-    { wch: 25 }, // Occurrences
-    { wch: 15 }, // Warnings
+    { wch: 34 },
+    { wch: 22 },
+    { wch: 30 },
+    { wch: 14 },
   ]
 
+  // Row heights
+  ws['!rows'] = AOA.map((_, i) => {
+    if (i === 0) return { hpt: 28 }              // company banner
+    if (i === 1) return { hpt: 20 }              // report title
+    if (i === 4) return { hpt: 30 }              // table header
+    if (i > 4 && i < summaryHeaderRow) return { hpt: 18 }
+    if (i === summaryHeaderRow) return { hpt: 22 }
+    return { hpt: 17 }
+  })
 
-  // Create a safe sheet name (max 31 chars, no special chars)
-  let sheetName = `Tardiness_${cutoffTitle.replace(/[^a-zA-Z0-9]/g, '_')}`
-  if (sheetName.length > 31) {
-    sheetName = sheetName.substring(0, 31);
+  // Merges
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } },   // company name full width
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 3 } },   // report title full width
+    { s: { r: 2, c: 0 }, e: { r: 2, c: 1 } },   // period label A–B
+    { s: { r: 2, c: 2 }, e: { r: 2, c: 3 } },   // generated label C–D
+    { s: { r: summaryHeaderRow, c: 0 }, e: { r: summaryHeaderRow, c: 3 } }, // section header
+    ...summaryData.map((_, idx) => ({
+      s: { r: summaryHeaderRow + 1 + idx, c: 0 },
+      e: { r: summaryHeaderRow + 1 + idx, c: 1 }
+    })),
+    ...summaryData.map((_, idx) => ({
+      s: { r: summaryHeaderRow + 1 + idx, c: 2 },
+      e: { r: summaryHeaderRow + 1 + idx, c: 3 }
+    })),
+    // Notes rows: full width merges
+    { s: { r: notesStartRow, c: 0 }, e: { r: notesStartRow, c: 3 } },
+    { s: { r: notesStartRow + 1, c: 0 }, e: { r: notesStartRow + 1, c: 3 } },
+    { s: { r: notesStartRow + 2, c: 0 }, e: { r: notesStartRow + 2, c: 3 } },
+    { s: { r: notesStartRow + 3, c: 0 }, e: { r: notesStartRow + 3, c: 3 } },
+  ]
+
+  // ── Style applier ──────────────────────────────────────────────────────────
+  const S = (r: number, c: number, style: object) => {
+    const addr = XLSX.utils.encode_cell({ r, c })
+    if (!ws[addr]) ws[addr] = { t: 's', v: '' }
+    ws[addr].s = style
   }
 
+  // R0 – Deep navy company banner
+  S(0, 0, {
+    font: { bold: true, sz: 14, color: { rgb: WHITE }, name: 'Calibri' },
+    fill: { patternType: 'solid', fgColor: { rgb: NAVY } },
+    alignment: { horizontal: 'center', vertical: 'center' },
+  })
 
-  // Add the worksheet to workbook
+  // R1 – Slightly lighter navy subtitle band
+  S(1, 0, {
+    font: { bold: false, sz: 11, color: { rgb: WHITE }, name: 'Calibri', italic: true },
+    fill: { patternType: 'solid', fgColor: { rgb: '630C22' } },
+    alignment: { horizontal: 'center', vertical: 'center' },
+  })
+
+  // R2 – Soft indigo tint for metadata row (period / generated)
+  S(2, 0, {
+    font: { sz: 9, bold: true, color: { rgb: INDIGO }, name: 'Calibri' },
+    fill: { patternType: 'solid', fgColor: { rgb: INDIGO_LIGHT } },
+    alignment: { horizontal: 'left', vertical: 'center' },
+    border: { bottom: thin(BORDER_CLR) },
+  })
+  S(2, 2, {
+    font: { sz: 9, bold: false, color: { rgb: GRAY }, name: 'Calibri' },
+    fill: { patternType: 'solid', fgColor: { rgb: INDIGO_LIGHT } },
+    alignment: { horizontal: 'right', vertical: 'center' },
+    border: { bottom: thin(BORDER_CLR) },
+  })
+
+    // R4 – Indigo table column header
+    ;[0, 1, 2, 3].forEach(c => {
+      S(4, c, {
+        font: { bold: true, sz: 10, color: { rgb: WHITE }, name: 'Calibri' },
+        fill: { patternType: 'solid', fgColor: { rgb: INDIGO } },
+        alignment: { horizontal: c === 0 ? 'left' : 'center', vertical: 'center', wrapText: true },
+        border: border('9B1535'),
+      })
+    })
+
+  // Data rows – alternating slate / white with thin borders
+  summaryArray.forEach((_, i) => {
+    const r = 5 + i
+    const rowFill = i % 2 === 0 ? WHITE : SLATE_ALT
+      ;[0, 1, 2, 3].forEach(c => {
+        S(r, c, {
+          font: { sz: 10, color: { rgb: BLACK }, name: 'Calibri', bold: c === 0 },
+          fill: { patternType: 'solid', fgColor: { rgb: rowFill } },
+          alignment: { horizontal: c === 0 ? 'left' : 'center', vertical: 'center' },
+          border: border(),
+        })
+      })
+  })
+
+  // Summary Statistics section header — indigo-tinted, no heavy fill
+  S(summaryHeaderRow, 0, {
+    font: { bold: true, sz: 11, color: { rgb: INDIGO }, name: 'Calibri' },
+    fill: { patternType: 'solid', fgColor: { rgb: INDIGO_LIGHT } },
+    alignment: { horizontal: 'left', vertical: 'center' },
+    border: { top: thin(INDIGO), bottom: thin(BORDER_CLR), left: thin(INDIGO), right: thin(BORDER_CLR) },
+  })
+
+  // Summary data rows — clean white, text-only label, value in col C
+  summaryData.forEach((row, idx) => {
+    const r = summaryHeaderRow + 1 + idx
+    const isEven = idx % 2 === 0
+    // Label cell (A–B merged)
+    S(r, 0, {
+      font: { sz: 10, bold: true, color: { rgb: GRAY }, name: 'Calibri' },
+      fill: { patternType: 'solid', fgColor: { rgb: isEven ? WHITE : SLATE_ALT } },
+      alignment: { horizontal: 'left', vertical: 'center' },
+      border: border(),
+    })
+    // Value cell (C–D merged)
+    S(r, 2, {
+      font: { sz: 10, bold: true, color: { rgb: INDIGO }, name: 'Calibri' },
+      fill: { patternType: 'solid', fgColor: { rgb: isEven ? WHITE : SLATE_ALT } },
+      alignment: { horizontal: 'left', vertical: 'center' },
+      border: border(),
+    })
+  })
+
+  // Notes block — plain white, caption font
+  const noteStyles = [
+    { bold: true, color: GRAY, sz: 9 },
+    { bold: false, color: GRAY_LIGHT, sz: 9 },
+    { bold: false, color: GRAY_LIGHT, sz: 9 },
+    { bold: false, color: GRAY_LIGHT, sz: 9 },
+  ]
+  noteStyles.forEach((ns, i) => {
+    S(notesStartRow + i, 0, {
+      font: { sz: ns.sz, bold: ns.bold, italic: i > 0, color: { rgb: ns.color }, name: 'Calibri' },
+      fill: { patternType: 'solid', fgColor: { rgb: 'F9FAFB' } },
+      alignment: { horizontal: 'left', vertical: 'center' },
+    })
+  })
+
+  // Signatory rows — centered in C–D
+  const sigBase = notesStartRow + 4 + 1
+    ;[0, 1, 2, 3, 4].forEach(offset => {
+      S(sigBase + offset, 2, {
+        font: {
+          sz: offset === 1 ? 9 : 10,
+          bold: offset === 0 || offset === 4,
+          color: { rgb: offset === 4 ? INDIGO : GRAY },
+          name: 'Calibri',
+        },
+        alignment: { horizontal: 'center', vertical: 'center' },
+      })
+    })
+
+  // ── Page setup — Folio 8½" × 13" with 1-inch margins ──────────────────────
+  // paperSize 14 = US Folio (8.5 × 13 in) in the OOXML spec
+  ws['!pageSetup'] = {
+    paperSize: 14,
+    orientation: 'portrait',
+    fitToPage: false,
+    scale: 100,
+  }
+  // All margins in inches (1 inch each side; header/footer 0.5 in)
+  ws['!margins'] = {
+    left: 1,
+    right: 1,
+    top: 1,
+    bottom: 1,
+    header: 0.5,
+    footer: 0.5,
+  }
+
+  // ── Write file ─────────────────────────────────────────────────────────────
+  let sheetName = `Tardiness_${cutoffTitle.replace(/[^a-zA-Z0-9]/g, '_')}`
+  if (sheetName.length > 31) sheetName = sheetName.substring(0, 31)
+
   XLSX.utils.book_append_sheet(wb, ws, sheetName)
-
-
-  // Export the file
   XLSX.writeFile(wb, `Tardiness_Summary_${cutoffTitle.replace(/[^a-zA-Z0-9]/g, '_')}_${month}_${year}.xlsx`)
 }
 
@@ -354,13 +561,15 @@ function EmployeeSelector({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between h-7 md:h-8 text-xl md:text-xl border-stone-200 hover:bg-stone-50 font-medium"
+          className="w-full justify-center gap-2 h-9 text-sm border-stone-200 hover:bg-stone-50 font-normal text-slate-700 rounded-sm shadow-none"
         >
-          <span className="truncate">{value || "Select employee..."}</span>
-          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <span className="truncate shrink-0">
+            {value ? (value.length > 35 ? value.substring(0, 35) + '...' : value) : "Select employee..."}
+          </span>
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[200px] p-0">
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
         <Command>
           <CommandInput placeholder="Search employee..." className="h-9" />
           <CommandEmpty>No employee found.</CommandEmpty>
@@ -530,7 +739,9 @@ function SummarySheet({ isOpen, onClose, cutoffTitle, entries, selectedYear, sel
               <div className="flex justify-between items-center">
                 <CardTitle className="text-xl text-[#4A081A] font-bold">Employee Lates Summary</CardTitle>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-[#630C22]">{totalLateMinutes} mins / {totalOccurrences} occ / {totalWarnings} warnings</p>
+                  <p className="text-sm font-bold text-[#630C22]">
+                    {totalLateMinutes} mins / {totalOccurrences} occ / <span className="text-red-600">{totalWarnings} warnings</span>
+                  </p>
                 </div>
               </div>
               <CardDescription className="text-[#630C22]/70 text-xs font-medium">
@@ -555,25 +766,17 @@ function SummarySheet({ isOpen, onClose, cutoffTitle, entries, selectedYear, sel
                       summaryPagination.paginatedItems.map((emp, idx) => (
                         <tr key={idx} className="hover:bg-[#FFE5EC] transition-colors duration-200">
                           <td className="px-4 py-3 text-slate-700 font-semibold">{emp.name}</td>
-                          <td className="px-4 py-3">
-                            <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-[#FFE5EC] text-[#800020] border border-[#C9184A]">
-                              {emp.totalMinutes}
-                            </span>
+                          <td className="px-4 py-3 text-center font-semibold text-slate-700">
+                            {emp.totalMinutes}
                           </td>
-                          <td className="px-4 py-3">
-                            {emp.occurrences > 0 ? (
-                              <span className="px-3 py-1 bg-rose-100 text-[#C9184A] rounded-full text-xs font-bold border border-rose-200">
-                                {emp.occurrences}
-                              </span>
-                            ) : (
-                              <span className="text-slate-300">—</span>
-                            )}
+                          <td className="px-4 py-3 text-center font-semibold text-slate-700">
+                            {emp.occurrences > 0 ? emp.occurrences : <span className="text-slate-300">—</span>}
                           </td>
                           <td className="px-4 py-3">
                             {emp.warnings > 0 ? (
                               <div className="flex items-center gap-1.5">
-                                <AlertTriangle className="w-4 h-4 text-amber-600" />
-                                <span className="px-3 py-1 bg-amber-50 text-amber-700 rounded-full text-xs font-bold border border-amber-200">
+                                <AlertTriangle className="w-4 h-4 text-red-600" />
+                                <span className="px-3 py-1 bg-red-50 text-red-700 rounded-full text-xs font-bold border border-red-200">
                                   {emp.warnings}
                                 </span>
                               </div>
@@ -863,6 +1066,8 @@ export default function AttendanceDashboard() {
         const data = await res.json()
         if (!data.success) {
           toast.error(data.message || 'Failed to update entry')
+        } else {
+          toast.success(data.message || 'Tardiness entry updated successfully')
         }
       } catch (err) {
         console.error('Update error:', err)
@@ -1047,15 +1252,15 @@ export default function AttendanceDashboard() {
 
               {/* Year selector & Actions */}
               <div className="flex items-center gap-3">
-                <Button onClick={handleAddNewYearConfirm} variant="outline" className="border-white/30 text-white hover:bg-white/20 hover:text-white bg-transparent backdrop-blur-sm shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg">
+                <Button onClick={handleAddNewYearConfirm} variant="outline" className="bg-white border-transparent text-[#7B0F2B] hover:bg-rose-50 hover:text-[#4A081A] shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg">
                   <Plus className="w-4 h-4 mr-2" /> New Year
                 </Button>
                 <Button
                   onClick={() => setIsEntryFormOpen(!isEntryFormOpen)}
                   variant="outline"
                   className={cn(
-                    "border-white/30 text-white hover:bg-white/20 hover:text-white bg-transparent backdrop-blur-sm shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg flex items-center gap-2",
-                    isEntryFormOpen && "bg-white/20 border-white/50"
+                    "bg-white border-transparent text-[#7B0F2B] hover:bg-rose-50 hover:text-[#4A081A] shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg flex items-center gap-2",
+                    isEntryFormOpen && "bg-rose-100 text-[#4A081A]"
                   )}
                 >
                   {isEntryFormOpen ? (
@@ -1219,64 +1424,73 @@ export default function AttendanceDashboard() {
 
         <div className={cn(
           "overflow-hidden transition-all duration-500 ease-in-out",
-          isEntryFormOpen ? "max-h-[500px] opacity-100 mb-2" : "max-h-0 opacity-0 pointer-events-none"
+          isEntryFormOpen ? "max-h-[500px] opacity-100 mb-6" : "max-h-0 opacity-0 pointer-events-none mb-0"
         )}>
           <div className="flex justify-center pt-2">
-            <Card className="w-full max-w-5xl bg-white border border-[#FFE5EC] shadow-lg rounded-xl overflow-hidden ring-4 ring-rose-50/50">
-              <CardContent className="p-4 md:p-5">
-                <div className="flex flex-col lg:flex-row items-center gap-4 lg:gap-6">
-                  {/* Minimal Header Part */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <div className="p-1.5 bg-rose-50 rounded-lg">
-                      <Plus className="w-4 h-4 text-[#4A081A]" />
+            <Card className="w-full bg-white border-[1.5px] border-[#800020] shadow-sm rounded-none">
+              <CardContent className="p-6 pb-4">
+                <div className="flex flex-col">
+                  {/* Header Part */}
+                  <div className="flex items-center gap-2 shrink-0 mb-4 mt-2">
+                    <div className="w-6 h-6 bg-[#FBDADD]/40 rounded-md flex items-center justify-center">
+                      <Plus className="w-3.5 h-3.5 text-[#4A081A] stroke-[2.5]" />
                     </div>
-                    <h2 className="text-lg font-black text-[#4A081A] uppercase tracking-wider whitespace-nowrap">
+                    <h2 className="text-[13px] font-black text-[#4A081A] uppercase tracking-wider whitespace-nowrap">
                       New Late Entry
                     </h2>
                   </div>
 
-
-                  {/* Form Fields - Horizontal Inline */}
-                  <div className="flex flex-1 flex-col sm:flex-row items-center gap-4 w-full">
-                    <div className="flex-1 w-full min-w-[200px]">
-                      <EmployeeSelector
-                        value={newEntryEmployee}
-                        onChange={setNewEntryEmployee}
-                        employees={employees}
-                      />
+                  {/* Form Fields & Actions - Horizontal Inline */}
+                  <div className="flex flex-col lg:flex-row items-center w-full px-2 gap-4">
+                    {/* Employee & Time Group */}
+                    <div className="flex flex-col sm:flex-row items-center flex-1 gap-4 w-full">
+                      <div className="flex-1 w-full">
+                        <EmployeeSelector
+                          value={newEntryEmployee}
+                          onChange={setNewEntryEmployee}
+                          employees={employees}
+                        />
+                      </div>
+                      <div className="relative group w-full sm:w-36 shrink-0">
+                        <Clock className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400 group-focus-within:text-[#4A081A] transition-colors" />
+                        <Input
+                          id="time"
+                          type="time"
+                          value={newEntryTime}
+                          onChange={(e) => setNewEntryTime(e.target.value)}
+                          className="bg-white border text-center border-rose-100 text-slate-800 pl-8 pr-2 h-9 w-full rounded-md text-sm font-bold focus:ring-[#800020]/10 focus:border-[#630C22] shadow-none transition-all"
+                        />
+                      </div>
                     </div>
 
-
-                    <div className="relative group w-full sm:w-40 shrink-0">
-                      <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 group-focus-within:text-[#4A081A] transition-colors" />
-                      <Input
-                        id="time"
-                        type="time"
-                        value={newEntryTime}
-                        onChange={(e) => setNewEntryTime(e.target.value)}
-                        className="bg-white border border-[#FFE5EC] text-slate-800 pl-9 h-10 w-full rounded-lg text-lg font-bold focus:ring-[#800020]/10 focus:border-[#630C22] transition-all"
-                      />
+                    {/* Actions Group */}
+                    <div className="flex items-center gap-3 shrink-0 mt-4 lg:mt-0 lg:ml-auto">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setIsEntryFormOpen(false)
+                          resetAddEntryFields()
+                        }}
+                        className="border border-[#FBDADD] text-slate-700 hover:bg-rose-50 text-xs px-6 h-9 rounded-sm shadow-none font-medium"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        onClick={handleSaveClick}
+                        disabled={isSaving || selectedYear !== new Date().getFullYear()}
+                        className="bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#800020] hover:shadow-md active:scale-95 text-white font-medium text-sm px-6 h-9 rounded-md transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed min-w-[120px] shadow-none"
+                      >
+                        {isSaving ? (
+                          <div className="flex items-center justify-center gap-2">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            <span>Saving...</span>
+                          </div>
+                        ) : (
+                          "Save Record"
+                        )}
+                      </Button>
                     </div>
-                  </div>
-
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Button
-                      type="submit"
-                      onClick={handleSaveClick}
-                      disabled={isSaving || selectedYear !== new Date().getFullYear()}
-                      className="bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#800020] hover:shadow-lg active:scale-95 text-white font-bold text-xl px-6 h-10 rounded-lg transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed min-w-[120px]"
-                    >
-                      {isSaving ? (
-                        <div className="flex items-center gap-2">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          <span>Saving...</span>
-                        </div>
-                      ) : (
-                        "Save Record"
-                      )}
-                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -1303,6 +1517,7 @@ export default function AttendanceDashboard() {
                     `${selectedMonth} ${selectedYear} – 1-15`,
                     firstCutoffEntries
                   )}
+                  totalRecords={firstCutoffEntries.length}
                   pagination={{
                     currentPage: firstPagination.currentPage,
                     totalPages: firstPagination.totalPages,
@@ -1323,6 +1538,7 @@ export default function AttendanceDashboard() {
                     `${selectedMonth} ${selectedYear} – ${selectedMonth === 'February' ? '16-28/29' : '16-30/31'}`,
                     secondCutoffEntries
                   )}
+                  totalRecords={secondCutoffEntries.length}
                   pagination={{
                     currentPage: secondPagination.currentPage,
                     totalPages: secondPagination.totalPages,
@@ -1440,12 +1656,14 @@ function CutoffTable({
   entries,
   onUpdateTime,
   onSummaryClick,
+  totalRecords,
   pagination,
 }: {
   title: string
   entries: LateEntry[]
   onUpdateTime: (id: string | number, newTime: string) => void
   onSummaryClick: () => void
+  totalRecords: number
   pagination: {
     currentPage: number
     totalPages: number
@@ -1476,7 +1694,7 @@ function CutoffTable({
           <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#C9184A]" />
           <span>Minutes from 8:00 AM</span>
           <span className="text-[#FFE5EC]">|</span>
-          <span>{entries.length} records</span>
+          <span>{totalRecords} records</span>
         </CardDescription>
       </CardHeader>
 
@@ -1510,10 +1728,10 @@ function CutoffTable({
                   </td>
                   <td className="px-3 py-5">
                     <Input
-                      value={entry.actual_in || entry.actualIn || ''}
-                      onChange={(e) => onUpdateTime(entry.id, e.target.value.toUpperCase())}
-                      placeholder="8:00 AM"
-                      className="bg-white border-[#FFE5EC] text-slate-800 placeholder:text-slate-300 h-10 text-base md:text-lg w-28 font-bold focus:ring-2 focus:ring-[#A0153E] uppercase shadow-sm"
+                      type="time"
+                      value={(entry.actual_in || entry.actualIn || '').substring(0, 5)}
+                      onChange={(e) => onUpdateTime(entry.id, e.target.value)}
+                      className="bg-white border-[#FFE5EC] text-slate-800 placeholder:text-slate-300 h-10 text-base md:text-lg w-32 font-bold focus:ring-2 focus:ring-[#A0153E] shadow-sm appearance-none"
                     />
                   </td>
 

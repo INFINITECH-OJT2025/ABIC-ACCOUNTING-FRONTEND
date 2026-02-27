@@ -6,7 +6,7 @@ import { getApiUrl } from '@/lib/api'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { X, ArrowUpDown, ListFilter, ArrowUpAZ, ArrowDownAZ, Clock3, History, Search, Plus, Users, ChevronDown, Check } from 'lucide-react'
+import { X, ArrowUpDown, ListFilter, ArrowUpAZ, ArrowDownAZ, Clock3, History, Search, Plus, Users, ChevronDown, Check, Edit2, Save, Loader2, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmationModal } from '@/components/ConfirmationModal'
 import {
@@ -22,13 +22,24 @@ interface OnboardingChecklist {
 
 import { Skeleton } from '@/components/ui/skeleton'
 
+// PH Address Data
+import regionsDataRaw from '@/ph-json/region.json'
+import provincesDataRaw from '@/ph-json/province.json'
+import citiesDataRaw from '@/ph-json/city.json'
+import barangaysDataRaw from '@/ph-json/barangay.json'
+
+const regionsData = regionsDataRaw as any[]
+const provincesData = provincesDataRaw as any[]
+const citiesData = citiesDataRaw as any[]
+const barangaysData = barangaysDataRaw as any[]
+
 interface Employee {
   id: number
   first_name: string
   last_name: string
   email: string
   position: string
-  status: 'pending' | 'employed' | 'terminated'
+  status: 'pending' | 'employed' | 'terminated' | 'rehire_pending' | 'rehired_employee'
   created_at: string
   onboarding_tasks?: {
     done: number
@@ -47,12 +58,16 @@ const statusBadgeColors = {
   pending: 'bg-amber-50 text-amber-700 border-amber-200',
   employed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   terminated: 'bg-rose-50 text-rose-700 border-rose-200',
+  rehire_pending: 'bg-orange-50 text-orange-700 border-orange-200',
+  rehired_employee: 'bg-blue-50 text-blue-700 border-blue-200',
 }
 
 const statusLabels = {
   pending: 'Pending',
   employed: 'Employed',
   terminated: 'Terminated',
+  rehire_pending: 'Rehire Pending',
+  rehired_employee: 'Rehired Employee',
 }
 
 export default function MasterfilePage() {
@@ -67,6 +82,22 @@ export default function MasterfilePage() {
   const [isActionLoading, setIsActionLoading] = useState(false)
   const [isDetailLoading, setIsDetailLoading] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
+  
+  // Editing States
+  const [isEditingContact, setIsEditingContact] = useState(false)
+  const [isEditingCurrent, setIsEditingCurrent] = useState(false)
+  const [isEditingPermanent, setIsEditingPermanent] = useState(false)
+  const [editFormData, setEditFormData] = useState<Partial<EmployeeDetails>>({})
+
+  // PSGC Dropdown States
+  const [regions, setRegions] = useState<{ code: string; name: string }[]>([])
+  const [provinces, setProvinces] = useState<{ code: string; name: string }[]>([])
+  const [cities, setCities] = useState<{ code: string; name: string }[]>([])
+  const [barangays, setBarangays] = useState<{ code: string; name: string }[]>([])
+  const [loadingRegions, setLoadingRegions] = useState(false)
+  const [loadingProvinces, setLoadingProvinces] = useState(false)
+  const [loadingCities, setLoadingCities] = useState(false)
+  const [loadingBarangays, setLoadingBarangays] = useState(false)
   const [checklists, setChecklists] = useState<OnboardingChecklist[]>([])
 
   const [sortOrder, setSortOrder] = useState<'recent' | 'oldest' | 'az' | 'za'>('recent')
@@ -92,7 +123,249 @@ export default function MasterfilePage() {
 
   useEffect(() => {
     fetchEmployees()
+    fetchRegions()
   }, [])
+
+  const fetchRegions = async () => {
+    setLoadingRegions(true)
+    try {
+      const regionsArray = regionsData.map((region: any) => ({
+        code: region.region_code || region.code,
+        name: region.region_name || region.name
+      }))
+      
+      // Deduplicate by code
+      const uniqueRegions = Array.from(
+        new Map(regionsArray.map(r => [r.code, r])).values()
+      ).sort((a, b) => a.name.localeCompare(b.name))
+
+      setRegions(uniqueRegions)
+    } catch (error) {
+      console.error('Error loading regions:', error)
+      setRegions([])
+    } finally {
+      setLoadingRegions(false)
+    }
+  }
+
+  const fetchProvinces = async (regionCode: string, isPermanent = false) => {
+    if (!regionCode) {
+      setProvinces([])
+      setCities([])
+      setBarangays([])
+      return
+    }
+    setLoadingProvinces(true)
+    try {
+      const filteredProvinces = provincesData
+        .filter((prov: any) => prov.region_code === regionCode)
+        .map((prov: any) => ({
+          code: prov.province_code || prov.code,
+          name: prov.province_name || prov.name
+        }))
+
+      // Deduplicate by code
+      const uniqueProvinces = Array.from(
+        new Map(filteredProvinces.map(p => [p.code, p])).values()
+      ).sort((a, b) => a.name.localeCompare(b.name))
+
+      setProvinces(uniqueProvinces)
+    } catch (error) {
+      console.error('Error filtering provinces:', error)
+      setProvinces([])
+    } finally {
+      setLoadingProvinces(false)
+    }
+  }
+
+  const fetchCities = async (provinceCode: string, isPermanent = false) => {
+    if (!provinceCode) {
+      setCities([])
+      setBarangays([])
+      return
+    }
+    setLoadingCities(true)
+    try {
+      const filteredCities = citiesData
+        .filter((city: any) => city.province_code === provinceCode)
+        .map((city: any) => ({
+          code: city.city_code || city.code,
+          name: city.city_name || city.name
+        }))
+
+      // Deduplicate by code
+      const uniqueCities = Array.from(
+        new Map(filteredCities.map(c => [c.code, c])).values()
+      ).sort((a, b) => a.name.localeCompare(b.name))
+
+      setCities(uniqueCities)
+    } catch (error) {
+      console.error('Error filtering cities:', error)
+      setCities([])
+    } finally {
+      setLoadingCities(false)
+    }
+  }
+
+  const fetchBarangays = async (cityCode: string, isPermanent = false) => {
+    if (!cityCode) {
+      setBarangays([])
+      return
+    }
+    setLoadingBarangays(true)
+    try {
+      const filteredBarangays = barangaysData
+        .filter((brgy: any) => brgy.city_code === cityCode)
+        .map((brgy: any) => ({
+          code: brgy.brgy_code || brgy.code,
+          name: brgy.brgy_name || brgy.name
+        }))
+
+      // Deduplicate by code
+      const uniqueBarangays = Array.from(
+        new Map(filteredBarangays.map(b => [b.code, b])).values()
+      ).sort((a, b) => a.name.localeCompare(b.name))
+
+      setBarangays(uniqueBarangays)
+    } catch (error) {
+      console.error('Error filtering barangays:', error)
+      setBarangays([])
+    } finally {
+      setLoadingBarangays(false)
+    }
+  }
+
+  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target
+
+    // Validation for mobile number: only numbers, max 10 digits
+    if (name === 'mobile_number') {
+      const numericValue = value.replace(/\D/g, '').slice(0, 10)
+      setEditFormData(prev => ({ ...prev, [name]: numericValue }))
+      return
+    }
+
+    setEditFormData(prev => ({ ...prev, [name]: value }))
+
+    // PSGC logic for Current Address
+    if (name === 'region') {
+      const selectedRegion = regions.find(r => r.name === value)
+      if (selectedRegion) fetchProvinces(selectedRegion.code)
+      setEditFormData(prev => ({ ...prev, province: '', city_municipality: '', barangay: '' }))
+    } else if (name === 'province') {
+      const selectedProvince = provinces.find(p => p.name === value)
+      if (selectedProvince) fetchCities(selectedProvince.code)
+      setEditFormData(prev => ({ ...prev, city_municipality: '', barangay: '' }))
+    } else if (name === 'city_municipality') {
+      const selectedCity = cities.find(c => c.name === value)
+      if (selectedCity) fetchBarangays(selectedCity.code)
+      setEditFormData(prev => ({ ...prev, barangay: '' }))
+    }
+    
+    // PSGC logic for Permanent Address
+    else if (name === 'perm_region') {
+      const selectedRegion = regions.find(r => r.name === value)
+      if (selectedRegion) fetchProvinces(selectedRegion.code, true)
+      setEditFormData(prev => ({ ...prev, perm_province: '', perm_city_municipality: '', perm_barangay: '' }))
+    } else if (name === 'perm_province') {
+      const selectedProvince = provinces.find(p => p.name === value)
+      if (selectedProvince) fetchCities(selectedProvince.code, true)
+      setEditFormData(prev => ({ ...prev, perm_city_municipality: '', perm_barangay: '' }))
+    } else if (name === 'perm_city_municipality') {
+      const selectedCity = cities.find(c => c.name === value)
+      if (selectedCity) fetchBarangays(selectedCity.code, true)
+      setEditFormData(prev => ({ ...prev, perm_barangay: '' }))
+    }
+  }
+
+  const toggleEditSection = async (section: 'contact' | 'current' | 'permanent') => {
+    if (!selectedEmployee) return
+
+    if (section === 'contact') {
+      if (!isEditingContact) {
+        setEditFormData({ ...selectedEmployee })
+        setIsEditingCurrent(false)
+        setIsEditingPermanent(false)
+      }
+      setIsEditingContact(!isEditingContact)
+    } else if (section === 'current') {
+      if (!isEditingCurrent) {
+        setEditFormData({ ...selectedEmployee })
+        setIsEditingContact(false)
+        setIsEditingPermanent(false)
+        // Pre-fetch PSGC data if possible
+        if (selectedEmployee.region) {
+          const region = regions.find(r => r.name === selectedEmployee.region)
+          if (region) {
+            await fetchProvinces(region.code)
+            if (selectedEmployee.province) {
+              const province = provinces.find(p => p.name === selectedEmployee.province)
+              if (province) {
+                await fetchCities(province.code)
+                if (selectedEmployee.city_municipality) {
+                  const city = cities.find(c => c.name === selectedEmployee.city_municipality)
+                  if (city) await fetchBarangays(city.code)
+                }
+              }
+            }
+          }
+        }
+      }
+      setIsEditingCurrent(!isEditingCurrent)
+    } else if (section === 'permanent') {
+      if (!isEditingPermanent) {
+        setEditFormData({ ...selectedEmployee })
+        setIsEditingContact(false)
+        setIsEditingCurrent(false)
+        if (selectedEmployee.perm_region) {
+          const region = regions.find(r => r.name === selectedEmployee.perm_region)
+          if (region) {
+            await fetchProvinces(region.code, true)
+            if (selectedEmployee.perm_province) {
+              const province = provinces.find(p => p.name === selectedEmployee.perm_province)
+              if (province) {
+                await fetchCities(province.code, true)
+                if (selectedEmployee.perm_city_municipality) {
+                  const city = cities.find(c => c.name === selectedEmployee.perm_city_municipality)
+                  if (city) await fetchBarangays(city.code, true)
+                }
+              }
+            }
+          }
+        }
+      }
+      setIsEditingPermanent(!isEditingPermanent)
+    }
+  }
+
+  const handleSaveSection = async (section: 'contact' | 'current' | 'permanent') => {
+    if (!selectedEmployee) return
+    setIsActionLoading(true)
+    try {
+      const response = await fetch(`${getApiUrl()}/api/employees/${selectedEmployee.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editFormData),
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        toast.success('Section updated successfully')
+        setSelectedEmployee({ ...selectedEmployee, ...editFormData })
+        if (section === 'contact') setIsEditingContact(false)
+        else if (section === 'current') setIsEditingCurrent(false)
+        else if (section === 'permanent') setIsEditingPermanent(false)
+        fetchEmployees() // Refresh list
+      } else {
+        toast.error(data.message || 'Failed to update section')
+      }
+    } catch (error) {
+      console.error('Error saving section:', error)
+      toast.error('Network Error')
+    } finally {
+      setIsActionLoading(false)
+    }
+  }
 
   const fetchEmployees = async () => {
     setFetchError(null)
@@ -271,18 +544,24 @@ export default function MasterfilePage() {
       }
     }
 
-    return { isComplete: true, status: 'READY TO EMPLOY', batchId: 1 }
+    return { 
+      isComplete: true, 
+      status: emp.status === 'rehire_pending' ? 'READY TO RE-HIRE' : 'READY TO EMPLOY', 
+      batchId: 1 
+    }
   }
 
   const handleSetAsEmployed = async () => {
     if (!selectedEmployee) return
 
     const { isComplete } = checkCompleteness(selectedEmployee)
+    const isRehire = selectedEmployee.status === 'rehire_pending'
+    
     if (!isComplete) {
       setConfirmModal({
         isOpen: true,
         title: 'Information Incomplete',
-        description: 'Cannot employ: Missing required Information. Please complete the employee profile first.',
+        description: `Cannot ${isRehire ? 're-hire' : 'employ'}: Missing required Information. Please complete the employee profile first.`,
         variant: 'warning',
         confirmText: 'Got it',
         hideCancel: true,
@@ -293,24 +572,26 @@ export default function MasterfilePage() {
 
     setConfirmModal({
       isOpen: true,
-      title: 'Confirm Employment',
-      description: `Are you sure you want to employ ${selectedEmployee.first_name} ${selectedEmployee.last_name}?`,
+      title: isRehire ? 'Confirm Re-hire' : 'Confirm Employment',
+      description: `Are you sure you want to ${isRehire ? 're-hire' : 'employ'} ${selectedEmployee.first_name} ${selectedEmployee.last_name}?`,
       variant: 'default',
-      confirmText: 'Yes, Employ',
+      confirmText: isRehire ? 'Yes, Re-hire' : 'Yes, Employ',
       hideCancel: false,
       onConfirm: async () => {
         setIsUpdating(true)
         try {
           const apiUrl = getApiUrl()
+          const finalStatus = isRehire ? 'rehired_employee' : 'employed'
+          
           const response = await fetch(`${apiUrl}/api/employees/${selectedEmployee.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 'employed' }),
+            body: JSON.stringify({ status: finalStatus }),
           })
 
           const data = await response.json()
           if (data.success) {
-            toast.success(`${selectedEmployee.first_name} set as employed successfully`)
+            toast.success(`${selectedEmployee.first_name} ${isRehire ? 're-hired' : 'set as employed'} successfully`)
             await fetchEmployees()
             setViewMode('list')
             setSelectedEmployee(null)
@@ -371,9 +652,13 @@ export default function MasterfilePage() {
     return result
   }
 
-  const employedList = filterEmployees(employees.filter(e => e.status === 'employed'))
+  const employedList = filterEmployees(
+    employees.filter(e => e.status === 'employed' || e.status === 'rehired_employee')
+  )
   const terminatedList = filterEmployees(employees.filter(e => e.status === 'terminated'))
-  const pendingList = filterEmployees(employees.filter(e => e.status === 'pending'))
+  const pendingList = filterEmployees(
+    employees.filter(e => e.status === 'pending' || e.status === 'rehire_pending')
+  )
   const allList = filterEmployees(employees)
 
   // End filter derivation
@@ -572,7 +857,7 @@ export default function MasterfilePage() {
                         : 'text-white/70 hover:text-white hover:bg-white/5'
                         }`}
                     >
-                      Employed ({employees.filter(e => e.status === 'employed').length})
+                      Employed ({employees.filter(e => e.status === 'employed' || e.status === 'rehired_employee').length})
                     </button>
                     <button
                       onClick={() => setActiveTab('terminated')}
@@ -590,7 +875,7 @@ export default function MasterfilePage() {
                         : 'text-white/70 hover:text-white hover:bg-white/5'
                         }`}
                     >
-                      Pending ({employees.filter(e => e.status === 'pending').length})
+                      Pending ({employees.filter(e => e.status === 'pending' || e.status === 'rehire_pending').length})
                     </button>
                   </div>
 
@@ -781,7 +1066,7 @@ export default function MasterfilePage() {
                                 </div>
                               )}
                               <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                {employee.status === 'pending' && (!isComplete || !employee.onboarding_tasks?.isComplete) && (
+                                {(employee.status === 'pending' || employee.status === 'rehire_pending') && (!isComplete || !employee.onboarding_tasks?.isComplete) && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -904,7 +1189,7 @@ export default function MasterfilePage() {
               <div className="flex items-center gap-3">
                 <span className="text-sm font-bold text-white/70 uppercase tracking-wider">Status</span>
                 <div className="bg-white border-2 border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 justify-between shadow-sm font-bold inline-flex items-center whitespace-nowrap rounded-lg">
-                  {selectedEmployee?.status === 'pending' ? (
+                  {(selectedEmployee?.status === 'pending' || selectedEmployee?.status === 'rehire_pending') ? (
                     <div className="flex items-center gap-2">
                       {selectedEmployee.onboarding_tasks?.isComplete ? 
                         checkCompleteness(selectedEmployee).status : 
@@ -1002,17 +1287,59 @@ export default function MasterfilePage() {
 
             {/* CONTACT */}
             <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
-              <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4">
+              <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4 flex justify-between items-center">
                 <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
                   <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
                   Contact Information
                 </h3>
+                <div className="flex gap-2">
+                  {isEditingContact ? (
+                    <>
+                      <Button variant="ghost" size="sm" onClick={() => setIsEditingContact(false)} className="h-8 text-slate-500 hover:text-slate-700">
+                        <X className="w-4 h-4 mr-1" /> Cancel
+                      </Button>
+                      <Button size="sm" onClick={() => handleSaveSection('contact')} disabled={isActionLoading} className="h-8 bg-[#630C22] hover:bg-[#800020] text-white">
+                        {isActionLoading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Save className="w-4 h-4 mr-1" />} Save
+                      </Button>
+                    </>
+                  ) : (
+                    <Button variant="ghost" size="sm" onClick={() => toggleEditSection('contact')} className="h-8 text-[#630C22] hover:bg-[#630C22]/10 font-bold">
+                      <Edit2 className="w-4 h-4 mr-1" /> Edit
+                    </Button>
+                  )}
+                </div>
               </div>
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
-                  <DetailItem label="Email Address" value={selectedEmployee.email || selectedEmployee.email_address} required />
-                  <DetailItem label="Mobile Number" value={selectedEmployee.mobile_number} required />
-                  <DetailItem label="Tel Number" value={selectedEmployee.phone_number} />
+                  {isEditingContact ? (
+                    <>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Email Address</label>
+                        <Input name="email_address" value={editFormData.email_address || editFormData.email || ''} onChange={handleEditChange} className="h-9" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Mobile Number</label>
+                        <div className="relative group">
+                          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-[#630C22] pointer-events-none group-focus-within:text-[#800020] transition-colors">
+                            +63
+                          </div>
+                          <Input 
+                            name="mobile_number" 
+                            value={editFormData.mobile_number || ''} 
+                            onChange={handleEditChange} 
+                            className="h-9 pl-11 font-bold" 
+                            placeholder="9XXXXXXXXX"
+                            maxLength={10}
+                          />
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <DetailItem label="Email Address" value={selectedEmployee.email_address || selectedEmployee.email} required />
+                      <DetailItem label="Mobile Number" value={selectedEmployee.mobile_number ? `+63 ${selectedEmployee.mobile_number}` : ''} required />
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -1021,47 +1348,185 @@ export default function MasterfilePage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* CURRENT ADDRESS */}
               <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
-                <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4">
+                <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4 flex justify-between items-center">
                   <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
                     <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
                     Current Address
                   </h3>
+                  <div className="flex gap-2">
+                    {isEditingCurrent ? (
+                      <>
+                        <Button variant="ghost" size="sm" onClick={() => setIsEditingCurrent(false)} className="h-8 text-slate-500 hover:text-slate-700">
+                          <X className="w-4 h-4 mr-1" /> Cancel
+                        </Button>
+                        <Button size="sm" onClick={() => handleSaveSection('current')} disabled={isActionLoading} className="h-8 bg-[#630C22] hover:bg-[#800020] text-white">
+                          {isActionLoading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Save className="w-4 h-4 mr-1" />} Save
+                        </Button>
+                      </>
+                    ) : (
+                      <Button variant="ghost" size="sm" onClick={() => toggleEditSection('current')} className="h-8 text-[#630C22] hover:bg-[#630C22]/10 font-bold">
+                        <Edit2 className="w-4 h-4 mr-1" /> Edit
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <div className="p-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
-                    <DetailItem label="House No." value={selectedEmployee.house_number} />
-                    <DetailItem label="Street" value={selectedEmployee.street} required />
-                    <DetailItem label="Village" value={selectedEmployee.village} />
-                    <DetailItem label="Subdivision" value={selectedEmployee.subdivision} />
-                    <DetailItem label="Barangay" value={selectedEmployee.barangay} required />
-                    <DetailItem label="City / Municipality" value={selectedEmployee.city_municipality} required />
-                    <DetailItem label="Province" value={selectedEmployee.province} required />
-                    <DetailItem label="Region" value={selectedEmployee.region} required />
-                    <DetailItem label="Zip Code" value={selectedEmployee.zip_code} required />
-                  </div>
+                  {isEditingCurrent ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase">House No.</label>
+                        <Input name="house_number" value={editFormData.house_number || ''} onChange={handleEditChange} className="h-9" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Street <span className="text-red-500">*</span></label>
+                        <Input name="street" value={editFormData.street || ''} onChange={handleEditChange} className="h-9" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Village</label>
+                        <Input name="village" value={editFormData.village || ''} onChange={handleEditChange} className="h-9" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Subdivision</label>
+                        <Input name="subdivision" value={editFormData.subdivision || ''} onChange={handleEditChange} className="h-9" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Region</label>
+                        <select name="region" value={editFormData.region || ''} onChange={handleEditChange} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
+                          <option value="">Select Region...</option>
+                          {regions.map(r => <option key={r.code} value={r.name}>{r.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Province</label>
+                        <select name="province" value={editFormData.province || ''} onChange={handleEditChange} disabled={!editFormData.region || loadingProvinces} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
+                          <option value="">Select Province...</option>
+                          {provinces.map(p => <option key={p.code} value={p.name}>{p.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase">City / Municipality</label>
+                        <select name="city_municipality" value={editFormData.city_municipality || ''} onChange={handleEditChange} disabled={!editFormData.province || loadingCities} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
+                          <option value="">Select City...</option>
+                          {cities.map(c => <option key={c.code} value={c.name}>{c.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Barangay</label>
+                        <select name="barangay" value={editFormData.barangay || ''} onChange={handleEditChange} disabled={!editFormData.city_municipality || loadingBarangays} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
+                          <option value="">Select Barangay...</option>
+                          {barangays.map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Zip Code</label>
+                        <Input name="zip_code" value={editFormData.zip_code || ''} onChange={handleEditChange} className="h-9" />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
+                      <DetailItem label="House No." value={selectedEmployee.house_number} />
+                      <DetailItem label="Street" value={selectedEmployee.street} required />
+                      <DetailItem label="Village" value={selectedEmployee.village} />
+                      <DetailItem label="Subdivision" value={selectedEmployee.subdivision} />
+                      <DetailItem label="Barangay" value={selectedEmployee.barangay} required />
+                      <DetailItem label="City / Municipality" value={selectedEmployee.city_municipality} required />
+                      <DetailItem label="Province" value={selectedEmployee.province} required />
+                      <DetailItem label="Region" value={selectedEmployee.region} required />
+                      <DetailItem label="Zip Code" value={selectedEmployee.zip_code} required />
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* PERMANENT ADDRESS */}
               <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
-                <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4">
+                <div className="bg-gradient-to-r from-[#4A081A]/10 to-transparent pb-3 border-b-2 border-[#630C22] p-4 flex justify-between items-center">
                   <h3 className="text-lg text-[#4A081A] font-bold flex items-center gap-2">
                     <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
                     Permanent Address
                   </h3>
+                  <div className="flex gap-2">
+                    {isEditingPermanent ? (
+                      <>
+                        <Button variant="ghost" size="sm" onClick={() => setIsEditingPermanent(false)} className="h-8 text-slate-500 hover:text-slate-700">
+                          <X className="w-4 h-4 mr-1" /> Cancel
+                        </Button>
+                        <Button size="sm" onClick={() => handleSaveSection('permanent')} disabled={isActionLoading} className="h-8 bg-[#630C22] hover:bg-[#800020] text-white">
+                          {isActionLoading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Save className="w-4 h-4 mr-1" />} Save
+                        </Button>
+                      </>
+                    ) : (
+                      <Button variant="ghost" size="sm" onClick={() => toggleEditSection('permanent')} className="h-8 text-[#630C22] hover:bg-[#630C22]/10 font-bold">
+                        <Edit2 className="w-4 h-4 mr-1" /> Edit
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <div className="p-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
-                    <DetailItem label="House No." value={selectedEmployee.perm_house_number} />
-                    <DetailItem label="Street" value={selectedEmployee.perm_street} required />
-                    <DetailItem label="Village" value={selectedEmployee.perm_village} />
-                    <DetailItem label="Subdivision" value={selectedEmployee.perm_subdivision} />
-                    <DetailItem label="Barangay" value={selectedEmployee.perm_barangay} required />
-                    <DetailItem label="City / Municipality" value={selectedEmployee.perm_city_municipality} required />
-                    <DetailItem label="Province" value={selectedEmployee.perm_province} required />
-                    <DetailItem label="Region" value={selectedEmployee.perm_region} required />
-                    <DetailItem label="Zip Code" value={selectedEmployee.perm_zip_code} required />
-                  </div>
+                  {isEditingPermanent ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase">House No.</label>
+                        <Input name="perm_house_number" value={editFormData.perm_house_number || ''} onChange={handleEditChange} className="h-9" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Street</label>
+                        <Input name="perm_street" value={editFormData.perm_street || ''} onChange={handleEditChange} className="h-9" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Village</label>
+                        <Input name="perm_village" value={editFormData.perm_village || ''} onChange={handleEditChange} className="h-9" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Subdivision</label>
+                        <Input name="perm_subdivision" value={editFormData.perm_subdivision || ''} onChange={handleEditChange} className="h-9" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Region</label>
+                        <select name="perm_region" value={editFormData.perm_region || ''} onChange={handleEditChange} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
+                          <option value="">Select Region...</option>
+                          {regions.map(r => <option key={r.code} value={r.name}>{r.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Province <span className="text-red-500">*</span></label>
+                        <select name="perm_province" value={editFormData.perm_province || ''} onChange={handleEditChange} disabled={!editFormData.perm_region || loadingProvinces} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
+                          <option value="">Select Province...</option>
+                          {provinces.map(p => <option key={p.code} value={p.name}>{p.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase">City / Municipality <span className="text-red-500">*</span></label>
+                        <select name="perm_city_municipality" value={editFormData.perm_city_municipality || ''} onChange={handleEditChange} disabled={!editFormData.perm_province || loadingCities} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
+                          <option value="">Select City...</option>
+                          {cities.map(c => <option key={c.code} value={c.name}>{c.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Barangay <span className="text-red-500">*</span></label>
+                        <select name="perm_barangay" value={editFormData.perm_barangay || ''} onChange={handleEditChange} disabled={!editFormData.perm_city_municipality || loadingBarangays} className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium">
+                          <option value="">Select Barangay...</option>
+                          {barangays.map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Zip Code <span className="text-red-500">*</span></label>
+                        <Input name="perm_zip_code" value={editFormData.perm_zip_code || ''} onChange={handleEditChange} className="h-9" />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
+                      <DetailItem label="House No." value={selectedEmployee.perm_house_number} />
+                      <DetailItem label="Street" value={selectedEmployee.perm_street} required />
+                      <DetailItem label="Village" value={selectedEmployee.perm_village} />
+                      <DetailItem label="Subdivision" value={selectedEmployee.perm_subdivision} />
+                      <DetailItem label="Barangay" value={selectedEmployee.perm_barangay} required />
+                      <DetailItem label="City / Municipality" value={selectedEmployee.perm_city_municipality} required />
+                      <DetailItem label="Province" value={selectedEmployee.perm_province} required />
+                      <DetailItem label="Region" value={selectedEmployee.perm_region} required />
+                      <DetailItem label="Zip Code" value={selectedEmployee.perm_zip_code} required />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1145,7 +1610,7 @@ export default function MasterfilePage() {
 
         {/* Footer Actions */}
         <div className="bg-slate-50 px-6 py-4 rounded-lg border border-[#FFE5EC] flex justify-end gap-3">
-          {selectedEmployee?.status === 'pending' ? (
+          {(selectedEmployee?.status === 'pending' || selectedEmployee?.status === 'rehire_pending') ? (
             <>
               {selectedEmployee.onboarding_tasks?.isComplete && !checkCompleteness(selectedEmployee).isComplete && (
                 <button
@@ -1164,7 +1629,7 @@ export default function MasterfilePage() {
                     : 'bg-gradient-to-r from-[#4A081A] via-[#630C22] to-[#800020] hover:from-[#630C22] hover:to-[#A0153E] text-white hover:shadow-xl hover:-translate-y-0.5'
                 }`}
               >
-                Approve & Set as Employed
+                {selectedEmployee.status === 'rehire_pending' ? 'Approve & Re-hire' : 'Approve & Set as Employed'}
               </button>
             </>
           ) : (
@@ -1211,7 +1676,6 @@ function DetailItem({ label, value, required }: { label: string, value: any, req
     <div className="group">
       <p className="text-xs font-bold text-slate-500 mb-1.5 flex items-center gap-1 group-hover:text-[#630C22] transition-colors">
         {label}
-        {required && <span className="text-rose-500 text-[10px] bg-rose-50 px-1 rounded ml-1">REQUIRED</span>}
       </p>
       <p className={`font-medium text-base ${isEmpty ? 'text-slate-300 italic' : 'text-slate-800'}`}>
         {isEmpty ? 'Not Provided' : value}

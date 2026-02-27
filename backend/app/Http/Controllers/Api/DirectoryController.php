@@ -487,4 +487,59 @@ class DirectoryController extends Controller
             ], 500);
         }
     }
+
+    public function deleteCloudinaryImage(Request $request)
+    {
+        $validated = $request->validate([
+            'public_id' => 'required|string',
+        ]);
+
+        $cloudName = env('NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME');
+        $apiKey = env('CLOUDINARY_API_KEY');
+        $apiSecret = env('CLOUDINARY_API_SECRET');
+
+        if (!$cloudName || !$apiKey || !$apiSecret) {
+            return response()->json(['message' => 'Cloudinary credentials not configured'], 500);
+        }
+
+        $publicId = $validated['public_id'];
+        $timestamp = time();
+        $signature = sha1("public_id={$publicId}&timestamp={$timestamp}{$apiSecret}");
+
+        try {
+            $response = Http::withoutVerifying()
+                ->asForm()
+                ->post("https://api.cloudinary.com/v1_1/{$cloudName}/image/destroy", [
+                    'public_id' => $publicId,
+                    'timestamp' => $timestamp,
+                    'api_key' => $apiKey,
+                    'signature' => $signature,
+                ]);
+
+            if ($response->failed()) {
+                Log::error('Cloudinary Delete API Error', ['body' => $response->body()]);
+                return response()->json(['message' => 'Failed to delete image from Cloudinary'], $response->status());
+            }
+
+            $result = $response->json();
+            if (($result['result'] ?? null) !== 'ok') {
+                Log::warning('Cloudinary Delete Unexpected Result', ['response' => $result]);
+                return response()->json(['message' => 'Image deletion was not confirmed by Cloudinary'], 400);
+            }
+
+            Agency::where('image_public_id', $publicId)->update([
+                'image_url' => null,
+                'image_public_id' => null,
+            ]);
+            GeneralContact::where('avatar_public_id', $publicId)->update([
+                'avatar_url' => null,
+                'avatar_public_id' => null,
+            ]);
+
+            return response()->json(['message' => 'Image deleted successfully']);
+        } catch (\Exception $e) {
+            Log::error('Cloudinary Delete Exception', ['message' => $e->getMessage()]);
+            return response()->json(['message' => 'Internal Server Error'], 500);
+        }
+    }
 }

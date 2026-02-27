@@ -17,6 +17,7 @@ Route::get('/user', function (Request $request) {
 
 // Employee API Routes
 Route::get('/employees/check-email', [EmployeeController::class, 'checkEmail']);
+Route::get('/employees/check-name', [EmployeeController::class, 'checkName']);
 Route::apiResource('employees', EmployeeController::class);
 
 // Positions API Routes
@@ -49,6 +50,8 @@ Route::put('/department-checklist-templates', [DepartmentChecklistTemplateContro
 Route::post('/employees/{id}/terminate', [EmployeeController::class, 'terminate']);
 Route::post('/employees/{id}/rehire', [EmployeeController::class, 'rehire']);
 Route::get('/terminations', [EmployeeController::class, 'getTerminations']);
+Route::get('/resigned', [EmployeeController::class, 'getResigned']);
+Route::get('/rehired', [EmployeeController::class, 'getRehired']);
 
 // Additional Fields API Routes
 Route::get('/employee-additional-fields', [EmployeeAdditionalFieldController::class, 'index']);
@@ -61,6 +64,18 @@ Route::post('/employees/{id}/additional-values', [EmployeeAdditionalFieldControl
 Route::get('/activity-logs', [ActivityLogController::class, 'index']);
 Route::get('/activity-logs/stats', [ActivityLogController::class, 'stats']);
 Route::get('/activity-logs/{id}', [ActivityLogController::class, 'show']);
+
+// Evaluation API Routes
+Route::get('/evaluations', [EvaluationController::class, 'index']);
+Route::post('/evaluations', [EvaluationController::class, 'store']);
+
+
+
+
+// Department Checklist Template Routes
+use App\Http\Controllers\Api\DepartmentChecklistTemplateController;
+Route::get('/department-checklist-templates', [DepartmentChecklistTemplateController::class, 'index']);
+Route::put('/department-checklist-templates', [DepartmentChecklistTemplateController::class, 'upsert']);
 
 // Directory API Routes
 use App\Http\Controllers\Api\DirectoryController;

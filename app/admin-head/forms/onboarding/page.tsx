@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import { TextFieldStatus } from '@/components/ui/text-field-status'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select"
@@ -71,6 +72,22 @@ interface OnboardingRecord {
   tasks: ChecklistTask[]
 }
 
+
+const buildBlankRecord = (departmentName: string): OnboardingRecord => ({
+  id: '',
+  name: '',
+  startDate: '',
+  position: '',
+  department: departmentName,
+  status: 'PENDING',
+  updatedAt: '',
+  tasks: [],
+})
+
+interface DepartmentOption {
+  id: number
+  name: string
+}
 
 const buildBlankRecord = (departmentName: string): OnboardingRecord => ({
   id: '',
@@ -211,6 +228,24 @@ function OnboardingChecklistPageContent() {
     buildBlankRecord,
     targetName,
   })
+
+  useEffect(() => {
+    if (!employeeInfo?.department) return
+    const departmentMatch = departmentsData.find((item) => item.name === employeeInfo.department)
+    setSelectedDepartmentId(departmentMatch?.id ?? null)
+  }, [employeeInfo?.department, departmentsData])
+
+  useEffect(() => {
+    if (loading) return
+    if (employeeInfo) return
+    const firstDepartment = departmentOptions[0]
+    if (!firstDepartment) return
+    const blank = buildBlankRecord(firstDepartment)
+    setEmployeeInfo(blank)
+    setTasks([])
+    const departmentMatch = departmentsData.find((item) => item.name === firstDepartment)
+    setSelectedDepartmentId(departmentMatch?.id ?? null)
+  }, [loading, employeeInfo, departmentOptions, departmentsData])
 
 
   const completionPercentage = useMemo(() => {
@@ -1096,4 +1131,3 @@ function OnboardingChecklistPageContent() {
     </div>
   )
 }
-
