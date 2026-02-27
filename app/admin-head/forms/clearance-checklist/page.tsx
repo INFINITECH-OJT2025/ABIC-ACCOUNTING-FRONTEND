@@ -5,6 +5,7 @@
 
 
 import React, { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table"
@@ -88,19 +89,6 @@ interface DepartmentOption {
   name: string
 }
 
-const buildBlankRecord = (departmentName: string): ClearanceRecord => ({
-  id: '',
-  name: '',
-  startDate: '',
-  position: '',
-  department: departmentName,
-  resignationDate: '',
-  lastDay: '',
-  status: 'PENDING',
-  updatedAt: '',
-  tasks: [],
-})
-
 
 const normalizeTasks = (input: unknown): ChecklistTask[] => {
   const tasks = Array.isArray(input) ? input : []
@@ -177,6 +165,7 @@ const isRecordDone = (record: ClearanceRecord) =>
 
 
 export default function ClearanceChecklistPage() {
+  const router = useRouter()
   const editMode = true
   const [saving, setSaving] = useState(false)
   const [taskIdToDelete, setTaskIdToDelete] = useState<number | null>(null)

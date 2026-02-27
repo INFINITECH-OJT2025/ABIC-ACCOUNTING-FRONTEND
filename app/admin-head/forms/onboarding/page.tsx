@@ -89,17 +89,6 @@ interface DepartmentOption {
   name: string
 }
 
-const buildBlankRecord = (departmentName: string): OnboardingRecord => ({
-  id: '',
-  name: '',
-  startDate: '',
-  position: '',
-  department: departmentName,
-  status: 'PENDING',
-  updatedAt: '',
-  tasks: [],
-})
-
 
 const normalizeTasks = (input: unknown): ChecklistTask[] => {
   const tasks = Array.isArray(input) ? input : []

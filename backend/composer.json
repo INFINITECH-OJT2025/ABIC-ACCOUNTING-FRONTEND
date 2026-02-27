@@ -24,7 +24,11 @@
             "App\\": "app/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
-        }
+        },
+        "exclude-from-classmap": [
+            "app/Http/Controllers/Api/EmployeeController_new.php",
+            "app/Http/Controllers/Api/EmployeeController_old.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {

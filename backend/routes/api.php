@@ -5,8 +5,11 @@ use App\Http\Controllers\Api\EmployeeAdditionalFieldController;
 use App\Http\Controllers\Api\PositionController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\ActivityLogController;
+use App\Http\Controllers\Api\ClearanceChecklistController;
+use App\Http\Controllers\Api\DirectoryController;
 use App\Http\Controllers\Api\OnboardingChecklistController;
 use App\Http\Controllers\Api\DepartmentChecklistTemplateController;
+use App\Http\Controllers\EvaluationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -37,7 +40,6 @@ Route::post('/onboarding-checklist', [OnboardingChecklistController::class, 'sto
 Route::put('/onboarding-checklist/{id}', [OnboardingChecklistController::class, 'update']);
 
 // CLEARANCE ROUTES
-use App\Http\Controllers\Api\ClearanceChecklistController;
 Route::get('/clearance-checklist', [ClearanceChecklistController::class, 'index']);
 Route::post('/clearance-checklist', [ClearanceChecklistController::class, 'store']);
 Route::put('/clearance-checklist/{id}', [ClearanceChecklistController::class, 'update']);
@@ -72,13 +74,7 @@ Route::post('/evaluations', [EvaluationController::class, 'store']);
 
 
 
-// Department Checklist Template Routes
-use App\Http\Controllers\Api\DepartmentChecklistTemplateController;
-Route::get('/department-checklist-templates', [DepartmentChecklistTemplateController::class, 'index']);
-Route::put('/department-checklist-templates', [DepartmentChecklistTemplateController::class, 'upsert']);
-
 // Directory API Routes
-use App\Http\Controllers\Api\DirectoryController;
 Route::get('/directory/agencies', [DirectoryController::class, 'index']);
 Route::put('/directory/agencies/{code}', [DirectoryController::class, 'update']);
 Route::put('/directory/agencies/{code}/image', [DirectoryController::class, 'updateImage']);
