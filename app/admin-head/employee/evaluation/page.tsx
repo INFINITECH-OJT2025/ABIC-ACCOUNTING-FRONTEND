@@ -103,13 +103,12 @@ export default function EvaluationPage() {
     }
   }
 
-  const calculateEvaluationDates = (dateHired: string, employee?: (Employee & Partial<Evaluation>)) => {
+  const calculateEvaluationDates = (dateHired: string, evaluationContext?: { id?: string } & Partial<Evaluation>) => {
     if (!dateHired) return null
     const hiredDate = new Date(dateHired)
     
-    const liveEvaluation = evaluations[employee?.id || '']
-    const fallbackEvaluation = employee || ({} as Partial<Employee & Evaluation>)
-    const evaluation = (liveEvaluation || fallbackEvaluation) as Partial<Evaluation>
+    const liveEvaluation = evaluations[evaluationContext?.id || '']
+    const evaluation = (liveEvaluation || evaluationContext || {}) as Partial<Evaluation>
     
     const firstEval = addMonths(hiredDate, 3)
     const secondEval = addMonths(hiredDate, 5)
@@ -142,9 +141,9 @@ export default function EvaluationPage() {
   const getDatesForEmployee = (emp: Employee) => {
     const evalRecord = evaluations[emp.id] || persistedEvaluations[emp.id]
     if (evalRecord) {
-      return calculateEvaluationDates(emp.date_hired, { ...emp, ...evalRecord })
+      return calculateEvaluationDates(emp.date_hired, { id: emp.id, ...evalRecord })
     }
-    return calculateEvaluationDates(emp.date_hired, emp)
+    return calculateEvaluationDates(emp.date_hired)
   }
 
   const handleScoreChange = (employeeId: string, scoreType: 'score_1' | 'score_2', value: string) => {
