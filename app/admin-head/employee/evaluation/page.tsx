@@ -42,6 +42,7 @@ export default function EvaluationPage() {
   const [isActionLoading, setIsActionLoading] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'All' | 'Probee' | 'Regular' | 'Failed'>('Probee')
 
   useEffect(() => {
     fetchData()
@@ -144,6 +145,14 @@ export default function EvaluationPage() {
     return calculateEvaluationDates(emp.date_hired)
   }
 
+  const getStatusForFilter = (emp: Employee) => {
+    const persisted = persistedEvaluations[emp.id]
+    if (persisted) {
+      return calculateEvaluationDates(emp.date_hired, { id: emp.id, ...persisted })?.status || 'Probee'
+    }
+    return calculateEvaluationDates(emp.date_hired)?.status || 'Probee'
+  }
+
   const handleScoreChange = (employeeId: string, scoreType: 'score_1' | 'score_2', value: string) => {
     // Restrict to numbers only and max 2 digits
     const cleanedValue = value.replace(/[^0-9]/g, '').slice(0, 2)
@@ -204,10 +213,14 @@ export default function EvaluationPage() {
     }
   }
 
-  const filteredEmployees = employees.filter(emp => 
-    `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    emp.id.includes(searchQuery)
-  ).sort((a, b) => {
+  const filteredEmployees = employees.filter(emp => {
+    const matchesSearch =
+      `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      emp.id.includes(searchQuery)
+    const status = getStatusForFilter(emp)
+    const matchesStatus = statusFilter === 'All' ? true : status === statusFilter
+    return matchesSearch && matchesStatus
+  }).sort((a, b) => {
     const statusA = getDatesForEmployee(a)?.status || ''
     const statusB = getDatesForEmployee(b)?.status || ''
     
@@ -319,14 +332,32 @@ export default function EvaluationPage() {
               </div>
             </div>
             
-            <div className="relative w-full md:w-80">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <Input 
-                placeholder="Search candidates..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 h-11 bg-stone-50/50 border-[#FFE5EC] focus:border-[#C9184A] rounded-xl text-sm"
-              />
+            <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+              <div className="relative w-full md:w-80">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Input 
+                  placeholder="Search candidates..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 h-11 bg-stone-50/50 border-[#FFE5EC] focus:border-[#C9184A] rounded-xl text-sm"
+                />
+              </div>
+              <div className="flex items-center gap-2 bg-[#FFE5EC]/40 border border-[#FFE5EC] rounded-xl p-1 h-11">
+                {(['All', 'Probee', 'Regular', 'Failed'] as const).map((status) => (
+                  <button
+                    key={status}
+                    type="button"
+                    onClick={() => setStatusFilter(status)}
+                    className={`px-4 h-9 rounded-lg text-[11px] font-extrabold uppercase tracking-wide transition-all ${
+                      statusFilter === status
+                        ? 'bg-white text-[#7B0F2B] shadow-sm'
+                        : 'text-[#7B0F2B]/70 hover:text-[#7B0F2B]'
+                    }`}
+                  >
+                    {status}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
