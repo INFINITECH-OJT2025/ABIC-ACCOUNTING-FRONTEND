@@ -133,21 +133,29 @@ class PositionController extends Controller
         try {
             $validated = $request->validate([
                 'positions' => 'required|array',
-                'positions.*' => 'required|string|max:255'
+                'positions.*' => 'required|string|max:255',
+                'department_id' => 'nullable|integer|exists:departments,id'
             ]);
+
+            $departmentId = $request->input('department_id');
 
             $created = [];
             foreach ($validated['positions'] as $positionName) {
-                $position = Position::firstOrCreate(
-                    ['name' => $positionName],
-                    ['is_custom' => true]
-                );
-                $created[] = $position;
+                $position = Position::where('name', $positionName)->first();
 
-                // Log activity for each created position
-                if ($position->wasRecentlyCreated) {
+                if (!$position) {
+                    $position = Position::create([
+                        'name' => $positionName,
+                        'is_custom' => true,
+                        'department_id' => $departmentId
+                    ]);
                     $this->activityLogService->logPositionAction('created', $position, null, $request);
+                } else if ($departmentId && !$position->department_id) {
+                    // Update department_id if missing
+                    $position->update(['department_id' => $departmentId]);
                 }
+
+                $created[] = $position;
             }
 
             return response()->json([

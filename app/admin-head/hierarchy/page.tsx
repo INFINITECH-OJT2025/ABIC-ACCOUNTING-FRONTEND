@@ -30,14 +30,14 @@ function titleToId(value: string) {
 
 function NodePill({ label, variant = "staff" }: { label: string; variant?: "staff" | "dept" | "exec" | "admin" }) {
   const styles = {
-    staff: "bg-stone-100 text-stone-900 border-stone-500",
-    dept: "text-slate-900 border-slate-600",
-    exec: "bg-gradient-to-r from-violet-500 to-cyan-400 text-white border-violet-700",
-    admin: "bg-[#ff7b1c] text-black border-amber-700",
+    staff: "bg-white text-slate-700 border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300",
+    dept: "text-white border-transparent shadow-md",
+    exec: "bg-gradient-to-r from-violet-600 to-indigo-500 text-white border-transparent shadow-lg shadow-indigo-500/20",
+    admin: "bg-gradient-to-r from-rose-500 to-orange-400 text-white border-transparent shadow-lg shadow-rose-500/20",
   }
 
   return (
-    <div className={`rounded-2xl border-2 px-4 py-2 text-center text-xs font-black uppercase tracking-wider shadow-sm ${styles[variant]}`}>
+    <div className={`rounded-xl border-2 px-6 py-2.5 text-center text-xs font-bold tracking-wide transition-all duration-200 ${styles[variant]}`}>
       {label}
     </div>
   )
@@ -47,14 +47,14 @@ function HierarchyBranch({ node, allNodes }: { node: PositionNode; allNodes: Pos
   const children = allNodes.filter((item) => item.parentId === node.id)
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <NodePill label={node.title} variant="staff" />
       {children.length > 0 && (
-        <div className="relative ml-4 border-l-2 border-slate-300 pl-4">
-          <div className="space-y-2">
+        <div className="relative ml-6 border-l-[1.5px] border-slate-200 pl-6">
+          <div className="space-y-4 py-1">
             {children.map((child) => (
               <div key={child.id} className="relative">
-                <div className="absolute -left-4 top-4 h-px w-4 bg-slate-300" />
+                <div className="absolute -left-6 top-5 h-[1.5px] w-6 bg-slate-200" />
                 <HierarchyBranch node={child} allNodes={allNodes} />
               </div>
             ))}
@@ -74,7 +74,6 @@ export default function AdminHeadHierarchyPage() {
   const [departmentColor, setDepartmentColor] = useState("#59D2DE")
 
   const [positionTitle, setPositionTitle] = useState("")
-  const [positionRole, setPositionRole] = useState("")
   const [selectedDepartment, setSelectedDepartment] = useState("")
   const [selectedParent, setSelectedParent] = useState("admin-head")
   const [loading, setLoading] = useState(false)
@@ -170,9 +169,8 @@ export default function AdminHeadHierarchyPage() {
 
   const handleAddPosition = async () => {
     const cleanTitle = positionTitle.trim()
-    const cleanRole = positionRole.trim()
 
-    if (!cleanTitle || !cleanRole || !selectedDepartment) return
+    if (!cleanTitle || !selectedDepartment) return
 
     setLoading(true)
     try {
@@ -183,7 +181,8 @@ export default function AdminHeadHierarchyPage() {
           'Accept': 'application/json'
         },
         body: JSON.stringify({
-          positions: [cleanTitle]
+          positions: [cleanTitle],
+          department_id: selectedDepartment === 'core' ? null : Number(selectedDepartment)
         })
       })
       if (!posRes.ok) throw new Error('Failed to create position')
@@ -200,7 +199,7 @@ export default function AdminHeadHierarchyPage() {
           position_id: p.id,
           department_id: selectedDepartment === 'core' ? null : Number(selectedDepartment),
           parent_id: selectedParent === 'admin-head' ? null : Number(selectedParent),
-          role: cleanRole
+          role: cleanTitle
         })
       })
       if (!hierRes.ok) throw new Error('Failed to create hierarchy link')
@@ -212,7 +211,7 @@ export default function AdminHeadHierarchyPage() {
         {
           id: h.id.toString(),
           title: cleanTitle,
-          role: cleanRole,
+          role: cleanTitle,
           departmentId: selectedDepartment,
           parentId: selectedParent || "admin-head",
           createdAt: Date.now(),
@@ -220,7 +219,6 @@ export default function AdminHeadHierarchyPage() {
       ])
 
       setPositionTitle("")
-      setPositionRole("")
       setSelectedParent("admin-head")
       toast?.success("Position successfully added to hierarchy.")
     } catch (err) {
@@ -318,12 +316,6 @@ export default function AdminHeadHierarchyPage() {
                   <option key={posName} value={posName} />
                 ))}
               </datalist>
-              <Textarea
-                value={positionRole}
-                onChange={(event) => setPositionRole(event.target.value)}
-                placeholder="Role description"
-                className="min-h-[84px]"
-              />
               <Select
                 value={selectedDepartment}
                 onValueChange={(value) => {
@@ -380,7 +372,7 @@ export default function AdminHeadHierarchyPage() {
                 ))}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
                 {departments.map((department) => {
                   const roots = positions.filter((item) => {
                     if (item.departmentId !== department.id) return false
@@ -389,21 +381,33 @@ export default function AdminHeadHierarchyPage() {
                     return !parent || parent.departmentId !== department.id
                   })
 
+                  // Use color but add opacity, or use default if weird
+                  const headerBg = department.color || '#59D2DE'
+
                   return (
-                    <div key={department.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div key={department.id} className="rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col">
                       <div
-                        className="mb-3 rounded-xl border-2 px-3 py-2 text-center text-xs font-black uppercase tracking-wider"
-                        style={{ backgroundColor: department.color }}
+                        className="px-6 py-4 border-b border-black/5 flex items-center gap-3 relative overflow-hidden"
+                        style={{ backgroundColor: headerBg }}
                       >
-                        {department.name}
+                        <div className="absolute inset-0 bg-white/20" />
+                        <Building2 className="w-5 h-5 text-black/60 relative z-10" />
+                        <span className="font-bold text-black/80 tracking-wide relative z-10">
+                          {department.name}
+                        </span>
                       </div>
 
-                      <div className="space-y-3">
-                        {roots.length === 0 ? (
-                          <p className="text-xs text-slate-400">No position assigned yet.</p>
-                        ) : (
-                          roots.map((root) => <HierarchyBranch key={root.id} node={root} allNodes={positions} />)
-                        )}
+                      <div className="p-6 flex-1 bg-slate-50/30">
+                        <div className="space-y-4 relative">
+                          {roots.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-8 text-center text-slate-400">
+                               <Users className="w-8 h-8 mb-2 opacity-20" />
+                               <p className="text-sm font-medium">No positions assigned</p>
+                            </div>
+                          ) : (
+                            roots.map((root) => <HierarchyBranch key={root.id} node={root} allNodes={positions} />)
+                          )}
+                        </div>
                       </div>
                     </div>
                   )
@@ -411,14 +415,14 @@ export default function AdminHeadHierarchyPage() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-6 pt-3 border-t border-slate-200">
+            <div className="flex flex-wrap items-center justify-center gap-6 pt-6 mt-4 border-t border-slate-100">
               <div className="flex items-center gap-3">
-                <span className="text-sm font-bold uppercase tracking-wider">Staff =</span>
-                <div className="h-9 w-24 rounded-2xl border-2 border-stone-500 bg-stone-100" />
+                <span className="text-sm font-bold uppercase tracking-wider text-slate-500">Staff =</span>
+                <div className="h-9 w-24 rounded-xl border-2 border-slate-200 bg-white shadow-sm" />
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-sm font-bold uppercase tracking-wider">Departments =</span>
-                <div className="h-9 w-24 rounded-2xl border-2 border-slate-600 bg-[#59D2DE]" />
+                <span className="text-sm font-bold uppercase tracking-wider text-slate-500">Departments =</span>
+                <div className="h-9 w-24 rounded-xl border border-transparent shadow-md bg-[#59D2DE]" />
               </div>
             </div>
           </CardContent>
@@ -437,7 +441,6 @@ export default function AdminHeadHierarchyPage() {
                 return (
                   <div key={item.id} className="rounded-xl border border-slate-200 p-3 bg-white">
                     <p className="font-bold text-slate-900 uppercase text-xs tracking-wider">{item.title}</p>
-                    <p className="text-sm text-slate-600 mt-1">{item.role}</p>
                     <p className="text-[11px] text-slate-400 mt-2 font-semibold uppercase tracking-wider">
                       {department?.name || "Core Position"}
                     </p>

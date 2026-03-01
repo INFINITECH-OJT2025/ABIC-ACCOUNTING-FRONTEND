@@ -56,6 +56,7 @@ interface EmployeeDetails {
 interface Position {
   id: number
   name: string
+  department_id?: number
 }
 
 interface Department {
@@ -1359,9 +1360,19 @@ function OnboardPageContent() {
       return
     }
 
+    let extraUpdates = {}
+    if (name === 'position') {
+      const pos = positions.find(p => p.name === value)
+      if (pos && pos.department_id) {
+        const dept = departments.find(d => d.id === pos.department_id)
+        if (dept) extraUpdates = { department: dept.name }
+      }
+    }
+
     setProgressionFormData((prev) => ({
       ...prev,
       [name]: value,
+      ...extraUpdates
     }))
 
     if (name === 'region') {
@@ -1775,7 +1786,20 @@ function OnboardPageContent() {
                           {inlineManagerType === 'position' ? 'CLOSE MANAGER' : 'MANAGE LIST'}{inlineManagerType === 'position' ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                         </button>
                       </div>
-                      <select value={onboardFormData.position} onChange={(e) => setOnboardFormData(prev => ({ ...prev, position: e.target.value }))} className="w-full h-10 px-3 py-2 border border-slate-200 bg-white rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#630C22] transition-all">
+                      <select 
+                        value={onboardFormData.position} 
+                        onChange={(e) => {
+                          const val = e.target.value
+                          let autoDept = onboardFormData.department
+                          const pos = positions.find(p => p.name === val)
+                          if (pos && pos.department_id) {
+                            const dept = departments.find(d => d.id === pos.department_id)
+                            if (dept) autoDept = dept.name
+                          }
+                          setOnboardFormData(prev => ({ ...prev, position: val, department: autoDept }))
+                        }} 
+                        className="w-full h-10 px-3 py-2 border border-slate-200 bg-white rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#630C22] transition-all"
+                      >
                         <option value="">Select Position...</option>
                         {positions.map((pos) => (<option key={pos.id} value={pos.name}>{pos.name}</option>))}
                       </select>

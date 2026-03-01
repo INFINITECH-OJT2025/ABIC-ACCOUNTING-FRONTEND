@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Position extends Model
 {
-    protected $fillable = ['name', 'is_custom'];
+    protected $fillable = ['name', 'is_custom', 'department_id'];
     protected $hidden = [];
     public $timestamps = true;
 }
