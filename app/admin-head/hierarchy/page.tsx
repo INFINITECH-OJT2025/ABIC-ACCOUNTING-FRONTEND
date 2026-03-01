@@ -1,18 +1,30 @@
 "use client"
 
 import { useMemo, useState, useEffect } from "react"
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input } from "@/components/ui"
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Building2, GitBranch, Plus, ShieldCheck, Users } from "lucide-react"
+import { Building2, GitBranch, Plus, ShieldCheck, Users, Clock, X, Save } from "lucide-react"
 import { getApiUrl } from "@/lib/api"
 import { toast } from "sonner"
+
+type Office = {
+  id: string
+  name: string
+}
 
 type Department = {
   id: string
   name: string
   color: string
+  officeId: string
+}
+
+type OfficeShiftSchedule = {
+  id?: number
+  office_name: string
+  shift_options: string[]
 }
 
 type PositionNode = {
@@ -78,24 +90,45 @@ export default function AdminHeadHierarchyPage() {
   const [selectedParent, setSelectedParent] = useState("admin-head")
   const [loading, setLoading] = useState(false)
 
+  // Office States
+  const [offices, setOffices] = useState<Office[]>([])
+  const [officeName, setOfficeName] = useState("")
+  const [selectedOffice, setSelectedOffice] = useState("")
+
+  // Shift Schedule States
+  const [schedules, setSchedules] = useState<OfficeShiftSchedule[]>([])
+  const [isShiftModalOpen, setIsShiftModalOpen] = useState(false)
+  const [editingSchedule, setEditingSchedule] = useState<OfficeShiftSchedule | null>(null)
+  const [newShiftStart, setNewShiftStart] = useState("08:00")
+  const [newShiftEnd, setNewShiftEnd] = useState("12:00")
+
   useEffect(() => {
     async function fetchData() {
       try {
-        const [deptRes, hierRes, posRes] = await Promise.all([
+        const [deptRes, hierRes, posRes, schedRes, officeRes] = await Promise.all([
           fetch(getApiUrl() + '/api/departments', { headers: { Accept: 'application/json' } }),
           fetch(getApiUrl() + '/api/hierarchies', { headers: { Accept: 'application/json' } }),
-          fetch(getApiUrl() + '/api/positions', { headers: { Accept: 'application/json' } })
+          fetch(getApiUrl() + '/api/positions', { headers: { Accept: 'application/json' } }),
+          fetch(getApiUrl() + '/api/office-shift-schedules', { headers: { Accept: 'application/json' } }),
+          fetch(getApiUrl() + '/api/offices', { headers: { Accept: 'application/json' } })
         ])
         const deptData = await deptRes.json()
         const hierData = await hierRes.json()
         const posData = await posRes.json()
+        const schedData = await schedRes.json()
+        const officeData = await officeRes.json()
         
         const mappedDeps = (Array.isArray(deptData?.data) ? deptData.data : (Array.isArray(deptData) ? deptData : [])).map((d: any) => ({
           id: d.id.toString(),
           name: d.name,
-          color: d.color || '#59D2DE'
+          color: d.color || '#59D2DE',
+          officeId: d.office_id?.toString() || ""
         }))
         setDepartments(mappedDeps)
+
+        if (officeData.success) {
+          setOffices(officeData.data.map((o: any) => ({ id: o.id.toString(), name: o.name })))
+        }
 
         const hierArray = Array.isArray(hierData?.data) ? hierData.data : (Array.isArray(hierData) ? hierData : [])
         const mappedPos = hierArray.map((h: any) => ({
@@ -110,6 +143,10 @@ export default function AdminHeadHierarchyPage() {
 
         const posArray = Array.isArray(posData?.data) ? posData.data : (Array.isArray(posData) ? posData : [])
         setAvailablePositions(posArray.map((p: any) => p.name))
+
+        if (schedData.success) {
+          setSchedules(schedData.data)
+        }
 
       } catch (err) {
         console.error("Failed to load hierarchy data", err)
@@ -129,9 +166,81 @@ export default function AdminHeadHierarchyPage() {
       .slice(0, 6)
   }, [positions])
 
+  const handleOpenShiftModal = (office: Office) => {
+    const existing = schedules.find(s => s.office_name === office.name)
+    setEditingSchedule(existing || { office_name: office.name, shift_options: [] })
+    setIsShiftModalOpen(true)
+  }
+
+  const handleSaveShiftSchedule = async () => {
+    if (!editingSchedule) return
+    setLoading(true)
+    try {
+      const res = await fetch(getApiUrl() + '/api/office-shift-schedules', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(editingSchedule)
+      })
+      const result = await res.json()
+      if (result.success) {
+        setSchedules(prev => {
+          const idx = prev.findIndex(s => s.office_name === result.data.office_name)
+          if (idx >= 0) {
+            const next = [...prev]
+            next[idx] = result.data
+            return next
+          }
+          return [...prev, result.data]
+        })
+        setIsShiftModalOpen(false)
+        toast.success("Office shift schedule updated successfully!")
+      } else {
+        throw new Error(result.message || "Failed to update schedule")
+      }
+    } catch (err) {
+      console.error(err)
+      toast.error("Error saving shift schedule.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const addShiftOption = () => {
+    if (!editingSchedule) return
+    
+    const formatTime = (time: string) => {
+      const [hours, minutes] = time.split(':')
+      const h = parseInt(hours)
+      const ampm = h >= 12 ? 'PM' : 'AM'
+      const h12 = h % 12 || 12
+      return `${h12}:${minutes} ${ampm}`
+    }
+
+    const formattedOption = `${formatTime(newShiftStart)} – ${formatTime(newShiftEnd)}`
+    
+    setEditingSchedule({
+      ...editingSchedule,
+      shift_options: [...editingSchedule.shift_options, formattedOption]
+    })
+  }
+
+  const removeShiftOption = (idx: number) => {
+    if (!editingSchedule) return
+    setEditingSchedule({
+      ...editingSchedule,
+      shift_options: editingSchedule.shift_options.filter((_, i) => i !== idx)
+    })
+  }
+
   const handleAddDepartment = async () => {
     const cleanName = departmentName.trim()
-    if (!cleanName) return
+    if (!cleanName || !selectedOffice) {
+      toast.error("Please provide department name and select an office.")
+      return
+    }
 
     setLoading(true)
     try {
@@ -143,6 +252,7 @@ export default function AdminHeadHierarchyPage() {
         },
         body: JSON.stringify({
           name: cleanName,
+          office_id: Number(selectedOffice),
           is_custom: true,
           color: departmentColor
         })
@@ -154,14 +264,45 @@ export default function AdminHeadHierarchyPage() {
       setDepartments((prev) => [...prev, {
         id: d.id.toString(),
         name: d.name,
-        color: d.color || '#59D2DE'
+        color: d.color || '#59D2DE',
+        officeId: d.office_id?.toString() || ""
       }])
       setDepartmentName("")
       setDepartmentColor("#59D2DE")
+      setSelectedOffice("")
       toast?.success("Department created and saved.")
     } catch (err) {
       console.error(err)
       toast?.error("Failed to create department.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleAddOffice = async () => {
+    const cleanName = officeName.trim()
+    if (!cleanName) return
+
+    setLoading(true)
+    try {
+      const res = await fetch(getApiUrl() + '/api/offices', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ name: cleanName })
+      })
+      if (!res.ok) throw new Error('Failed to create office')
+      const result = await res.json()
+      const o = result.data
+      
+      setOffices((prev) => [...prev, { id: o.id.toString(), name: o.name }])
+      setOfficeName("")
+      toast?.success("Office created successfully.")
+    } catch (err) {
+      console.error(err)
+      toast?.error("Failed to create office.")
     } finally {
       setLoading(false)
     }
@@ -277,13 +418,42 @@ export default function AdminHeadHierarchyPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-3">
+              <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Add Office</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={officeName}
+                  onChange={(e) => setOfficeName(e.target.value)}
+                  placeholder="Office Name (e.g. ABIC)"
+                  className="h-10"
+                />
+                <Button onClick={handleAddOffice} disabled={loading} className="bg-slate-700 hover:bg-slate-800">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="h-px w-full bg-slate-200" />
+
+            <div className="space-y-3">
               <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Add Department</Label>
-              <Input
-                value={departmentName}
-                onChange={(event) => setDepartmentName(event.target.value)}
-                placeholder="Department name"
-                className="h-10"
-              />
+              <div className="grid grid-cols-1 gap-3">
+                <Input
+                  value={departmentName}
+                  onChange={(event) => setDepartmentName(event.target.value)}
+                  placeholder="Department name"
+                  className="h-10"
+                />
+                <Select value={selectedOffice} onValueChange={setSelectedOffice}>
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="Assign Office" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {offices.map((o) => (
+                      <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="flex items-center gap-3">
                 <Label htmlFor="dept-color" className="text-xs font-bold uppercase tracking-wider text-slate-500">Color</Label>
                 <Input
@@ -372,42 +542,73 @@ export default function AdminHeadHierarchyPage() {
                 ))}
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
-                {departments.map((department) => {
-                  const roots = positions.filter((item) => {
-                    if (item.departmentId !== department.id) return false
-                    if (item.parentId === "admin-head") return true
-                    const parent = positions.find((pos) => pos.id === item.parentId)
-                    return !parent || parent.departmentId !== department.id
-                  })
-
-                  // Use color but add opacity, or use default if weird
-                  const headerBg = department.color || '#59D2DE'
-
+              <div className="space-y-12">
+                {offices.map((office) => {
+                  const officeDepts = departments.filter(d => d.officeId === office.id)
+                  
                   return (
-                    <div key={department.id} className="rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col">
-                      <div
-                        className="px-6 py-4 border-b border-black/5 flex items-center gap-3 relative overflow-hidden"
-                        style={{ backgroundColor: headerBg }}
-                      >
-                        <div className="absolute inset-0 bg-white/20" />
-                        <Building2 className="w-5 h-5 text-black/60 relative z-10" />
-                        <span className="font-bold text-black/80 tracking-wide relative z-10">
-                          {department.name}
-                        </span>
+                    <div key={office.id} className="space-y-6">
+                      <div className="flex items-center gap-4">
+                        <div className="h-[2px] flex-1 bg-slate-200" />
+                        <div className="flex items-center gap-3 px-6 py-2 rounded-full bg-slate-100 border border-slate-200 shadow-sm">
+                          <span className="text-sm font-black uppercase tracking-widest text-slate-600">{office.name} OFFICE</span>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 text-slate-400 hover:text-[#A4163A] hover:bg-white transition-colors"
+                            onClick={() => handleOpenShiftModal(office)}
+                          >
+                            <Clock className="w-4 h-4" />
+                          </Button>
+                        </div>
+                        <div className="h-[2px] flex-1 bg-slate-200" />
                       </div>
 
-                      <div className="p-6 flex-1 bg-slate-50/30">
-                        <div className="space-y-4 relative">
-                          {roots.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-8 text-center text-slate-400">
-                               <Users className="w-8 h-8 mb-2 opacity-20" />
-                               <p className="text-sm font-medium">No positions assigned</p>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
+                        {officeDepts.map((department) => {
+                          const roots = positions.filter((item) => {
+                            if (item.departmentId !== department.id) return false
+                            if (item.parentId === "admin-head") return true
+                            const parent = positions.find((pos) => pos.id === item.parentId)
+                            return !parent || parent.departmentId !== department.id
+                          })
+
+                          const headerBg = department.color || '#59D2DE'
+
+                          return (
+                            <div key={department.id} className="rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col">
+                              <div
+                                className="px-6 py-4 border-b border-black/5 flex items-center gap-3 relative overflow-hidden"
+                                style={{ backgroundColor: headerBg }}
+                              >
+                                <div className="absolute inset-0 bg-white/20" />
+                                <Building2 className="w-5 h-5 text-black/60 relative z-10" />
+                                <span className="font-bold text-black/80 tracking-wide relative z-10 flex-1">
+                                  {department.name}
+                                </span>
+                              </div>
+
+                              <div className="p-6 flex-1 bg-slate-50/30">
+                                <div className="space-y-4 relative">
+                                  {roots.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-8 text-center text-slate-400">
+                                      <Users className="w-8 h-8 mb-2 opacity-20" />
+                                      <p className="text-sm font-medium">No positions assigned</p>
+                                    </div>
+                                  ) : (
+                                    roots.map((root) => <HierarchyBranch key={root.id} node={root} allNodes={positions} />)
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                          ) : (
-                            roots.map((root) => <HierarchyBranch key={root.id} node={root} allNodes={positions} />)
-                          )}
-                        </div>
+                          )
+                        })}
+                        {officeDepts.length === 0 && (
+                          <div className="col-span-full py-10 flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-200 rounded-3xl">
+                            <Building2 className="w-10 h-10 mb-2 opacity-10" />
+                            <p className="text-sm font-medium italic">No departments under {office.name}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )
@@ -451,6 +652,86 @@ export default function AdminHeadHierarchyPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={isShiftModalOpen} onOpenChange={setIsShiftModalOpen}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-[#A4163A]" />
+              Shift Schedule: {editingSchedule?.office_name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-3">
+              <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Add Shift Option</Label>
+              <div className="flex flex-col gap-3 p-3 border border-slate-100 bg-slate-50/50 rounded-xl">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-bold text-slate-400 uppercase">Start Time</Label>
+                    <Input 
+                      type="time"
+                      value={newShiftStart}
+                      onChange={(e) => setNewShiftStart(e.target.value)}
+                      className="h-9 bg-white"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-bold text-slate-400 uppercase">End Time</Label>
+                    <Input 
+                      type="time"
+                      value={newShiftEnd}
+                      onChange={(e) => setNewShiftEnd(e.target.value)}
+                      className="h-9 bg-white"
+                    />
+                  </div>
+                </div>
+                <Button 
+                  variant="outline" 
+                  className="w-full h-9 border-dashed border-[#A4163A]/30 text-[#A4163A] hover:bg-[#A4163A]/5 hover:border-[#A4163A]"
+                  onClick={addShiftOption}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add to Options
+                </Button>
+              </div>
+              
+              <div className="space-y-2 max-h-[150px] overflow-y-auto pr-1">
+                {editingSchedule?.shift_options.map((option, idx) => (
+                  <div key={idx} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                    <span className="text-sm font-medium text-slate-600">{option}</span>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 text-slate-400 hover:text-rose-500"
+                      onClick={() => removeShiftOption(idx)}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                ))}
+                {editingSchedule?.shift_options.length === 0 && (
+                  <p className="text-center py-4 text-xs text-slate-400 italic border-2 border-dashed border-slate-100 rounded-xl">
+                    No individual shift options added yet.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsShiftModalOpen(false)} disabled={loading}>
+              Cancel
+            </Button>
+            <Button 
+              className="bg-[#A4163A] hover:bg-[#7B0F2B] text-white" 
+              onClick={handleSaveShiftSchedule}
+              disabled={loading}
+            >
+              <Save className="w-4 h-4 mr-2" />
+              {loading ? 'Saving...' : 'Save Schedule'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

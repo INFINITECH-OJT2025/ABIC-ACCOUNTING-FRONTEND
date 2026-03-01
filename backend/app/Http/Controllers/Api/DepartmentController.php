@@ -38,10 +38,12 @@ class DepartmentController extends Controller
             $validated = $request->validate([
                 'name' => 'required|string|max:255|unique:departments',
                 'color' => 'nullable|string|max:50',
+                'office_id' => 'required|exists:offices,id',
             ]);
 
             $department = Department::create([
                 'name' => $validated['name'],
+                'office_id' => $validated['office_id'],
                 'is_custom' => true,
                 'color' => $validated['color'] ?? '#59D2DE',
             ]);

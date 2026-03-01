@@ -6,7 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class Department extends Model
 {
-    protected $fillable = ['name', 'is_custom', 'color'];
+    protected $fillable = ['name', 'office_id', 'is_custom', 'color'];
     protected $hidden = [];
     public $timestamps = true;
+
+    public function office()
+    {
+        return $this->belongsTo(Office::class);
+    }
 }

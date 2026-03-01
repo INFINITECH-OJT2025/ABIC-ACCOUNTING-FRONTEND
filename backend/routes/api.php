@@ -32,6 +32,11 @@ Route::apiResource('hierarchies', HierarchyController::class);
 Route::apiResource('departments', DepartmentController::class);
 Route::post('/departments/bulk', [DepartmentController::class, 'bulkCreate']);
 
+// Office API Routes
+use App\Http\Controllers\Api\OfficeController;
+Route::get('/offices', [OfficeController::class, 'index']);
+Route::post('/offices', [OfficeController::class, 'store']);
+
 // Onboarding routes
 Route::post('/employees/{id}/onboard', [EmployeeController::class, 'onboard']);
 
@@ -87,9 +92,10 @@ Route::put('/directory/general-contacts', [DirectoryController::class, 'updateGe
 Route::get('/directory/cloudinary-images', [DirectoryController::class, 'listCloudinaryImages']);
 Route::delete('/directory/cloudinary-images', [DirectoryController::class, 'deleteCloudinaryImage']);
 
-// Department Shift Schedule Routes
-use App\Http\Controllers\Api\DepartmentShiftScheduleController;
-Route::get('/department-shift-schedules', [DepartmentShiftScheduleController::class, 'index']);
+// Office Shift Schedule Routes
+use App\Http\Controllers\Api\OfficeShiftScheduleController;
+Route::get('/office-shift-schedules', [OfficeShiftScheduleController::class, 'index']);
+Route::post('/office-shift-schedules', [OfficeShiftScheduleController::class, 'upsert']);
 
 // Leave Routes
 use App\Http\Controllers\Api\LeaveController;
