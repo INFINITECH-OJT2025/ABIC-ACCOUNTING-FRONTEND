@@ -41,7 +41,7 @@ import { cn } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from '@/components/ui/input'
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+  Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue
 } from "@/components/ui/select"
 
 interface Employee {
@@ -92,6 +92,7 @@ function TerminatePageContent() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [terminations, setTerminations] = useState<TerminationRecord[]>([])
   const [resigned, setResigned] = useState<TerminationRecord[]>([])
+  const [hierarchies, setHierarchies] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
@@ -417,10 +418,45 @@ function TerminatePageContent() {
     return historyFilter === 'resigned'
   })
   const selectedRecordIsResigned = selectedTermination?.exit_type === 'resigned'
-  const approverPositions = ['admin supervisor', 'it supervisor', 'admin head']
-  const approverEmployees = employees.filter((emp) =>
-    approverPositions.includes(String(emp.position ?? '').toLowerCase().trim())
-  )
+  const { superiors, otherEmployees } = React.useMemo(() => {
+    if (!selectedEmployeeId) return { superiors: [], otherEmployees: employees }
+    const targetEmp = employees.find(e => e.id === selectedEmployeeId)
+    if (!targetEmp) return { superiors: [], otherEmployees: employees }
+
+    const empPosName = String(targetEmp.position || '').toLowerCase().trim()
+    
+    // Find hierarchy node for the employee's position
+    const node = hierarchies.find(h => String(h.position?.name || '').toLowerCase().trim() === empPosName)
+    const ancestorPositionNames = new Set<string>()
+
+    if (!node) {
+      ancestorPositionNames.add('admin head')
+      ancestorPositionNames.add('admin supervisor')
+      ancestorPositionNames.add('executive officer')
+    } else {
+      let currentParentId = node.parent_id
+      while (currentParentId) {
+        const parentNode = hierarchies.find(h => h.id === currentParentId)
+        if (parentNode) {
+          if (parentNode.position?.name) ancestorPositionNames.add(String(parentNode.position.name).toLowerCase().trim())
+          currentParentId = parentNode.parent_id
+        } else {
+          break
+        }
+      }
+      ancestorPositionNames.add('admin head')
+      ancestorPositionNames.add('executive officer')
+    }
+
+    const superiorsList = employees.filter(emp => 
+      ancestorPositionNames.has(String(emp.position || '').toLowerCase().trim())
+    )
+    const othersList = employees.filter(emp => 
+      !ancestorPositionNames.has(String(emp.position || '').toLowerCase().trim())
+    )
+
+    return { superiors: superiorsList, otherEmployees: othersList }
+  }, [selectedEmployeeId, employees, hierarchies])
 
   const allCount = realtimeTerminations.length
   const terminatedCount = realtimeTerminations.filter((r) => !isRehiredRecord(r)).length
@@ -451,15 +487,20 @@ function TerminatePageContent() {
     setFetchError(null)
     setLoading(true)
     try {
-      const [empRes, termRes, resignedRes] = await Promise.all([
+      const [empRes, termRes, resignedRes, hierRes] = await Promise.all([
         fetch(`${getApiUrl()}/api/employees`),
         fetch(`${getApiUrl()}/api/terminations`),
-        fetch(`${getApiUrl()}/api/resigned`)
+        fetch(`${getApiUrl()}/api/resigned`),
+        fetch(`${getApiUrl()}/api/hierarchies`, { headers: { Accept: 'application/json' } })
       ])
 
       const empData = await empRes.json()
       const termData = await termRes.json()
       const resignedData = await resignedRes.json()
+      const hierData = await hierRes.json()
+      
+      const parsedHierarchies = Array.isArray(hierData?.data) ? hierData.data : (Array.isArray(hierData) ? hierData : [])
+      setHierarchies(parsedHierarchies)
 
       if (empData.success && Array.isArray(empData.data)) {
         // Only show currently employed or rehired employees in dropdown
@@ -1242,11 +1283,26 @@ function TerminatePageContent() {
                         <SelectValue placeholder="Select recommender..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {approverEmployees.map((emp) => (
-                          <SelectItem key={`recommended-${emp.id}`} value={`${emp.first_name} ${emp.last_name}`}>
-                            {emp.first_name} {emp.last_name} ({emp.position})
-                          </SelectItem>
-                        ))}
+                        {superiors.length > 0 && (
+                          <SelectGroup>
+                            <SelectLabel className="text-xs text-slate-500 bg-slate-50">Recommended (Superiors)</SelectLabel>
+                            {superiors.map((emp) => (
+                              <SelectItem key={`recommended-sup-${emp.id}`} value={`${emp.first_name} ${emp.last_name}`}>
+                                {emp.first_name} {emp.last_name} ({emp.position})
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        )}
+                        {otherEmployees.length > 0 && (
+                          <SelectGroup>
+                            <SelectLabel className="text-xs text-slate-500 bg-slate-50">Other Employees</SelectLabel>
+                            {otherEmployees.map((emp) => (
+                              <SelectItem key={`recommended-oth-${emp.id}`} value={`${emp.first_name} ${emp.last_name}`}>
+                                {emp.first_name} {emp.last_name} ({emp.position})
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1308,11 +1364,26 @@ function TerminatePageContent() {
                     <SelectValue placeholder="Select reviewer..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {approverEmployees.map((emp) => (
-                      <SelectItem key={`reviewed-${emp.id}`} value={`${emp.first_name} ${emp.last_name}`}>
-                        {emp.first_name} {emp.last_name} ({emp.position})
-                      </SelectItem>
-                    ))}
+                    {superiors.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel className="text-xs text-slate-500 bg-slate-50">Recommended (Superiors)</SelectLabel>
+                        {superiors.map((emp) => (
+                          <SelectItem key={`reviewed-sup-${emp.id}`} value={`${emp.first_name} ${emp.last_name}`}>
+                            {emp.first_name} {emp.last_name} ({emp.position})
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                    {otherEmployees.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel className="text-xs text-slate-500 bg-slate-50">Other Employees</SelectLabel>
+                        {otherEmployees.map((emp) => (
+                          <SelectItem key={`reviewed-oth-${emp.id}`} value={`${emp.first_name} ${emp.last_name}`}>
+                            {emp.first_name} {emp.last_name} ({emp.position})
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
