@@ -217,7 +217,7 @@ export default function AdminHeadPage() {
                 <h1 className="text-2xl md:text-3xl font-bold mb-1">Activity Logs</h1>
                 <p className="text-white/80 text-sm md:text-base flex items-center gap-2">
                   <Activity className="w-4 h-4" />
-                  ABIC REALTY & CONSULTANCY • Real-time Monitoring
+                  ABIC REALTY & CONSULTANCY - Real-time Monitoring
                 </p>
               </div>
 
@@ -329,7 +329,7 @@ export default function AdminHeadPage() {
                             Entry added for <span className="font-semibold text-stone-900">{entry.employee_name}</span>{' '}
                             at <span className="font-medium">{timeText}</span>{' '}
                             on <span className="font-medium">{dateText}</span>
-                            {hasWarning && <span className="text-amber-700 font-semibold"> — {warnText}</span>}
+                            {hasWarning && <span className="text-amber-700 font-semibold"> - {warnText}</span>}
                           </p>
                           <p className="text-stone-400 text-xs mt-0.5">
                             {entry.minutes_late} min{entry.minutes_late !== 1 ? 's' : ''} late from 8:00 AM
@@ -444,7 +444,7 @@ export default function AdminHeadPage() {
                                 Entry added for <span className="font-semibold text-stone-900">{entry.employee_name}</span>{' '}
                                 at <span className="font-medium">{timeText}</span>{' '}
                                 on <span className="font-medium">{dateText}</span>
-                                {hasWarning && <span className="text-amber-700 font-semibold"> — {warnText}</span>}
+                                {hasWarning && <span className="text-amber-700 font-semibold"> - {warnText}</span>}
                               </p>
                               <p className="text-stone-400 text-xs mt-0.5">
                                 {entry.minutes_late} min{entry.minutes_late !== 1 ? 's' : ''} late from 8:00 AM

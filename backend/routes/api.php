@@ -24,6 +24,10 @@ Route::apiResource('employees', EmployeeController::class);
 Route::apiResource('positions', PositionController::class);
 Route::post('/positions/bulk', [PositionController::class, 'bulkCreate']);
 
+// Hierarchies API Routes
+use App\Http\Controllers\HierarchyController;
+Route::apiResource('hierarchies', HierarchyController::class);
+
 // Departments API Routes
 Route::apiResource('departments', DepartmentController::class);
 Route::post('/departments/bulk', [DepartmentController::class, 'bulkCreate']);

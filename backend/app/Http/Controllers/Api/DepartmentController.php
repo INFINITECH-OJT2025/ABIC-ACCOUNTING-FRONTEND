@@ -37,11 +37,13 @@ class DepartmentController extends Controller
         try {
             $validated = $request->validate([
                 'name' => 'required|string|max:255|unique:departments',
+                'color' => 'nullable|string|max:50',
             ]);
 
             $department = Department::create([
                 'name' => $validated['name'],
-                'is_custom' => true
+                'is_custom' => true,
+                'color' => $validated['color'] ?? '#59D2DE',
             ]);
 
             // Log activity
