@@ -5,7 +5,7 @@ import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Dialog,
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Building2, GitBranch, Plus, ShieldCheck, Users, Clock, X, Save } from "lucide-react"
+import { Building2, GitBranch, Plus, ShieldCheck, Users, Clock, X, Save, Edit2 } from "lucide-react"
 import { getApiUrl } from "@/lib/api"
 import { toast } from "sonner"
 
@@ -99,6 +99,7 @@ export default function AdminHeadHierarchyPage() {
   const [schedules, setSchedules] = useState<OfficeShiftSchedule[]>([])
   const [isShiftModalOpen, setIsShiftModalOpen] = useState(false)
   const [editingSchedule, setEditingSchedule] = useState<OfficeShiftSchedule | null>(null)
+  const [editingOptionIndex, setEditingOptionIndex] = useState<number | null>(null)
   const [newShiftStart, setNewShiftStart] = useState("08:00")
   const [newShiftEnd, setNewShiftEnd] = useState("12:00")
 
@@ -169,6 +170,7 @@ export default function AdminHeadHierarchyPage() {
   const handleOpenShiftModal = (office: Office) => {
     const existing = schedules.find(s => s.office_name === office.name)
     setEditingSchedule(existing || { office_name: office.name, shift_options: [] })
+    setEditingOptionIndex(null)
     setIsShiftModalOpen(true)
   }
 
@@ -211,6 +213,11 @@ export default function AdminHeadHierarchyPage() {
   const addShiftOption = () => {
     if (!editingSchedule) return
 
+    if (editingOptionIndex === null && editingSchedule.shift_options.length >= 2) {
+      toast.error("You can only have a maximum of 2 shift options.")
+      return
+    }
+
     const formatTime = (time: string) => {
       const [hours, minutes] = time.split(':')
       const h = parseInt(hours)
@@ -221,10 +228,40 @@ export default function AdminHeadHierarchyPage() {
 
     const formattedOption = `${formatTime(newShiftStart)} – ${formatTime(newShiftEnd)}`
 
-    setEditingSchedule({
-      ...editingSchedule,
-      shift_options: [...editingSchedule.shift_options, formattedOption]
-    })
+    if (editingOptionIndex !== null) {
+      const nextOptions = [...editingSchedule.shift_options]
+      nextOptions[editingOptionIndex] = formattedOption
+      setEditingSchedule({
+        ...editingSchedule,
+        shift_options: nextOptions
+      })
+      setEditingOptionIndex(null)
+    } else {
+      setEditingSchedule({
+        ...editingSchedule,
+        shift_options: [...editingSchedule.shift_options, formattedOption]
+      })
+    }
+  }
+
+  const startEditingOption = (idx: number) => {
+    if (!editingSchedule) return
+    const option = editingSchedule.shift_options[idx]
+    // Example: "08:00 AM – 12:00 PM"
+    const parts = option.split(' – ')
+    if (parts.length !== 2) return
+
+    const parseTime = (timeStr: string) => {
+      const [time, ampm] = timeStr.split(' ')
+      let [h, m] = time.split(':').map(Number)
+      if (ampm === 'PM' && h < 12) h += 12
+      if (ampm === 'AM' && h === 12) h = 0
+      return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
+    }
+
+    setNewShiftStart(parseTime(parts[0]))
+    setNewShiftEnd(parseTime(parts[1]))
+    setEditingOptionIndex(idx)
   }
 
   const removeShiftOption = (idx: number) => {
@@ -233,6 +270,8 @@ export default function AdminHeadHierarchyPage() {
       ...editingSchedule,
       shift_options: editingSchedule.shift_options.filter((_, i) => i !== idx)
     })
+    if (editingOptionIndex === idx) setEditingOptionIndex(null)
+    else if (editingOptionIndex !== null && editingOptionIndex > idx) setEditingOptionIndex(editingOptionIndex - 1)
   }
 
   const handleAddDepartment = async () => {
@@ -685,28 +724,60 @@ export default function AdminHeadHierarchyPage() {
                     />
                   </div>
                 </div>
-                <Button
-                  variant="outline"
-                  className="w-full h-9 border-dashed border-[#A4163A]/30 text-[#A4163A] hover:bg-[#A4163A]/5 hover:border-[#A4163A]"
-                  onClick={addShiftOption}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add to Options
-                </Button>
+                <div className="flex gap-2 w-full">
+                  <Button
+                    variant="outline"
+                    className="flex-1 h-9 border-dashed border-[#A4163A]/30 text-[#A4163A] hover:bg-[#A4163A]/5 hover:border-[#A4163A]"
+                    onClick={addShiftOption}
+                    disabled={editingOptionIndex === null && (editingSchedule?.shift_options?.length ?? 0) >= 2}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    {editingOptionIndex !== null ? 'Update Option' : 'Add to Options'}
+                  </Button>
+                  {editingOptionIndex !== null && (
+                    <Button
+                      variant="outline"
+                      title="Cancel Edit"
+                      className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:bg-slate-100"
+                      onClick={() => {
+                        setEditingOptionIndex(null)
+                        setNewShiftStart("08:00")
+                        setNewShiftEnd("12:00")
+                      }}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+                {editingOptionIndex === null && (editingSchedule?.shift_options?.length ?? 0) >= 2 && (
+                  <p className="text-[10px] text-amber-600 font-semibold text-center italic">Max 2 shift options reached.</p>
+                )}
               </div>
 
               <div className="space-y-2 max-h-[150px] overflow-y-auto pr-1">
                 {editingSchedule?.shift_options.map((option, idx) => (
                   <div key={idx} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
                     <span className="text-sm font-medium text-slate-600">{option}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-slate-400 hover:text-rose-500"
-                      onClick={() => removeShiftOption(idx)}
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Edit Option"
+                        className="h-6 w-6 text-slate-400 hover:text-[#A4163A]"
+                        onClick={() => startEditingOption(idx)}
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Remove Option"
+                        className="h-6 w-6 text-slate-400 hover:text-rose-500"
+                        onClick={() => removeShiftOption(idx)}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
                 {editingSchedule?.shift_options.length === 0 && (
