@@ -374,6 +374,9 @@ interface AddLeaveModalProps {
   employees: Employee[]
   departments: Department[]
   onSave: (entry: Omit<LeaveEntry, 'id'>) => void
+  hierarchies?: any[]
+  positions?: any[]
+  shiftSchedules?: DepartmentShiftSchedule[]
 }
 
 const emptyForm = {
@@ -391,7 +394,7 @@ const emptyForm = {
   cite_reason: '',
 }
 
-function AddLeaveModal({ open, onClose, employees, departments, onSave }: AddLeaveModalProps) {
+function AddLeaveModal({ open, onClose, employees, departments, onSave, hierarchies = [], positions = [], shiftSchedules = [] }: AddLeaveModalProps) {
   const [form, setForm] = useState({ ...emptyForm })
   const [empOpen, setEmpOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -427,20 +430,70 @@ function AddLeaveModal({ open, onClose, employees, departments, onSave }: AddLea
     }
   }, [form.start_date, form.leave_end_date, form.category])
 
-  const availableShifts = form.department ? getShiftFallback(form.department).shifts : []
-  const shiftLabel = form.department ? getShiftFallback(form.department).label : ''
+  const _formShiftRow = shiftSchedules.find(s => {
+    const d1 = form.department.toLowerCase().trim()
+    const d2 = s.department.toLowerCase().trim()
+    if (!d1 || !d2) return false
+    if (d1 === d2) return true
+    const words1 = d1.split(/\s+/)
+    const words2 = d2.split(/\s+/)
+    return words1.some(w => words2.includes(w)) || words2.some(w => words1.includes(w))
+  })
+  const _formFallback = form.department ? getShiftFallback(form.department) : null
+  const availableShifts: string[] = _formShiftRow?.shift_options ?? _formFallback?.shifts ?? []
+  const shiftLabel: string = _formShiftRow?.schedule_label ?? _formFallback?.label ?? ''
 
-  const adminEmployees = useMemo(() => {
-    const keywords = ['Head', 'Manager', 'Admin', 'VP', 'President', 'Director', 'Supervisor', 'Lead', 'Chief']
-    return employees.filter(emp =>
-      emp.position && keywords.some(k => emp.position?.toLowerCase().includes(k.toLowerCase()))
+  const getSuperiorsForEmployee = (empId: string | number | undefined) => {
+    const adminPositionKeywords = ['Head', 'Manager', 'Admin', 'VP', 'President', 'Director', 'Supervisor', 'Lead', 'Chief']
+    const admins = employees.filter(e =>
+      e.position && adminPositionKeywords.some(kw => e.position?.toLowerCase().includes(kw.toLowerCase()))
     ).map(e => ({ label: e.name, value: e.name, color: 'bg-green-500 text-white' }))
-  }, [employees])
 
-  const approvalOptions = [
-    ...APPROVAL_OPTIONS,
-    ...adminEmployees,
-  ]
+    if (!empId) return admins
+
+    const emp = employees.find(e => String(e.id) === String(empId))
+    if (!emp || !emp.position || !positions || !hierarchies) return admins
+
+    const empPos = positions.find(p => p.name.toLowerCase() === emp.position?.toLowerCase())
+    if (!empPos) return admins
+
+    let empHier = hierarchies.find(h => String(h.position_id) === String(empPos.id))
+    if (empHier && emp.department_id) {
+      const specificHier = hierarchies.find(h => String(h.position_id) === String(empPos.id) && String(h.department_id) === String(emp.department_id))
+      if (specificHier) empHier = specificHier
+    }
+
+    if (empHier && empHier.parent_id) {
+      const parentHier = hierarchies.find(h => String(h.id) === String(empHier.parent_id))
+      if (parentHier) {
+        const parentPos = positions.find(p => String(p.id) === String(parentHier.position_id))
+        if (parentPos) {
+          const sups = employees.filter(e => e.position && e.position.toLowerCase() === parentPos.name.toLowerCase())
+          if (sups.length > 0) {
+            const specificSuperiors = sups.map(s => ({
+              label: `${s.name} (${parentPos.name})`,
+              value: s.name,
+              color: 'bg-[#A4163A] text-white font-bold'
+            }))
+
+            const specificValues = specificSuperiors.map(s => s.value)
+            const filteredAdmins = admins.filter(a => !specificValues.includes(a.value))
+
+            return [...specificSuperiors, ...filteredAdmins]
+          }
+        }
+      }
+    }
+
+    return admins
+  }
+
+  const approvalOptions = useMemo(() => {
+    return [
+      ...APPROVAL_OPTIONS,
+      ...getSuperiorsForEmployee(form.employee_id)
+    ]
+  }, [employees, hierarchies, positions, form.employee_id])
 
   const remarkOptions = LEAVE_REMARKS.map(r => ({ label: r, value: r }))
 
@@ -865,18 +918,41 @@ export default function LeavePage() {
       .catch(console.error)
   }, [])
 
+  // State for hierarchies and positions
+  const [hierarchies, setHierarchies] = useState<any[]>([])
+  const [positions, setPositions] = useState<any[]>([])
+
   useEffect(() => {
-    fetch(`${getApiUrl()}/api/employees`)
-      .then(r => r.json())
-      .then((d: { success: boolean; data: Array<{ id: string; first_name: string; last_name: string; department?: string | null; department_id?: number; position?: string | null }> }) => {
-        if (d.success) {
-          setEmployees(d.data.map(e => ({
+    // Fetch employees, hierarchies, and positions
+    Promise.all([
+      fetch(`${getApiUrl()}/api/employees?status=employed,rehired`).then(r => r.json()),
+      fetch(`${getApiUrl()}/api/hierarchies`).then(r => r.json()),
+      fetch(`${getApiUrl()}/api/positions`).then(r => r.json())
+    ])
+      .then(([empJson, hierJson, posJson]) => {
+        let fetchedEmployees = []
+        let fetchedHierarchies = []
+        let fetchedPositions = []
+
+        if (empJson.success) {
+          fetchedEmployees = empJson.data.map((e: any) => ({
             id: e.id,
             name: `${e.first_name ?? ''} ${e.last_name ?? ''}`.trim(),
             department: e.department ?? undefined,
             department_id: e.department_id,
             position: e.position ?? undefined,
-          })))
+          }))
+          setEmployees(fetchedEmployees)
+        }
+
+        if (typeof hierJson === 'object' && hierJson !== null) {
+          fetchedHierarchies = Array.isArray(hierJson.data) ? hierJson.data : (Array.isArray(hierJson) ? hierJson : [])
+          setHierarchies(fetchedHierarchies)
+        }
+
+        if (typeof posJson === 'object' && posJson !== null) {
+          fetchedPositions = Array.isArray(posJson.data) ? posJson.data : (Array.isArray(posJson) ? posJson : [])
+          setPositions(fetchedPositions)
         }
       })
       .catch(console.error)
@@ -993,17 +1069,57 @@ export default function LeavePage() {
     }
   }, [inlineForm.start_date, inlineForm.leave_end_date, inlineForm.category])
 
-  const inlineApprovalOptions = useMemo(() => {
+  const getSuperiorsForEmployee = (empId: string | number | undefined) => {
     const adminPositionKeywords = ['Head', 'Manager', 'Admin', 'VP', 'President', 'Director', 'Supervisor', 'Lead', 'Chief']
     const admins = employees.filter(e =>
       e.position && adminPositionKeywords.some(kw => e.position?.toLowerCase().includes(kw.toLowerCase()))
     ).map(e => ({ label: e.name, value: e.name, color: 'bg-green-500 text-white' }))
 
+    if (!empId) return admins
+
+    const emp = employees.find(e => String(e.id) === String(empId))
+    if (!emp || !emp.position || !positions || !hierarchies) return admins
+
+    const empPos = positions.find(p => p.name.toLowerCase() === emp.position?.toLowerCase())
+    if (!empPos) return admins
+
+    let empHier = hierarchies.find(h => String(h.position_id) === String(empPos.id))
+    if (empHier && emp.department_id) {
+      const specificHier = hierarchies.find(h => String(h.position_id) === String(empPos.id) && String(h.department_id) === String(emp.department_id))
+      if (specificHier) empHier = specificHier
+    }
+
+    if (empHier && empHier.parent_id) {
+      const parentHier = hierarchies.find(h => String(h.id) === String(empHier.parent_id))
+      if (parentHier) {
+        const parentPos = positions.find(p => String(p.id) === String(parentHier.position_id))
+        if (parentPos) {
+          const sups = employees.filter(e => e.position && e.position.toLowerCase() === parentPos.name.toLowerCase())
+          if (sups.length > 0) {
+            const specificSuperiors = sups.map(s => ({
+              label: `${s.name} (${parentPos.name})`,
+              value: s.name,
+              color: 'bg-[#A4163A] text-white font-bold'
+            }))
+
+            const specificValues = specificSuperiors.map(s => s.value)
+            const filteredAdmins = admins.filter(a => !specificValues.includes(a.value))
+
+            return [...specificSuperiors, ...filteredAdmins]
+          }
+        }
+      }
+    }
+
+    return admins
+  }
+
+  const inlineApprovalOptions = useMemo(() => {
     return [
       ...APPROVAL_OPTIONS,
-      ...admins
+      ...getSuperiorsForEmployee(inlineForm.employee_id)
     ]
-  }, [employees])
+  }, [employees, hierarchies, positions, inlineForm.employee_id])
 
   const inlineRemarkOptions = LEAVE_REMARKS.map(r => ({ label: r, value: r }))
 

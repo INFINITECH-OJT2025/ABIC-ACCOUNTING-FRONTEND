@@ -79,11 +79,16 @@ class EmployeeController extends Controller
     /**
      * Display a listing of all employees.
      */
-    public function index()
+    public function index(Request $request)
     {
+        $query = Employee::query();
+        if ($request->has('status')) {
+            $statuses = explode(',', $request->query('status'));
+            $query->whereIn('status', $statuses);
+        }
         return response()->json([
             'success' => true,
-            'data' => Employee::all()
+            'data' => $query->get()
         ]);
     }
 

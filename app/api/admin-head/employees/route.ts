@@ -64,8 +64,10 @@ export async function GET(request: NextRequest) {
     const values: any[] = []
 
     if (status) {
-      sqlQuery += " WHERE status = ?"
-      values.push(status)
+      const statusArray = status.split(',')
+      const placeholders = statusArray.map(() => '?').join(', ')
+      sqlQuery += ` WHERE status IN (${placeholders})`
+      values.push(...statusArray)
     }
 
     sqlQuery += " ORDER BY created_at DESC"
