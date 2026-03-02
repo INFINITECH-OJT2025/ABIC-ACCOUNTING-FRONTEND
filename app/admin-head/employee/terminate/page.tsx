@@ -1198,7 +1198,7 @@ function TerminatePageContent() {
                       aria-expanded={openCombobox}
                       disabled={loading || submitting}
                       className={cn(
-                        "w-full justify-between h-10 text-sm font-normal",
+                        "w-full justify-between h-10 text-sm font-normal rounded-lg",
                         !selectedEmployeeId && "text-slate-400"
                       )}
                     >
@@ -1279,7 +1279,7 @@ function TerminatePageContent() {
                       value={formData.recommended_by}
                       onValueChange={(value) => setFormData((prev) => ({ ...prev, recommended_by: value }))}
                     >
-                      <SelectTrigger className="h-10">
+                      <SelectTrigger className="w-full h-10 rounded-lg">
                         <SelectValue placeholder="Select recommender..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -1360,7 +1360,7 @@ function TerminatePageContent() {
                   value={formData.reviewed_by}
                   onValueChange={(value) => setFormData((prev) => ({ ...prev, reviewed_by: value }))}
                 >
-                  <SelectTrigger className="h-10">
+                  <SelectTrigger className="w-full h-10 rounded-lg">
                     <SelectValue placeholder="Select reviewer..." />
                   </SelectTrigger>
                   <SelectContent>
