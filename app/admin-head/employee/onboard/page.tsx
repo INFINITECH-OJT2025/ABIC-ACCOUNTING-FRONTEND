@@ -1424,14 +1424,14 @@ function OnboardPageContent() {
         return !!data.last_name && !!data.first_name && !!data.birthday &&
           !!data.birthplace && !!data.gender && !!data.civil_status
       case 3:
-        return !!data.mobile_number && !!data.street
+        return !!data.mobile_number && !!data.email_address
       case 4:
         return true
       case 5:
         return !!data.mlast_name && !!data.mfirst_name
       case 6:
         return !!data.region && !!data.province && !!data.city_municipality &&
-          !!data.barangay && !!data.zip_code && !!data.email_address
+          !!data.barangay && !!data.zip_code && !!data.street
       case 7:
         return !!data.perm_region && !!data.perm_province && !!data.perm_city_municipality &&
           !!data.perm_barangay && !!data.perm_zip_code && !!data.perm_street
@@ -2179,20 +2179,8 @@ function OnboardPageContent() {
                           </div>
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="house_number" className="text-sm font-semibold">House number</Label>
-                          <Input id="house_number" name="house_number" value={progressionFormData.house_number || ''} onChange={handleProgressionChange} className="font-medium" />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="street" className="text-sm font-semibold">Street <span className="text-red-500">*</span></Label>
-                          <Input id="street" name="street" value={progressionFormData.street || ''} onChange={handleProgressionChange} className="font-medium" />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="village" className="text-sm font-semibold">Village</Label>
-                          <Input id="village" name="village" value={progressionFormData.village || ''} onChange={handleProgressionChange} className="font-medium" />
-                        </div>
-                        <div className="space-y-2 md:col-span-2">
-                          <Label htmlFor="subdivision" className="text-sm font-semibold">Subdivision</Label>
-                          <Input id="subdivision" name="subdivision" value={progressionFormData.subdivision || ''} onChange={handleProgressionChange} className="font-medium" />
+                          <Label htmlFor="email_address" className="text-sm font-semibold">Email Address <span className="text-red-500">*</span></Label>
+                          <Input id="email_address" type="email" name="email_address" value={progressionFormData.email_address || ''} onChange={handleProgressionChange} className="font-medium" />
                         </div>
                       </div>
                     )}
@@ -2247,6 +2235,22 @@ function OnboardPageContent() {
                     {currentBatch === 6 && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
+                          <Label htmlFor="house_number" className="text-sm font-semibold">House number</Label>
+                          <Input id="house_number" name="house_number" value={progressionFormData.house_number || ''} onChange={handleProgressionChange} className="font-medium" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="street" className="text-sm font-semibold">Street <span className="text-red-500">*</span></Label>
+                          <Input id="street" name="street" value={progressionFormData.street || ''} onChange={handleProgressionChange} className="font-medium" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="village" className="text-sm font-semibold">Village</Label>
+                          <Input id="village" name="village" value={progressionFormData.village || ''} onChange={handleProgressionChange} className="font-medium" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="subdivision" className="text-sm font-semibold">Subdivision</Label>
+                          <Input id="subdivision" name="subdivision" value={progressionFormData.subdivision || ''} onChange={handleProgressionChange} className="font-medium" />
+                        </div>
+                        <div className="space-y-2">
                           <Label htmlFor="region" className="text-sm font-semibold">Region <span className="text-red-500">*</span></Label>
                           <select name="region" value={progressionFormData.region || ''} onChange={handleProgressionChange} className="flex h-10 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-medium">
                             <option value="">Select Region...</option>
@@ -2274,13 +2278,9 @@ function OnboardPageContent() {
                             {currentBarangays.map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
                           </select>
                         </div>
-                        <div className="space-y-2">
+                        <div className="space-y-2 md:col-span-2">
                           <Label htmlFor="zip_code" className="text-sm font-semibold">ZIP Code <span className="text-red-500">*</span></Label>
                           <Input id="zip_code" name="zip_code" value={progressionFormData.zip_code || ''} onChange={handleProgressionChange} className="font-medium" />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="email_address" className="text-sm font-semibold">Email Address <span className="text-red-500">*</span></Label>
-                          <Input id="email_address" type="email" name="email_address" value={progressionFormData.email_address || ''} onChange={handleProgressionChange} className="font-medium" />
                         </div>
                       </div>
                     )}
