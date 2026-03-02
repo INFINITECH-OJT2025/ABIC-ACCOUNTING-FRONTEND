@@ -5,7 +5,7 @@ import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Dialog,
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Building2, GitBranch, Plus, ShieldCheck, Users, Clock, X, Save } from "lucide-react"
+import { Building2, GitBranch, Plus, ShieldCheck, Users, Clock, X, Save, Edit2 } from "lucide-react"
 import { getApiUrl } from "@/lib/api"
 import { toast } from "sonner"
 
@@ -724,15 +724,31 @@ export default function AdminHeadHierarchyPage() {
                     />
                   </div>
                 </div>
-                <Button 
-                  variant="outline" 
-                  className="w-full h-9 border-dashed border-[#A4163A]/30 text-[#A4163A] hover:bg-[#A4163A]/5 hover:border-[#A4163A]"
-                  onClick={addShiftOption}
-                  disabled={editingOptionIndex === null && (editingSchedule?.shift_options?.length ?? 0) >= 2}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  {editingOptionIndex !== null ? 'Update Option' : 'Add to Options'}
-                </Button>
+                <div className="flex gap-2 w-full">
+                  <Button 
+                    variant="outline" 
+                    className="flex-1 h-9 border-dashed border-[#A4163A]/30 text-[#A4163A] hover:bg-[#A4163A]/5 hover:border-[#A4163A]"
+                    onClick={addShiftOption}
+                    disabled={editingOptionIndex === null && (editingSchedule?.shift_options?.length ?? 0) >= 2}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    {editingOptionIndex !== null ? 'Update Option' : 'Add to Options'}
+                  </Button>
+                  {editingOptionIndex !== null && (
+                    <Button 
+                      variant="outline" 
+                      title="Cancel Edit"
+                      className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:bg-slate-100"
+                      onClick={() => {
+                        setEditingOptionIndex(null)
+                        setNewShiftStart("08:00")
+                        setNewShiftEnd("12:00")
+                      }}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
                 {editingOptionIndex === null && (editingSchedule?.shift_options?.length ?? 0) >= 2 && (
                   <p className="text-[10px] text-amber-600 font-semibold text-center italic">Max 2 shift options reached.</p>
                 )}
@@ -746,14 +762,16 @@ export default function AdminHeadHierarchyPage() {
                       <Button 
                         variant="ghost" 
                         size="icon" 
+                        title="Edit Option"
                         className="h-6 w-6 text-slate-400 hover:text-[#A4163A]"
                         onClick={() => startEditingOption(idx)}
                       >
-                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <Edit2 className="w-3.5 h-3.5" />
                       </Button>
                       <Button 
                         variant="ghost" 
                         size="icon" 
+                        title="Remove Option"
                         className="h-6 w-6 text-slate-400 hover:text-rose-500"
                         onClick={() => removeShiftOption(idx)}
                       >
