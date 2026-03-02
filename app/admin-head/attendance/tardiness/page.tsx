@@ -902,7 +902,7 @@ export default function AttendanceDashboard() {
       setIsLoading(true)
       try {
         // Fetch employees
-        const empRes = await fetch('/api/admin-head/employees')
+        const empRes = await fetch('/api/admin-head/employees?status=employed')
         const empData = await empRes.json()
         if (empData.success) {
           setEmployees(empData.data)

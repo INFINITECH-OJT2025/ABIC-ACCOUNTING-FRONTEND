@@ -21,7 +21,7 @@ class PositionController extends Controller
      */
     public function index()
     {
-        $positions = Position::orderBy('is_custom', 'asc')->orderBy('name', 'asc')->get();
+        $positions = Position::with('department')->orderBy('is_custom', 'asc')->orderBy('name', 'asc')->get();
 
         return response()->json([
             'success' => true,
@@ -37,11 +37,13 @@ class PositionController extends Controller
         try {
             $validated = $request->validate([
                 'name' => 'required|string|max:255|unique:positions',
+                'department_id' => 'nullable|integer|exists:departments,id'
             ]);
 
             $position = Position::create([
                 'name' => $validated['name'],
-                'is_custom' => true
+                'is_custom' => true,
+                'department_id' => $validated['department_id'] ?? null
             ]);
 
             // Log activity
@@ -64,8 +66,10 @@ class PositionController extends Controller
     /**
      * Display the specified position.
      */
-    public function show(Position $position)
+    public function show($id)
     {
+        $position = Position::with('department')->findOrFail($id);
+        
         return response()->json([
             'success' => true,
             'data' => $position
@@ -80,6 +84,7 @@ class PositionController extends Controller
         try {
             $validated = $request->validate([
                 'name' => 'sometimes|string|max:255|unique:positions,name,' . $position->id,
+                'department_id' => 'nullable|integer|exists:departments,id'
             ]);
 
             $position->update($validated);
