@@ -97,6 +97,13 @@ use App\Http\Controllers\Api\OfficeShiftScheduleController;
 Route::get('/office-shift-schedules', [OfficeShiftScheduleController::class, 'index']);
 Route::post('/office-shift-schedules', [OfficeShiftScheduleController::class, 'upsert']);
 
+// Tardiness API Routes
+use App\Http\Controllers\Api\TardinessEntryController;
+Route::get('/admin-head/attendance/tardiness', [TardinessEntryController::class, 'index']);
+Route::post('/admin-head/attendance/tardiness', [TardinessEntryController::class, 'store']);
+Route::patch('/admin-head/attendance/tardiness/{id}', [TardinessEntryController::class, 'update']);
+Route::get('/admin-head/attendance/tardiness/years', [TardinessEntryController::class, 'years']);
+
 // Leave Routes
 use App\Http\Controllers\Api\LeaveController;
 Route::apiResource('leaves', LeaveController::class);
