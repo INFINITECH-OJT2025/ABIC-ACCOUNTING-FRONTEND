@@ -37,23 +37,33 @@ export function TextFieldStatus({
   const isTooLong = typeof max === "number" ? length > max : false
 
   const isValid = !isTooShort && !isTooLong && !hasForbiddenChars
+  const shouldShow = !isValid && (!allowEmpty || length > 0)
+
+  if (!shouldShow) return null
+
+  const issues: string[] = []
+  if (isTooShort && typeof min === "number") {
+    issues.push(`Must be at least ${min} characters (currently ${length}).`)
+  }
+  if (isTooLong && typeof max === "number") {
+    issues.push(`Must be ${max} characters or fewer (currently ${length}).`)
+  }
+  if (hasForbiddenChars) {
+    issues.push(`Contains unsupported characters: ${forbiddenChars.join(" ")}.`)
+  }
 
   return (
-    <div className={cn("mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-semibold", className)}>
-      <span className={cn(isTooLong ? "text-rose-600" : "text-slate-500")}>
-        Length: {length}{typeof max === "number" ? `/${max}` : ""}
-      </span>
-      {typeof min === "number" ? (
-        <span className={cn(isTooShort ? "text-rose-600" : "text-emerald-600")}>
-          Min {min}: {isTooShort ? "Not met" : "Met"}
-        </span>
-      ) : null}
-      <span className={cn(hasForbiddenChars ? "text-rose-600" : "text-emerald-600")}>
-        {hasForbiddenChars ? `Forbidden chars: ${forbiddenChars.join(" ")}` : "Forbidden chars: none"}
-      </span>
-      <span className={cn(isValid ? "text-emerald-600" : "text-amber-600")}>
-        Status: {isValid ? "Looks good" : "Needs attention"}
-      </span>
+    <div
+      className={cn(
+        "mt-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800",
+        className
+      )}
+      role="alert"
+      aria-live="polite"
+    >
+      {issues.map((issue) => (
+        <p key={issue}>{issue}</p>
+      ))}
     </div>
   )
 }

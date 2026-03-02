@@ -163,6 +163,37 @@ const getRecordCompletionPercentage = (record: ClearanceRecord) => {
 const isRecordDone = (record: ClearanceRecord) =>
   String(record.status).toUpperCase() === 'DONE' || getRecordCompletionPercentage(record) === 100
 
+const CLEARANCE_DEFAULT_TASKS = [
+  'Return Company ID',
+  'Return Office Keys',
+  'Return Company Laptop / Computer (if any)',
+  'Return Company Mobile Phone (if any)',
+  'Return Documents / Client Files',
+  'Return Access Cards / Gate Pass',
+  'Return Company Uniform (if any)',
+  'Return Other Company Property (if any)',
+  'Endorse All Pending Tasks to Immediate Supervisor',
+  'Return All Company Documents and Confidential Files',
+  'Endorse Email and System Access for Deactivation',
+  'Complete Liquidation of Cash Advances (if any)',
+  'Settle Company Loans / Accountabilities (if any)',
+  'Process Certificate of Employment (COE)',
+  'HR Final Review: Cleared for Final Pay Processing',
+  'HR Final Review: With Pending Accountabilities (if any)',
+] as const
+
+const createChecklistTask = (task = '', idSeed = Date.now()): ChecklistTask => ({
+  id: idSeed,
+  task,
+  status: 'PENDING',
+  date: '',
+})
+
+const buildChecklistTasks = (taskLabels: readonly string[]): ChecklistTask[] => {
+  const baseId = Date.now()
+  return taskLabels.map((task, index) => createChecklistTask(task, baseId + index + 1))
+}
+
 
 export default function ClearanceChecklistPage() {
   const router = useRouter()
@@ -176,6 +207,7 @@ export default function ClearanceChecklistPage() {
   const [recordStatusFilter, setRecordStatusFilter] = useState<RecordStatusFilter>('ALL')
   const [recordSort, setRecordSort] = useState<RecordSort>('UPDATED_DESC')
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false)
+  const [startChecklistOpen, setStartChecklistOpen] = useState(false)
   const [unsavedPromptOpen, setUnsavedPromptOpen] = useState(false)
   const [pendingDepartmentSelection, setPendingDepartmentSelection] = useState<string | null>(null)
   const [pendingNavigationUrl, setPendingNavigationUrl] = useState<string | null>(null)
@@ -393,8 +425,20 @@ export default function ClearanceChecklistPage() {
 
 
   const addTask = () => {
-    setTasks([...tasks, { id: Date.now() + Math.floor(Math.random() * 1000), task: '', status: 'PENDING', date: '' }]);
-  };
+    setTasks([...tasks, createChecklistTask('', Date.now() + Math.floor(Math.random() * 1000))])
+  }
+
+  const startChecklistWithoutDefaultTasks = () => {
+    setTasks([])
+    setStartChecklistOpen(false)
+    toast.info('Checklist started with no default tasks. Add rows to build your own list.')
+  }
+
+  const startChecklistWithDefaultTasks = () => {
+    setTasks(buildChecklistTasks(CLEARANCE_DEFAULT_TASKS))
+    setStartChecklistOpen(false)
+    toast.success('Clearance default tasks loaded.')
+  }
 
 
   const removeTask = (id: number) => {
@@ -845,7 +889,7 @@ export default function ClearanceChecklistPage() {
                   <TableCell colSpan={2} className="py-24 text-center">
                     <ClipboardList className="w-12 h-12 text-slate-200 mx-auto mb-4" />
                     <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">No tasks initialized</p>
-                    <Button onClick={addTask} variant="outline" size="sm" className="mt-4 border-[#FFE5EC] text-[#A4163A] font-black h-9 rounded-xl">
+                    <Button onClick={() => setStartChecklistOpen(true)} variant="outline" size="sm" className="mt-4 border-[#FFE5EC] text-[#A4163A] font-black h-9 rounded-xl">
                       <Plus className="w-4 h-4 mr-1" /> START CHECKLIST
                     </Button>
                   </TableCell>
@@ -903,6 +947,29 @@ export default function ClearanceChecklistPage() {
               }}
             >
               {saving ? 'Saving...' : 'Confirm Save'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={startChecklistOpen} onOpenChange={setStartChecklistOpen}>
+        <AlertDialogContent className="border-4 border-[#FFE5EC] rounded-3xl p-8 bg-white shadow-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl font-black text-slate-900">Start Clearance Checklist</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-600">
+              Choose how you want to initialize this department&apos;s checklist.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="rounded-xl border border-[#FFE5EC] bg-rose-50/30 p-4 text-sm font-semibold text-slate-700">
+            You can either begin with no tasks and add your own, or preload the clearance default tasks.
+          </div>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-3 mt-2">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button variant="outline" onClick={startChecklistWithoutDefaultTasks}>
+              Start With No Tasks
+            </Button>
+            <AlertDialogAction className="bg-[#A4163A] text-white hover:bg-[#800020]" onClick={startChecklistWithDefaultTasks}>
+              Use Default Tasks
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

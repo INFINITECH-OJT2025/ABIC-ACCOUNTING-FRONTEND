@@ -12,9 +12,6 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { TextFieldStatus } from '@/components/ui/text-field-status'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -69,7 +66,6 @@ import {
 
 
 type ProcessType = 'Adding' | 'Removing'
-type GeneralContactsSort = 'EST_ASC' | 'EST_DESC'
 
 
 type BackendContact = {
@@ -287,7 +283,6 @@ export default function GovernmentDirectoryPage() {
   const [generalContacts, setGeneralContacts] = useState<GeneralContact[]>([])
   const [generalContactsDraft, setGeneralContactsDraft] = useState<EditableGeneralContact[]>([])
   const [generalContactsSearch, setGeneralContactsSearch] = useState('')
-  const [generalContactsSort, setGeneralContactsSort] = useState<GeneralContactsSort>('EST_ASC')
   const [loadingGeneralContacts, setLoadingGeneralContacts] = useState(false)
   const [savingGeneralContacts, setSavingGeneralContacts] = useState(false)
   const [editingGeneralContacts, setEditingGeneralContacts] = useState(false)
@@ -304,13 +299,12 @@ export default function GovernmentDirectoryPage() {
       const contactPerson = String(row.contact_person || '').toLowerCase()
       return establishment.includes(term) || services.includes(term) || contactPerson.includes(term)
     })
-    const direction = generalContactsSort === 'EST_ASC' ? 1 : -1
     return [...filtered].sort((a, b) => {
       const left = String(a.establishment_name || '').toLowerCase()
       const right = String(b.establishment_name || '').toLowerCase()
-      return left.localeCompare(right) * direction
+      return left.localeCompare(right)
     })
-  }, [generalContacts, generalContactsSearch, generalContactsSort])
+  }, [generalContacts, generalContactsSearch])
 
   const filteredGeneralContactsDraft = useMemo(() => {
     const term = generalContactsSearch.trim().toLowerCase()
@@ -324,13 +318,12 @@ export default function GovernmentDirectoryPage() {
           return establishment.includes(term) || services.includes(term) || contactPerson.includes(term)
         })
 
-    const direction = generalContactsSort === 'EST_ASC' ? 1 : -1
     return [...filtered].sort((a, b) => {
       const left = String(a.row.establishment_name || '').toLowerCase()
       const right = String(b.row.establishment_name || '').toLowerCase()
-      return left.localeCompare(right) * direction
+      return left.localeCompare(right)
     })
-  }, [generalContactsDraft, generalContactsSearch, generalContactsSort])
+  }, [generalContactsDraft, generalContactsSearch])
 
   const directoryQuery = useQuery({
     queryKey: ['directory-agencies'],
@@ -1234,15 +1227,6 @@ export default function GovernmentDirectoryPage() {
                     placeholder="Search establishment, services, contact person..."
                     className="w-[360px] max-w-full h-10 rounded-sm"
                   />
-                  <Select value={generalContactsSort} onValueChange={(value) => setGeneralContactsSort(value as GeneralContactsSort)}>
-                    <SelectTrigger className="w-[220px] h-10 rounded-lg bg-white border-slate-200">
-                      <SelectValue placeholder="Sort by establishment" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="EST_ASC">Establishment: A to Z</SelectItem>
-                      <SelectItem value="EST_DESC">Establishment: Z to A</SelectItem>
-                    </SelectContent>
-                  </Select>
                   <Button
                     variant="outline"
                     className="rounded-lg"
@@ -1322,9 +1306,6 @@ export default function GovernmentDirectoryPage() {
                     <p className="text-sm text-slate-500">No rows yet. Click Add Row to create one.</p>
                   ) : (
                     <>
-                    <p className="text-[11px] font-semibold text-slate-500">
-                      Constraints: Establishment {VALIDATION_CONSTRAINTS.directory.generalEstablishment.min}-{VALIDATION_CONSTRAINTS.directory.generalEstablishment.max} chars, Services up to {VALIDATION_CONSTRAINTS.directory.generalServices.max}, Contact Person up to {VALIDATION_CONSTRAINTS.directory.generalContactPerson.max}, Contact Value {VALIDATION_CONSTRAINTS.directory.generalValue.min}-{VALIDATION_CONSTRAINTS.directory.generalValue.max}.
-                    </p>
                     {filteredGeneralContactsDraft.map(({ row, index }) => (
                       <div key={`general-contact-draft-${index}`} className="border border-slate-200 rounded-md p-3 space-y-2">
                         <div className="flex items-center justify-between gap-3">
@@ -1606,9 +1587,6 @@ export default function GovernmentDirectoryPage() {
 
               {editMode && draft ? (
                 <div className="space-y-3">
-                  <p className="text-[11px] font-semibold text-white/80">
-                    Constraints: Short Name {VALIDATION_CONSTRAINTS.directory.agencyName.min}-{VALIDATION_CONSTRAINTS.directory.agencyName.max} chars, Full Name up to {VALIDATION_CONSTRAINTS.directory.agencyFullName.max} chars.
-                  </p>
                   <Input
                     value={draft.name}
                     onChange={e => setDraft({ ...draft, name: e.target.value })}
@@ -1618,7 +1596,7 @@ export default function GovernmentDirectoryPage() {
                     className="text-4xl md:text-6xl font-black text-white bg-transparent border-b border-white/40 rounded-none px-0 h-auto focus-visible:ring-0 focus-visible:border-white placeholder:text-white/30"
                     placeholder="SHORT NAME"
                   />
-                  <TextFieldStatus value={draft.name} min={VALIDATION_CONSTRAINTS.directory.agencyName.min} max={VALIDATION_CONSTRAINTS.directory.agencyName.max} className="text-white/85" />
+                  <TextFieldStatus value={draft.name} min={VALIDATION_CONSTRAINTS.directory.agencyName.min} max={VALIDATION_CONSTRAINTS.directory.agencyName.max} className="border-amber-200/80 bg-amber-50/95 text-amber-900" />
                   <Input
                     value={draft.full_name}
                     onChange={e => setDraft({ ...draft, full_name: e.target.value })}
@@ -1627,7 +1605,7 @@ export default function GovernmentDirectoryPage() {
                     className="text-xl md:text-2xl font-medium text-white/90 bg-transparent border-b border-white/40 rounded-none px-0 h-auto focus-visible:ring-0 focus-visible:border-white placeholder:text-white/30"
                     placeholder="Agency Full Business Name"
                   />
-                  <TextFieldStatus value={draft.full_name} max={VALIDATION_CONSTRAINTS.directory.agencyFullName.max} className="text-white/85" />
+                  <TextFieldStatus value={draft.full_name} max={VALIDATION_CONSTRAINTS.directory.agencyFullName.max} className="border-amber-200/80 bg-amber-50/95 text-amber-900" />
                 </div>
               ) : (
                 <>
@@ -1783,11 +1761,6 @@ export default function GovernmentDirectoryPage() {
             <p className="text-slate-500 font-medium text-sm mt-1">
               24/7 hotline, mobile support, callback service, and main office details.
             </p>
-            {editMode && (
-              <p className="text-[11px] font-semibold text-slate-500 mt-1">
-                Constraints: Type up to {VALIDATION_CONSTRAINTS.directory.contactType.max} chars, Label up to {VALIDATION_CONSTRAINTS.directory.contactLabel.max} chars, Value {VALIDATION_CONSTRAINTS.directory.contactValue.min}-{VALIDATION_CONSTRAINTS.directory.contactValue.max} chars.
-              </p>
-            )}
           </div>
           {editMode && (
             <div className="mb-4 flex justify-end">

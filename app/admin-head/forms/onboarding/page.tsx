@@ -159,6 +159,37 @@ const getRecordCompletionPercentage = (record: OnboardingRecord) => {
 const isRecordDone = (record: OnboardingRecord) =>
   String(record.status).toUpperCase() === 'DONE' || getRecordCompletionPercentage(record) === 100
 
+const ONBOARDING_DEFAULT_TASKS = [
+  'Signing of Job Offer',
+  'Signing of Employment Contract',
+  'Information Fill-Up for ID and Employee Record',
+  'Provide Link to Employee Handbook',
+  'Conduct Onboarding Presentation',
+  'Introduce to Departments and Key Team Members',
+  'Distribute Polo Shirt, ID Lace & keys',
+  'Add Employee to Biometrics',
+  'Create Company Accounts (Email and Telegram - Required)',
+  'Create Optional Accounts (Viber, WhatsApp, WeChat - Sales/Marketing only)',
+  'Set Up Email Signature',
+  'Add New Employee to Official Group Chats',
+  'Add New Employee to Masterfile Google Sheet',
+  'Add New Employee to Tardiness & Leave Monitoring Google Sheet',
+  'Prepare Requirement Checklist (Medical Certificate, Diploma, TOR, Birth Certificate, Philhealth, Pag-IBIG, SSS)',
+  'Collect and Verify Employee Requirements',
+] as const
+
+const createChecklistTask = (task = '', idSeed = Date.now()): ChecklistTask => ({
+  id: idSeed,
+  task,
+  status: 'PENDING',
+  date: '',
+})
+
+const buildChecklistTasks = (taskLabels: readonly string[]): ChecklistTask[] => {
+  const baseId = Date.now()
+  return taskLabels.map((task, index) => createChecklistTask(task, baseId + index + 1))
+}
+
 
 export default function OnboardingChecklistPage() {
   return (
@@ -191,6 +222,7 @@ function OnboardingChecklistPageContent() {
   const [recordStatusFilter, setRecordStatusFilter] = useState<RecordStatusFilter>('ALL')
   const [recordSort, setRecordSort] = useState<RecordSort>('UPDATED_DESC')
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false)
+  const [startChecklistOpen, setStartChecklistOpen] = useState(false)
   const [unsavedPromptOpen, setUnsavedPromptOpen] = useState(false)
   const [pendingDepartmentSelection, setPendingDepartmentSelection] = useState<string | null>(null)
   const [pendingNavigationUrl, setPendingNavigationUrl] = useState<string | null>(null)
@@ -436,8 +468,20 @@ function OnboardingChecklistPageContent() {
 
 
   const addTask = () => {
-    setTasks([...tasks, { id: Date.now() + Math.floor(Math.random() * 1000), task: '', status: 'PENDING', date: '' }]);
-  };
+    setTasks([...tasks, createChecklistTask('', Date.now() + Math.floor(Math.random() * 1000))])
+  }
+
+  const startChecklistWithoutDefaultTasks = () => {
+    setTasks([])
+    setStartChecklistOpen(false)
+    toast.info('Checklist started with no default tasks. Add rows to build your own list.')
+  }
+
+  const startChecklistWithDefaultTasks = () => {
+    setTasks(buildChecklistTasks(ONBOARDING_DEFAULT_TASKS))
+    setStartChecklistOpen(false)
+    toast.success('Onboarding default tasks loaded.')
+  }
 
 
   const removeTask = (id: number) => {
@@ -949,7 +993,7 @@ function OnboardingChecklistPageContent() {
                   <TableCell colSpan={2} className="py-24 text-center">
                     <ClipboardList className="w-12 h-12 text-slate-200 mx-auto mb-4" />
                     <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">No tasks initialized</p>
-                    <Button onClick={addTask} variant="outline" size="sm" className="mt-4 border-[#FFE5EC] text-[#A4163A] font-black h-9 rounded-xl">
+                    <Button onClick={() => setStartChecklistOpen(true)} variant="outline" size="sm" className="mt-4 border-[#FFE5EC] text-[#A4163A] font-black h-9 rounded-xl">
                       <Plus className="w-4 h-4 mr-1" /> START CHECKLIST
                     </Button>
                   </TableCell>
@@ -1090,6 +1134,29 @@ function OnboardingChecklistPageContent() {
               }}
             >
               {saving ? 'Saving...' : 'Confirm Save'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={startChecklistOpen} onOpenChange={setStartChecklistOpen}>
+        <AlertDialogContent className="border-4 border-[#FFE5EC] rounded-3xl p-8 bg-white shadow-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl font-black text-slate-900">Start Onboarding Checklist</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-600">
+              Choose how you want to initialize this department&apos;s checklist.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="rounded-xl border border-[#FFE5EC] bg-rose-50/30 p-4 text-sm font-semibold text-slate-700">
+            You can either begin with no tasks and add your own, or preload the onboarding default tasks.
+          </div>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-3 mt-2">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button variant="outline" onClick={startChecklistWithoutDefaultTasks}>
+              Start With No Tasks
+            </Button>
+            <AlertDialogAction className="bg-[#A4163A] text-white hover:bg-[#800020]" onClick={startChecklistWithDefaultTasks}>
+              Use Default Tasks
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
