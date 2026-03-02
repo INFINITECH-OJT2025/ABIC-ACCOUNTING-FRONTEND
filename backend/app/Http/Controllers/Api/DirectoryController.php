@@ -15,6 +15,130 @@ use Illuminate\Http\Client\PendingRequest;
 
 class DirectoryController extends Controller
 {
+    private function directoryFolderForAgencyCode(string $code): string
+    {
+        $normalized = strtolower(trim($code));
+
+        return match ($normalized) {
+            'tin' => 'directory/bir',
+            'pagibig' => 'directory/pagibig',
+            'philhealth' => 'directory/philhealth',
+            'sss' => 'directory/sss',
+            default => 'directory/' . ($normalized !== '' ? $normalized : 'misc'),
+        };
+    }
+
+    private function cloudinarySignParams(array $params, string $apiSecret): string
+    {
+        $filtered = array_filter($params, static fn ($value) => $value !== null && $value !== '');
+        ksort($filtered);
+
+        $serialized = collect($filtered)
+            ->map(fn ($value, $key) => $key . '=' . $value)
+            ->implode('&');
+
+        return sha1($serialized . $apiSecret);
+    }
+
+    private function moveCloudinaryImageToFolder(string $publicId, string $targetFolder, array $config): array
+    {
+        $cloudName = $config['cloud_name'];
+        $apiKey = $config['api_key'];
+        $apiSecret = $config['api_secret'];
+        $verifySsl = $config['verify_ssl'];
+
+        $fromPublicId = trim($publicId, '/');
+        $normalizedFolder = trim($targetFolder, '/');
+        $targetPrefix = $normalizedFolder !== '' ? ($normalizedFolder . '/') : '';
+
+        $baseName = basename($fromPublicId);
+        if ($baseName === '' || $baseName === '.' || $baseName === '..') {
+            throw new \RuntimeException('Unable to derive image file name for Cloudinary folder move.');
+        }
+
+        $currentPublicId = $fromPublicId;
+
+        if ($targetPrefix === '' || !str_starts_with($fromPublicId, $targetPrefix)) {
+            $toPublicId = $targetPrefix . $baseName;
+            $timestamp = time();
+            $params = [
+                'from_public_id' => $fromPublicId,
+                'to_public_id' => $toPublicId,
+                'overwrite' => 'true',
+                'invalidate' => 'true',
+                'timestamp' => (string) $timestamp,
+            ];
+            $signature = $this->cloudinarySignParams($params, $apiSecret);
+
+            $response = Http::asForm()
+                ->withOptions(['verify' => $verifySsl])
+                ->post("https://api.cloudinary.com/v1_1/{$cloudName}/image/rename", [
+                    ...$params,
+                    'api_key' => $apiKey,
+                    'signature' => $signature,
+                ]);
+
+            if ($response->failed()) {
+                Log::error('Cloudinary rename failed', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                    'from_public_id' => $fromPublicId,
+                    'to_public_id' => $toPublicId,
+                ]);
+
+                throw new \RuntimeException('Unable to move image to the required Cloudinary folder.');
+            }
+
+            $renameData = $response->json();
+            $renamedPublicId = trim((string) ($renameData['public_id'] ?? ''), '/');
+            if ($renamedPublicId === '') {
+                throw new \RuntimeException('Cloudinary rename response did not include a public_id.');
+            }
+            $currentPublicId = $renamedPublicId;
+        }
+
+        // Enforce Media Library folder placement for dynamic-folder mode.
+        $explicitTimestamp = time();
+        $explicitParams = [
+            'public_id' => $currentPublicId,
+            'type' => 'upload',
+            'asset_folder' => $normalizedFolder,
+            'invalidate' => 'true',
+            'timestamp' => (string) $explicitTimestamp,
+        ];
+        $explicitSignature = $this->cloudinarySignParams($explicitParams, $apiSecret);
+
+        $explicitResponse = Http::asForm()
+            ->withOptions(['verify' => $verifySsl])
+            ->post("https://api.cloudinary.com/v1_1/{$cloudName}/image/explicit", [
+                ...$explicitParams,
+                'api_key' => $apiKey,
+                'signature' => $explicitSignature,
+            ]);
+
+        if ($explicitResponse->failed()) {
+            Log::warning('Cloudinary explicit asset_folder update failed; using renamed image as fallback', [
+                'status' => $explicitResponse->status(),
+                'body' => $explicitResponse->body(),
+                'public_id' => $currentPublicId,
+                'asset_folder' => $normalizedFolder,
+            ]);
+
+            return [
+                'public_id' => $currentPublicId,
+                'secure_url' => null,
+            ];
+        }
+
+        $explicitData = $explicitResponse->json();
+        $explicitPublicId = trim((string) ($explicitData['public_id'] ?? $currentPublicId), '/');
+
+        return [
+            'public_id' => $explicitPublicId !== '' ? $explicitPublicId : $currentPublicId,
+            'secure_url' => isset($explicitData['secure_url']) ? (string) $explicitData['secure_url'] : null,
+        ];
+    }
+
     private function cloudinaryConfig(): array
     {
         $cloudName = trim((string) (env('CLOUDINARY_CLOUD_NAME') ?: env('NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME')));
@@ -240,12 +364,29 @@ class DirectoryController extends Controller
             'bytes.max' => 'Image size must be 20MB or less.',
         ]);
 
+        $finalImageUrl = $validated['image_url'];
+        $finalPublicId = isset($validated['image_public_id']) && trim((string) $validated['image_public_id']) !== ''
+            ? trim((string) $validated['image_public_id'])
+            : null;
+
+        if ($finalPublicId) {
+            $config = $this->cloudinaryConfig();
+            if ($config['cloud_name'] && $config['api_key'] && $config['api_secret']) {
+                $targetFolder = $this->directoryFolderForAgencyCode((string) $agency->code);
+                $moved = $this->moveCloudinaryImageToFolder($finalPublicId, $targetFolder, $config);
+                $finalPublicId = $moved['public_id'];
+                if (!empty($moved['secure_url'])) {
+                    $finalImageUrl = $moved['secure_url'];
+                }
+            }
+        }
+
         $agency->update([
-            'image_url' => $validated['image_url'],
-            'image_public_id' => $validated['image_public_id'],
+            'image_url' => $finalImageUrl,
+            'image_public_id' => $finalPublicId,
         ]);
 
-        return response()->json(['data' => $agency]);
+        return response()->json(['data' => $agency->fresh()]);
     }
 
     public function listGeneralContacts()
@@ -392,11 +533,59 @@ class DirectoryController extends Controller
             return response()->json(['message' => 'Cloudinary credentials not configured'], 500);
         }
 
-        $prefix = $request->query('prefix', '');
+        $folder = trim((string) $request->query('folder', ''), " \t\n\r\0\x0B/");
+        $prefix = trim((string) $request->query('prefix', ''));
         $maxResults = (int) $request->query('max_results', 30);
         $maxResults = max(1, min($maxResults, 100));
+        $matchesRequestedFolder = function (array $resource) use ($folder): bool {
+            if ($folder === '') {
+                return true;
+            }
+
+            $assetFolder = trim((string) ($resource['asset_folder'] ?? ''), '/');
+            $folderField = trim((string) ($resource['folder'] ?? ''), '/');
+            // Strict folder filtering to prevent stale public_id path leakage.
+            return $assetFolder === $folder || $folderField === $folder;
+        };
+
+        $filterByRequestedFolder = function (array $resources) use ($matchesRequestedFolder): array {
+            return array_values(array_filter($resources, function ($resource) use ($matchesRequestedFolder) {
+                if (!is_array($resource)) {
+                    return false;
+                }
+                return $matchesRequestedFolder($resource);
+            }));
+        };
 
         try {
+            if ($folder !== '') {
+                $searchExpression = sprintf(
+                    'resource_type:image AND type:upload AND asset_folder="%s"',
+                    addslashes($folder)
+                );
+
+                $searchResponse = $this->cloudinaryHttpClient($apiKey, $apiSecret, $verifySsl)
+                    ->post("https://api.cloudinary.com/v1_1/{$cloudName}/resources/search", [
+                        'expression' => $searchExpression,
+                        'max_results' => $maxResults,
+                        'sort_by' => [
+                            ['created_at' => 'desc'],
+                        ],
+                    ]);
+
+                if ($searchResponse->successful()) {
+                    $resources = $searchResponse->json()['resources'] ?? [];
+                    $resources = is_array($resources) ? $resources : [];
+                    return response()->json(['data' => $filterByRequestedFolder($resources)]);
+                }
+
+                Log::warning('Cloudinary Search API fallback to prefix filter', [
+                    'status' => $searchResponse->status(),
+                    'body' => $searchResponse->body(),
+                    'folder' => $folder,
+                ]);
+            }
+
             $response = $this->cloudinaryHttpClient($apiKey, $apiSecret, $verifySsl)
                 ->get("https://api.cloudinary.com/v1_1/{$cloudName}/resources/image", [
                     'type' => 'upload',
@@ -415,7 +604,9 @@ class DirectoryController extends Controller
                 ], $response->status());
             }
 
-            return response()->json(['data' => $response->json()['resources'] ?? []]);
+            $resources = $response->json()['resources'] ?? [];
+            $resources = is_array($resources) ? $resources : [];
+            return response()->json(['data' => $filterByRequestedFolder($resources)]);
         } catch (\Exception $e) {
             Log::error('Cloudinary Exception', ['message' => $e->getMessage()]);
             return response()->json([

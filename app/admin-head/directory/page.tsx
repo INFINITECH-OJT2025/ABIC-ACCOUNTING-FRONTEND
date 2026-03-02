@@ -173,6 +173,7 @@ type PortalLink = {
 
 const ALLOWED_UPLOAD_FORMATS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif'] as const
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024
+const CLOUDINARY_PAGE_SIZE = 9
 const OFFICIAL_PORTALS: PortalLink[] = [
   { code: 'sss', label: 'SSS', url: 'https://member.sss.gov.ph/' },
   { code: 'pagibig', label: 'PAG-IBIG', url: 'https://www.pagibigfundservices.com/' },
@@ -180,7 +181,20 @@ const OFFICIAL_PORTALS: PortalLink[] = [
   { code: 'tin', label: 'TIN (BIR)', url: 'https://www.bir.gov.ph/eServices' },
 ]
 const GENERAL_CONTACTS_KEY = 'general-contacts'
-type CloudinaryPickerTarget = { type: 'agency' } | { type: 'general-contact'; index: number }
+type CloudinaryPickerTarget = { type: 'agency'; agencyCode: string } | { type: 'general-contact'; index: number }
+const DIRECTORY_FOLDER_ALIASES: Record<string, string> = {
+  sss: 'sss',
+  philhealth: 'philhealth',
+  tin: 'bir',
+  pagibig: 'pagibig',
+  [GENERAL_CONTACTS_KEY]: 'general-contacts',
+}
+
+const getDirectoryFolderPath = (sectionCode: string): string => {
+  const normalized = normalizeCode(sectionCode)
+  const mapped = DIRECTORY_FOLDER_ALIASES[normalized] || normalized || 'misc'
+  return `directory/${mapped}`
+}
 
 
 const normalizeCode = (value: string): string => String(value || '').trim().toLowerCase()
@@ -269,6 +283,7 @@ const parseBackendDateMs = (value: string | null | undefined): number => {
 
 export default function GovernmentDirectoryPage() {
   const deleteDialogTitleRef = useRef<HTMLHeadingElement | null>(null)
+  const agencyUploadTargetRef = useRef<string>('')
   const [activeAgency, setActiveAgency] = useState<string>('')
   const [activeProcess, setActiveProcess] = useState<ProcessType>('Adding')
   const [imageError, setImageError] = useState<Record<string, boolean>>({})
@@ -277,9 +292,11 @@ export default function GovernmentDirectoryPage() {
   const [cloudinaryPickerOpen, setCloudinaryPickerOpen] = useState(false)
   const [cloudinaryPickerTarget, setCloudinaryPickerTarget] = useState<CloudinaryPickerTarget | null>(null)
   const [cloudinaryImages, setCloudinaryImages] = useState<CloudinaryAsset[]>([])
+  const [cloudinaryPage, setCloudinaryPage] = useState(1)
   const [loadingCloudinaryImages, setLoadingCloudinaryImages] = useState(false)
   const [deleteCandidate, setDeleteCandidate] = useState<CloudinaryAsset | null>(null)
   const [deletingCloudinaryImage, setDeletingCloudinaryImage] = useState(false)
+  const [agencyImageRefreshKey, setAgencyImageRefreshKey] = useState<Record<string, number>>({})
   const [generalContacts, setGeneralContacts] = useState<GeneralContact[]>([])
   const [generalContactsDraft, setGeneralContactsDraft] = useState<EditableGeneralContact[]>([])
   const [generalContactsSearch, setGeneralContactsSearch] = useState('')
@@ -324,6 +341,26 @@ export default function GovernmentDirectoryPage() {
       return left.localeCompare(right)
     })
   }, [generalContactsDraft, generalContactsSearch])
+
+  const cloudinaryTotalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(cloudinaryImages.length / CLOUDINARY_PAGE_SIZE))
+  }, [cloudinaryImages.length])
+
+  const paginatedCloudinaryImages = useMemo(() => {
+    const start = (cloudinaryPage - 1) * CLOUDINARY_PAGE_SIZE
+    return cloudinaryImages.slice(start, start + CLOUDINARY_PAGE_SIZE)
+  }, [cloudinaryImages, cloudinaryPage])
+
+  const cloudinaryPickerFolderPath = useMemo(() => {
+    const sectionCode = cloudinaryPickerTarget?.type === 'general-contact'
+      ? GENERAL_CONTACTS_KEY
+      : cloudinaryPickerTarget?.agencyCode ?? activeAgency
+    return getDirectoryFolderPath(sectionCode)
+  }, [cloudinaryPickerTarget, activeAgency])
+
+  useEffect(() => {
+    setCloudinaryPage((prev) => Math.min(prev, cloudinaryTotalPages))
+  }, [cloudinaryTotalPages])
 
   const directoryQuery = useQuery({
     queryKey: ['directory-agencies'],
@@ -388,12 +425,19 @@ export default function GovernmentDirectoryPage() {
           shortName: backend?.name?.trim() || code.toUpperCase(),
           fullName: backend?.full_name?.trim() || backend?.name?.trim() || code.toUpperCase(),
           summary: backend?.summary?.trim() || '',
-          image: backend?.image_url?.trim() || '',
+          image: (() => {
+            const raw = backend?.image_url?.trim() || ''
+            if (!raw) return ''
+            const refreshKey = agencyImageRefreshKey[code]
+            if (!refreshKey) return raw
+            const joiner = raw.includes('?') ? '&' : '?'
+            return `${raw}${joiner}r=${refreshKey}`
+          })(),
           icon: getAgencyIcon(code),
           details: backendDetails,
         }
       })
-  }, [agenciesByCode])
+  }, [agenciesByCode, agencyImageRefreshKey])
 
 
   const agency = useMemo(
@@ -685,12 +729,18 @@ export default function GovernmentDirectoryPage() {
 
 
   const persistAgencyImage = async (params: {
+    agencyCode?: string
     imageUrl: string
     publicId?: string | null
     format?: string | null
     bytes?: number | null
   }) => {
-    const response = await fetch(`${getApiUrl()}/api/directory/agencies/${activeAgency}/image`, {
+    const targetAgencyCode = normalizeCode(params.agencyCode || activeAgency)
+    if (!targetAgencyCode) {
+      throw new Error('Please select a valid agency before updating its picture.')
+    }
+
+    const response = await fetch(`${getApiUrl()}/api/directory/agencies/${targetAgencyCode}/image`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -714,21 +764,29 @@ export default function GovernmentDirectoryPage() {
     if (updated && code) {
       setAgenciesByCode((prev) => ({ ...prev, [code]: updated }))
       setImageError((prev) => ({ ...prev, [code]: false }))
+      setAgencyImageRefreshKey((prev) => ({ ...prev, [code]: Date.now() }))
     }
   }
 
 
-  const loadCloudinaryImages = async (target: CloudinaryPickerTarget = { type: 'agency' }) => {
+  const loadCloudinaryImages = async (target: CloudinaryPickerTarget) => {
     try {
       setLoadingCloudinaryImages(true)
       setCloudinaryPickerTarget(target)
-      const response = await fetch(`${getApiUrl()}/api/directory/cloudinary-images?prefix=directory/&max_results=60`, {
+      const sectionCode = target.type === 'general-contact' ? GENERAL_CONTACTS_KEY : target.agencyCode
+      const folderPath = getDirectoryFolderPath(sectionCode)
+      const prefix = `${folderPath}/`
+      const response = await fetch(
+        `${getApiUrl()}/api/directory/cloudinary-images?folder=${encodeURIComponent(folderPath)}&prefix=${encodeURIComponent(prefix)}&max_results=60`,
+        {
         headers: { Accept: 'application/json' },
-      })
+        }
+      )
       await ensureOkResponse(response, 'Unable to load images from Cloudinary.')
       const result = await response.json()
       const rows = Array.isArray(result?.data) ? result.data : []
       setCloudinaryImages(rows)
+      setCloudinaryPage(1)
       setCloudinaryPickerOpen(true)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load Cloudinary images'
@@ -967,7 +1025,7 @@ export default function GovernmentDirectoryPage() {
   }
 
 
-  const handleImageUpdate = async (uploadResult: any) => {
+  const handleImageUpdate = async (uploadResult: any, agencyCode: string) => {
     try {
       const info = uploadResult?.info ?? uploadResult
       const imageUrl = info?.secure_url
@@ -993,6 +1051,7 @@ export default function GovernmentDirectoryPage() {
 
       setUpdatingImage(true)
       await persistAgencyImage({
+        agencyCode,
         imageUrl,
         publicId,
         format,
@@ -1364,7 +1423,8 @@ export default function GovernmentDirectoryPage() {
                                     maxFiles: 1,
                                     resourceType: 'image',
                                     sources: ['local'],
-                                    folder: 'directory/general-contacts',
+                                    folder: getDirectoryFolderPath(GENERAL_CONTACTS_KEY),
+                                    ...({ asset_folder: getDirectoryFolderPath(GENERAL_CONTACTS_KEY) } as any),
                                     maxFileSize: MAX_IMAGE_BYTES,
                                     clientAllowedFormats: [...ALLOWED_UPLOAD_FORMATS],
                                   }}
@@ -1541,15 +1601,19 @@ export default function GovernmentDirectoryPage() {
                     maxFiles: 1,
                     resourceType: 'image',
                     sources: ['local'],
-                    folder: `directory/${activeAgency}`,
+                    folder: getDirectoryFolderPath(activeAgency),
+                    ...({ asset_folder: getDirectoryFolderPath(activeAgency) } as any),
                     maxFileSize: MAX_IMAGE_BYTES,
                     clientAllowedFormats: [...ALLOWED_UPLOAD_FORMATS],
                   }}
-                  onSuccess={(result) => void handleImageUpdate(result)}
+                  onSuccess={(result) => void handleImageUpdate(result, agencyUploadTargetRef.current || activeAgency)}
                 >
                   {({ open }) => (
                     <Button
-                      onClick={() => open()}
+                      onClick={() => {
+                        agencyUploadTargetRef.current = activeAgency
+                        open()
+                      }}
                       disabled={updatingImage}
                       className="bg-[#A4163A] hover:bg-[#8a1230] text-white border-none rounded-lg px-6 shadow-lg shadow-red-900/20 font-bold"
                     >
@@ -1564,7 +1628,7 @@ export default function GovernmentDirectoryPage() {
 
 
               <Button
-                onClick={() => void loadCloudinaryImages({ type: 'agency' })}
+                onClick={() => void loadCloudinaryImages({ type: 'agency', agencyCode: activeAgency })}
                 disabled={loadingCloudinaryImages || updatingImage}
                 className="bg-[#A4163A] hover:bg-[#8a1230] text-white border-none rounded-lg px-6 shadow-lg shadow-red-900/20 font-bold"
               >
@@ -1927,6 +1991,7 @@ export default function GovernmentDirectoryPage() {
         onOpenChange={(open) => {
           setCloudinaryPickerOpen(open)
           if (!open) setCloudinaryPickerTarget(null)
+          if (open) setCloudinaryPage(1)
         }}
       >
         <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-hidden p-0">
@@ -1935,15 +2000,18 @@ export default function GovernmentDirectoryPage() {
               {cloudinaryPickerTarget?.type === 'general-contact' ? 'Select Avatar Image' : 'Select Agency Image'}
             </DialogTitle>
             <DialogDescription>
-              Choose an existing image from your uploads. Max 20MB and allowed formats: JPG, JPEG, PNG, GIF, WebP, HEIC, HEIF.
+              Choose an existing image from your uploads in <span className="font-mono">{cloudinaryPickerFolderPath}</span>. Max 20MB and allowed formats: JPG, JPEG, PNG, GIF, WebP, HEIC, HEIF.
             </DialogDescription>
           </DialogHeader>
-          <div className="px-6 pb-6 overflow-y-auto">
+          <div className="px-6 pb-6 overflow-y-auto max-h-[calc(85vh-10rem)]">
             {cloudinaryImages.length === 0 ? (
-              <div className="py-10 text-center text-slate-500">No uploaded images found in Cloudinary folder `directory/`.</div>
+              <div className="py-10 text-center text-slate-500">
+                No uploaded images found in Cloudinary folder <span className="font-mono">{cloudinaryPickerFolderPath}</span>.
+              </div>
             ) : (
+              <>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {cloudinaryImages.map((asset) => (
+                {paginatedCloudinaryImages.map((asset) => (
                   <button
                     key={asset.public_id}
                     type="button"
@@ -1957,6 +2025,7 @@ export default function GovernmentDirectoryPage() {
                           toast.success('Avatar selected. Save contacts to apply changes.')
                         } else {
                           await persistAgencyImage({
+                            agencyCode: cloudinaryPickerTarget?.agencyCode,
                             imageUrl: asset.secure_url,
                             publicId: asset.public_id,
                             format: asset.format,
@@ -2004,6 +2073,32 @@ export default function GovernmentDirectoryPage() {
                   </button>
                 ))}
               </div>
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <p className="text-xs text-slate-500">
+                  Page {cloudinaryPage} of {cloudinaryTotalPages} • {cloudinaryImages.length} uploaded image{cloudinaryImages.length === 1 ? '' : 's'}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={cloudinaryPage <= 1}
+                    onClick={() => setCloudinaryPage((prev) => Math.max(1, prev - 1))}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={cloudinaryPage >= cloudinaryTotalPages}
+                    onClick={() => setCloudinaryPage((prev) => Math.min(cloudinaryTotalPages, prev + 1))}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+              </>
             )}
           </div>
         </DialogContent>
