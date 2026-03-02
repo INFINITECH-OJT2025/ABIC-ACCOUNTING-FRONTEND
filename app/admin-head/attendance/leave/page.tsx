@@ -617,10 +617,12 @@ function CalendarView({ year, month, entries, weekOnly = false }: {
                     <div className="bg-rose-50 px-6 py-5 border-b border-rose-100">
                       <span className="text-[#800020] font-black text-sm uppercase tracking-wider">Leave Reason</span>
                     </div>
-                    <div className="p-6 bg-white flex-1">
-                      <p className="text-slate-700 text-base leading-relaxed break-all whitespace-pre-wrap font-medium">
-                        {se.cite_reason}
-                      </p>
+                    <div className="p-6 bg-white overflow-hidden">
+                      <div className="max-h-[110px] overflow-y-auto custom-scrollbar pr-2">
+                        <p className="text-slate-700 text-base leading-relaxed break-all whitespace-pre-wrap font-medium">
+                          {se.cite_reason}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1141,7 +1143,7 @@ export default function LeavePage() {
   const [filterDept, setFilterDept] = useState('')
   const [filterType, setFilterType] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
-  const [sortOrder, setSortOrder] = useState('date-asc')
+  const [sortOrder, setSortOrder] = useState('input-desc')
   const [searchQuery, setSearchQuery] = useState('')
 
   const sortOptions = [
@@ -1415,7 +1417,7 @@ export default function LeavePage() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <div className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 min-w-[220px] justify-between shadow-sm font-bold inline-flex items-center whitespace-nowrap rounded-lg cursor-pointer group border-2">
-                      <span className="truncate max-w-[170px]">{sortOptions.find(o => o.value === sortOrder)?.label || 'Ascending (Leave Date)'}</span>
+                      <span className="truncate max-w-[170px]">{sortOptions.find(o => o.value === sortOrder)?.label || 'Recent (Inputted)'}</span>
                       <ChevronDown className="w-4 h-4 ml-2 opacity-50 group-hover:opacity-100 transition-opacity shrink-0" />
                     </div>
                   </DropdownMenuTrigger>
@@ -1456,234 +1458,6 @@ export default function LeavePage() {
         </div>
       </div>
 
-      {/* ── Inline Add Leave Form (toggleable) ── */}
-      <div className={cn(
-        'transition-all duration-500 overflow-hidden',
-        addModalOpen ? 'max-h-[1200px] opacity-100 mb-8' : 'max-h-0 opacity-0 overflow-hidden'
-      )}>
-        <div className="px-8 py-6">
-          <div className="bg-white rounded-xl shadow border border-rose-100 overflow-hidden ring-4 ring-rose-50/50">
-            {/* Form Header */}
-            <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] px-6 py-4 flex justify-between items-center">
-              <h2 className="text-white text-xl font-bold">
-                {inlineForm.id ? 'Update Leave Record' : 'Add Leave Record'}
-              </h2>
-              {inlineForm.id && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={resetInlineForm}
-                  className="text-white hover:bg-white/10 h-7 text-[10px] font-bold uppercase tracking-wider"
-                >
-                  <Plus className="w-3 h-3 mr-1" /> New Entry
-                </Button>
-              )}
-            </div>
-
-            <div className="px-12 py-12 space-y-10">
-              <div className="grid grid-cols-2 gap-x-16 gap-y-12">
-                {/* Row 1 */}
-                <div className="flex items-center gap-5">
-                  <span className="text-base font-extrabold text-[#4A081A] uppercase tracking-[0.1em] w-40 shrink-0 text-right">EMPLOYEE ID:</span>
-                  <div className={cn("flex-1 border border-[#630C22] rounded-xl px-6 py-3 text-lg bg-slate-50 shadow-sm h-[60px] flex items-center min-w-0", inlineForm.employee_id ? "text-slate-800 font-semibold" : "text-slate-400 italic font-medium")}>
-                    <span className="truncate">{inlineForm.employee_id || 'Auto-filled on name selection'}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-5 relative">
-                  <span className="text-base font-extrabold text-[#4A081A] uppercase tracking-[0.1em] w-40 shrink-0 text-right">NAME:</span>
-                  <Popover open={empOpen} onOpenChange={setEmpOpen}>
-                    <PopoverTrigger asChild>
-                      <button type="button" className="flex items-center justify-between flex-1 border border-[#630C22] rounded-xl px-6 py-3 text-xl bg-white hover:border-[#4A081A] transition-all shadow-sm h-[60px] min-w-0 text-left">
-                        <span className={cn('flex-1 truncate', inlineForm.employee_name ? 'text-slate-800 font-semibold' : 'text-slate-400 italic')}>
-                          {inlineForm.employee_name || 'Select Employee Name'}
-                        </span>
-                        <ChevronDown className="w-6 h-6 text-slate-400 shrink-0 ml-2" />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="p-0 w-[450px]">
-                      <Command>
-                        <CommandInput placeholder="Search employee..." className="text-lg h-12" />
-                        <CommandEmpty className="text-lg p-5">No employee found.</CommandEmpty>
-                        <CommandList>
-                          <CommandGroup>
-                            {employees
-                              .filter(e => e.id !== inlineForm.employee_id)
-                              .map(emp => (
-                                <CommandItem key={emp.id} value={emp.name} onSelect={() => handleInlineSelectEmployee(emp)} className="text-lg py-4">
-                                  {emp.name}
-                                </CommandItem>
-                              ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="flex items-center gap-5">
-                  <span className="text-base font-extrabold text-[#4A081A] uppercase tracking-[0.1em] w-40 shrink-0 text-right">CATEGORY:</span>
-                  <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
-                    <PopoverTrigger asChild>
-                      <button
-                        type="button"
-                        className={cn(
-                          "flex items-center justify-between flex-1 border border-[#630C22] rounded-xl px-6 py-3 text-xl transition-all shadow-sm h-[60px] min-w-0 text-left",
-                          inlineForm.category
-                            ? (LEAVE_CATEGORY_OPTIONS.find(o => o.value === inlineForm.category)?.color || "bg-white hover:border-[#4A081A]")
-                            : "bg-white hover:border-[#4A081A]"
-                        )}
-                      >
-                        <span className={cn('flex-1 truncate', inlineForm.category ? 'font-black tracking-wide' : 'text-slate-400 italic text-xl')}>
-                          {LEAVE_CATEGORY_OPTIONS.find(o => o.value === inlineForm.category)?.label || 'Half-day/Whole day'}
-                        </span>
-                        <ChevronDown className={cn("w-6 h-6 shrink-0 ml-2", inlineForm.category ? "opacity-50" : "text-slate-400")} />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="p-2 w-[350px] space-y-2 border-0 shadow-2xl rounded-2xl bg-white">
-                      {LEAVE_CATEGORY_OPTIONS.map(o => (
-                        <button
-                          key={o.value}
-                          type="button"
-                          onClick={() => {
-                            setInlineForm(p => ({ ...p, category: o.value as 'half-day' | 'whole-day', shift: '' }));
-                            setCategoryOpen(false);
-                          }}
-                          className={cn(
-                            "w-full text-left px-5 py-4 rounded-xl text-lg transition-all font-black tracking-wider shadow-sm hover:opacity-80 uppercase",
-                            o.color
-                          )}
-                        >
-                          {o.label}
-                        </button>
-                      ))}
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                {/* Row 2 */}
-                <div className="flex items-center gap-5 relative">
-                  <span className="text-base font-extrabold text-[#4A081A] uppercase tracking-[0.1em] w-40 shrink-0 text-right">SHIFT:</span>
-                  <Popover open={shiftOpen} onOpenChange={setShiftOpen}>
-                    <PopoverTrigger asChild>
-                      <button type="button" disabled={inlineForm.category === 'whole-day'} className={cn('flex items-center justify-between flex-1 border border-[#630C22] rounded-xl px-6 py-3 text-xl bg-white transition-all shadow-sm h-[60px] min-w-0 text-left', inlineForm.category === 'whole-day' ? 'opacity-40 cursor-not-allowed bg-slate-50' : 'hover:border-[#4A081A]')}>
-                        <span className={cn('flex-1 truncate', inlineForm.shift ? 'text-slate-800 font-semibold' : 'text-slate-400 italic text-xl')}>
-                          {inlineForm.shift || 'Select Hour'}
-                        </span>
-                        <ChevronDown className="w-6 h-6 text-slate-400 shrink-0 ml-2" />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="p-2 w-[400px] space-y-1">
-                      {inlineAvailableShifts.length > 0 ? (
-                        inlineAvailableShifts
-                          .filter(s => s !== inlineForm.shift)
-                          .map(s => (
-                            <button key={s} type="button" onClick={() => { setInlineForm(p => ({ ...p, shift: s })); setShiftOpen(false); }} className="w-full text-left px-5 py-4 rounded-lg text-lg hover:bg-rose-50 transition-all font-medium">{s}</button>
-                          ))
-                      ) : (
-                        <p className="text-lg text-slate-400 italic px-5 py-4">{inlineForm.department ? `No shifts configured for "${inlineForm.department}"` : 'Select an employee first'}</p>
-                      )}
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="flex items-center gap-5">
-                  <span className="text-base font-extrabold text-[#4A081A] uppercase tracking-[0.1em] w-40 shrink-0 text-right">START DATE:</span>
-                  <Input type="date" max={inlineForm.leave_end_date || undefined} value={inlineForm.start_date || ''} onChange={e => setInlineForm(p => ({ ...p, start_date: e.target.value }))} className="border-[#630C22] bg-white text-slate-700 flex-1 h-[60px] text-xl rounded-xl shadow-sm px-6" />
-                </div>
-                <div className="flex items-center gap-5">
-                  <span className="text-base font-extrabold text-[#4A081A] uppercase tracking-[0.1em] w-40 shrink-0 text-right">LEAVE END:</span>
-                  <Input
-                    type="date"
-                    min={inlineForm.start_date || undefined}
-                    value={inlineForm.category === 'half-day' ? (inlineForm.start_date || '') : (inlineForm.leave_end_date || '')}
-                    disabled={inlineForm.category === 'half-day'}
-                    onChange={e => setInlineForm(p => ({ ...p, leave_end_date: e.target.value }))}
-                    className={cn(
-                      "border-[#630C22] bg-white text-slate-700 flex-1 h-[60px] text-xl rounded-xl shadow-sm px-6 font-medium",
-                      inlineForm.category === 'half-day' && "opacity-60 cursor-not-allowed bg-slate-50 border-slate-300"
-                    )}
-                  />
-                </div>
-
-                {/* Row 3 */}
-                <div className="flex items-center gap-5">
-                  <span className="text-base font-extrabold text-[#4A081A] uppercase tracking-[0.1em] w-40 shrink-0 text-right">NO. OF DAYS:</span>
-                  <Input readOnly value={inlineForm.number_of_days > 0 ? formatDays(inlineForm.number_of_days, inlineForm.category) : ''} placeholder="" className="border-[#630C22] bg-white text-slate-700 cursor-default flex-1 h-[60px] rounded-xl shadow-sm px-6 font-bold text-3xl" />
-                </div>
-                <div className="flex items-center gap-5">
-                  <span className="text-base font-extrabold text-[#4A081A] uppercase tracking-[0.1em] w-40 shrink-0 text-right">APPROVED BY:</span>
-                  <Popover open={approvalOpen} onOpenChange={setApprovalOpen}>
-                    <PopoverTrigger asChild>
-                      <button
-                        type="button"
-                        className={cn(
-                          "flex items-center justify-between flex-1 border border-[#630C22] rounded-xl px-6 py-3 text-xl transition-all shadow-sm h-[60px] min-w-0 text-left",
-                          inlineForm.approved_by
-                            ? (inlineApprovalOptions.find(o => o.value === inlineForm.approved_by)?.color || "bg-white hover:border-[#4A081A]")
-                            : "bg-white hover:border-[#4A081A]"
-                        )}
-                      >
-                        <span className={cn('flex-1 truncate', inlineForm.approved_by ? 'font-bold tracking-wide' : 'text-slate-400 italic text-xl')}>
-                          {inlineApprovalOptions.find(o => o.value === inlineForm.approved_by)?.label || 'Select Status/Name'}
-                        </span>
-                        <ChevronDown className={cn("w-6 h-6 shrink-0 ml-2 opacity-50")} />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="p-2 w-[400px] space-y-2 border-0 shadow-2xl rounded-2xl bg-white">
-                      {inlineApprovalOptions.map(o => (
-                        <button
-                          key={o.value}
-                          type="button"
-                          onClick={() => { setInlineForm(p => ({ ...p, approved_by: o.value })); setApprovalOpen(false); }}
-                          className={cn(
-                            "w-full text-left px-5 py-4 rounded-xl text-lg transition-all font-bold tracking-wide shadow-sm hover:opacity-80",
-                            o.color
-                          )}
-                        >
-                          {o.label}
-                        </button>
-                      ))}
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="flex items-start gap-5">
-                  <span className="text-base font-extrabold text-[#4A081A] uppercase tracking-[0.1em] w-40 shrink-0 text-right pt-[18px]">REMARKS:</span>
-                  <Popover open={remarksOpen} onOpenChange={setRemarksOpen}>
-                    <PopoverTrigger asChild>
-                      <button type="button" className="flex items-center justify-between flex-1 border border-[#630C22] rounded-xl px-6 py-3 text-xl bg-white hover:border-[#4A081A] transition-all shadow-sm h-[60px] min-w-0 text-left">
-                        <span className={cn('flex-1 truncate', inlineForm.remarks ? 'text-slate-800 font-semibold' : 'text-slate-400 italic text-xl')}>
-                          {inlineRemarkOptions.find(o => o.value === inlineForm.remarks)?.label || 'Select Leave Type'}
-                        </span>
-                        <ChevronDown className="w-6 h-6 text-slate-400 shrink-0 ml-2" />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="p-2 w-[400px] space-y-1">
-                      {inlineRemarkOptions.map(o => (
-                        <button key={o.value} type="button" onClick={() => { setInlineForm(p => ({ ...p, remarks: o.value })); setRemarksOpen(false); }} className="w-full text-left px-5 py-4 rounded-lg text-lg hover:bg-rose-50 transition-all font-medium">
-                          {o.label}
-                        </button>
-                      ))}
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                <div className="flex items-start gap-5">
-                  <span className="text-base font-extrabold text-[#4A081A] uppercase tracking-[0.1em] w-40 shrink-0 text-right pt-[18px]">REASON:</span>
-                  <textarea rows={3} value={inlineForm.cite_reason} onChange={e => setInlineForm(p => ({ ...p, cite_reason: e.target.value }))} placeholder="specify reason" className={cn("flex-1 border border-[#630C22] rounded-xl px-6 py-5 text-xl resize-none focus:outline-none focus:border-[#4A081A] shadow-sm transition-all min-h-[120px]", inlineForm.cite_reason ? "text-slate-800 font-semibold" : "italic font-medium text-slate-400")} />
-                </div>
-              </div>
-
-              {/* Footer actions */}
-              <div className="flex justify-end gap-5 pt-10 pr-2 pb-6">
-                <Button variant="outline" onClick={() => { setAddModalOpen(false); resetInlineForm() }} className="border-rose-300 text-[#4A081A] hover:bg-rose-50 text-xl px-16 h-[72px] font-extrabold rounded-2xl shadow-sm transition-all hover:scale-105">
-                  Cancel
-                </Button>
-                <Button onClick={handleInlineSave} disabled={inlineSaving} className="bg-[#630C22] hover:bg-[#4A081A] text-white text-xl px-20 h-[72px] font-extrabold rounded-2xl shadow-xl hover:shadow-[#630C22]/40 transition-all hover:scale-105 active:scale-95">
-                  {inlineSaving ? (inlineForm.id ? 'Updating…' : 'Saving…') : (inlineForm.id ? 'Update Leave' : 'Save Leave')}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       <div className="px-8 py-6 space-y-8">
         {/* ── Calendar ── */}
@@ -1762,6 +1536,233 @@ export default function LeavePage() {
             />
           </section>
         )}
+
+        {/* ── Inline Add Leave Form (toggleable) ── */}
+        <div className={cn(
+          'transition-all duration-500 overflow-hidden',
+          addModalOpen ? 'max-h-[1200px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
+        )}>
+          <div className="bg-white rounded-xl shadow border border-rose-100 overflow-hidden ring-4 ring-rose-50/50">
+            {/* Form Header */}
+            <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] px-6 py-4 flex justify-between items-center">
+              <h2 className="text-white text-xl font-bold">
+                {inlineForm.id ? 'Update Leave Record' : 'Add Leave Record'}
+              </h2>
+              {inlineForm.id && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={resetInlineForm}
+                  className="text-white hover:bg-white/10 h-7 text-[10px] font-bold uppercase tracking-wider"
+                >
+                  <Plus className="w-3 h-3 mr-1" /> New Entry
+                </Button>
+              )}
+            </div>
+
+            <div className="px-8 py-8 space-y-6">
+              <div className="grid grid-cols-2 gap-x-10 gap-y-6">
+                {/* Row 1 */}
+                <div className="flex items-center gap-4">
+                  <span className="text-[13px] font-extrabold text-[#4A081A] uppercase tracking-[0.05em] w-32 shrink-0 text-right">EMPLOYEE ID:</span>
+                  <div className={cn("flex-1 border border-[#630C22] rounded-xl px-4 py-2 text-base bg-slate-50 shadow-sm h-[48px] flex items-center min-w-0", inlineForm.employee_id ? "text-slate-800 font-semibold" : "text-slate-400 italic font-medium")}>
+                    <span className="truncate">{inlineForm.employee_id || 'Auto-filled on name selection'}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 relative">
+                  <span className="text-[13px] font-extrabold text-[#4A081A] uppercase tracking-[0.05em] w-32 shrink-0 text-right">NAME:</span>
+                  <Popover open={empOpen} onOpenChange={setEmpOpen}>
+                    <PopoverTrigger asChild>
+                      <button type="button" className="flex items-center justify-between flex-1 border border-[#630C22] rounded-xl px-4 py-2 text-lg bg-white hover:border-[#4A081A] transition-all shadow-sm h-[48px] min-w-0 text-left">
+                        <span className={cn('flex-1 truncate', inlineForm.employee_name ? 'text-slate-800 font-semibold' : 'text-slate-400 italic')}>
+                          {inlineForm.employee_name || 'Select Employee Name'}
+                        </span>
+                        <ChevronDown className="w-5 h-5 text-slate-400 shrink-0 ml-2" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-0 w-[450px]">
+                      <Command>
+                        <CommandInput placeholder="Search employee..." className="text-base h-10" />
+                        <CommandEmpty className="text-base p-4">No employee found.</CommandEmpty>
+                        <CommandList>
+                          <CommandGroup>
+                            {employees
+                              .filter(e => e.id !== inlineForm.employee_id)
+                              .map(emp => (
+                                <CommandItem key={emp.id} value={emp.name} onSelect={() => handleInlineSelectEmployee(emp)} className="text-base py-3">
+                                  {emp.name}
+                                </CommandItem>
+                              ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="text-[13px] font-extrabold text-[#4A081A] uppercase tracking-[0.05em] w-32 shrink-0 text-right">CATEGORY:</span>
+                  <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className={cn(
+                          "flex items-center justify-between flex-1 border border-[#630C22] rounded-xl px-4 py-2 text-lg transition-all shadow-sm h-[48px] min-w-0 text-left",
+                          inlineForm.category
+                            ? (LEAVE_CATEGORY_OPTIONS.find(o => o.value === inlineForm.category)?.color || "bg-white hover:border-[#4A081A]")
+                            : "bg-white hover:border-[#4A081A]"
+                        )}
+                      >
+                        <span className={cn('flex-1 truncate', inlineForm.category ? 'font-black tracking-wide' : 'text-slate-400 italic text-lg')}>
+                          {LEAVE_CATEGORY_OPTIONS.find(o => o.value === inlineForm.category)?.label || 'Half-day/Whole day'}
+                        </span>
+                        <ChevronDown className={cn("w-5 h-5 shrink-0 ml-2", inlineForm.category ? "opacity-50" : "text-slate-400")} />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-2 w-[350px] space-y-2 border-0 shadow-2xl rounded-2xl bg-white">
+                      {LEAVE_CATEGORY_OPTIONS.map(o => (
+                        <button
+                          key={o.value}
+                          type="button"
+                          onClick={() => {
+                            setInlineForm(p => ({ ...p, category: o.value as 'half-day' | 'whole-day', shift: '' }));
+                            setCategoryOpen(false);
+                          }}
+                          className={cn(
+                            "w-full text-left px-5 py-4 rounded-xl text-lg transition-all font-black tracking-wider shadow-sm hover:opacity-80 uppercase",
+                            o.color
+                          )}
+                        >
+                          {o.label}
+                        </button>
+                      ))}
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Row 2 */}
+                <div className="flex items-center gap-4 relative">
+                  <span className="text-[13px] font-extrabold text-[#4A081A] uppercase tracking-[0.05em] w-32 shrink-0 text-right">SHIFT:</span>
+                  <Popover open={shiftOpen} onOpenChange={setShiftOpen}>
+                    <PopoverTrigger asChild>
+                      <button type="button" disabled={inlineForm.category === 'whole-day'} className={cn('flex items-center justify-between flex-1 border border-[#630C22] rounded-xl px-4 py-2 text-lg bg-white transition-all shadow-sm h-[48px] min-w-0 text-left', inlineForm.category === 'whole-day' ? 'opacity-40 cursor-not-allowed bg-slate-50' : 'hover:border-[#4A081A]')}>
+                        <span className={cn('flex-1 truncate', inlineForm.shift ? 'text-slate-800 font-semibold' : 'text-slate-400 italic text-lg')}>
+                          {inlineForm.shift || 'Select Hour'}
+                        </span>
+                        <ChevronDown className="w-5 h-5 text-slate-400 shrink-0 ml-2" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-2 w-[400px] space-y-1">
+                      {inlineAvailableShifts.length > 0 ? (
+                        inlineAvailableShifts
+                          .filter(s => s !== inlineForm.shift)
+                          .map(s => (
+                            <button key={s} type="button" onClick={() => { setInlineForm(p => ({ ...p, shift: s })); setShiftOpen(false); }} className="w-full text-left px-5 py-4 rounded-lg text-lg hover:bg-rose-50 transition-all font-medium">{s}</button>
+                          ))
+                      ) : (
+                        <p className="text-lg text-slate-400 italic px-5 py-4">{inlineForm.department ? `No shifts configured for "${inlineForm.department}"` : 'Select an employee first'}</p>
+                      )}
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="text-[13px] font-extrabold text-[#4A081A] uppercase tracking-[0.05em] w-32 shrink-0 text-right">START DATE:</span>
+                  <Input type="date" max={inlineForm.leave_end_date || undefined} value={inlineForm.start_date || ''} onChange={e => setInlineForm(p => ({ ...p, start_date: e.target.value }))} className="border-[#630C22] bg-white text-slate-700 flex-1 h-[48px] text-lg rounded-xl shadow-sm px-4" />
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="text-[13px] font-extrabold text-[#4A081A] uppercase tracking-[0.05em] w-32 shrink-0 text-right">LEAVE END:</span>
+                  <Input
+                    type="date"
+                    min={inlineForm.start_date || undefined}
+                    value={inlineForm.category === 'half-day' ? (inlineForm.start_date || '') : (inlineForm.leave_end_date || '')}
+                    disabled={inlineForm.category === 'half-day'}
+                    onChange={e => setInlineForm(p => ({ ...p, leave_end_date: e.target.value }))}
+                    className={cn(
+                      "border-[#630C22] bg-white text-slate-700 flex-1 h-[48px] text-lg rounded-xl shadow-sm px-4 font-medium",
+                      inlineForm.category === 'half-day' && "opacity-60 cursor-not-allowed bg-slate-50 border-slate-300"
+                    )}
+                  />
+                </div>
+
+                {/* Row 3 */}
+                <div className="flex items-center gap-4">
+                  <span className="text-[13px] font-extrabold text-[#4A081A] uppercase tracking-[0.05em] w-32 shrink-0 text-right">NO. OF DAYS:</span>
+                  <Input readOnly value={inlineForm.number_of_days > 0 ? formatDays(inlineForm.number_of_days, inlineForm.category) : ''} placeholder="" className="border-[#630C22] bg-white text-slate-700 cursor-default flex-1 h-[48px] rounded-xl shadow-sm px-4 font-bold text-2xl" />
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="text-[13px] font-extrabold text-[#4A081A] uppercase tracking-[0.05em] w-32 shrink-0 text-right">APPROVED BY:</span>
+                  <Popover open={approvalOpen} onOpenChange={setApprovalOpen}>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className={cn(
+                          "flex items-center justify-between flex-1 border border-[#630C22] rounded-xl px-4 py-2 text-lg transition-all shadow-sm h-[48px] min-w-0 text-left",
+                          inlineForm.approved_by
+                            ? (inlineApprovalOptions.find(o => o.value === inlineForm.approved_by)?.color || "bg-white hover:border-[#4A081A]")
+                            : "bg-white hover:border-[#4A081A]"
+                        )}
+                      >
+                        <span className={cn('flex-1 truncate', inlineForm.approved_by ? 'font-bold tracking-wide' : 'text-slate-400 italic text-lg')}>
+                          {inlineApprovalOptions.find(o => o.value === inlineForm.approved_by)?.label || 'Select Status/Name'}
+                        </span>
+                        <ChevronDown className={cn("w-5 h-5 shrink-0 ml-2 opacity-50")} />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-2 w-[400px] space-y-2 border-0 shadow-2xl rounded-2xl bg-white">
+                      {inlineApprovalOptions.map(o => (
+                        <button
+                          key={o.value}
+                          type="button"
+                          onClick={() => { setInlineForm(p => ({ ...p, approved_by: o.value })); setApprovalOpen(false); }}
+                          className={cn(
+                            "w-full text-left px-5 py-4 rounded-xl text-lg transition-all font-bold tracking-wide shadow-sm hover:opacity-80",
+                            o.color
+                          )}
+                        >
+                          {o.label}
+                        </button>
+                      ))}
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="flex items-start gap-4">
+                  <span className="text-[13px] font-extrabold text-[#4A081A] uppercase tracking-[0.05em] w-32 shrink-0 text-right pt-[14px]">REMARKS:</span>
+                  <Popover open={remarksOpen} onOpenChange={setRemarksOpen}>
+                    <PopoverTrigger asChild>
+                      <button type="button" className="flex items-center justify-between flex-1 border border-[#630C22] rounded-xl px-4 py-2 text-lg bg-white hover:border-[#4A081A] transition-all shadow-sm h-[48px] min-w-0 text-left">
+                        <span className={cn('flex-1 truncate', inlineForm.remarks ? 'text-slate-800 font-semibold' : 'text-slate-400 italic text-lg')}>
+                          {inlineRemarkOptions.find(o => o.value === inlineForm.remarks)?.label || 'Select Leave Type'}
+                        </span>
+                        <ChevronDown className="w-5 h-5 text-slate-400 shrink-0 ml-2" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-2 w-[400px] space-y-1">
+                      {inlineRemarkOptions.map(o => (
+                        <button key={o.value} type="button" onClick={() => { setInlineForm(p => ({ ...p, remarks: o.value })); setRemarksOpen(false); }} className="w-full text-left px-5 py-4 rounded-lg text-lg hover:bg-rose-50 transition-all font-medium">
+                          {o.label}
+                        </button>
+                      ))}
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <span className="text-[13px] font-extrabold text-[#4A081A] uppercase tracking-[0.05em] w-32 shrink-0 text-right pt-[14px]">REASON:</span>
+                  <textarea rows={2} value={inlineForm.cite_reason} onChange={e => setInlineForm(p => ({ ...p, cite_reason: e.target.value }))} placeholder="specify reason" className={cn("flex-1 border border-[#630C22] rounded-xl px-4 py-3 text-lg resize-none focus:outline-none focus:border-[#4A081A] shadow-sm transition-all min-h-[90px]", inlineForm.cite_reason ? "text-slate-800 font-semibold" : "italic font-medium text-slate-400")} />
+                </div>
+              </div>
+
+              {/* Footer actions */}
+              <div className="flex justify-end gap-4 pt-6 pr-2 pb-4">
+                <Button variant="outline" onClick={() => { setAddModalOpen(false); resetInlineForm() }} className="border-rose-300 text-[#4A081A] hover:bg-rose-50 text-lg px-12 h-[56px] font-extrabold rounded-2xl shadow-sm transition-all hover:scale-105">
+                  Cancel
+                </Button>
+                <Button onClick={handleInlineSave} disabled={inlineSaving} className="bg-[#630C22] hover:bg-[#4A081A] text-white text-lg px-16 h-[56px] font-extrabold rounded-2xl shadow-xl hover:shadow-[#630C22]/40 transition-all hover:scale-105 active:scale-95">
+                  {inlineSaving ? (inlineForm.id ? 'Updating…' : 'Saving…') : (inlineForm.id ? 'Update Leave' : 'Save Leave')}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* ── Leave Monitoring Table ── */}
         <section>
