@@ -30,7 +30,8 @@ import {
 import { ConfirmationModal } from '@/components/ConfirmationModal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-interface Department { id: number; name: string }
+interface Department { id: number; name: string; office_id?: number }
+interface Office { id: number; name: string }
 interface Employee { id: string; name: string; department?: string | null; department_id?: number; position?: string | null }
 
 interface LeaveEntry {
@@ -48,31 +49,10 @@ interface LeaveEntry {
   cite_reason: string
 }
 
-// ─── Department shift schedule type (loaded from API) ─────────────────────────
-interface DepartmentShiftSchedule {
-  id: number
-  department: string
-  schedule_label: string
-  shift_options: string[]   // e.g. ["8:00 AM – 12:00 PM", "1:00 PM – 4:00 PM"]
-}
-
-// Fallback helper for cases where no DB row matches (should rarely happen)
-function getShiftFallback(departmentName: string): { label: string; shifts: string[] } {
-  const d = departmentName.toLowerCase().trim()
-  const words = d.split(/\s+/)
-
-  const isMultimedia = words.some(w => ['multimedia', 'marketing', 'studio'].includes(w))
-  const isIT = words.some(w => ['it', 'infinitech'].includes(w))
-  const isABIC = words.some(w => ['accounting', 'sales', 'admin', 'abic'].includes(w))
-
-  if (isMultimedia)
-    return { label: 'Multimedia/Marketing/Studio (10:00 AM – 2:00 PM / 3:00 PM – 7:00 PM)', shifts: ['10:00 AM – 2:00 PM', '3:00 PM – 7:00 PM'] }
-  if (isIT)
-    return { label: 'IT/Infinitech (9:00 AM – 1:00 PM / 2:00 PM – 6:00 PM)', shifts: ['9:00 AM – 1:00 PM', '2:00 PM – 6:00 PM'] }
-  if (isABIC)
-    return { label: 'Accounting/Sales/Admin (8:00 AM – 12:00 PM / 1:00 PM – 4:00 PM)', shifts: ['8:00 AM – 12:00 PM', '1:00 PM – 4:00 PM'] }
-
-  return { label: 'ABIC (8:00 AM – 12:00 PM / 1:00 PM – 4:00 PM)', shifts: ['8:00 AM – 12:00 PM', '1:00 PM – 4:00 PM'] }
+interface OfficeShiftSchedule {
+  id?: number
+  office_name: string
+  shift_options: string[]
 }
 
 
@@ -367,176 +347,6 @@ function DateRangePicker({
   )
 }
 
-// ─── Add Leave Modal ──────────────────────────────────────────────────────────
-interface AddLeaveModalProps {
-  open: boolean
-  onClose: () => void
-  employees: Employee[]
-  departments: Department[]
-  onSave: (entry: Omit<LeaveEntry, 'id'>) => void
-  hierarchies?: any[]
-  positions?: any[]
-  shiftSchedules?: DepartmentShiftSchedule[]
-}
-
-const emptyForm = {
-  id: null as number | null,
-  employee_id: '' as string,   // registered DB id (e.g. "26-001")
-  employee_name: '',
-  department: '',
-  category: '' as '' | 'half-day' | 'whole-day',
-  shift: '',
-  start_date: '',
-  leave_end_date: '',
-  number_of_days: 0,
-  approved_by: '',
-  remarks: '',
-  cite_reason: '',
-}
-
-function AddLeaveModal({ open, onClose, employees, departments, onSave, hierarchies = [], positions = [], shiftSchedules = [] }: AddLeaveModalProps) {
-  const [form, setForm] = useState({ ...emptyForm })
-  const [empOpen, setEmpOpen] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [showConfirm, setShowConfirm] = useState(false)
-  const [pendingPayload, setPendingPayload] = useState<Omit<LeaveEntry, 'id'> | null>(null)
-
-  // Reset on open
-  useEffect(() => {
-    if (open) setForm({ ...emptyForm })
-  }, [open])
-
-  // Auto-set department when employee is selected
-  const handleSelectEmployee = (emp: Employee) => {
-    const dept =
-      (emp.department && emp.department.trim()) ||
-      departments.find(d => d.id === emp.department_id)?.name ||
-      (emp.position && emp.position.trim()) ||
-      ''
-    setForm(prev => ({ ...prev, employee_id: emp.id, employee_name: emp.name, department: dept, shift: '' }))
-    setEmpOpen(false)
-  }
-
-  // Auto-calc number of days
-  useEffect(() => {
-    if (form.start_date && form.leave_end_date) {
-      const start = new Date(form.start_date)
-      const end = new Date(form.leave_end_date)
-      if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end >= start) {
-        const diff = Math.round((end.getTime() - start.getTime()) / 86400000) + 1
-        const days = form.category === 'half-day' ? diff * 0.5 : diff
-        setForm(prev => ({ ...prev, number_of_days: days }))
-      }
-    }
-  }, [form.start_date, form.leave_end_date, form.category])
-
-  const _formShiftRow = shiftSchedules.find(s => {
-    const d1 = form.department.toLowerCase().trim()
-    const d2 = s.department.toLowerCase().trim()
-    if (!d1 || !d2) return false
-    if (d1 === d2) return true
-    const words1 = d1.split(/\s+/)
-    const words2 = d2.split(/\s+/)
-    return words1.some(w => words2.includes(w)) || words2.some(w => words1.includes(w))
-  })
-  const _formFallback = form.department ? getShiftFallback(form.department) : null
-  const availableShifts: string[] = _formShiftRow?.shift_options ?? _formFallback?.shifts ?? []
-  const shiftLabel: string = _formShiftRow?.schedule_label ?? _formFallback?.label ?? ''
-
-  const getSuperiorsForEmployee = (empId: string | number | undefined) => {
-    const adminPositionKeywords = ['Head', 'Manager', 'Admin', 'VP', 'President', 'Director', 'Supervisor', 'Lead', 'Chief']
-    const admins = employees.filter(e =>
-      e.position && adminPositionKeywords.some(kw => e.position?.toLowerCase().includes(kw.toLowerCase()))
-    ).map(e => ({ label: e.name, value: e.name, color: 'bg-green-500 text-white' }))
-
-    if (!empId) return admins
-
-    const emp = employees.find(e => String(e.id) === String(empId))
-    if (!emp || !emp.position || !positions || !hierarchies) return admins
-
-    const empPos = positions.find(p => p.name.toLowerCase() === emp.position?.toLowerCase())
-    if (!empPos) return admins
-
-    let empHier = hierarchies.find(h => String(h.position_id) === String(empPos.id))
-    if (empHier && emp.department_id) {
-      const specificHier = hierarchies.find(h => String(h.position_id) === String(empPos.id) && String(h.department_id) === String(emp.department_id))
-      if (specificHier) empHier = specificHier
-    }
-
-    if (empHier && empHier.parent_id) {
-      const parentHier = hierarchies.find(h => String(h.id) === String(empHier.parent_id))
-      if (parentHier) {
-        const parentPos = positions.find(p => String(p.id) === String(parentHier.position_id))
-        if (parentPos) {
-          const sups = employees.filter(e => e.position && e.position.toLowerCase() === parentPos.name.toLowerCase())
-          if (sups.length > 0) {
-            const specificSuperiors = sups.map(s => ({
-              label: `${s.name} (${parentPos.name})`,
-              value: s.name,
-              color: 'bg-[#A4163A] text-white font-bold'
-            }))
-
-            const specificValues = specificSuperiors.map(s => s.value)
-            const filteredAdmins = admins.filter(a => !specificValues.includes(a.value))
-
-            return [...specificSuperiors, ...filteredAdmins]
-          }
-        }
-      }
-    }
-
-    return admins
-  }
-
-  const approvalOptions = useMemo(() => {
-    return [
-      ...APPROVAL_OPTIONS,
-      ...getSuperiorsForEmployee(form.employee_id)
-    ]
-  }, [employees, hierarchies, positions, form.employee_id])
-
-  const remarkOptions = LEAVE_REMARKS.map(r => ({ label: r, value: r }))
-
-  const handleSave = async () => {
-    if (!form.employee_name) { toast.error('Please select an employee'); return }
-    if (!form.category) { toast.error('Please select a category'); return }
-    if (!form.start_date) { toast.error('Please enter a start date'); return }
-    if (!form.leave_end_date) { toast.error('Please enter a leave end date'); return }
-    if (!form.approved_by) { toast.error('Please select approval status'); return }
-    if (!form.remarks) { toast.error('Please select leave type'); return }
-
-    const payload: Omit<LeaveEntry, 'id'> = {
-      employee_id: form.employee_id,
-      employee_name: form.employee_name,
-      department: form.department,
-      category: form.category as 'half-day' | 'whole-day',
-      shift: form.category === 'half-day' ? form.shift : undefined,
-      start_date: form.start_date,
-      leave_end_date: form.leave_end_date,
-      number_of_days: form.number_of_days,
-      approved_by: form.approved_by,
-      remarks: form.remarks,
-      cite_reason: form.cite_reason,
-    }
-    setPendingPayload(payload)
-    setShowConfirm(true)
-  }
-
-  const confirmSave = async () => {
-    if (!pendingPayload) return
-    setSaving(true)
-    try {
-      await onSave(pendingPayload)
-      onClose()
-    } finally {
-      setSaving(false)
-      setShowConfirm(false)
-      setPendingPayload(null)
-    }
-  }
-
-
-}
 
 // ─── Calendar View ─────────────────────────────────────────────────────────────
 function CalendarView({ year, month, entries, weekOnly = false }: {
@@ -829,6 +639,21 @@ export default function LeavePage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [entries, setEntries] = useState<LeaveEntry[]>([])
 
+  const emptyForm = {
+    id: null as number | null,
+    employee_id: '' as string,   // registered DB id (e.g. "26-001")
+    employee_name: '',
+    department: '',
+    category: '' as '' | 'half-day' | 'whole-day',
+    shift: '',
+    start_date: '',
+    leave_end_date: '',
+    number_of_days: 0,
+    approved_by: '',
+    remarks: '',
+    cite_reason: '',
+  }
+
   // ── Inline form state ──────────────────────────────────────────────────────
   const [inlineForm, setInlineForm] = useState({ ...emptyForm })
   const [empOpen, setEmpOpen] = useState(false)
@@ -847,7 +672,8 @@ export default function LeavePage() {
   const [showEditConfirm, setShowEditConfirm] = useState(false)
   const [entryToEdit, setEntryToEdit] = useState<LeaveEntry | null>(null)
 
-  const [shiftSchedules, setShiftSchedules] = useState<DepartmentShiftSchedule[]>([])
+  const [shiftSchedules, setShiftSchedules] = useState<OfficeShiftSchedule[]>([])
+  const [offices, setOffices] = useState<Office[]>([])
 
   // ── Data Fetching ──────────────────────────────────────────────────────────
   const fetchEntries = async () => {
@@ -959,12 +785,17 @@ export default function LeavePage() {
   }, [])
 
   useEffect(() => {
-    fetch(`${getApiUrl()}/api/department-shift-schedules`)
+    fetch(`${getApiUrl()}/api/offices`)
       .then(r => r.json())
-      .then((json: { success: boolean; data: DepartmentShiftSchedule[] }) => {
+      .then(d => { if (d.success) setOffices(d.data) })
+      .catch(console.error)
+
+    fetch(`${getApiUrl()}/api/office-shift-schedules`)
+      .then(r => r.json())
+      .then((json) => {
         if (json.success) setShiftSchedules(json.data)
       })
-      .catch(() => { /* fallback data will be used */ })
+      .catch(console.error)
   }, [])
 
   const resetInlineForm = () => setInlineForm({ ...emptyForm })
@@ -1042,19 +873,46 @@ export default function LeavePage() {
     setEmpOpen(false)
   }
 
-  // Lookup shift info from DB data (fall back to static helper if not found)
-  const _shiftRow = shiftSchedules.find(s => {
-    const d1 = inlineForm.department.toLowerCase().trim()
-    const d2 = s.department.toLowerCase().trim()
-    if (!d1 || !d2) return false
-    if (d1 === d2) return true
-    const words1 = d1.split(/\s+/)
-    const words2 = d2.split(/\s+/)
-    return words1.some(w => words2.includes(w)) || words2.some(w => words1.includes(w))
-  })
-  const _fallback = inlineForm.department ? getShiftFallback(inlineForm.department) : null
-  const inlineAvailableShifts: string[] = _shiftRow?.shift_options ?? _fallback?.shifts ?? []
-  const inlineShiftLabel: string = _shiftRow?.schedule_label ?? _fallback?.label ?? ''
+  // Lookup shift info from DB data
+  const _shiftRow = useMemo(() => {
+    let matchingOfficeName = ''
+    // Identify department of this form
+    const emp = employees.find(e => e.id === inlineForm.employee_id)
+    const deptId = emp?.department_id
+
+    if (deptId) {
+      const d = departments.find(d => String(d.id) === String(deptId))
+      if (d && d.office_id) {
+        const off = offices.find(o => String(o.id) === String(d.office_id))
+        if (off) matchingOfficeName = off.name
+      }
+    }
+    if (!matchingOfficeName && inlineForm.department) {
+      // Find best match in departments text if fallback
+      const d = departments.find(d => d.name.toLowerCase() === inlineForm.department.toLowerCase())
+      if (d && d.office_id) {
+        const off = offices.find(o => String(o.id) === String(d.office_id))
+        if (off) matchingOfficeName = off.name
+      } else {
+        // Direct text fallback to office name if any
+        const off = offices.find(o => inlineForm.department.toLowerCase().includes(o.name.toLowerCase()))
+        if (off) matchingOfficeName = off.name
+      }
+    }
+
+    if (matchingOfficeName) {
+      return shiftSchedules.find(s => s.office_name.toLowerCase() === matchingOfficeName.toLowerCase())
+    }
+
+    // General fallback: attempt text match on office names via shift schedules
+    return shiftSchedules.find(s => {
+      const officeWords = s.office_name.toLowerCase().split(/\s+/)
+      return officeWords.some(w => w.length > 2 && inlineForm.department.toLowerCase().includes(w))
+    })
+  }, [inlineForm.employee_id, inlineForm.department, employees, departments, offices, shiftSchedules])
+
+  const inlineAvailableShifts: string[] = _shiftRow?.shift_options ?? []
+  const inlineShiftLabel: string = _shiftRow ? _shiftRow.office_name : ''
 
   // Auto-calc number of days for inline form
   useEffect(() => {

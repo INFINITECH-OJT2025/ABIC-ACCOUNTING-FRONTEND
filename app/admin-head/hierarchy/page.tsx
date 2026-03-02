@@ -117,7 +117,7 @@ export default function AdminHeadHierarchyPage() {
         const posData = await posRes.json()
         const schedData = await schedRes.json()
         const officeData = await officeRes.json()
-        
+
         const mappedDeps = (Array.isArray(deptData?.data) ? deptData.data : (Array.isArray(deptData) ? deptData : [])).map((d: any) => ({
           id: d.id.toString(),
           name: d.name,
@@ -210,7 +210,7 @@ export default function AdminHeadHierarchyPage() {
 
   const addShiftOption = () => {
     if (!editingSchedule) return
-    
+
     const formatTime = (time: string) => {
       const [hours, minutes] = time.split(':')
       const h = parseInt(hours)
@@ -220,7 +220,7 @@ export default function AdminHeadHierarchyPage() {
     }
 
     const formattedOption = `${formatTime(newShiftStart)} – ${formatTime(newShiftEnd)}`
-    
+
     setEditingSchedule({
       ...editingSchedule,
       shift_options: [...editingSchedule.shift_options, formattedOption]
@@ -260,7 +260,7 @@ export default function AdminHeadHierarchyPage() {
       if (!res.ok) throw new Error('Failed to create department')
       const result = await res.json()
       const d = result.data || result
-      
+
       setDepartments((prev) => [...prev, {
         id: d.id.toString(),
         name: d.name,
@@ -296,7 +296,7 @@ export default function AdminHeadHierarchyPage() {
       if (!res.ok) throw new Error('Failed to create office')
       const result = await res.json()
       const o = result.data
-      
+
       setOffices((prev) => [...prev, { id: o.id.toString(), name: o.name }])
       setOfficeName("")
       toast?.success("Office created successfully.")
@@ -545,16 +545,16 @@ export default function AdminHeadHierarchyPage() {
               <div className="space-y-12">
                 {offices.map((office) => {
                   const officeDepts = departments.filter(d => d.officeId === office.id)
-                  
+
                   return (
                     <div key={office.id} className="space-y-6">
                       <div className="flex items-center gap-4">
                         <div className="h-[2px] flex-1 bg-slate-200" />
                         <div className="flex items-center gap-3 px-6 py-2 rounded-full bg-slate-100 border border-slate-200 shadow-sm">
                           <span className="text-sm font-black uppercase tracking-widest text-slate-600">{office.name} OFFICE</span>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="h-7 w-7 text-slate-400 hover:text-[#A4163A] hover:bg-white transition-colors"
                             onClick={() => handleOpenShiftModal(office)}
                           >
@@ -668,7 +668,7 @@ export default function AdminHeadHierarchyPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-[10px] font-bold text-slate-400 uppercase">Start Time</Label>
-                    <Input 
+                    <Input
                       type="time"
                       value={newShiftStart}
                       onChange={(e) => setNewShiftStart(e.target.value)}
@@ -677,7 +677,7 @@ export default function AdminHeadHierarchyPage() {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-[10px] font-bold text-slate-400 uppercase">End Time</Label>
-                    <Input 
+                    <Input
                       type="time"
                       value={newShiftEnd}
                       onChange={(e) => setNewShiftEnd(e.target.value)}
@@ -685,8 +685,8 @@ export default function AdminHeadHierarchyPage() {
                     />
                   </div>
                 </div>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full h-9 border-dashed border-[#A4163A]/30 text-[#A4163A] hover:bg-[#A4163A]/5 hover:border-[#A4163A]"
                   onClick={addShiftOption}
                 >
@@ -694,14 +694,14 @@ export default function AdminHeadHierarchyPage() {
                   Add to Options
                 </Button>
               </div>
-              
+
               <div className="space-y-2 max-h-[150px] overflow-y-auto pr-1">
                 {editingSchedule?.shift_options.map((option, idx) => (
                   <div key={idx} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
                     <span className="text-sm font-medium text-slate-600">{option}</span>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       className="h-6 w-6 text-slate-400 hover:text-rose-500"
                       onClick={() => removeShiftOption(idx)}
                     >
@@ -721,8 +721,8 @@ export default function AdminHeadHierarchyPage() {
             <Button variant="outline" onClick={() => setIsShiftModalOpen(false)} disabled={loading}>
               Cancel
             </Button>
-            <Button 
-              className="bg-[#A4163A] hover:bg-[#7B0F2B] text-white" 
+            <Button
+              className="bg-[#A4163A] hover:bg-[#7B0F2B] text-white"
               onClick={handleSaveShiftSchedule}
               disabled={loading}
             >
