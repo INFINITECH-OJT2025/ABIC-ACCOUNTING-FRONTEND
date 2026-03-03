@@ -567,17 +567,30 @@ export default function AdminHeadHierarchyPage() {
                         <Checkbox
                           id={`child-${item.id}`}
                           checked={selectedChildren.includes(item.id)}
+                          disabled={selectedChildren.length > 0 && !selectedChildren.includes(item.id)}
                           onCheckedChange={(checked) => {
                             if (checked) {
-                              setSelectedChildren((prev) => [...prev, item.id])
+                              if (parentOptions.length === 1) {
+                                toast.error("You cannot select all positions in a department as subordinates.")
+                                return
+                              }
+                              if (selectedChildren.length >= 1) {
+                                toast.error("Selection limited to one subordinate.")
+                                return
+                              }
+                              setSelectedChildren([item.id])
                             } else {
-                              setSelectedChildren((prev) => prev.filter((id) => id !== item.id))
+                              setSelectedChildren([])
                             }
                           }}
                         />
                         <label
                           htmlFor={`child-${item.id}`}
-                          className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-slate-600"
+                          className={`text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${
+                            selectedChildren.length > 0 && !selectedChildren.includes(item.id) 
+                              ? "text-slate-300" 
+                              : "text-slate-600"
+                          }`}
                         >
                           {item.title}
                         </label>
