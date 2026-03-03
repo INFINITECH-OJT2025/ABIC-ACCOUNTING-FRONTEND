@@ -773,7 +773,28 @@ export default function ClearanceChecklistPage() {
 
         {/* Task List Section */}
         <Card className="rounded-2xl border-2 border-[#FFE5EC] shadow-2xl bg-white overflow-hidden mb-12">
+          <div className="p-4 md:px-8 bg-slate-50/50 border-b border-[#FFE5EC] flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex items-center gap-3">
+              <Button onClick={addTask} size="sm" className="bg-[#A4163A] hover:bg-[#800020] text-white font-black text-xs h-9 px-6 rounded-xl shadow-md active:scale-95 transition-all">
+                <Plus className="w-3.5 h-3.5 mr-2" /> ADD ROW
+              </Button>
+              <Separator orientation="vertical" className="h-4 bg-slate-200" />
+              <p className="text-[8px] font-black text-slate-300 uppercase tracking-[0.2em] italic">
+                ADMINISTRATION FRAMEWORK â€¢ ABIC HR
+              </p>
+            </div>
 
+            <div className="flex gap-3">
+              <Button
+                onClick={() => setSaveConfirmOpen(true)}
+                disabled={saving || !employeeInfo}
+                className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg active:scale-95 transition-all rounded-xl"
+              >
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <Save className="w-3.5 h-3.5 mr-2" />}
+                {saving ? 'UPDATING...' : 'FINALIZE SAVE'}
+              </Button>
+            </div>
+          </div>
 
           <Table>
             <TableHeader className="bg-[#FFE5EC]/40">
@@ -900,7 +921,7 @@ export default function ClearanceChecklistPage() {
 
 
           {/* Table Footer */}
-          <div className="p-4 md:px-8 bg-slate-50/50 border-t border-[#FFE5EC] flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="hidden p-4 md:px-8 bg-slate-50/50 border-t border-[#FFE5EC] flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-3">
               <Button onClick={addTask} size="sm" className="bg-[#A4163A] hover:bg-[#800020] text-white font-black text-xs h-9 px-6 rounded-xl shadow-md active:scale-95 transition-all">
                 <Plus className="w-3.5 h-3.5 mr-2" /> ADD ROW

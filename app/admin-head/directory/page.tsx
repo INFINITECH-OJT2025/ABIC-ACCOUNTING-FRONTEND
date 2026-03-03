@@ -174,6 +174,7 @@ type PortalLink = {
 const ALLOWED_UPLOAD_FORMATS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif'] as const
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024
 const CLOUDINARY_PAGE_SIZE = 9
+const GENERAL_CONTACTS_PAGE_SIZE = 12
 const OFFICIAL_PORTALS: PortalLink[] = [
   { code: 'sss', label: 'SSS', url: 'https://member.sss.gov.ph/' },
   { code: 'pagibig', label: 'PAG-IBIG', url: 'https://www.pagibigfundservices.com/' },
@@ -300,6 +301,7 @@ export default function GovernmentDirectoryPage() {
   const [generalContacts, setGeneralContacts] = useState<GeneralContact[]>([])
   const [generalContactsDraft, setGeneralContactsDraft] = useState<EditableGeneralContact[]>([])
   const [generalContactsSearch, setGeneralContactsSearch] = useState('')
+  const [generalContactsPage, setGeneralContactsPage] = useState(1)
   const [loadingGeneralContacts, setLoadingGeneralContacts] = useState(false)
   const [savingGeneralContacts, setSavingGeneralContacts] = useState(false)
   const [editingGeneralContacts, setEditingGeneralContacts] = useState(false)
@@ -342,6 +344,21 @@ export default function GovernmentDirectoryPage() {
     })
   }, [generalContactsDraft, generalContactsSearch])
 
+  const generalContactsTotalPages = useMemo(() => {
+    const totalRows = editingGeneralContacts ? filteredGeneralContactsDraft.length : filteredGeneralContacts.length
+    return Math.max(1, Math.ceil(totalRows / GENERAL_CONTACTS_PAGE_SIZE))
+  }, [editingGeneralContacts, filteredGeneralContactsDraft.length, filteredGeneralContacts.length])
+
+  const paginatedFilteredGeneralContacts = useMemo(() => {
+    const start = (generalContactsPage - 1) * GENERAL_CONTACTS_PAGE_SIZE
+    return filteredGeneralContacts.slice(start, start + GENERAL_CONTACTS_PAGE_SIZE)
+  }, [filteredGeneralContacts, generalContactsPage])
+
+  const paginatedFilteredGeneralContactsDraft = useMemo(() => {
+    const start = (generalContactsPage - 1) * GENERAL_CONTACTS_PAGE_SIZE
+    return filteredGeneralContactsDraft.slice(start, start + GENERAL_CONTACTS_PAGE_SIZE)
+  }, [filteredGeneralContactsDraft, generalContactsPage])
+
   const cloudinaryTotalPages = useMemo(() => {
     return Math.max(1, Math.ceil(cloudinaryImages.length / CLOUDINARY_PAGE_SIZE))
   }, [cloudinaryImages.length])
@@ -361,6 +378,15 @@ export default function GovernmentDirectoryPage() {
   useEffect(() => {
     setCloudinaryPage((prev) => Math.min(prev, cloudinaryTotalPages))
   }, [cloudinaryTotalPages])
+
+  useEffect(() => {
+    setGeneralContactsPage((prev) => Math.min(prev, generalContactsTotalPages))
+  }, [generalContactsTotalPages])
+
+  useEffect(() => {
+    if (activeAgency !== GENERAL_CONTACTS_KEY) return
+    setGeneralContactsPage(1)
+  }, [generalContactsSearch, editingGeneralContacts, activeAgency])
 
   const directoryQuery = useQuery({
     queryKey: ['directory-agencies'],
@@ -1333,7 +1359,7 @@ export default function GovernmentDirectoryPage() {
 
             <div className="px-6 md:px-8 py-6">
               {loadingGeneralContacts ? (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {Array.from({ length: 8 }).map((_, idx) => (
                     <div key={`general-contact-skeleton-${idx}`} className="border border-slate-100 rounded-md p-3">
                       <div className="flex items-start gap-3">
@@ -1365,7 +1391,7 @@ export default function GovernmentDirectoryPage() {
                     <p className="text-sm text-slate-500">No rows yet. Click Add Row to create one.</p>
                   ) : (
                     <>
-                    {filteredGeneralContactsDraft.map(({ row, index }) => (
+                    {paginatedFilteredGeneralContactsDraft.map(({ row, index }) => (
                       <div key={`general-contact-draft-${index}`} className="border border-slate-200 rounded-md p-3 space-y-2">
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-2 min-w-0">
@@ -1525,8 +1551,8 @@ export default function GovernmentDirectoryPage() {
                   {generalContacts.length === 0 ? 'No general contacts yet.' : 'No contacts match your search.'}
                 </p>
               ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                  {filteredGeneralContacts.map((contact) => {
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {paginatedFilteredGeneralContacts.map((contact) => {
                     return (
                       <div key={contact.id} className="flex items-start gap-3 rounded-md border border-slate-100 p-3 min-w-0">
                         {contact.avatar_url ? (
@@ -1563,6 +1589,40 @@ export default function GovernmentDirectoryPage() {
                   })}
                 </div>
               )}
+              {!loadingGeneralContacts && (editingGeneralContacts ? filteredGeneralContactsDraft.length > 0 : filteredGeneralContacts.length > 0) ? (
+                <div className="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-4 md:flex-row md:items-center md:justify-between">
+                  <p className="text-xs font-semibold text-slate-500">
+                    Showing {(generalContactsPage - 1) * GENERAL_CONTACTS_PAGE_SIZE + 1}
+                    -
+                    {(generalContactsPage - 1) * GENERAL_CONTACTS_PAGE_SIZE + (editingGeneralContacts ? paginatedFilteredGeneralContactsDraft.length : paginatedFilteredGeneralContacts.length)} of {editingGeneralContacts ? filteredGeneralContactsDraft.length : filteredGeneralContacts.length}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 px-3"
+                      disabled={generalContactsPage <= 1}
+                      onClick={() => setGeneralContactsPage((prev) => Math.max(1, prev - 1))}
+                    >
+                      <ArrowRight className="mr-1 h-3.5 w-3.5 rotate-180" />
+                      Previous
+                    </Button>
+                    <span className="text-xs font-bold text-slate-600 px-2">
+                      Page {generalContactsPage} of {generalContactsTotalPages}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 px-3"
+                      disabled={generalContactsPage >= generalContactsTotalPages}
+                      onClick={() => setGeneralContactsPage((prev) => Math.min(generalContactsTotalPages, prev + 1))}
+                    >
+                      Next
+                      <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </Card>
         ) : (
