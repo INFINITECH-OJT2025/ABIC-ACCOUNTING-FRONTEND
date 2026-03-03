@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState, useEffect } from "react"
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui"
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Checkbox } from "@/components/ui"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -30,10 +30,10 @@ type OfficeShiftSchedule = {
 type PositionNode = {
   id: string
   title: string
-  role: string
   departmentId: string
   parentId: string
   createdAt: number
+  positionId?: string
 }
 
 function titleToId(value: string) {
@@ -88,6 +88,7 @@ export default function AdminHeadHierarchyPage() {
   const [positionTitle, setPositionTitle] = useState("")
   const [selectedDepartment, setSelectedDepartment] = useState("")
   const [selectedParent, setSelectedParent] = useState("admin-head")
+  const [selectedChildren, setSelectedChildren] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
 
   // Office States
@@ -103,62 +104,81 @@ export default function AdminHeadHierarchyPage() {
   const [newShiftStart, setNewShiftStart] = useState("08:00")
   const [newShiftEnd, setNewShiftEnd] = useState("12:00")
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const [deptRes, hierRes, posRes, schedRes, officeRes] = await Promise.all([
-          fetch(getApiUrl() + '/api/departments', { headers: { Accept: 'application/json' } }),
-          fetch(getApiUrl() + '/api/hierarchies', { headers: { Accept: 'application/json' } }),
-          fetch(getApiUrl() + '/api/positions', { headers: { Accept: 'application/json' } }),
-          fetch(getApiUrl() + '/api/office-shift-schedules', { headers: { Accept: 'application/json' } }),
-          fetch(getApiUrl() + '/api/offices', { headers: { Accept: 'application/json' } })
-        ])
-        const deptData = await deptRes.json()
-        const hierData = await hierRes.json()
-        const posData = await posRes.json()
-        const schedData = await schedRes.json()
-        const officeData = await officeRes.json()
+  const fetchData = async () => {
+    try {
+      const [deptRes, hierRes, posRes, schedRes, officeRes] = await Promise.all([
+        fetch(getApiUrl() + '/api/departments', { headers: { Accept: 'application/json' } }),
+        fetch(getApiUrl() + '/api/hierarchies', { headers: { Accept: 'application/json' } }),
+        fetch(getApiUrl() + '/api/positions', { headers: { Accept: 'application/json' } }),
+        fetch(getApiUrl() + '/api/office-shift-schedules', { headers: { Accept: 'application/json' } }),
+        fetch(getApiUrl() + '/api/offices', { headers: { Accept: 'application/json' } })
+      ])
+      const deptData = await deptRes.json()
+      const hierData = await hierRes.json()
+      const posData = await posRes.json()
+      const schedData = await schedRes.json()
+      const officeData = await officeRes.json()
 
-        const mappedDeps = (Array.isArray(deptData?.data) ? deptData.data : (Array.isArray(deptData) ? deptData : [])).map((d: any) => ({
-          id: d.id.toString(),
-          name: d.name,
-          color: d.color || '#59D2DE',
-          officeId: d.office_id?.toString() || ""
-        }))
-        setDepartments(mappedDeps)
+      const mappedDeps = (Array.isArray(deptData?.data) ? deptData.data : (Array.isArray(deptData) ? deptData : [])).map((d: any) => ({
+        id: d.id.toString(),
+        name: d.name,
+        color: d.color || '#59D2DE',
+        officeId: d.office_id?.toString() || ""
+      }))
+      setDepartments(mappedDeps)
 
-        if (officeData.success) {
-          setOffices(officeData.data.map((o: any) => ({ id: o.id.toString(), name: o.name })))
-        }
-
-        const hierArray = Array.isArray(hierData?.data) ? hierData.data : (Array.isArray(hierData) ? hierData : [])
-        const mappedPos = hierArray.map((h: any) => ({
-          id: h.id.toString(),
-          title: h.position?.name || 'Unknown',
-          role: h.role || '',
-          departmentId: h.department_id ? h.department_id.toString() : 'core',
-          parentId: h.parent_id ? h.parent_id.toString() : 'admin-head',
-          createdAt: new Date(h.created_at).getTime()
-        }))
-        setPositions(mappedPos)
-
-        const posArray = Array.isArray(posData?.data) ? posData.data : (Array.isArray(posData) ? posData : [])
-        setAvailablePositions(posArray.map((p: any) => p.name))
-
-        if (schedData.success) {
-          setSchedules(schedData.data)
-        }
-
-      } catch (err) {
-        console.error("Failed to load hierarchy data", err)
+      if (officeData.success) {
+        setOffices(officeData.data.map((o: any) => ({ id: o.id.toString(), name: o.name })))
       }
+
+      const hierArray = Array.isArray(hierData?.data) ? hierData.data : (Array.isArray(hierData) ? hierData : [])
+      const posArray = Array.isArray(posData?.data) ? posData.data : (Array.isArray(posData) ? posData : [])
+      setAvailablePositions(posArray.map((p: any) => p.name))
+
+      // 1. Map explicit hierarchy records
+      const mappedPos = hierArray.map((h: any) => ({
+        id: h.id.toString(),
+        title: h.position?.name || 'Unknown',
+        departmentId: h.department_id ? h.department_id.toString() : 'core',
+        parentId: h.parent_id ? h.parent_id.toString() : 'admin-head',
+        createdAt: new Date(h.created_at).getTime(),
+        positionId: h.position_id?.toString()
+      }))
+
+      // 2. Add positions that are assigned to departments but NOT in the hierarchy table
+      const missingFromHier = posArray.filter((p: any) => 
+        !hierArray.some((h: any) => h.position_id === p.id)
+      )
+
+      const extraNodes = missingFromHier.map((p: any) => ({
+        id: `virtual-${p.id}`,
+        title: p.name,
+        departmentId: p.department_id?.toString() || 'core',
+        parentId: 'admin-head',
+        createdAt: new Date(p.created_at).getTime(),
+        positionId: p.id.toString()
+      }))
+
+      setPositions([...mappedPos, ...extraNodes])
+
+      if (schedData.success) {
+        setSchedules(schedData.data)
+      }
+
+    } catch (err) {
+      console.error("Failed to load hierarchy data", err)
     }
+  }
+
+  useEffect(() => {
     fetchData()
   }, [])
 
   const parentOptions = useMemo(() => {
     if (!selectedDepartment) return []
-    return positions.filter((item) => item.departmentId === selectedDepartment)
+    return positions
+      .filter((item) => item.departmentId === selectedDepartment)
+      .sort((a, b) => a.title.localeCompare(b.title))
   }, [positions, selectedDepartment])
 
   const recentlyAdded = useMemo(() => {
@@ -354,20 +374,10 @@ export default function AdminHeadHierarchyPage() {
 
     setLoading(true)
     try {
-      const posRes = await fetch(getApiUrl() + '/api/positions/bulk', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          positions: [cleanTitle],
-          department_id: selectedDepartment === 'core' ? null : Number(selectedDepartment)
-        })
-      })
-      if (!posRes.ok) throw new Error('Failed to create position')
-      const posResult = await posRes.json()
-      const p = posResult.data[0] || posResult[0]
+      const child_ids = selectedChildren.filter(id => !id.startsWith('virtual-')).map(Number)
+      const child_position_ids = selectedChildren
+        .filter(id => id.startsWith('virtual-'))
+        .map(id => Number(id.replace('virtual-', '')))
 
       const hierRes = await fetch(getApiUrl() + '/api/hierarchies', {
         method: 'POST',
@@ -376,30 +386,21 @@ export default function AdminHeadHierarchyPage() {
           'Accept': 'application/json'
         },
         body: JSON.stringify({
-          position_id: p.id,
+          position_name: cleanTitle,
           department_id: selectedDepartment === 'core' ? null : Number(selectedDepartment),
           parent_id: selectedParent === 'admin-head' ? null : Number(selectedParent),
-          role: cleanTitle
+          child_ids,
+          child_position_ids
         })
       })
       if (!hierRes.ok) throw new Error('Failed to create hierarchy link')
-      const hResult = await hierRes.json()
-      const h = hResult.data || hResult
-
-      setPositions((prev) => [
-        ...prev,
-        {
-          id: h.id.toString(),
-          title: cleanTitle,
-          role: cleanTitle,
-          departmentId: selectedDepartment,
-          parentId: selectedParent || "admin-head",
-          createdAt: Date.now(),
-        },
-      ])
+      
+      // Refresh the entire data to ensure local state is perfectly in sync with DB
+      await fetchData()
 
       setPositionTitle("")
       setSelectedParent("admin-head")
+      setSelectedChildren([])
       toast?.success("Position successfully added to hierarchy.")
     } catch (err) {
       console.error(err)
@@ -555,6 +556,37 @@ export default function AdminHeadHierarchyPage() {
                 </SelectContent>
               </Select>
 
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Subordinates (Children)</Label>
+                <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-3 space-y-2 bg-white">
+                  {parentOptions.length === 0 ? (
+                    <p className="text-[10px] text-slate-400 italic text-center py-2">No existing positions in this department.</p>
+                  ) : (
+                    parentOptions.map((item) => (
+                      <div key={item.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`child-${item.id}`}
+                          checked={selectedChildren.includes(item.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedChildren((prev) => [...prev, item.id])
+                            } else {
+                              setSelectedChildren((prev) => prev.filter((id) => id !== item.id))
+                            }
+                          }}
+                        />
+                        <label
+                          htmlFor={`child-${item.id}`}
+                          className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-slate-600"
+                        >
+                          {item.title}
+                        </label>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
               <Button onClick={handleAddPosition} disabled={loading} className="w-full bg-[#630C22] hover:bg-[#4A081A]">
                 <Plus className="h-4 w-4 mr-2" />
                 {loading ? 'Adding...' : 'Add Position to Hierarchy'}
@@ -577,7 +609,7 @@ export default function AdminHeadHierarchyPage() {
 
               <div className="flex justify-center gap-6">
                 {positions.filter((item) => item.departmentId === "core" && item.parentId === "admin-head").map((item) => (
-                  <NodePill key={item.id} label={item.title} variant="staff" />
+                  <HierarchyBranch key={item.id} node={item} allNodes={positions} />
                 ))}
               </div>
 
@@ -608,8 +640,9 @@ export default function AdminHeadHierarchyPage() {
                           const roots = positions.filter((item) => {
                             if (item.departmentId !== department.id) return false
                             if (item.parentId === "admin-head") return true
+                            // If parent doesn't exist or is in a different department, count as root
                             const parent = positions.find((pos) => pos.id === item.parentId)
-                            return !parent || parent.departmentId !== department.id
+                            return !parent || (parent.departmentId !== department.id && parent.departmentId !== 'core')
                           })
 
                           const headerBg = department.color || '#59D2DE'

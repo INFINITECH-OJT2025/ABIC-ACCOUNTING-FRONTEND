@@ -24,10 +24,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Save as LucideSave,
-  Trash2,
-  ChevronDown,
-  ChevronUp,
-  PlusCircle,
   AlertCircle,
   ClipboardList,
   Save,
@@ -156,9 +152,6 @@ function OnboardPageContent() {
 
   // UI States
   const [isSaving, setIsSaving] = useState(false)
-  const [inlineManagerType, setInlineManagerType] = useState<'position' | 'department' | null>(null)
-  const [newItemName, setNewItemName] = useState('')
-  const [isActionLoading, setIsActionLoading] = useState(false)
   const [loadingRegions, setLoadingRegions] = useState(false)
   const [loadingProvinces, setLoadingProvinces] = useState(false)
   const [loadingCities, setLoadingCities] = useState(false)
@@ -993,79 +986,6 @@ function OnboardPageContent() {
   }
 
   // Handlers
-  const handleAddItem = async () => {
-    if (!newItemName.trim() || !inlineManagerType) return
-
-    setIsActionLoading(true)
-    try {
-      const endpoint = inlineManagerType === 'position' ? 'positions' : 'departments'
-      const response = await fetch(`${getApiUrl()}/api/${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newItemName.trim() }),
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        if (inlineManagerType === 'position') {
-          await fetchPositions()
-        } else {
-          await fetchDepartments()
-        }
-        setNewItemName('')
-        toast.success(`${inlineManagerType === 'position' ? 'Position' : 'Department'} added successfully`)
-      } else {
-        toast.error(data.message || 'Error adding item')
-      }
-    } catch (error) {
-      console.error('Error adding item:', error)
-      toast.error('Failed to add item')
-    } finally {
-      setIsActionLoading(false)
-    }
-  }
-
-  const handleDeleteItem = async (id: number) => {
-    if (!inlineManagerType) return
-
-    setConfirmModal({
-      isOpen: true,
-      title: `Delete ${inlineManagerType === 'position' ? 'Position' : 'Department'}`,
-      description: `Are you sure you want to delete this ${inlineManagerType}? This action cannot be undone.`,
-      variant: 'destructive',
-      onConfirm: async () => {
-        setIsActionLoading(true)
-        try {
-          const endpoint = inlineManagerType === 'position' ? 'positions' : 'departments'
-          const response = await fetch(`${getApiUrl()}/api/${endpoint}/${id}`, {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-          })
-
-          const data = await response.json()
-          if (data.success) {
-            if (inlineManagerType === 'position') {
-              await fetchPositions()
-              if (onboardFormData.position === data.name) setOnboardFormData(prev => ({ ...prev, position: '' }))
-            } else {
-              await fetchDepartments()
-              if (onboardFormData.department === data.name) setOnboardFormData(prev => ({ ...prev, department: '' }))
-            }
-            toast.success(`${inlineManagerType === 'position' ? 'Position' : 'Department'} deleted successfully`)
-          } else {
-            toast.error(data.message || 'Error deleting item')
-          }
-        } catch (error) {
-          console.error('Error deleting item:', error)
-          toast.error('Failed to delete item')
-        } finally {
-          setIsActionLoading(false)
-          setConfirmModal(prev => ({ ...prev, isOpen: false }))
-        }
-      }
-    })
-  }
-
   const handleStartOnboarding = async () => {
     const { first_name, last_name, email, position, onboarding_date, department } = onboardFormData
     if (!first_name || !last_name || !email || !position || !onboarding_date || !department) {
@@ -1630,7 +1550,7 @@ function OnboardPageContent() {
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-12 relative">
       {/* ----- GLOBAL LOADING OVERLAY (For Actions Only) ----- */}
-      {(isSaving || isActionLoading) && (
+      {isSaving && (
         <div className="fixed inset-0 z-[100] bg-white/40 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-500">
           <div className="bg-white/80 backdrop-blur-xl w-[400px] h-auto p-12 rounded-[40px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] border border-white/50 flex flex-col items-center gap-10 animate-in zoom-in-95 duration-300">
             <div className="relative">
@@ -1782,9 +1702,6 @@ function OnboardPageContent() {
                     <div className="space-y-2">
                       <div className="flex justify-between items-center">
                         <label className="block text-sm font-semibold text-slate-700">Position <span className="text-red-500">*</span></label>
-                        <button onClick={() => setInlineManagerType(inlineManagerType === 'position' ? null : 'position')} className={`text-xs flex items-center gap-1 font-bold transition-colors ${inlineManagerType === 'position' ? 'text-[#630C22]' : 'text-slate-400 hover:text-slate-600'}`}>
-                          {inlineManagerType === 'position' ? 'CLOSE MANAGER' : 'MANAGE LIST'}{inlineManagerType === 'position' ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                        </button>
                       </div>
                       <select 
                         value={onboardFormData.position} 
@@ -1803,50 +1720,15 @@ function OnboardPageContent() {
                         <option value="">Select Position...</option>
                         {positions.map((pos) => (<option key={pos.id} value={pos.name}>{pos.name}</option>))}
                       </select>
-                      {inlineManagerType === 'position' && (
-                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mt-2 shadow-inner">
-                          <div className="flex gap-2 mb-3">
-                            <Input placeholder="Add new position..." value={newItemName} onChange={(e) => setNewItemName(e.target.value)} className="h-9 text-xs" onKeyDown={(e) => e.key === 'Enter' && handleAddItem()} />
-                            <button onClick={handleAddItem} disabled={isActionLoading || !newItemName.trim()} className="bg-[#630C22] h-9 px-3 text-white rounded-md"><PlusCircle size={16} /></button>
-                          </div>
-                          <div className="max-h-32 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-                            {positions.map(pos => (
-                              <div key={pos.id} className="flex justify-between items-center p-2 bg-white border border-slate-100 rounded text-xs">
-                                <span className="truncate max-w-[150px]">{pos.name}</span>
-                                <button onClick={() => handleDeleteItem(pos.id)} className="text-rose-500 hover:text-rose-700 p-1"><Trash2 size={12} /></button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
                     <div className="space-y-2">
                       <div className="flex justify-between items-center">
                         <label className="block text-sm font-semibold text-slate-700">Department <span className="text-red-500">*</span></label>
-                        <button onClick={() => setInlineManagerType(inlineManagerType === 'department' ? null : 'department')} className={`text-xs flex items-center gap-1 font-bold transition-colors ${inlineManagerType === 'department' ? 'text-[#630C22]' : 'text-slate-400 hover:text-slate-600'}`}>
-                          {inlineManagerType === 'department' ? 'CLOSE MANAGER' : 'MANAGE LIST'}{inlineManagerType === 'department' ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                        </button>
                       </div>
                       <select value={onboardFormData.department} onChange={(e) => setOnboardFormData(prev => ({ ...prev, department: e.target.value }))} className="w-full h-10 px-3 py-2 border border-slate-200 bg-white rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#630C22] transition-all">
                         <option value="">Select Department...</option>
                         {departments.map((dept) => (<option key={dept.id} value={dept.name}>{dept.name}</option>))}
                       </select>
-                      {inlineManagerType === 'department' && (
-                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mt-2 shadow-inner">
-                          <div className="flex gap-2 mb-3">
-                            <Input placeholder="Add new department..." value={newItemName} onChange={(e) => setNewItemName(e.target.value)} className="h-9 text-xs" onKeyDown={(e) => e.key === 'Enter' && handleAddItem()} />
-                            <button onClick={handleAddItem} disabled={isActionLoading || !newItemName.trim()} className="bg-[#630C22] h-9 px-3 text-white rounded-md"><PlusCircle size={16} /></button>
-                          </div>
-                          <div className="max-h-32 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-                            {departments.map(dept => (
-                              <div key={dept.id} className="flex justify-between items-center p-2 bg-white border border-slate-100 rounded text-xs">
-                                <span className="truncate max-w-[150px]">{dept.name}</span>
-                                <button onClick={() => handleDeleteItem(dept.id)} className="text-rose-500 hover:text-rose-700 p-1"><Trash2 size={12} /></button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-semibold text-slate-700 mb-2">Onboarding Date <span className="text-red-500">*</span></label>
@@ -2429,7 +2311,7 @@ function OnboardPageContent() {
         title={confirmModal.title}
         description={confirmModal.description}
         variant={confirmModal.variant}
-        isLoading={isSaving || isActionLoading}
+        isLoading={isSaving}
       />
     </div>
   )

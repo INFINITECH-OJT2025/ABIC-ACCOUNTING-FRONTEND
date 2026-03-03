@@ -1016,38 +1016,46 @@ function TerminatePageContent() {
               </p>
             </div>
             <div className="w-full lg:w-auto flex flex-col items-start lg:items-end gap-2">
-              {isRequestFormOpen ? (
+              <div className="flex items-center gap-2">
                 <Button
-                  onClick={() => setIsRequestFormOpen(false)}
-                  className="font-bold px-5 py-2.5 rounded-lg transition-all duration-300 shadow-lg flex items-center gap-2 h-auto border text-sm uppercase tracking-wider bg-white text-[#A4163A] hover:bg-rose-50 border-white"
-                >
-                  <X className="h-4 w-4" />
-                  <span>Close</span>
-                </Button>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={() => {
+                  onClick={() => {
+                    if (isRequestFormOpen && exitActionType === 'terminate') {
+                      setIsRequestFormOpen(false)
+                    } else {
                       setExitActionType('terminate')
                       setIsRequestFormOpen(true)
-                    }}
-                    className="font-bold px-5 py-2.5 rounded-lg transition-all duration-300 shadow-lg flex items-center gap-2 h-auto border text-sm uppercase tracking-wider bg-white/10 text-white hover:bg-white/20 border-white/20 backdrop-blur-sm"
-                  >
-                    <Users className="h-4 w-4" />
-                    <span>Terminate Employee</span>
-                  </Button>
-                  <Button
-                    onClick={() => {
+                    }
+                  }}
+                  className={cn(
+                    "font-bold px-5 py-2.5 rounded-lg transition-all duration-300 shadow-lg flex items-center gap-2 h-auto border text-sm uppercase tracking-wider",
+                    isRequestFormOpen && exitActionType === 'terminate'
+                      ? "bg-white text-[#A4163A] border-white"
+                      : "bg-white/10 text-white hover:bg-white/20 border-white/20 backdrop-blur-sm"
+                  )}
+                >
+                  {isRequestFormOpen && exitActionType === 'terminate' ? <X className="h-4 w-4" /> : <Users className="h-4 w-4" />}
+                  <span>Terminate Employee</span>
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (isRequestFormOpen && exitActionType === 'resigned') {
+                      setIsRequestFormOpen(false)
+                    } else {
                       setExitActionType('resigned')
                       setIsRequestFormOpen(true)
-                    }}
-                    className="font-bold px-5 py-2.5 rounded-lg transition-all duration-300 shadow-lg flex items-center gap-2 h-auto border text-sm uppercase tracking-wider bg-white text-[#A4163A] hover:bg-rose-50 border-white"
-                  >
-                    <Users className="h-4 w-4" />
-                    <span>Resigned Employee</span>
-                  </Button>
-                </div>
-              )}
+                    }
+                  }}
+                  className={cn(
+                    "font-bold px-5 py-2.5 rounded-lg transition-all duration-300 shadow-lg flex items-center gap-2 h-auto border text-sm uppercase tracking-wider",
+                    isRequestFormOpen && exitActionType === 'resigned'
+                      ? "bg-white text-[#A4163A] border-white"
+                      : "bg-white/10 text-white hover:bg-white/20 border-white/20 backdrop-blur-sm"
+                  )}
+                >
+                  {isRequestFormOpen && exitActionType === 'resigned' ? <X className="h-4 w-4" /> : <Users className="h-4 w-4" />}
+                  <span>Resigned Employee</span>
+                </Button>
+              </div>
             </div>
           </div>
         </div>
