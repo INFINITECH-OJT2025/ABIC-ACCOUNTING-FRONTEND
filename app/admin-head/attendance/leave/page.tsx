@@ -32,6 +32,8 @@ import { ConfirmationModal } from '@/components/ConfirmationModal'
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Department { id: number; name: string; office_id?: number }
 interface Office { id: number; name: string }
+interface Position { id: number; name: string }
+interface Hierarchy { id: number; position_id: number; department_id: number | null; parent_id: number | null; role: string; position_name?: string; position?: Position }
 interface Employee { id: string; name: string; department?: string | null; department_id?: number; position?: string | null }
 
 interface LeaveEntry {
@@ -68,8 +70,13 @@ const LEAVE_REMARKS = [
 
 // ─── Approved-by options ───────────────────────────────────────────────────────
 const APPROVAL_OPTIONS = [
-  { label: 'Pending', value: 'Pending', color: 'bg-orange-400 text-white' },
-  { label: 'Declined', value: 'Declined', color: 'bg-red-500 text-white' },
+  { label: 'Pending', value: 'Pending', color: 'bg-[#FFF3C4] text-[#A67B00] border-2 border-[#FFE894] shadow-sm' },
+  { label: 'Declined', value: 'Declined', color: 'bg-[#FFEAEB] text-[#800020] border-2 border-[#FFD1D4] shadow-sm' },
+]
+
+const LEAVE_CATEGORY_OPTIONS = [
+  { label: 'HALF-DAY', value: 'half-day', color: 'bg-[#FFF3C4] text-[#A67B00] border-2 border-[#FFE894] shadow-sm' },
+  { label: 'WHOLE DAY', value: 'whole-day', color: 'bg-[#FFEAEB] text-[#800020] border-2 border-[#FFD1D4] shadow-sm' },
 ]
 // HEAD_NAMES removed, now dynamic from employees
 
@@ -88,9 +95,9 @@ function firstDayOfMonth(year: number, month: number) {
 
 // ─── Status colours ────────────────────────────────────────────────────────────
 const STATUS_DOT: Record<string, string> = {
-  'Pending': 'bg-blue-300',
-  'Approved/Completed': 'bg-green-400',
-  'Declined': 'bg-orange-400',
+  'Pending': 'bg-amber-100 text-amber-700 border border-amber-200 shadow-sm',
+  'Approved/Completed': 'bg-emerald-100 text-emerald-700 border border-emerald-200 shadow-sm',
+  'Declined': 'bg-rose-100 text-rose-700 border border-rose-200 shadow-sm',
 }
 
 // ─── Formatting Helpers ───────────────────────────────────────────────────────
@@ -591,7 +598,7 @@ function CalendarView({ year, month, entries, weekOnly = false }: {
                     </div>
 
                     <div className="flex flex-col gap-1.5 pb-2 border-b border-slate-100">
-                      <span className="text-slate-400 font-semibold text-xs uppercase tracking-wider">Processed By</span>
+                      <span className="text-slate-400 font-semibold text-xs uppercase tracking-wider">Approved By</span>
                       <span className="font-bold text-slate-800 text-lg">{se.approved_by}</span>
                     </div>
 
@@ -610,10 +617,12 @@ function CalendarView({ year, month, entries, weekOnly = false }: {
                     <div className="bg-rose-50 px-6 py-5 border-b border-rose-100">
                       <span className="text-[#800020] font-black text-sm uppercase tracking-wider">Leave Reason</span>
                     </div>
-                    <div className="p-6 bg-white flex-1">
-                      <p className="text-slate-700 text-base leading-relaxed break-all whitespace-pre-wrap font-medium">
-                        {se.cite_reason}
-                      </p>
+                    <div className="p-6 bg-white overflow-hidden">
+                      <div className="max-h-[110px] overflow-y-auto custom-scrollbar pr-2">
+                        <p className="text-slate-700 text-base leading-relaxed break-all whitespace-pre-wrap font-medium">
+                          {se.cite_reason}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -745,8 +754,8 @@ export default function LeavePage() {
   }, [])
 
   // State for hierarchies and positions
-  const [hierarchies, setHierarchies] = useState<any[]>([])
-  const [positions, setPositions] = useState<any[]>([])
+  const [hierarchies, setHierarchies] = useState<Hierarchy[]>([])
+  const [positions, setPositions] = useState<Position[]>([])
 
   useEffect(() => {
     // Fetch employees, hierarchies, and positions
@@ -876,10 +885,24 @@ export default function LeavePage() {
   // Lookup shift info from DB data
   const _shiftRow = useMemo(() => {
     let matchingOfficeName = ''
-    // Identify department of this form
-    const emp = employees.find(e => e.id === inlineForm.employee_id)
-    const deptId = emp?.department_id
 
+    // Identify employee and their department ID
+    const emp = employees.find(e => String(e.id) === String(inlineForm.employee_id))
+    let deptId = emp?.department_id
+
+    // If no deptId on employee, try to find it via their position in the hierarchy
+    if (!deptId && emp?.position && positions.length > 0 && hierarchies.length > 0) {
+      const pos = positions.find(p => p.name.toLowerCase() === emp.position?.toLowerCase())
+      if (pos) {
+        // Find hierarchy entry for this position
+        const hier = hierarchies.find(h => String(h.position_id) === String(pos.id))
+        if (hier && hier.department_id) {
+          deptId = hier.department_id
+        }
+      }
+    }
+
+    // Trace deptId to office name
     if (deptId) {
       const d = departments.find(d => String(d.id) === String(deptId))
       if (d && d.office_id) {
@@ -887,89 +910,156 @@ export default function LeavePage() {
         if (off) matchingOfficeName = off.name
       }
     }
+
+    // Fallback: Use the department name string to find the office
     if (!matchingOfficeName && inlineForm.department) {
-      // Find best match in departments text if fallback
       const d = departments.find(d => d.name.toLowerCase() === inlineForm.department.toLowerCase())
       if (d && d.office_id) {
         const off = offices.find(o => String(o.id) === String(d.office_id))
         if (off) matchingOfficeName = off.name
       } else {
-        // Direct text fallback to office name if any
-        const off = offices.find(o => inlineForm.department.toLowerCase().includes(o.name.toLowerCase()))
+        // Direct text match on office names
+        const off = offices.find(o =>
+          inlineForm.department.toLowerCase().includes(o.name.toLowerCase()) ||
+          o.name.toLowerCase().includes(inlineForm.department.toLowerCase())
+        )
         if (off) matchingOfficeName = off.name
       }
     }
 
+    // Final matching to shift schedule
     if (matchingOfficeName) {
-      return shiftSchedules.find(s => s.office_name.toLowerCase() === matchingOfficeName.toLowerCase())
+      const sched = shiftSchedules.find(s => s.office_name.toLowerCase() === matchingOfficeName.toLowerCase())
+      if (sched) return sched
     }
 
-    // General fallback: attempt text match on office names via shift schedules
+    // Last resort: attempt text match on office names via shift schedules
     return shiftSchedules.find(s => {
-      const officeWords = s.office_name.toLowerCase().split(/\s+/)
-      return officeWords.some(w => w.length > 2 && inlineForm.department.toLowerCase().includes(w))
+      const words = s.office_name.toLowerCase().split(/\s+/)
+      const deptLow = inlineForm.department.toLowerCase()
+      return words.some(w => w.length > 2 && deptLow.includes(w))
     })
-  }, [inlineForm.employee_id, inlineForm.department, employees, departments, offices, shiftSchedules])
+  }, [inlineForm.employee_id, inlineForm.department, employees, departments, offices, shiftSchedules, hierarchies, positions])
 
   const inlineAvailableShifts: string[] = _shiftRow?.shift_options ?? []
   const inlineShiftLabel: string = _shiftRow ? _shiftRow.office_name : ''
 
   // Auto-calc number of days for inline form
   useEffect(() => {
-    if (inlineForm.start_date && inlineForm.leave_end_date) {
-      const start = new Date(inlineForm.start_date)
-      const end = new Date(inlineForm.leave_end_date)
-      if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end >= start) {
-        const diff = Math.round((end.getTime() - start.getTime()) / 86400000) + 1
-        const days = inlineForm.category === 'half-day' ? diff * 0.5 : diff
-        setInlineForm(prev => ({ ...prev, number_of_days: days }))
+    if (inlineForm.start_date) {
+      if (inlineForm.category === 'half-day') {
+        // Force end date to be same as start date for half-day
+        const days = 0.5
+        setInlineForm(prev => ({
+          ...prev,
+          leave_end_date: prev.start_date,
+          number_of_days: days
+        }))
+      } else if (inlineForm.leave_end_date) {
+        const start = new Date(inlineForm.start_date)
+        const end = new Date(inlineForm.leave_end_date)
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end >= start) {
+          const diff = Math.round((end.getTime() - start.getTime()) / 86400000) + 1
+          setInlineForm(prev => ({ ...prev, number_of_days: diff }))
+        }
       }
     }
   }, [inlineForm.start_date, inlineForm.leave_end_date, inlineForm.category])
 
   const getSuperiorsForEmployee = (empId: string | number | undefined) => {
-    const adminPositionKeywords = ['Head', 'Manager', 'Admin', 'VP', 'President', 'Director', 'Supervisor', 'Lead', 'Chief']
-    const admins = employees.filter(e =>
-      e.position && adminPositionKeywords.some(kw => e.position?.toLowerCase().includes(kw.toLowerCase()))
-    ).map(e => ({ label: e.name, value: e.name, color: 'bg-green-500 text-white' }))
-
-    if (!empId) return admins
+    if (!empId || employees.length === 0) return []
 
     const emp = employees.find(e => String(e.id) === String(empId))
-    if (!emp || !emp.position || !positions || !hierarchies) return admins
+    if (!emp) return []
 
-    const empPos = positions.find(p => p.name.toLowerCase() === emp.position?.toLowerCase())
-    if (!empPos) return admins
+    const empDeptId = emp.department_id
+    const empPosName = String(emp.position || '').toLowerCase().trim()
 
-    let empHier = hierarchies.find(h => String(h.position_id) === String(empPos.id))
-    if (empHier && emp.department_id) {
-      const specificHier = hierarchies.find(h => String(h.position_id) === String(empPos.id) && String(h.department_id) === String(emp.department_id))
-      if (specificHier) empHier = specificHier
-    }
+    // 1. Find hierarchy node for the employee's position
+    // Matches position name from nested object or direct label
+    const node = hierarchies.find(h => {
+      const posName = String(h.position_name || h.position?.name || '').toLowerCase().trim()
+      if (posName === empPosName) return true
+      if (h.position_id) {
+        const pObj = positions.find(p => String(p.id) === String(h.position_id))
+        return pObj && pObj.name.toLowerCase().trim() === empPosName
+      }
+      return false
+    })
 
-    if (empHier && empHier.parent_id) {
-      const parentHier = hierarchies.find(h => String(h.id) === String(empHier.parent_id))
-      if (parentHier) {
-        const parentPos = positions.find(p => String(p.id) === String(parentHier.position_id))
-        if (parentPos) {
-          const sups = employees.filter(e => e.position && e.position.toLowerCase() === parentPos.name.toLowerCase())
-          if (sups.length > 0) {
-            const specificSuperiors = sups.map(s => ({
-              label: `${s.name} (${parentPos.name})`,
-              value: s.name,
-              color: 'bg-[#A4163A] text-white font-bold'
-            }))
+    const ancestorPositionNames = new Set<string>()
+    const supervisorPositionIds = new Set<string | number>()
 
-            const specificValues = specificSuperiors.map(s => s.value)
-            const filteredAdmins = admins.filter(a => !specificValues.includes(a.value))
+    // Broad defaults for company-wide authority figures
+    const globalAuthorityNames = ['admin head', 'admin supervisor', 'executive officer', 'acting executive officer', 'hr head', 'president', 'v-p', 'vp', 'chief']
+    globalAuthorityNames.forEach(name => ancestorPositionNames.add(name))
 
-            return [...specificSuperiors, ...filteredAdmins]
+    if (node) {
+      let currentParentId = node.parent_id
+      let safety = 0
+      while (currentParentId && safety < 20) {
+        const parentNode = hierarchies.find(h => String(h.id) === String(currentParentId))
+        if (parentNode) {
+          const pName = String(parentNode.position_name || parentNode.position?.name || '').toLowerCase().trim()
+          if (pName) ancestorPositionNames.add(pName)
+
+          if (parentNode.position_id) {
+            supervisorPositionIds.add(parentNode.position_id)
+            const pObj = positions.find(p => String(p.id) === String(parentNode.position_id))
+            if (pObj) ancestorPositionNames.add(pObj.name.toLowerCase().trim())
           }
-        }
+          currentParentId = parentNode.parent_id
+        } else break
+        safety++
       }
     }
 
-    return admins
+    const highRoleKeywords = ['head', 'manager', 'director', 'president', 'v-p', 'vp', 'chief', 'admin', 'supervisor', 'lead', 'hr', 'officer']
+
+    // 3. Collect Match Results
+    const superiorEmployees = employees.filter(e => {
+      if (String(e.id) === String(empId)) return false
+
+      const ePosName = String(e.position || '').toLowerCase().trim()
+      const isSameDept = (empDeptId && String(e.department_id) === String(empDeptId)) ||
+        (emp.department && e.department && emp.department.trim().toLowerCase() === e.department.trim().toLowerCase())
+
+      // Found via Hierarchy Tree or Global Authority
+      if (ancestorPositionNames.has(ePosName)) return true
+
+      // Found via Same Dept + Role Keyword
+      if (isSameDept && highRoleKeywords.some(kw => ePosName.includes(kw))) return true
+
+      // Found via Cross-Dept Executive Status
+      if (['executive officer', 'admin head', 'president', 'v-p', 'vp', 'chief'].some(kw => ePosName.includes(kw))) return true
+
+      return false
+    })
+
+    // 4. Map and Sort
+    return superiorEmployees.map(s => {
+      const ePosName = String(s.position || '').toLowerCase().trim()
+      const isRecommended = ancestorPositionNames.has(ePosName) || (highRoleKeywords.some(kw => ePosName.includes(kw)) && (empDeptId && String(s.department_id) === String(empDeptId)))
+      const sameDept = (empDeptId && String(s.department_id) === String(empDeptId))
+
+      return {
+        label: isRecommended && sameDept ? `${s.name} (${s.position}) - Recommended` : `${s.name} (${s.position})`,
+        value: s.name,
+        isSupervisor: isRecommended && sameDept,
+        isSameDept: sameDept,
+        color: (isRecommended && sameDept)
+          ? 'bg-[#E1F7E1] text-[#006400] border-2 border-[#10B981] font-bold shadow-md ring-2 ring-[#D1FAE5]'
+          : sameDept
+            ? 'bg-[#F0FDF4] text-[#166534] border border-[#BBF7D0] font-semibold'
+            : 'bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] font-semibold' // Mint green for cross-dept superiors
+      }
+    }).sort((a, b) => {
+      if (b.isSupervisor && !a.isSupervisor) return 1
+      if (!b.isSupervisor && a.isSupervisor) return -1
+      if (b.isSameDept && !a.isSameDept) return 1
+      if (!b.isSameDept && a.isSameDept) return -1
+      return a.label.localeCompare(b.label)
+    })
   }
 
   const inlineApprovalOptions = useMemo(() => {
@@ -1053,7 +1143,7 @@ export default function LeavePage() {
   const [filterDept, setFilterDept] = useState('')
   const [filterType, setFilterType] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
-  const [sortOrder, setSortOrder] = useState('date-asc')
+  const [sortOrder, setSortOrder] = useState('input-desc')
   const [searchQuery, setSearchQuery] = useState('')
 
   const sortOptions = [
@@ -1216,14 +1306,22 @@ export default function LeavePage() {
                   <><Plus className="w-4 h-4" /><span>ADD LEAVE</span></>
                 )}
               </Button>
+              <Link href="/admin-head/attendance/leave/leave-summary">
+                <Button
+                  variant="outline"
+                  className="bg-white border-transparent text-[#7B0F2B] hover:bg-rose-50 hover:text-[#4A081A] shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg flex items-center gap-2 whitespace-nowrap"
+                >
+                  <FileText className="w-4 h-4" /><span>YEARLY SUMMARY</span>
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
 
         {/* Secondary Toolbar */}
-        <div className="border-t border-white/10 bg-white/5 backdrop-blur-sm">
+        <div className="border-t border-white/10 bg-white/5 backdrop-blur-sm overflow-x-auto no-scrollbar">
           <div className="w-full px-4 md:px-8 py-3">
-            <div className="flex flex-wrap items-center gap-3 md:gap-4">
+            <div className="flex items-center gap-3 md:gap-4 min-w-max md:min-w-0">
 
               {/* Department Filter */}
               <div className="flex items-center gap-3">
@@ -1319,7 +1417,7 @@ export default function LeavePage() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <div className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 min-w-[220px] justify-between shadow-sm font-bold inline-flex items-center whitespace-nowrap rounded-lg cursor-pointer group border-2">
-                      <span className="truncate max-w-[170px]">{sortOptions.find(o => o.value === sortOrder)?.label || 'Ascending (Leave Date)'}</span>
+                      <span className="truncate max-w-[170px]">{sortOptions.find(o => o.value === sortOrder)?.label || 'Recent (Inputted)'}</span>
                       <ChevronDown className="w-4 h-4 ml-2 opacity-50 group-hover:opacity-100 transition-opacity shrink-0" />
                     </div>
                   </DropdownMenuTrigger>
@@ -1342,233 +1440,24 @@ export default function LeavePage() {
                 </DropdownMenu>
               </div>
 
-              {/* Search Bar & Yearly Summary */}
-              <div className="flex items-center gap-3 ml-auto">
-                <span className="text-sm font-bold text-white/70 uppercase tracking-wider hidden xl:block">Search</span>
-                <div className="relative">
+              {/* Search Bar */}
+              <div className="flex items-center gap-3 flex-1 min-w-[200px] max-w-[400px]">
+                <span className="text-sm font-bold text-white/70 uppercase tracking-wider hidden 2xl:block">Search</span>
+                <div className="relative w-full">
                   <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <Input
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
-                    placeholder="Search ID, Name, Date, Category..."
-                    className="pl-9 h-10 w-[300px] lg:w-[400px] bg-white border-2 border-[#FFE5EC] text-[#800020] placeholder:text-slate-400 font-medium rounded-lg shadow-sm focus-visible:ring-rose-200 transition-all duration-200 focus:w-[320px] lg:focus:w-[440px]"
+                    placeholder="Search ID, Name, Date..."
+                    className="pl-9 h-10 w-full bg-white border-2 border-[#FFE5EC] text-[#800020] placeholder:text-slate-400 font-medium rounded-lg shadow-sm focus-visible:ring-rose-200 transition-all duration-200"
                   />
                 </div>
-                <Link href="/admin-head/attendance/leave/leave-summary.tsx">
-                  <Button
-                    variant="outline"
-                    className="bg-white border-transparent text-[#7B0F2B] hover:bg-rose-50 hover:text-[#4A081A] shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg flex items-center gap-2"
-                  >
-                    <FileText className="w-4 h-4" /><span>YEARLY SUMMARY</span>
-                  </Button>
-                </Link>
-              </div>
-
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Inline Add Leave Form (toggleable) ── */}
-      <div className={cn(
-        'transition-all duration-500 overflow-hidden',
-        addModalOpen ? 'max-h-[1200px] opacity-100 mb-8' : 'max-h-0 opacity-0 overflow-hidden'
-      )}>
-        <div className="px-8 py-6">
-          <div className="bg-white rounded-xl shadow border border-rose-100 overflow-hidden ring-4 ring-rose-50/50">
-            {/* Form Header */}
-            <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] px-6 py-4 flex justify-between items-center">
-              <h2 className="text-white text-xl font-bold">
-                {inlineForm.id ? 'Update Leave Record' : 'Add Leave Record'}
-              </h2>
-              {inlineForm.id && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={resetInlineForm}
-                  className="text-white hover:bg-white/10 h-7 text-[10px] font-bold uppercase tracking-wider"
-                >
-                  <Plus className="w-3 h-3 mr-1" /> New Entry
-                </Button>
-              )}
-            </div>
-
-            <div className="px-12 py-12 space-y-10">
-              <div className="grid grid-cols-2 gap-x-16 gap-y-12">
-                {/* Row 1 */}
-                <div className="flex items-center gap-5">
-                  <span className="text-base font-extrabold text-[#4A081A] uppercase tracking-[0.1em] w-40 shrink-0 text-right">EMP. ID:</span>
-                  <div className={cn("flex-1 border border-[#630C22] rounded-xl px-6 py-3 text-lg bg-slate-50 truncate shadow-sm h-[60px] flex items-center", inlineForm.employee_id ? "text-slate-800 font-semibold" : "text-slate-400 italic font-medium")}>
-                    {inlineForm.employee_id || 'Auto-filled on name selection'}
-                  </div>
-                </div>
-                <div className="flex items-center gap-5 relative">
-                  <span className="text-base font-extrabold text-[#4A081A] uppercase tracking-[0.1em] w-40 shrink-0 text-right">NAME:</span>
-                  <Popover open={empOpen} onOpenChange={setEmpOpen}>
-                    <PopoverTrigger asChild>
-                      <button type="button" className="flex items-center justify-between flex-1 border border-[#630C22] rounded-xl px-6 py-3 text-xl bg-white hover:border-[#4A081A] transition-all shadow-sm h-[60px]">
-                        <span className={inlineForm.employee_name ? 'text-slate-800 font-semibold truncate' : 'text-slate-400 italic truncate'}>
-                          {inlineForm.employee_name || 'Select Employee Name'}
-                        </span>
-                        <ChevronDown className="w-6 h-6 text-slate-400 shrink-0 ml-2" />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="p-0 w-[450px]">
-                      <Command>
-                        <CommandInput placeholder="Search employee..." className="text-lg h-12" />
-                        <CommandEmpty className="text-lg p-5">No employee found.</CommandEmpty>
-                        <CommandList>
-                          <CommandGroup>
-                            {employees
-                              .filter(e => e.id !== inlineForm.employee_id)
-                              .map(emp => (
-                                <CommandItem key={emp.id} value={emp.name} onSelect={() => handleInlineSelectEmployee(emp)} className="text-lg py-4">
-                                  {emp.name}
-                                </CommandItem>
-                              ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="flex items-center gap-5">
-                  <span className="text-base font-extrabold text-[#4A081A] uppercase tracking-[0.1em] w-40 shrink-0 text-right">CATEGORY:</span>
-                  <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
-                    <PopoverTrigger asChild>
-                      <button type="button" className="flex items-center justify-between flex-1 border border-[#630C22] rounded-xl px-6 py-3 text-xl bg-white hover:border-[#4A081A] transition-all shadow-sm h-[60px]">
-                        {inlineForm.category === 'half-day' ? (
-                          <span className="px-5 py-2 rounded-full bg-[#FFF3C4] text-[#A67B00] border-2 border-[#FFE894] font-extrabold text-base uppercase">half-day</span>
-                        ) : inlineForm.category === 'whole-day' ? (
-                          <span className="px-5 py-2 rounded-full bg-[#FFEAEB] text-[#800020] border-2 border-[#FFD1D4] font-extrabold text-base uppercase">whole day</span>
-                        ) : (
-                          <span className="text-slate-400 italic text-xl truncate">Half-day/Whole day</span>
-                        )}
-                        <ChevronDown className="w-6 h-6 text-slate-400 shrink-0 ml-2" />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="p-3 w-64 space-y-2 bg-white border-0 shadow-2xl rounded-2xl">
-                      {inlineForm.category !== 'half-day' && (
-                        <button type="button" onClick={() => { setInlineForm(p => ({ ...p, category: 'half-day', shift: '' })); setCategoryOpen(false); }} className="w-full text-center px-4 py-4 rounded-full bg-[#FFF3C4] text-[#A67B00] font-extrabold text-lg hover:bg-[#FFE894] transition-all uppercase tracking-wider border-2 border-[#FFE894]">half-day</button>
-                      )}
-                      {inlineForm.category !== 'whole-day' && (
-                        <button type="button" onClick={() => { setInlineForm(p => ({ ...p, category: 'whole-day', shift: '' })); setCategoryOpen(false); }} className="w-full text-center px-4 py-4 rounded-full bg-[#FFEAEB] text-[#800020] font-extrabold text-lg hover:bg-[#FFD1D4] transition-all uppercase tracking-wider border-2 border-[#FFD1D4]">whole day</button>
-                      )}
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                {/* Row 2 */}
-                <div className="flex items-center gap-5 relative">
-                  <span className="text-base font-extrabold text-[#4A081A] uppercase tracking-[0.1em] w-40 shrink-0 text-right">SHIFT:</span>
-                  <Popover open={shiftOpen} onOpenChange={setShiftOpen}>
-                    <PopoverTrigger asChild>
-                      <button type="button" disabled={inlineForm.category === 'whole-day'} className={cn('flex items-center justify-between flex-1 border border-[#630C22] rounded-xl px-6 py-3 text-xl bg-white transition-all shadow-sm h-[60px]', inlineForm.category === 'whole-day' ? 'opacity-40 cursor-not-allowed bg-slate-50' : 'hover:border-[#4A081A]')}>
-                        <span className={inlineForm.shift ? 'text-slate-800 font-semibold truncate' : 'text-slate-400 italic text-xl truncate'}>{inlineForm.shift || 'Select Hour'}</span>
-                        <ChevronDown className="w-6 h-6 text-slate-400 shrink-0 ml-2" />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="p-2 w-[400px] space-y-1">
-                      {inlineAvailableShifts.length > 0 ? (
-                        inlineAvailableShifts
-                          .filter(s => s !== inlineForm.shift)
-                          .map(s => (
-                            <button key={s} type="button" onClick={() => { setInlineForm(p => ({ ...p, shift: s })); setShiftOpen(false); }} className="w-full text-left px-5 py-4 rounded-lg text-lg hover:bg-rose-50 transition-all font-medium">{s}</button>
-                          ))
-                      ) : (
-                        <p className="text-lg text-slate-400 italic px-5 py-4">{inlineForm.department ? `No shifts configured for "${inlineForm.department}"` : 'Select an employee first'}</p>
-                      )}
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="flex items-center gap-5">
-                  <span className="text-base font-extrabold text-[#4A081A] uppercase tracking-[0.1em] w-40 shrink-0 text-right">START DATE:</span>
-                  <Input type="date" max={inlineForm.leave_end_date || undefined} value={inlineForm.start_date || ''} onChange={e => setInlineForm(p => ({ ...p, start_date: e.target.value }))} className="border-[#630C22] bg-white text-slate-700 flex-1 h-[60px] text-xl rounded-xl shadow-sm px-6" />
-                </div>
-                <div className="flex items-center gap-5">
-                  <span className="text-base font-extrabold text-[#4A081A] uppercase tracking-[0.1em] w-40 shrink-0 text-right">LEAVE END:</span>
-                  <Input type="date" min={inlineForm.start_date || undefined} value={inlineForm.leave_end_date || ''} onChange={e => setInlineForm(p => ({ ...p, leave_end_date: e.target.value }))} className="border-[#630C22] bg-white text-slate-700 flex-1 h-[60px] text-xl rounded-xl shadow-sm px-6" />
-                </div>
-
-                {/* Row 3 */}
-                <div className="flex items-center gap-5">
-                  <span className="text-base font-extrabold text-[#4A081A] uppercase tracking-[0.1em] w-40 shrink-0 text-right">NO. OF DAYS:</span>
-                  <Input readOnly value={inlineForm.number_of_days > 0 ? formatDays(inlineForm.number_of_days, inlineForm.category) : ''} placeholder="" className="border-[#630C22] bg-white text-slate-700 cursor-default flex-1 h-[60px] rounded-xl shadow-sm px-6 font-bold text-3xl" />
-                </div>
-                <div className="flex items-center gap-5">
-                  <span className="text-base font-extrabold text-[#4A081A] uppercase tracking-[0.1em] w-40 shrink-0 text-right">APPROVED BY:</span>
-                  <Popover open={approvalOpen} onOpenChange={setApprovalOpen}>
-                    <PopoverTrigger asChild>
-                      <button
-                        type="button"
-                        className={cn(
-                          "flex items-center justify-between flex-1 border border-[#630C22] rounded-xl px-6 py-3 text-xl transition-all shadow-sm h-[60px]",
-                          inlineForm.approved_by
-                            ? inlineApprovalOptions.find(o => o.value === inlineForm.approved_by)?.color
-                            : "bg-white hover:border-[#4A081A]"
-                        )}
-                      >
-                        <span className={inlineForm.approved_by ? 'font-bold tracking-wide truncate' : 'text-slate-400 italic text-xl truncate'}>
-                          {inlineApprovalOptions.find(o => o.value === inlineForm.approved_by)?.label || 'Select Status/Name'}
-                        </span>
-                        <ChevronDown className={cn("w-6 h-6 shrink-0 ml-2", inlineForm.approved_by ? "text-white" : "text-slate-400")} />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="p-2 w-[400px] space-y-2 border-0 shadow-2xl rounded-2xl bg-white">
-                      {inlineApprovalOptions.map(o => (
-                        <button
-                          key={o.value}
-                          type="button"
-                          onClick={() => { setInlineForm(p => ({ ...p, approved_by: o.value })); setApprovalOpen(false); }}
-                          className={cn(
-                            "w-full text-left px-5 py-4 rounded-xl text-lg transition-all font-bold tracking-wide shadow-sm hover:opacity-80",
-                            o.color
-                          )}
-                        >
-                          {o.label}
-                        </button>
-                      ))}
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="flex items-start gap-5">
-                  <span className="text-base font-extrabold text-[#4A081A] uppercase tracking-[0.1em] w-40 shrink-0 text-right pt-[18px]">REMARKS:</span>
-                  <Popover open={remarksOpen} onOpenChange={setRemarksOpen}>
-                    <PopoverTrigger asChild>
-                      <button type="button" className="flex items-center justify-between flex-1 border border-[#630C22] rounded-xl px-6 py-3 text-xl bg-white hover:border-[#4A081A] transition-all shadow-sm h-[60px]">
-                        <span className={inlineForm.remarks ? 'text-slate-800 font-semibold truncate' : 'text-slate-400 italic text-xl truncate'}>
-                          {inlineRemarkOptions.find(o => o.value === inlineForm.remarks)?.label || 'Select Leave Type'}
-                        </span>
-                        <ChevronDown className="w-6 h-6 text-slate-400 shrink-0 ml-2" />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="p-2 w-[400px] space-y-1">
-                      {inlineRemarkOptions.map(o => (
-                        <button key={o.value} type="button" onClick={() => { setInlineForm(p => ({ ...p, remarks: o.value })); setRemarksOpen(false); }} className="w-full text-left px-5 py-4 rounded-lg text-lg hover:bg-rose-50 transition-all font-medium">
-                          {o.label}
-                        </button>
-                      ))}
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                <div className="flex items-start gap-5">
-                  <span className="text-base font-extrabold text-[#4A081A] uppercase tracking-[0.1em] w-40 shrink-0 text-right pt-[18px]">REASON:</span>
-                  <textarea rows={3} value={inlineForm.cite_reason} onChange={e => setInlineForm(p => ({ ...p, cite_reason: e.target.value }))} placeholder="specify reason" className={cn("flex-1 border border-[#630C22] rounded-xl px-6 py-5 text-xl resize-none focus:outline-none focus:border-[#4A081A] shadow-sm transition-all min-h-[120px]", inlineForm.cite_reason ? "text-slate-800 font-semibold" : "italic font-medium text-slate-400")} />
-                </div>
-              </div>
-
-              {/* Footer actions */}
-              <div className="flex justify-end gap-5 pt-10 pr-2">
-                <Button variant="outline" onClick={() => { setAddModalOpen(false); resetInlineForm() }} className="border-rose-300 text-[#4A081A] hover:bg-rose-50 text-base px-10 h-14 font-bold rounded-xl shadow-sm">Cancel</Button>
-                <Button onClick={handleInlineSave} disabled={inlineSaving} className="bg-[#630C22] hover:bg-[#4A081A] text-white text-base px-12 h-14 font-bold rounded-xl shadow-lg hover:shadow-[#630C22]/40 transition-all text-lg">
-                  {inlineSaving ? (inlineForm.id ? 'Updating…' : 'Saving…') : (inlineForm.id ? 'Update Leave' : 'Save Leave')}
-                </Button>
               </div>
             </div>
           </div>
         </div>
       </div>
+
 
       <div className="px-8 py-6 space-y-8">
         {/* ── Calendar ── */}
@@ -1648,6 +1537,233 @@ export default function LeavePage() {
           </section>
         )}
 
+        {/* ── Inline Add Leave Form (toggleable) ── */}
+        <div className={cn(
+          'transition-all duration-500 overflow-hidden',
+          addModalOpen ? 'max-h-[1200px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
+        )}>
+          <div className="bg-white rounded-xl shadow border border-rose-100 overflow-hidden ring-4 ring-rose-50/50">
+            {/* Form Header */}
+            <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] px-6 py-4 flex justify-between items-center">
+              <h2 className="text-white text-xl font-bold">
+                {inlineForm.id ? 'Update Leave Record' : 'Add Leave Record'}
+              </h2>
+              {inlineForm.id && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={resetInlineForm}
+                  className="text-white hover:bg-white/10 h-7 text-[10px] font-bold uppercase tracking-wider"
+                >
+                  <Plus className="w-3 h-3 mr-1" /> New Entry
+                </Button>
+              )}
+            </div>
+
+            <div className="px-8 py-8 space-y-6">
+              <div className="grid grid-cols-2 gap-x-10 gap-y-6">
+                {/* Row 1 */}
+                <div className="flex items-center gap-4">
+                  <span className="text-[13px] font-extrabold text-[#4A081A] uppercase tracking-[0.05em] w-32 shrink-0 text-right">EMPLOYEE ID:</span>
+                  <div className={cn("flex-1 border border-[#630C22] rounded-xl px-4 py-2 text-base bg-slate-50 shadow-sm h-[48px] flex items-center min-w-0", inlineForm.employee_id ? "text-slate-800 font-semibold" : "text-slate-400 italic font-medium")}>
+                    <span className="truncate">{inlineForm.employee_id || 'Auto-filled on name selection'}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 relative">
+                  <span className="text-[13px] font-extrabold text-[#4A081A] uppercase tracking-[0.05em] w-32 shrink-0 text-right">NAME:</span>
+                  <Popover open={empOpen} onOpenChange={setEmpOpen}>
+                    <PopoverTrigger asChild>
+                      <button type="button" className="flex items-center justify-between flex-1 border border-[#630C22] rounded-xl px-4 py-2 text-lg bg-white hover:border-[#4A081A] transition-all shadow-sm h-[48px] min-w-0 text-left">
+                        <span className={cn('flex-1 truncate', inlineForm.employee_name ? 'text-slate-800 font-semibold' : 'text-slate-400 italic')}>
+                          {inlineForm.employee_name || 'Select Employee Name'}
+                        </span>
+                        <ChevronDown className="w-5 h-5 text-slate-400 shrink-0 ml-2" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-0 w-[450px]">
+                      <Command>
+                        <CommandInput placeholder="Search employee..." className="text-base h-10" />
+                        <CommandEmpty className="text-base p-4">No employee found.</CommandEmpty>
+                        <CommandList>
+                          <CommandGroup>
+                            {employees
+                              .filter(e => e.id !== inlineForm.employee_id)
+                              .map(emp => (
+                                <CommandItem key={emp.id} value={emp.name} onSelect={() => handleInlineSelectEmployee(emp)} className="text-base py-3">
+                                  {emp.name}
+                                </CommandItem>
+                              ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="text-[13px] font-extrabold text-[#4A081A] uppercase tracking-[0.05em] w-32 shrink-0 text-right">CATEGORY:</span>
+                  <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className={cn(
+                          "flex items-center justify-between flex-1 border border-[#630C22] rounded-xl px-4 py-2 text-lg transition-all shadow-sm h-[48px] min-w-0 text-left",
+                          inlineForm.category
+                            ? (LEAVE_CATEGORY_OPTIONS.find(o => o.value === inlineForm.category)?.color || "bg-white hover:border-[#4A081A]")
+                            : "bg-white hover:border-[#4A081A]"
+                        )}
+                      >
+                        <span className={cn('flex-1 truncate', inlineForm.category ? 'font-black tracking-wide' : 'text-slate-400 italic text-lg')}>
+                          {LEAVE_CATEGORY_OPTIONS.find(o => o.value === inlineForm.category)?.label || 'Half-day/Whole day'}
+                        </span>
+                        <ChevronDown className={cn("w-5 h-5 shrink-0 ml-2", inlineForm.category ? "opacity-50" : "text-slate-400")} />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-2 w-[350px] space-y-2 border-0 shadow-2xl rounded-2xl bg-white">
+                      {LEAVE_CATEGORY_OPTIONS.map(o => (
+                        <button
+                          key={o.value}
+                          type="button"
+                          onClick={() => {
+                            setInlineForm(p => ({ ...p, category: o.value as 'half-day' | 'whole-day', shift: '' }));
+                            setCategoryOpen(false);
+                          }}
+                          className={cn(
+                            "w-full text-left px-5 py-4 rounded-xl text-lg transition-all font-black tracking-wider shadow-sm hover:opacity-80 uppercase",
+                            o.color
+                          )}
+                        >
+                          {o.label}
+                        </button>
+                      ))}
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Row 2 */}
+                <div className="flex items-center gap-4 relative">
+                  <span className="text-[13px] font-extrabold text-[#4A081A] uppercase tracking-[0.05em] w-32 shrink-0 text-right">SHIFT:</span>
+                  <Popover open={shiftOpen} onOpenChange={setShiftOpen}>
+                    <PopoverTrigger asChild>
+                      <button type="button" disabled={inlineForm.category === 'whole-day'} className={cn('flex items-center justify-between flex-1 border border-[#630C22] rounded-xl px-4 py-2 text-lg bg-white transition-all shadow-sm h-[48px] min-w-0 text-left', inlineForm.category === 'whole-day' ? 'opacity-40 cursor-not-allowed bg-slate-50' : 'hover:border-[#4A081A]')}>
+                        <span className={cn('flex-1 truncate', inlineForm.shift ? 'text-slate-800 font-semibold' : 'text-slate-400 italic text-lg')}>
+                          {inlineForm.shift || 'Select Hour'}
+                        </span>
+                        <ChevronDown className="w-5 h-5 text-slate-400 shrink-0 ml-2" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-2 w-[400px] space-y-1">
+                      {inlineAvailableShifts.length > 0 ? (
+                        inlineAvailableShifts
+                          .filter(s => s !== inlineForm.shift)
+                          .map(s => (
+                            <button key={s} type="button" onClick={() => { setInlineForm(p => ({ ...p, shift: s })); setShiftOpen(false); }} className="w-full text-left px-5 py-4 rounded-lg text-lg hover:bg-rose-50 transition-all font-medium">{s}</button>
+                          ))
+                      ) : (
+                        <p className="text-lg text-slate-400 italic px-5 py-4">{inlineForm.department ? `No shifts configured for "${inlineForm.department}"` : 'Select an employee first'}</p>
+                      )}
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="text-[13px] font-extrabold text-[#4A081A] uppercase tracking-[0.05em] w-32 shrink-0 text-right">START DATE:</span>
+                  <Input type="date" max={inlineForm.leave_end_date || undefined} value={inlineForm.start_date || ''} onChange={e => setInlineForm(p => ({ ...p, start_date: e.target.value }))} className="border-[#630C22] bg-white text-slate-700 flex-1 h-[48px] text-lg rounded-xl shadow-sm px-4" />
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="text-[13px] font-extrabold text-[#4A081A] uppercase tracking-[0.05em] w-32 shrink-0 text-right">LEAVE END:</span>
+                  <Input
+                    type="date"
+                    min={inlineForm.start_date || undefined}
+                    value={inlineForm.category === 'half-day' ? (inlineForm.start_date || '') : (inlineForm.leave_end_date || '')}
+                    disabled={inlineForm.category === 'half-day'}
+                    onChange={e => setInlineForm(p => ({ ...p, leave_end_date: e.target.value }))}
+                    className={cn(
+                      "border-[#630C22] bg-white text-slate-700 flex-1 h-[48px] text-lg rounded-xl shadow-sm px-4 font-medium",
+                      inlineForm.category === 'half-day' && "opacity-60 cursor-not-allowed bg-slate-50 border-slate-300"
+                    )}
+                  />
+                </div>
+
+                {/* Row 3 */}
+                <div className="flex items-center gap-4">
+                  <span className="text-[13px] font-extrabold text-[#4A081A] uppercase tracking-[0.05em] w-32 shrink-0 text-right">NO. OF DAYS:</span>
+                  <Input readOnly value={inlineForm.number_of_days > 0 ? formatDays(inlineForm.number_of_days, inlineForm.category) : ''} placeholder="" className="border-[#630C22] bg-white text-slate-700 cursor-default flex-1 h-[48px] rounded-xl shadow-sm px-4 font-bold text-2xl" />
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="text-[13px] font-extrabold text-[#4A081A] uppercase tracking-[0.05em] w-32 shrink-0 text-right">APPROVED BY:</span>
+                  <Popover open={approvalOpen} onOpenChange={setApprovalOpen}>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className={cn(
+                          "flex items-center justify-between flex-1 border border-[#630C22] rounded-xl px-4 py-2 text-lg transition-all shadow-sm h-[48px] min-w-0 text-left",
+                          inlineForm.approved_by
+                            ? (inlineApprovalOptions.find(o => o.value === inlineForm.approved_by)?.color || "bg-white hover:border-[#4A081A]")
+                            : "bg-white hover:border-[#4A081A]"
+                        )}
+                      >
+                        <span className={cn('flex-1 truncate', inlineForm.approved_by ? 'font-bold tracking-wide' : 'text-slate-400 italic text-lg')}>
+                          {inlineApprovalOptions.find(o => o.value === inlineForm.approved_by)?.label || 'Select Status/Name'}
+                        </span>
+                        <ChevronDown className={cn("w-5 h-5 shrink-0 ml-2 opacity-50")} />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-2 w-[400px] space-y-2 border-0 shadow-2xl rounded-2xl bg-white">
+                      {inlineApprovalOptions.map(o => (
+                        <button
+                          key={o.value}
+                          type="button"
+                          onClick={() => { setInlineForm(p => ({ ...p, approved_by: o.value })); setApprovalOpen(false); }}
+                          className={cn(
+                            "w-full text-left px-5 py-4 rounded-xl text-lg transition-all font-bold tracking-wide shadow-sm hover:opacity-80",
+                            o.color
+                          )}
+                        >
+                          {o.label}
+                        </button>
+                      ))}
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="flex items-start gap-4">
+                  <span className="text-[13px] font-extrabold text-[#4A081A] uppercase tracking-[0.05em] w-32 shrink-0 text-right pt-[14px]">REMARKS:</span>
+                  <Popover open={remarksOpen} onOpenChange={setRemarksOpen}>
+                    <PopoverTrigger asChild>
+                      <button type="button" className="flex items-center justify-between flex-1 border border-[#630C22] rounded-xl px-4 py-2 text-lg bg-white hover:border-[#4A081A] transition-all shadow-sm h-[48px] min-w-0 text-left">
+                        <span className={cn('flex-1 truncate', inlineForm.remarks ? 'text-slate-800 font-semibold' : 'text-slate-400 italic text-lg')}>
+                          {inlineRemarkOptions.find(o => o.value === inlineForm.remarks)?.label || 'Select Leave Type'}
+                        </span>
+                        <ChevronDown className="w-5 h-5 text-slate-400 shrink-0 ml-2" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-2 w-[400px] space-y-1">
+                      {inlineRemarkOptions.map(o => (
+                        <button key={o.value} type="button" onClick={() => { setInlineForm(p => ({ ...p, remarks: o.value })); setRemarksOpen(false); }} className="w-full text-left px-5 py-4 rounded-lg text-lg hover:bg-rose-50 transition-all font-medium">
+                          {o.label}
+                        </button>
+                      ))}
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <span className="text-[13px] font-extrabold text-[#4A081A] uppercase tracking-[0.05em] w-32 shrink-0 text-right pt-[14px]">REASON:</span>
+                  <textarea rows={2} value={inlineForm.cite_reason} onChange={e => setInlineForm(p => ({ ...p, cite_reason: e.target.value }))} placeholder="specify reason" className={cn("flex-1 border border-[#630C22] rounded-xl px-4 py-3 text-lg resize-none focus:outline-none focus:border-[#4A081A] shadow-sm transition-all min-h-[90px]", inlineForm.cite_reason ? "text-slate-800 font-semibold" : "italic font-medium text-slate-400")} />
+                </div>
+              </div>
+
+              {/* Footer actions */}
+              <div className="flex justify-end gap-4 pt-6 pr-2 pb-4">
+                <Button variant="outline" onClick={() => { setAddModalOpen(false); resetInlineForm() }} className="border-rose-300 text-[#4A081A] hover:bg-rose-50 text-lg px-12 h-[56px] font-extrabold rounded-2xl shadow-sm transition-all hover:scale-105">
+                  Cancel
+                </Button>
+                <Button onClick={handleInlineSave} disabled={inlineSaving} className="bg-[#630C22] hover:bg-[#4A081A] text-white text-lg px-16 h-[56px] font-extrabold rounded-2xl shadow-xl hover:shadow-[#630C22]/40 transition-all hover:scale-105 active:scale-95">
+                  {inlineSaving ? (inlineForm.id ? 'Updating…' : 'Saving…') : (inlineForm.id ? 'Update Leave' : 'Save Leave')}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* ── Leave Monitoring Table ── */}
         <section>
           <div className="rounded-xl overflow-hidden shadow border border-rose-100">
@@ -1694,8 +1810,8 @@ export default function LeavePage() {
                         <td className="border border-rose-100 px-3 py-3 font-semibold text-slate-700 text-lg">{entry.employee_name}</td>
                         <td className="border border-rose-100 px-3 py-3 text-center">
                           <span className={cn(
-                            'px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-tight',
-                            entry.category === 'half-day' ? 'bg-yellow-100 text-yellow-700 border border-yellow-200' : 'bg-red-100 text-red-700 border border-red-200'
+                            'px-3 py-1.5 rounded-none text-[10px] font-extrabold uppercase border shadow-sm transition-all',
+                            entry.category === 'half-day' ? 'bg-amber-100 text-amber-700 border-amber-200/50' : 'bg-rose-100 text-rose-700 border-rose-200/50'
                           )}>
                             {entry.category === 'half-day' ? 'HALF-DAY' : 'WHOLE DAY'}
                           </span>
@@ -1708,10 +1824,10 @@ export default function LeavePage() {
                         </td>
                         <td className="border border-rose-100 px-3 py-3 text-center">
                           <span className={cn(
-                            'px-2 py-1 rounded-full text-[10px] font-extrabold uppercase border',
-                            entry.approved_by === 'Pending' && 'bg-orange-100 text-orange-700 border-orange-200',
-                            entry.approved_by === 'Declined' && 'bg-red-100 text-red-700 border-red-200',
-                            !['Pending', 'Declined'].includes(entry.approved_by) && 'bg-green-100 text-green-700 border-green-200',
+                            'px-3 py-1.5 rounded-full text-[10px] font-extrabold uppercase border shadow-sm transition-all',
+                            entry.approved_by === 'Pending' && 'bg-amber-100 text-amber-700 border-amber-200/50',
+                            entry.approved_by === 'Declined' && 'bg-rose-100 text-rose-700 border-rose-200/50',
+                            !['Pending', 'Declined'].includes(entry.approved_by) && 'bg-emerald-100 text-emerald-700 border-emerald-200/50',
                           )}>
                             {entry.approved_by}
                           </span>
@@ -1719,23 +1835,44 @@ export default function LeavePage() {
                         <td className="border border-rose-100 px-3 py-3 text-center text-lg">
                           <span className="font-semibold text-[#4A081A] text-lg">{entry.remarks}</span>
                         </td>
-                        <td className="border border-rose-100 px-3 py-3 text-slate-600 text-lg max-w-[150px]">
+                        <td className="border border-rose-100 px-3 py-4 text-slate-600 text-lg max-w-[200px]">
                           {entry.cite_reason ? (
-                            <div className="flex items-center gap-2">
-                              <p className="italic truncate flex-1" title={entry.cite_reason}>{entry.cite_reason}</p>
+                            <div className="flex items-center gap-3">
+                              <p className="italic truncate flex-1 text-base font-medium text-slate-500" title={entry.cite_reason}>
+                                {entry.cite_reason}
+                              </p>
                               <Popover>
                                 <PopoverTrigger asChild>
-                                  <button title="View full reason" className="p-1 hover:bg-rose-100 rounded text-rose-500 transition-colors shrink-0">
-                                    <Eye className="w-3.5 h-3.5" />
+                                  <button
+                                    title="View full reason"
+                                    className="p-2 hover:bg-[#7B0F2B] hover:text-white rounded-xl text-[#7B0F2B] transition-all hover:rotate-6 active:scale-95 shrink-0 bg-rose-50 border border-rose-100 shadow-sm"
+                                  >
+                                    <Eye className="w-4 h-4" />
                                   </button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-64 p-3 text-xs leading-relaxed italic bg-white border-rose-100 text-slate-700 shadow-xl break-all whitespace-pre-wrap">
-                                  {entry.cite_reason}
+                                <PopoverContent
+                                  className="w-[450px] p-0 border-0 shadow-2xl rounded-2xl bg-white overflow-hidden ring-1 ring-black/5"
+                                  align="end"
+                                >
+                                  <div className="bg-gradient-to-r from-[#7B0F2B] to-[#A4163A] px-6 py-4 flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <div className="p-2 bg-white/10 rounded-lg">
+                                        <FileText className="w-5 h-5 text-white" />
+                                      </div>
+                                      <span className="text-white font-black text-sm tracking-[0.1em] uppercase">Reason for Leave</span>
+                                    </div>
+                                    <span className="text-[10px] font-bold text-rose-200 uppercase px-2 py-0.5 bg-white/10 rounded">Full Details</span>
+                                  </div>
+                                  <div className="p-8 max-h-[350px] overflow-y-auto custom-scrollbar bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-opacity-5">
+                                    <p className="text-slate-800 text-xl leading-loose font-semibold whitespace-pre-wrap break-words border-l-4 border-rose-200 pl-6 py-2 italic text-justify">
+                                      "{entry.cite_reason}"
+                                    </p>
+                                  </div>
                                 </PopoverContent>
                               </Popover>
                             </div>
                           ) : (
-                            <span className="text-slate-300">No reason cited</span>
+                            <span className="text-slate-300 italic text-sm text-center block w-full">No reason cited</span>
                           )}
                         </td>
                         <td className="border border-rose-100 px-3 py-3 text-center">

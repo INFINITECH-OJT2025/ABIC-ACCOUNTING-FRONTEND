@@ -10,8 +10,14 @@ class OfficeShiftSchedule extends Model
 
     protected $fillable = [
         'office_name',
+        'office_id',
         'shift_options',
     ];
+
+    public function office()
+    {
+        return $this->belongsTo(Office::class);
+    }
 
     protected $casts = [
         'shift_options' => 'array',

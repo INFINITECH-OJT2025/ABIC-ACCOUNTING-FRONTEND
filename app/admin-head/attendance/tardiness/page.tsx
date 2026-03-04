@@ -55,13 +55,14 @@ import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 
 import { cn } from '@/lib/utils'
+import { getApiUrl } from '@/lib/api'
 
 
-// ---------- TYPES & MOCK INITIAL DATA ----------
 // ---------- TYPES & MOCK INITIAL DATA ----------
 interface LateEntry {
+
   id: string | number
-  employee_id: number
+  employee_id: string | number
   employeeName: string // for backward compatibility in some components
   employee_name: string
   date: string
@@ -75,13 +76,252 @@ interface LateEntry {
   month: string
   year: number
   late_occurrence?: number // 1st late, 2nd late, etc.
+  department?: string // office/department name
+  office?: string // office name
 }
 
 
 interface Employee {
-  id: number
+  id: string | number
   name: string
   nickname?: string
+  department?: string // office/department name
+  office_name?: string // office name from hierarchy
+}
+
+
+interface OfficeShiftSchedule {
+  id?: number
+  office_name: string
+  shift_options: string[]
+}
+
+
+interface LeaveEntry {
+
+  id: number
+  employee_id: string | number
+  employee_name: string
+  department: string
+  category: 'half-day' | 'whole-day'
+  shift?: string
+  start_date: string
+  leave_end_date: string
+  number_of_days: number
+  approved_by: string
+  remarks: string
+  cite_reason: string
+}
+
+
+interface ShiftInfo {
+  startTimeMinutes: number
+  gracePeriodMinutes: number
+  displayName: string
+  allShifts?: { startTimeMinutes: number; displayName: string; shiftOption: string }[]
+}
+
+// Default fallback shift schedules (will be overridden by API data)
+const DEFAULT_SHIFT_SCHEDULES: Record<string, ShiftInfo> = {
+  'ABIC': { startTimeMinutes: 8 * 60, gracePeriodMinutes: 8 * 60 + 5, displayName: '8:00 AM' },
+  'INFINITECH': { startTimeMinutes: 9 * 60, gracePeriodMinutes: 9 * 60 + 5, displayName: '9:00 AM' },
+  'G-LIMIT': { startTimeMinutes: 10 * 60, gracePeriodMinutes: 10 * 60 + 5, displayName: '10:00 AM' },
+}
+
+// Global shift schedules reference (will be populated from API)
+let DYNAMIC_SHIFT_SCHEDULES: Record<string, ShiftInfo> = { ...DEFAULT_SHIFT_SCHEDULES }
+
+// Map from Department Name to Office Name
+let DEPT_TO_OFFICE_MAP: Record<string, string> = {}
+
+// Parse start time from shift option string (e.g., "8:00 AM – 12:00 PM" -> 8:00 AM)
+function extractStartTime(shiftOption: string): string {
+  // Support both en-dash (–) and hyphen (-)
+  const parts = shiftOption.split(/\s*[–-]\s*/)
+  return parts[0].trim()
+}
+
+// Unified time string parser (handles "8:00 AM", "08:00", "13:00:00", "01:10 pm", etc.)
+function parseTimeToMinutes(timeStr: string): number {
+  if (!timeStr) return 0
+  const normalized = timeStr.trim().toUpperCase()
+
+  // 1. Try 12-hour format: HH:MM AM/PM
+  const match12 = normalized.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/)
+  if (match12) {
+    let hours = parseInt(match12[1])
+    const minutes = parseInt(match12[2])
+    const period = match12[3]
+    if (period === 'PM' && hours !== 12) hours += 12
+    if (period === 'AM' && hours === 12) hours = 0
+    return hours * 60 + minutes
+  }
+
+  // 2. Try 24-hour format: HH:MM[:SS]
+  const match24 = normalized.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/)
+  if (match24) {
+    const hours = parseInt(match24[1])
+    const minutes = parseInt(match24[2])
+    return hours * 60 + minutes
+  }
+
+  // 3. Fallback: try direct Date parsing for weird formats
+  const dateStr = `2000-01-01 ${normalized}`
+  const d = new Date(dateStr)
+  if (!isNaN(d.getTime())) {
+    return d.getHours() * 60 + d.getMinutes()
+  }
+
+  return 0
+}
+
+// Alias for backward compatibility if needed, but we'll prioritize parseTimeToMinutes
+const timeStringToMinutes = parseTimeToMinutes
+
+// Helper to get shift schedule for an employee
+function getShiftSchedule(department?: string): ShiftInfo {
+  const fallbackKey = Object.keys(DYNAMIC_SHIFT_SCHEDULES).find(k => k.includes('ABIC')) || 'ABIC'
+  const fallback = DYNAMIC_SHIFT_SCHEDULES[fallbackKey] || DEFAULT_SHIFT_SCHEDULES['ABIC']
+
+  if (!department) return fallback
+
+  const normalized = department.toUpperCase().trim()
+
+  // 1. Try direct match with office/dept name
+  if (DYNAMIC_SHIFT_SCHEDULES[normalized]) return DYNAMIC_SHIFT_SCHEDULES[normalized]
+
+  // 2. Try mapping from department name to office
+  const mappedOffice = DEPT_TO_OFFICE_MAP[normalized]
+  if (mappedOffice) {
+    if (DYNAMIC_SHIFT_SCHEDULES[mappedOffice]) return DYNAMIC_SHIFT_SCHEDULES[mappedOffice]
+
+    // Fuzzy match mapped office against existing schedules
+    const partialMapped = Object.keys(DYNAMIC_SHIFT_SCHEDULES).find(off =>
+      mappedOffice.includes(off) || off.includes(mappedOffice)
+    )
+    if (partialMapped) return DYNAMIC_SHIFT_SCHEDULES[partialMapped]
+  }
+
+  // 3. Try fuzzy/partial match on department name itself
+  const partialMatch = Object.keys(DYNAMIC_SHIFT_SCHEDULES).find(off =>
+    normalized.includes(off) || off.includes(normalized)
+  )
+  if (partialMatch) return DYNAMIC_SHIFT_SCHEDULES[partialMatch]
+
+  return fallback
+}
+
+
+// Helper to get effective shift start time considering approved leaves
+function getEffectiveSchedule(
+  employeeId: string | number,
+  employeeName: string | undefined, // Added employeeName for fallback matching
+  date: string,
+  department: string | undefined,
+  leaves: LeaveEntry[]
+): ShiftInfo | null {
+  const schedule = getShiftSchedule(department)
+  const normalizedDate = formatDate(date)
+
+  // Find approved leave for this employee on this date
+  const leave = leaves.find(l =>
+    (String(l.employee_id) === String(employeeId) || (employeeName && l.employee_name && l.employee_name.toLowerCase() === employeeName.toLowerCase())) &&
+    (l.approved_by !== 'Pending' && l.approved_by !== 'Declined') && // Approved
+    (normalizeDate(l.start_date) <= normalizedDate && normalizeDate(l.leave_end_date) >= normalizedDate)
+  )
+
+  if (!leave) return schedule
+
+  const leaveCategory = (leave.category || '').toLowerCase().replace(/[\s_-]+/g, '')
+
+  if (leaveCategory.includes('whole')) {
+    return null // Signals whole-day leave
+  }
+
+  if (leaveCategory.includes('half') && leave.shift && schedule.allShifts && schedule.allShifts.length > 1) {
+    const leaveStartMins = timeStringToMinutes(extractStartTime(leave.shift))
+    const firstShiftStartMins = schedule.allShifts[0].startTimeMinutes
+
+    // Use a small tolerance (5 mins) for time comparison to avoid floating point or string mismatch issues
+    if (Math.abs(leaveStartMins - firstShiftStartMins) < 5) {
+      return {
+        startTimeMinutes: schedule.allShifts[1].startTimeMinutes,
+        gracePeriodMinutes: schedule.allShifts[1].startTimeMinutes + 5,
+        displayName: schedule.allShifts[1].displayName,
+        allShifts: schedule.allShifts
+      }
+    }
+  }
+
+  return schedule
+}
+
+// Helper for normalizeDate (copied from leave page for consistency)
+// Robust date normalizer to YYYY-MM-DD
+function normalizeDate(dateInput: any): string {
+  if (!dateInput) return ''
+  const d = new Date(dateInput)
+  if (isNaN(d.getTime())) return String(dateInput).slice(0, 10)
+
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+
+// Initialize dynamic shift schedules from API data
+async function initializeShiftSchedules() {
+  try {
+    const [schedRes, deptRes, officeRes] = await Promise.all([
+      fetch(`${getApiUrl()}/api/office-shift-schedules`),
+      fetch(`${getApiUrl()}/api/departments`),
+      fetch(`${getApiUrl()}/api/offices`)
+    ])
+
+    const schedData = await schedRes.json()
+    const deptData = await deptRes.json()
+    const officeData = await officeRes.json()
+
+    if (schedData.success && Array.isArray(schedData.data)) {
+      DYNAMIC_SHIFT_SCHEDULES = {}
+      schedData.data.forEach((schedule: OfficeShiftSchedule) => {
+        if (schedule.shift_options && schedule.shift_options.length > 0) {
+          const officeName = schedule.office_name.toUpperCase().trim()
+          const shifts = schedule.shift_options.map(opt => ({
+            startTimeMinutes: timeStringToMinutes(extractStartTime(opt)),
+            displayName: extractStartTime(opt),
+            shiftOption: opt
+          }))
+
+          DYNAMIC_SHIFT_SCHEDULES[officeName] = {
+            startTimeMinutes: shifts[0].startTimeMinutes,
+            gracePeriodMinutes: shifts[0].startTimeMinutes + 5,
+            displayName: shifts[0].displayName,
+            allShifts: shifts
+          }
+        }
+
+      })
+    }
+
+    if (deptData.success && officeData.success) {
+      const departments = deptData.data || []
+      const offices = officeData.data || []
+      DEPT_TO_OFFICE_MAP = {}
+
+      departments.forEach((dept: any) => {
+        const off = offices.find((o: any) => o.id === dept.office_id)
+        if (off) {
+          DEPT_TO_OFFICE_MAP[dept.name.toUpperCase().trim()] = off.name.toUpperCase().trim()
+        }
+      })
+    }
+  } catch (error) {
+    console.error('Failed to load shift schedules from API:', error)
+    // Fall back to defaults
+    DYNAMIC_SHIFT_SCHEDULES = { ...DEFAULT_SHIFT_SCHEDULES }
+  }
 }
 
 
@@ -91,66 +331,44 @@ const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 
 
 // ---------- TIME PARSING UTILITY ----------
-function parseTimeToMinutes(timeStr: string): number {
-  if (!timeStr) return 0
+// Removed redundant parseTimeToMinutes definition (already unified above)
 
 
-  // Support 12h format: HH:MM AM/PM
-  const regex12 = /(\d{1,2}):(\d{2})\s*(AM|PM)/i
-  const match12 = timeStr.match(regex12)
+// Calculate minutes from assigned start time (no grace period) - for table display
+function calculateMinutesLate(actualIn: string, department: string | undefined, employeeId: string | number | undefined, employeeName: string | undefined, date: string | undefined, leaves: LeaveEntry[]): number {
+  if (!actualIn) return 0
 
+  const schedule = (employeeId && date) ? getEffectiveSchedule(employeeId, employeeName, date, department, leaves) : getShiftSchedule(department)
 
-  if (match12) {
-    let hours = parseInt(match12[1])
-    const minutes = parseInt(match12[2])
-    const period = match12[3].toUpperCase()
+  if (!schedule) return 0 // Whole day leave
 
+  const actualTimeMinutes = parseTimeToMinutes(actualIn)
 
-    if (period === 'PM' && hours !== 12) hours += 12
-    if (period === 'AM' && hours === 12) hours = 0
+  if (actualTimeMinutes <= schedule.startTimeMinutes) return 0
 
-
-    return hours * 60 + minutes
-  }
-
-
-  // Support 24h format: HH:MM:SS (standard MySQL TIME format) or HH:MM
-  const regex24 = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/
-  const match24 = timeStr.match(regex24)
-
-
-  if (match24) {
-    const hours = parseInt(match24[1])
-    const minutes = parseInt(match24[2])
-    // Seconds are ignored as lates are counted by minutes
-    return hours * 60 + minutes
-  }
-
-
-  return 0
+  return Math.max(0, Math.floor(actualTimeMinutes - schedule.startTimeMinutes))
 }
 
 
-// Calculate minutes from 8:00 AM (no grace period) - for table display
-function calculateMinutesFrom8AM(actualIn: string): number {
-  const startTimeMinutes = 8 * 60 // 8:00 AM
+// Check if time exceeds grace period - for summary occurrences
+function exceedsGracePeriod(actualIn: string, department: string | undefined, employeeId: string | number | undefined, employeeName: string | undefined, date: string | undefined, leaves: LeaveEntry[]): boolean {
+  const schedule = (employeeId && date) ? getEffectiveSchedule(employeeId, employeeName, date, department, leaves) : getShiftSchedule(department)
+
+  if (!schedule) return false // Whole day leave
+
   const actualTimeMinutes = parseTimeToMinutes(actualIn)
-
-
-  if (actualTimeMinutes <= startTimeMinutes) return 0
-
-
-  return actualTimeMinutes - startTimeMinutes
+  return actualTimeMinutes > schedule.gracePeriodMinutes
 }
 
 
-// Check if time exceeds grace period (8:05 AM) - for summary occurrences
-function exceedsGracePeriod(actualIn: string): boolean {
-  const graceTimeMinutes = 8 * 60 + 5 // 8:05 AM
-  const actualTimeMinutes = parseTimeToMinutes(actualIn)
 
-
-  return actualTimeMinutes > graceTimeMinutes
+// Convert any time format (12h or 24h) to a 24h HH:MM string for native time inputs
+function to24h(timeStr: string): string {
+  if (!timeStr) return ''
+  const mins = parseTimeToMinutes(timeStr)
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
 
@@ -169,9 +387,10 @@ function formatDate(dateInput: any): string {
 
 
 // Recalculate warnings for all entries
-function recalculateWarnings(entries: LateEntry[]): LateEntry[] {
+function recalculateWarnings(entries: LateEntry[], leaves: LeaveEntry[]): LateEntry[] {
   // First, group by employee ONLY (to allow monthly cumulative counts)
   const entriesByEmployee = new Map<string | number, LateEntry[]>()
+
 
 
   entries.forEach(entry => {
@@ -185,6 +404,10 @@ function recalculateWarnings(entries: LateEntry[]): LateEntry[] {
 
   // Now process each group
   const updatedEntries: LateEntry[] = []
+
+  // Note: recalculateWarnings needs leaves too. Since it's a global function, 
+  // we either pass leaves or use a closure. For now, let's keep it simple.
+
 
 
   entriesByEmployee.forEach((groupEntries) => {
@@ -205,10 +428,12 @@ function recalculateWarnings(entries: LateEntry[]): LateEntry[] {
     const processedGroup = groupEntries.map(entry => {
       let warningLevel = 0
       const actualIn = entry.actual_in || entry.actualIn || ''
+      const department = entry.department || entry.office
 
 
-      // Check if late (using the same logic as Summary: > 8:05 AM)
-      if (actualIn && exceedsGracePeriod(actualIn)) {
+      // Check if late (using department-specific grace period)
+      if (actualIn && exceedsGracePeriod(actualIn, department, entry.employee_id, entry.employee_name || entry.employeeName, entry.date, leaves)) {
+
         lateCount++
         // New Rule: 3rd late = 1st warning, 4th = 2nd, 5th = 3rd
         if (lateCount >= 3) {
@@ -217,12 +442,16 @@ function recalculateWarnings(entries: LateEntry[]): LateEntry[] {
       }
 
 
+      const minutesLate = calculateMinutesLate(actualIn, department, entry.employee_id, entry.employee_name || entry.employeeName, entry.date, leaves)
+
       return {
         ...entry,
+        minutesLate: minutesLate,
         warningLevel: warningLevel,
         warning_level: warningLevel, // Update both for consistency
-        late_occurrence: actualIn && exceedsGracePeriod(actualIn) ? lateCount : 0
+        late_occurrence: actualIn && exceedsGracePeriod(actualIn, department, entry.employee_id, entry.employee_name || entry.employeeName, entry.date, leaves) ? lateCount : 0
       }
+
     })
 
 
@@ -346,8 +575,9 @@ function exportToExcel(
   AOA.push(['', '', '', ''])
   const notesStartRow = AOA.length
   AOA.push(['Notes:', '', '', ''])
-  AOA.push(['* Minutes are counted from 8:00 AM', '', '', ''])
-  AOA.push(['* Total Lates count is based on arrivals after 8:05 AM grace period', '', '', ''])
+  AOA.push(['* Minutes are counted from each employee\'s office start time', '', '', ''])
+  AOA.push(['* Shift times: ABIC=8:00 AM, INFINITECH=9:00 AM, G-LIMIT=10:00 AM', '', '', ''])
+  AOA.push(['* Total Lates count is based on arrivals after respective grace periods (5 minutes)', '', '', ''])
   AOA.push(['* Warnings: 3rd late = 1st warning, 4th = 2nd, 5th = 3rd', '', '', ''])
 
   // Signatory
@@ -650,6 +880,7 @@ function EmployeeSelector({
 
 
 // ---------- SUMMARY SHEET COMPONENT ----------
+// ---------- SUMMARY SHEET COMPONENT ----------
 interface SummarySheetProps {
   isOpen: boolean
   onClose: () => void
@@ -658,16 +889,17 @@ interface SummarySheetProps {
   selectedYear: number
   selectedMonth: string
   employees: Employee[]
+  leaves: LeaveEntry[]
 }
 
 
-function SummarySheet({ isOpen, onClose, cutoffTitle, entries, selectedYear, selectedMonth, employees }: SummarySheetProps) {
+function SummarySheet({ isOpen, onClose, cutoffTitle, entries, selectedYear, selectedMonth, employees, leaves }: SummarySheetProps) {
   // Search state
   const [searchQuery, setSearchQuery] = useState('')
 
 
   // Calculate summary from entries - ONLY from this specific cutoff range
-  const summaryMap = new Map<number, { totalMinutes: number; occurrences: number; name: string }>()
+  const summaryMap = new Map<string | number, { totalMinutes: number; occurrences: number; name: string }>()
 
 
   // Initialize all employees with 0 values
@@ -681,9 +913,10 @@ function SummarySheet({ isOpen, onClose, cutoffTitle, entries, selectedYear, sel
     const current = summaryMap.get(entry.employee_id)
     if (current) {
       current.totalMinutes += entry.minutesLate
-      // Use helper to check if late (assuming 8:05 AM grace)
+      // Use helper to check if late (using department-specific grace period and leaves)
       const actualTime = entry.actual_in || entry.actualIn || ''
-      if (actualTime && exceedsGracePeriod(actualTime)) {
+      const department = entry.department || entry.office
+      if (actualTime && exceedsGracePeriod(actualTime, department, entry.employee_id, entry.employee_name || entry.employeeName, entry.date, leaves)) {
         current.occurrences += 1
       }
     }
@@ -795,7 +1028,7 @@ function SummarySheet({ isOpen, onClose, cutoffTitle, entries, selectedYear, sel
                 </div>
               </div>
               <CardDescription className="text-[#630C22]/70 text-xs font-medium">
-                Minutes from 8:00 AM • Occurrences after 8:05 AM • {cutoffTitle} only
+                Minutes from Assigned Shift • Occurrences after 5min Grace Period • {cutoffTitle} only
               </CardDescription>
             </CardHeader>
 
@@ -853,8 +1086,8 @@ function SummarySheet({ isOpen, onClose, cutoffTitle, entries, selectedYear, sel
 
 
           <div className="text-xs text-stone-500 space-y-1">
-            <p>* Minutes are counted from 8:00 AM (no grace period in minutes display)</p>
-            <p>* Occurrences are only counted for arrivals after 8:05 AM grace period</p>
+            <p>* Minutes are counted from assigned shift start time (no grace period in minutes display)</p>
+            <p>* Occurrences are only counted for arrivals after the 5-minute grace period</p>
             <p>* Warnings: 3rd late = 1st warning, 4th = 2nd, 5th = 3rd</p>
             <p>This report includes data only from {cutoffTitle}</p>
           </div>
@@ -863,6 +1096,7 @@ function SummarySheet({ isOpen, onClose, cutoffTitle, entries, selectedYear, sel
     </Sheet>
   )
 }
+
 
 
 // ---------- MAIN DASHBOARD ----------
@@ -875,15 +1109,17 @@ export default function AttendanceDashboard() {
 
   // State for all entries (Master Record)
   const [allEntries, setAllEntries] = useState<LateEntry[]>([])
+  const [leaves, setLeaves] = useState<LeaveEntry[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
   const [isLoading, setIsLoading] = useState(false)
+
 
 
   // Fetch years list
   useEffect(() => {
     const fetchYears = async () => {
       try {
-        const res = await fetch('/api/admin-head/attendance/tardiness/years')
+        const res = await fetch(`${getApiUrl()}/api/admin-head/attendance/tardiness/years`)
         const data = await res.json()
         if (data.success) {
           setYearsList(data.data)
@@ -892,6 +1128,7 @@ export default function AttendanceDashboard() {
         console.error('Failed to fetch years:', error)
       }
     }
+
     fetchYears()
   }, [])
 
@@ -901,47 +1138,91 @@ export default function AttendanceDashboard() {
     const fetchData = async () => {
       setIsLoading(true)
       try {
-        // Fetch employees
-        const empRes = await fetch('/api/admin-head/employees?status=employed,rehired')
+        // 1. Initialize shift schedules (essential for minutesLate calculations)
+        await initializeShiftSchedules()
+
+        // 2. Fetch all required supporting data
+        const [empRes, hierRes, deptRes, posRes, leavesRes, offRes] = await Promise.all([
+          fetch('/api/admin-head/employees?status=employed,rehired'),
+          fetch(`${getApiUrl()}/api/hierarchies`),
+          fetch(`${getApiUrl()}/api/departments`),
+          fetch(`${getApiUrl()}/api/positions`),
+          fetch(`${getApiUrl()}/api/leaves`),
+          fetch(`${getApiUrl()}/api/offices`)
+        ])
+
         const empData = await empRes.json()
+        const hierData = await hierRes.json()
+        const deptData = await deptRes.json()
+        const posData = await posRes.json()
+        const leavesData = await leavesRes.json()
+        const offData = await offRes.json()
+
+        const currentLeaves = leavesData.success ? leavesData.data : []
+        setLeaves(currentLeaves)
+
         if (empData.success) {
-          setEmployees(empData.data)
-        }
+          const hierarchies = hierData.success ? hierData.data : []
+          const positions = posData.success ? posData.data : []
+          const departments = deptData.success ? deptData.data : []
+          const offices = offData.success ? offData.data : []
 
+          // 3. Resolve department and names for all employees immediately
+          const resolvedEmployees = empData.data.map((e: any) => {
+            let deptName = e.department
+            if (!deptName && e.position && positions.length > 0 && hierarchies.length > 0) {
+              const pos = positions.find((p: any) => p.name.toLowerCase() === e.position?.toLowerCase())
+              if (pos) {
+                const hier = hierarchies.find((h: any) => String(h.position_id) === String(pos.id))
+                if (hier && hier.department_id) {
+                  const d = departments.find((d: any) => String(d.id) === String(hier.department_id))
+                  if (d) deptName = d.name
+                }
+              }
+            }
 
-        // Fetch entries for current month/year
-        const entRes = await fetch(`/api/admin-head/attendance/tardiness?month=${selectedMonth}&year=${selectedYear}`)
-        const entData = await entRes.json()
-        if (entData.success) {
-          // Map backend fields to frontend interface
-          const mappedEntries = entData.data.map((e: any) => ({
-            ...e,
-            date: formatDate(e.date),
-            employeeName: e.employee_name,
-            cutoffPeriod: e.cutoff_period,
-            actualIn: e.actual_in,
-            minutesLate: e.minutes_late,
-            warningLevel: e.warning_level
-          }))
-          // Sort entries by date ascending (oldest to newest), then by time
-          const sortedEntries = mappedEntries.sort((a: any, b: any) => {
-            const dateA = new Date(a.date).getTime()
-            const dateB = new Date(b.date).getTime()
-            if (dateA !== dateB) return dateA - dateB
-            return parseTimeToMinutes(a.actual_in || a.actualIn) - parseTimeToMinutes(b.actual_in || b.actualIn)
+            // Corrected Name Resolution: Use 'e.name' if provided by the API (which it is for this route)
+            const fullName = e.name || (e.first_name && e.last_name ? `${e.first_name} ${e.last_name}` : String(e.id))
+
+            return {
+              ...e,
+              id: String(e.id),
+              name: fullName,
+              department: deptName || e.department || e.office_name
+            }
           })
+          setEmployees(resolvedEmployees)
 
+          // 4. Fetch and map attendance entries for the current selected month/year
+          const entRes = await fetch(`${getApiUrl()}/api/admin-head/attendance/tardiness?month=${selectedMonth}&year=${selectedYear}`)
+          const entData = await entRes.json()
 
-          // Apply dynamic warning calculation
-          const entriesWithWarnings = recalculateWarnings(sortedEntries)
-          setAllEntries(entriesWithWarnings)
+          if (entData.success) {
+            const mappedEntries = entData.data.map((e: any) => {
+              const empInfo = resolvedEmployees.find((emp: any) => String(emp.id) === String(e.employee_id))
+              return {
+                ...e,
+                date: formatDate(e.date),
+                employeeName: e.employee_name,
+                cutoffPeriod: e.cutoff_period,
+                actualIn: e.actual_in,
+                minutesLate: calculateMinutesLate(e.actual_in, empInfo?.department, e.employee_id, e.employee_name, e.date, currentLeaves),
+                warningLevel: e.warning_level,
+                department: empInfo?.department,
+                office: empInfo?.department
+              }
+            })
+
+            const sorted = mappedEntries.sort((a: any, b: any) => {
+              const dateA = new Date(a.date).getTime()
+              const dateB = new Date(b.date).getTime()
+              if (dateA !== dateB) return dateA - dateB
+              return parseTimeToMinutes(a.actual_in) - parseTimeToMinutes(b.actual_in)
+            })
+
+            setAllEntries(recalculateWarnings(sorted, currentLeaves))
+          }
         }
-
-
-
-
-
-
       } catch (error) {
         console.error('Failed to fetch data:', error)
         toast.error('Failed to load data from server')
@@ -949,7 +1230,6 @@ export default function AttendanceDashboard() {
         setIsLoading(false)
       }
     }
-
 
     fetchData()
   }, [selectedMonth, selectedYear])
@@ -1085,32 +1365,73 @@ export default function AttendanceDashboard() {
   // Shared handler to update actual_in time — updates local state immediately
   // and persists to the database after a short debounce
   const updateEntryTime = (id: string | number, newTime: string) => {
-    const minutesLate = calculateMinutesFrom8AM(newTime)
+    // Find the entry to get its department
+    const entryToUpdate = allEntries.find(e => e.id === id)
+    // Try to get fresh employee info to be 100% sure about the department
+    const employee = employees.find(e => {
+      const entryEmpId = String(entryToUpdate?.employee_id)
+      return String(e.id) === entryEmpId || e.name === entryToUpdate?.employee_name
+    })
+
+    const department = employee?.department || entryToUpdate?.department || entryToUpdate?.office
+    // Validation: Check for approved leave that covers this time
+    const dateStr = entryToUpdate?.date ? formatDate(entryToUpdate.date) : ''
+    const approvedLeave = leaves.find(l =>
+      String(l.employee_id) === String(entryToUpdate?.employee_id) &&
+      (l.approved_by !== 'Pending' && l.approved_by !== 'Declined') && // Approved
+      (normalizeDate(l.start_date) <= dateStr && normalizeDate(l.leave_end_date) >= dateStr)
+    )
+
+    if (approvedLeave) {
+      if (approvedLeave.category === 'whole-day') {
+        toast.error(`${entryToUpdate?.employee_name} has an approved whole-day leave. Attendance cannot be recorded.`)
+        return
+      }
+
+      if (approvedLeave.category === 'half-day' && approvedLeave.shift) {
+        const parts = approvedLeave.shift.split(' – ')
+        if (parts.length === 2) {
+          const startMins = timeStringToMinutes(parts[0])
+          const endMins = timeStringToMinutes(parts[1])
+          const entryMins = parseTimeToMinutes(newTime)
+
+          if (entryMins >= startMins && entryMins <= endMins) {
+            toast.error(`${entryToUpdate?.employee_name} has an approved half-day leave during this shift (${approvedLeave.shift}). Attendance cannot be recorded for this time.`)
+            return
+          }
+        }
+      }
+    }
+
+    // Persist the calculated minutes late immediately
+    const minutesLate = calculateMinutesLate(newTime, department, entryToUpdate?.employee_id, entryToUpdate?.employee_name, entryToUpdate?.date, leaves)
 
 
     // Optimistic local update with recalculation
     setAllEntries(prev => {
       const updatedList = prev.map(entry => {
         if (entry.id === id) {
-          return {
+          const updated = {
             ...entry,
             actual_in: newTime,
             actualIn: newTime,
             minutesLate,
           }
+          return updated
         }
         return entry
       })
       // Must recalculate warnings because changing one time might change the count/order of warnings
-      return recalculateWarnings(updatedList)
+      return recalculateWarnings(updatedList, leaves)
     })
+
 
 
     // Debounce the API call (600ms)
     if (debounceTimers.current[id]) clearTimeout(debounceTimers.current[id])
     debounceTimers.current[id] = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/admin-head/attendance/tardiness/${id}`, {
+        const res = await fetch(`${getApiUrl()}/api/admin-head/attendance/tardiness/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ actualIn: newTime, minutesLate }),
@@ -1182,6 +1503,36 @@ export default function AttendanceDashboard() {
     }
 
 
+    // Validation 3: Check for approved leave
+    const approvedLeave = leaves.find(l =>
+      String(l.employee_id) === String(selectedEmployee.id) &&
+      (l.approved_by !== 'Pending' && l.approved_by !== 'Declined') &&
+      (normalizeDate(l.start_date) <= dateStr && normalizeDate(l.leave_end_date) >= dateStr)
+    )
+
+    if (approvedLeave) {
+      if (approvedLeave.category === 'whole-day') {
+        toast.error(`${newEntryEmployee} has an approved whole-day leave for today. Attendance cannot be recorded.`)
+        return
+      }
+
+      if (approvedLeave.category === 'half-day' && approvedLeave.shift) {
+        const parts = approvedLeave.shift.split(' – ')
+        if (parts.length === 2) {
+          const startMins = timeStringToMinutes(parts[0])
+          const endMins = timeStringToMinutes(parts[1])
+          const entryMins = parseTimeToMinutes(newEntryTime)
+
+          if (entryMins >= startMins && entryMins <= endMins) {
+            toast.error(`${newEntryEmployee} has an approved half-day leave for this shift (${approvedLeave.shift}). Attendance cannot be recorded for this time.`)
+            return
+          }
+        }
+      }
+    }
+
+
+
     // If validation passes, open confirmation modal
     setShowSaveConfirm(true)
   }
@@ -1201,12 +1552,13 @@ export default function AttendanceDashboard() {
 
 
     const autoCutoff: 'cutoff1' | 'cutoff2' = dayOfMonth <= 15 ? 'cutoff1' : 'cutoff2'
-    const minutesLate = calculateMinutesFrom8AM(newEntryTime)
+    // Calculate minutes late based on employee's department shift AND leaves
+    const minutesLate = calculateMinutesLate(newEntryTime, selectedEmployee.department, selectedEmployee.id, selectedEmployee.name, dateStr, leaves)
 
 
     setIsSaving(true)
     try {
-      const response = await fetch('/api/admin-head/attendance/tardiness', {
+      const response = await fetch(`${getApiUrl()}/api/admin-head/attendance/tardiness`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1227,18 +1579,24 @@ export default function AttendanceDashboard() {
       if (data.success) {
         toast.success('Entry saved successfully')
         // Refresh entries with corrected mapping
-        const entRes = await fetch(`/api/admin-head/attendance/tardiness?month=${selectedMonth}&year=${selectedYear}`)
+        const entRes = await fetch(`${getApiUrl()}/api/admin-head/attendance/tardiness?month=${selectedMonth}&year=${selectedYear}`)
         const entData = await entRes.json()
         if (entData.success) {
-          const mapped = entData.data.map((e: any) => ({
-            ...e,
-            date: formatDate(e.date),
-            employeeName: e.employee_name,
-            cutoffPeriod: e.cutoff_period,
-            actualIn: e.actual_in,
-            minutesLate: e.minutes_late,
-            warningLevel: e.warning_level
-          }))
+          const mapped = entData.data.map((e: any) => {
+            const empInfo = employees.find(emp => String(emp.id) === String(e.employee_id))
+            return {
+              ...e,
+              date: formatDate(e.date),
+              employeeName: e.employee_name,
+              cutoffPeriod: e.cutoff_period,
+              actualIn: e.actual_in,
+              // Recalculate with CORRECT department and leaves
+              minutesLate: calculateMinutesLate(e.actual_in, empInfo?.department, e.employee_id, e.employee_name, e.date, leaves),
+              warningLevel: e.warning_level,
+              department: empInfo?.department,
+              office: empInfo?.department
+            }
+          })
           // Sort entries by date ascending (oldest to newest), then by time
           const sorted = mapped.sort((a: any, b: any) => {
             const dateA = new Date(a.date).getTime()
@@ -1247,9 +1605,10 @@ export default function AttendanceDashboard() {
             return parseTimeToMinutes(a.actual_in || a.actualIn) - parseTimeToMinutes(b.actual_in || b.actualIn)
           })
           // Apply dynamic warning calculation
-          const entriesWithWarnings = recalculateWarnings(sorted)
+          const entriesWithWarnings = recalculateWarnings(sorted, leaves)
           setAllEntries(entriesWithWarnings)
         }
+
 
 
         resetAddEntryFields()
@@ -1515,6 +1874,14 @@ export default function AttendanceDashboard() {
                           className="bg-white border text-center border-rose-100 text-slate-800 pl-8 pr-2 h-9 w-full rounded-md text-sm font-bold focus:ring-[#800020]/10 focus:border-[#630C22] shadow-none transition-all"
                         />
                       </div>
+
+                      {/* Shift Display */}
+                      {newEntryEmployee && employees.find(e => e.name === newEntryEmployee) && (
+                        <div className="flex items-center gap-2 px-3 py-2 bg-[#FFE5EC] rounded-md text-xs font-semibold text-[#4A081A] whitespace-nowrap">
+                          <span className="text-[10px] opacity-70">SHIFT:</span>
+                          <span>{getShiftSchedule(employees.find(e => e.name === newEntryEmployee)?.department).displayName}</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Actions Group */}
@@ -1631,7 +1998,7 @@ export default function AttendanceDashboard() {
             </>
           )}
           <div className="col-span-full text-right mt-2 text-md text-[#A0153E] font-medium italic">
-            * Table shows minutes from 8:00 AM • Summary counted after 8:05 AM
+            * Table shows minutes from assigned shift start time • Summary counts arrivals after 5th minute grace period
           </div>
         </div>
       </div>
@@ -1648,7 +2015,9 @@ export default function AttendanceDashboard() {
             selectedYear={selectedYear}
             selectedMonth={selectedMonth}
             employees={employees}
+            leaves={leaves}
           />
+
         )
       }
 
@@ -1764,7 +2133,7 @@ function CutoffTable({
         </div>
         <CardDescription className="text-[#A0153E]/70 flex items-center gap-2 text-xs font-medium mt-1">
           <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#C9184A]" />
-          <span>Minutes from 8:00 AM</span>
+          <span>Minutes from Assigned Shift</span>
           <span className="text-[#FFE5EC]">|</span>
           <span>{totalRecords} records</span>
         </CardDescription>
@@ -1801,7 +2170,7 @@ function CutoffTable({
                   <td className="px-3 py-5">
                     <Input
                       type="time"
-                      value={(entry.actual_in || entry.actualIn || '').substring(0, 5)}
+                      value={to24h(entry.actual_in || entry.actualIn || '')}
                       onChange={(e) => onUpdateTime(entry.id, e.target.value)}
                       className="bg-white border-[#FFE5EC] text-slate-800 placeholder:text-slate-300 h-10 text-base md:text-lg w-32 font-bold focus:ring-2 focus:ring-[#A0153E] shadow-sm appearance-none"
                     />
