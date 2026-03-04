@@ -25,7 +25,7 @@ import {
 } from 'lucide-react'
 import { getApiUrl } from '@/lib/api'
 import { toast } from 'sonner'
-import { format } from 'date-fns'
+import { format, addMonths } from 'date-fns'
 
 interface Employee {
   id: string
@@ -39,6 +39,10 @@ interface Employee {
 
 interface Evaluation {
   employee_id: string
+  score_1: number | null
+  remarks_1: string | null
+  score_2: number | null
+  remarks_2: string | null
   status: string | null
 }
 
@@ -158,6 +162,25 @@ export default function EvaluateEmployeePage() {
     return Object.values(scores).reduce((acc, curr) => acc + (parseInt(curr) || 0), 0)
   }, [scores])
 
+  const evaluationContext = useMemo(() => {
+    if (!selectedEmployee) return { isSecond: false, ratingPeriod: format(new Date(), 'MMMM yyyy'), targetScore: 'score_1', targetRemarks: 'remarks_1' }
+    const prevEval = evaluations[selectedEmployee.id]
+    
+    const hiredDate = new Date(selectedEmployee.date_hired)
+    const firstEvalDate = addMonths(hiredDate, 3)
+    const secondEvalDate = addMonths(hiredDate, 5)
+    
+    // Check if 1st eval failed (<= 30)
+    const failedFirst = prevEval && prevEval.score_1 !== null && prevEval.score_1 <= 30
+    
+    return {
+      isSecond: !!failedFirst,
+      ratingPeriod: format(failedFirst ? secondEvalDate : firstEvalDate, 'MMMM yyyy'),
+      targetScore: failedFirst ? 'score_2' : 'score_1',
+      targetRemarks: failedFirst ? 'remarks_2' : 'remarks_1'
+    }
+  }, [selectedEmployee, evaluations])
+
   const handleScoreChange = (id: string, value: string) => {
     const cleaned = value.replace(/[^1-5]/g, '').slice(0, 1)
     setScores(prev => ({ ...prev, [id]: cleaned }))
@@ -170,15 +193,17 @@ export default function EvaluateEmployeePage() {
 
     setIsSubmitting(true)
     try {
+      const payload = {
+        employee_id: selectedEmployeeId,
+        [evaluationContext.targetScore]: totalScore,
+        [evaluationContext.targetRemarks]: remarks,
+        status: recommendation === 'yes' ? 'Regular' : 'Probee' 
+      }
+
       const response = await fetch(`${getApiUrl()}/api/evaluations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          employee_id: selectedEmployeeId,
-          score_1: totalScore,
-          remarks_1: remarks,
-          status: recommendation === 'yes' ? 'Regular' : 'Probee' 
-        })
+        body: JSON.stringify(payload)
       })
 
       const data = await response.json()
@@ -259,7 +284,14 @@ export default function EvaluateEmployeePage() {
             <span className="font-bold whitespace-nowrap">RATING PERIOD</span>
             <span className="w-full relative border-b border-black">
               <span className="absolute left-0 -top-0.5 text-[#D32F2F] font-bold">
-                {format(new Date(), 'MMMM yyyy')}
+                {selectedEmployee && (
+                  <>
+                    {format(new Date(), 'MMMM dd, yyyy (EEEE)')}
+                    <span className="ml-4 text-xs italic text-slate-400 font-normal">
+                      ({evaluationContext.isSecond ? '2nd' : '1st'} Evaluation)
+                    </span>
+                  </>
+                )}
               </span>
               <span className="ml-[180px] font-bold">:</span>
             </span>
@@ -333,7 +365,9 @@ export default function EvaluateEmployeePage() {
           <div className="space-y-1">
             <div className="flex gap-2 font-bold">
               <span className="text-[#0000FF] underline">DATE:</span>
-              <div className="flex-1 border-b border-black"></div>
+              <div className="flex-1 border-b border-black relative">
+                <span className="absolute left-2 -top-0.5 text-[#D32F2F] font-bold">{format(new Date(), 'MMMM dd, yyyy')}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -374,11 +408,15 @@ export default function EvaluateEmployeePage() {
           </div>
         </div>
 
-        {/* Comment Lines */}
-        <div className="space-y-2 mb-20">
-          <div className="border-b border-black h-4 w-full"></div>
-          <div className="border-b border-black h-4 w-full"></div>
-          <div className="border-b border-black h-4 w-full"></div>
+        {/* Comment Lines / Remarks Section */}
+        <div className="mb-20">
+          <div className="font-bold uppercase mb-2">COMMENTS / REMARKS:</div>
+          <Textarea 
+            placeholder="Write your comments here..."
+            className="w-full border-b border-black rounded-none shadow-none focus:ring-0 min-h-[100px] resize-none p-0 text-[13px] leading-relaxed italic"
+            value={remarks}
+            onChange={(e) => setRemarks(e.target.value)}
+          />
         </div>
 
         {/* Manager Signatures */}
@@ -389,7 +427,9 @@ export default function EvaluateEmployeePage() {
           </div>
           <div className="flex gap-2">
             <span className="min-w-[40px]">Date:</span>
-            <div className="flex-1 border-b border-black"></div>
+            <div className="flex-1 border-b border-black relative">
+                <span className="absolute left-2 -top-0.5 text-[#D32F2F] font-bold">{format(new Date(), 'MMMM dd, yyyy')}</span>
+            </div>
           </div>
           
           <div className="flex gap-2">
@@ -398,7 +438,9 @@ export default function EvaluateEmployeePage() {
           </div>
           <div className="flex gap-2">
             <span className="min-w-[40px]">Date:</span>
-            <div className="flex-1 border-b border-black"></div>
+            <div className="flex-1 border-b border-black relative">
+                <span className="absolute left-2 -top-0.5 text-[#D32F2F] font-bold">{format(new Date(), 'MMMM dd, yyyy')}</span>
+            </div>
           </div>
           
           <div className="flex gap-2">
@@ -407,7 +449,9 @@ export default function EvaluateEmployeePage() {
           </div>
           <div className="flex gap-2">
             <span className="min-w-[40px]">Date:</span>
-            <div className="flex-1 border-b border-black"></div>
+            <div className="flex-1 border-b border-black relative">
+                <span className="absolute left-2 -top-0.5 text-[#D32F2F] font-bold">{format(new Date(), 'MMMM dd, yyyy')}</span>
+            </div>
           </div>
         </div>
 
