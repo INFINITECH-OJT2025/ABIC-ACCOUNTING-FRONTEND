@@ -6,12 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Hierarchy extends Model
 {
-    protected $fillable = ['position_id', 'department_id', 'parent_id'];
-
-    public function position()
-    {
-        return $this->belongsTo(Position::class);
-    }
+    protected $fillable = ['name', 'is_custom', 'department_id', 'parent_id'];
 
     public function department()
     {
