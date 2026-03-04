@@ -125,6 +125,15 @@ function FormLetterContent() {
     const [recipients, setRecipients] = useState<{ email: string; type: 'employee' | 'custom' }[]>([])
     const [dynamicSchedules, setDynamicSchedules] = useState<Record<string, ShiftInfo>>(DEFAULT_SHIFT_SCHEDULES)
     const [deptMap, setDeptMap] = useState<Record<string, string>>({})
+    const [customTardinessTemplate, setCustomTardinessTemplate] = useState<any>(null)
+    const [customLeaveTemplate, setCustomLeaveTemplate] = useState<any>(null)
+
+    useEffect(() => {
+        const savedTardiness = localStorage.getItem('warning_template_tardiness')
+        const savedLeave = localStorage.getItem('warning_template_leave')
+        if (savedTardiness) setCustomTardinessTemplate(JSON.parse(savedTardiness))
+        if (savedLeave) setCustomLeaveTemplate(JSON.parse(savedLeave))
+    }, [])
 
     useEffect(() => {
         const loadSchedules = async () => {
@@ -553,6 +562,7 @@ function FormLetterContent() {
                         month={month}
                         year={year}
                         formatDateLong={formatDateLong}
+                        customTemplate={type === 'late' ? customTardinessTemplate : customLeaveTemplate}
                     />
                 )}
 
@@ -736,7 +746,7 @@ function FormOneTemplate({
 }
 
 function FormTwoTemplate({
-    employee, entries, today, shiftTime, gracePeriod, salutationPrefix, lastName, numberToText, type, letterTitle, cutoffText, month, year, formatDateLong
+    employee, entries, today, shiftTime, gracePeriod, salutationPrefix, lastName, numberToText, type, letterTitle, cutoffText, month, year, formatDateLong, customTemplate
 }: any) {
     const totalDays = type === 'leave'
         ? entries.reduce((acc: number, curr: any) => acc + (Number(curr.number_of_days) || 0), 0)
@@ -780,7 +790,7 @@ function FormTwoTemplate({
                             </div>
                         </div>
                         <div className="text-left">
-                            <h2 className="text-3xl font-serif font-black text-black tracking-tight leading-none">ABIC Realty</h2>
+                            <h2 className="text-3xl font-serif font-black text-black tracking-tight leading-none">{customTemplate?.headerLogo || 'ABIC Realty'}</h2>
                             <p className="text-[11px] font-bold text-black tracking-[0.2em] uppercase mt-1">& Consultancy Corporation</p>
                         </div>
                     </div>
@@ -793,7 +803,7 @@ function FormTwoTemplate({
                 {/* Title */}
                 <div className="text-center mb-6">
                     <h1 className="text-xl font-black text-black tracking-wide">
-                        {type === 'late' ? 'TARDINESS WARNING LETTER' : letterTitle}
+                        {customTemplate?.title || (type === 'late' ? 'TARDINESS WARNING LETTER' : letterTitle)}
                     </h1>
                 </div>
 
@@ -824,70 +834,91 @@ function FormTwoTemplate({
 
                 {/* Body Content */}
                 <div className="space-y-4 text-justify text-sm">
-                    {type === 'late' ? (
-                        <>
-                            <p>
-                                This letter serves as a <span className="font-bold">Formal Warning</span> regarding your tardiness. Please be reminded that your scheduled time-in is <span className="font-bold">{shiftTime}</span>, with a <span className="font-bold">five (5)-minute grace period until {gracePeriod}</span>, in accordance with company policy.
-                            </p>
-                            <p>
-                                Despite this allowance, you have incurred <span className="font-bold">{numberToText(totalDays)} ({totalDays}) instances of tardiness beyond the allowable grace period within the current cut-off period</span>, which constitutes a violation of the Company&apos;s Attendance and Punctuality Policy.
-                            </p>
-                            <p>Below is the recorded instances for this cut-off period:</p>
-                        </>
+                    {customTemplate ? (
+                        <div className="whitespace-pre-wrap italic leading-relaxed text-slate-800">
+                            {customTemplate.body
+                                .replace(/{{salutation}}/g, salutationPrefix)
+                                .replace(/{{last_name}}/g, lastName)
+                                .replace(/{{shift_time}}/g, shiftTime)
+                                .replace(/{{grace_period}}/g, gracePeriod)
+                                .replace(/{{instances_text}}/g, numberToText(totalDays))
+                                .replace(/{{instances_count}}/g, String(totalDays))
+                                .replace(/{{cutoff_text}}/g, cutoffText)
+                                .replace(/{{month}}/g, month)
+                                .replace(/{{year}}/g, year)
+                                .replace(/{{entries_list}}/g, displayEntries.map((e: any) =>
+                                    `• ${formatDateLong(e.date || e.start_date)} – ${e.remarks || (type === 'late' ? `Actual In: ${formatTime(e.actual_in)}` : e.cite_reason) || 'No stated reason'}`
+                                ).join('\n'))
+                            }
+                        </div>
                     ) : (
                         <>
-                            <p>
-                                This letter serves as a <span className="font-bold">Formal Warning</span> regarding your <span className="font-bold">attendance record</span> for the current cutoff period.
-                            </p>
-                            <p>
-                                It has been noted that you incurred <span className="font-bold">{numberToText(totalDays)} ({totalDays}) days of leave</span> within the <span className="font-bold">{cutoffText} of {month} {year}</span>, specifically on the following dates:
-                            </p>
+                            {type === 'late' ? (
+                                <>
+                                    <p>
+                                        This letter serves as a <span className="font-bold">Formal Warning</span> regarding your tardiness. Please be reminded that your scheduled time-in is <span className="font-bold">{shiftTime}</span>, with a <span className="font-bold">five (5)-minute grace period until {gracePeriod}</span>, in accordance with company policy.
+                                    </p>
+                                    <p>
+                                        Despite this allowance, you have incurred <span className="font-bold">{numberToText(totalDays)} ({totalDays}) instances of tardiness beyond the allowable grace period within the current cut-off period</span>, which constitutes a violation of the Company&apos;s Attendance and Punctuality Policy.
+                                    </p>
+                                    <p>Below is the recorded instances for this cut-off period:</p>
+                                </>
+                            ) : (
+                                <>
+                                    <p>
+                                        This letter serves as a <span className="font-bold">Formal Warning</span> regarding your <span className="font-bold">attendance record</span> for the current cutoff period.
+                                    </p>
+                                    <p>
+                                        It has been noted that you incurred <span className="font-bold">{numberToText(totalDays)} ({totalDays}) days of leave</span> within the <span className="font-bold">{cutoffText} of {month} {year}</span>, specifically on the following dates:
+                                    </p>
+                                </>
+                            )}
+
+                            <ul className="list-disc ml-10 space-y-2">
+                                {displayEntries.map((entry: any, idx: number) => (
+                                    <li key={idx}>
+                                        <span className="font-bold">{formatDateLong(entry.date || entry.start_date)}</span> — {entry.remarks || (type === 'late' ? `Actual In: ${formatTime(entry.actual_in)}` : entry.cite_reason) || 'No stated reason'}
+                                    </li>
+                                ))}
+                            </ul>
+
+                            {type === 'late' ? (
+                                <>
+                                    <p>
+                                        Consistent tardiness negatively affects team productivity, disrupts workflow, and fails to meet the company&apos;s standards for punctuality and professionalism.
+                                    </p>
+                                    <p>Please be reminded of the following:</p>
+                                    <ol className="list-decimal ml-10 space-y-3 font-medium">
+                                        <li>You are expected to immediately correct your attendance behavior and strictly adhere to your scheduled working hours.</li>
+                                        <li>Any future occurrences of tardiness may result in stricter disciplinary action, up to and including suspension or termination, in accordance with company policy.</li>
+                                    </ol>
+                                    <p>This notice shall be documented accordingly. Your cooperation and compliance are expected.</p>
+                                    <p>Thank you.</p>
+                                </>
+                            ) : (
+                                <>
+                                    <p>
+                                        These absences negatively affect work operations and your evaluation needed for your regularization. As stated in the company&apos;s Attendance and Punctuality Policy, employees are expected to maintain regular attendance and provide valid justification or prior notice for any absence.
+                                    </p>
+                                    <p>
+                                        Please be reminded that repeated absences, especially within a short period, may lead to further disciplinary action in accordance with company rules and regulations.
+                                    </p>
+                                    <div>
+                                        <p className="mb-4">Moving forward, you are expected to:</p>
+                                        <ol className="list-decimal ml-10 space-y-3 font-medium">
+                                            <li>Improve your attendance immediately;</li>
+                                            <li>Avoid unnecessary or unapproved absences, and;</li>
+                                            <li>Provide proper documentation or notice for any unavoidable absence.</li>
+                                        </ol>
+                                    </div>
+                                    <p>
+                                        Failure to comply may result in stricter sanctions, up to and including suspension or termination.
+                                    </p>
+                                </>
+                            )}
+                            <p>Please acknowledge receipt of this {type === 'late' ? 'notice' : 'warning'} by signing below.</p>
                         </>
                     )}
-
-                    <ul className="list-disc ml-10 space-y-2">
-                        {displayEntries.map((entry: any, idx: number) => (
-                            <li key={idx}>
-                                <span className="font-bold">{formatDateLong(entry.date || entry.start_date)}</span> — {entry.remarks || (type === 'late' ? `Actual In: ${formatTime(entry.actual_in)}` : entry.cite_reason) || 'No stated reason'}
-                            </li>
-                        ))}
-                    </ul>
-
-                    {type === 'late' ? (
-                        <>
-                            <p>
-                                Consistent tardiness negatively affects team productivity, disrupts workflow, and fails to meet the company&apos;s standards for punctuality and professionalism.
-                            </p>
-                            <p>Please be reminded of the following:</p>
-                            <ol className="list-decimal ml-10 space-y-3 font-medium">
-                                <li>You are expected to immediately correct your attendance behavior and strictly adhere to your scheduled working hours.</li>
-                                <li>Any future occurrences of tardiness may result in stricter disciplinary action, up to and including suspension or termination, in accordance with company policy.</li>
-                            </ol>
-                            <p>This notice shall be documented accordingly. Your cooperation and compliance are expected.</p>
-                            <p>Thank you.</p>
-                        </>
-                    ) : (
-                        <>
-                            <p>
-                                These absences negatively affect work operations and your evaluation needed for your regularization. As stated in the company&apos;s Attendance and Punctuality Policy, employees are expected to maintain regular attendance and provide valid justification or prior notice for any absence.
-                            </p>
-                            <p>
-                                Please be reminded that repeated absences, especially within a short period, may lead to further disciplinary action in accordance with company rules and regulations.
-                            </p>
-                            <div>
-                                <p className="mb-4">Moving forward, you are expected to:</p>
-                                <ol className="list-decimal ml-10 space-y-3 font-medium">
-                                    <li>Improve your attendance immediately;</li>
-                                    <li>Avoid unnecessary or unapproved absences, and;</li>
-                                    <li>Provide proper documentation or notice for any unavoidable absence.</li>
-                                </ol>
-                            </div>
-                            <p>
-                                Failure to comply may result in stricter sanctions, up to and including suspension or termination.
-                            </p>
-                        </>
-                    )}
-                    <p>Please acknowledge receipt of this {type === 'late' ? 'notice' : 'warning'} by signing below.</p>
                 </div>
 
                 {/* Closing */}
