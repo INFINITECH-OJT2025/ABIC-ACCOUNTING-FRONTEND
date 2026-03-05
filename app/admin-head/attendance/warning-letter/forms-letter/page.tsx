@@ -16,7 +16,8 @@ import {
     Trash2,
     User,
     Edit3,
-    Check
+    Check,
+    Calendar
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -196,12 +197,12 @@ function FormLetterContent() {
         const fetchTemplates = async () => {
             try {
                 const res = await fetch(`${getApiUrl()}/api/warning-letter-templates`)
-                const data = await res.json()
+                const json = await res.json()
 
-                if (data && Object.keys(data).length > 0) {
+                if (json.success && Array.isArray(json.data)) {
                     const mapped: any = {}
-                    Object.entries(data).forEach(([slug, template]: [string, any]) => {
-                        mapped[slug] = {
+                    json.data.forEach((template: any) => {
+                        mapped[template.slug] = {
                             title: template.title,
                             subject: template.subject,
                             headerLogoImage: template.header_logo_image,
@@ -212,7 +213,7 @@ function FormLetterContent() {
                         }
                     })
                     setCustomLeaveTemplate(mapped['leave'])
-                    setCustomSupervisorTemplate(mapped['supervisor'])
+                    setCustomSupervisorTemplate(type === 'late' ? mapped['supervisor-tardiness'] : mapped['supervisor-leave'])
                     setCustomTardinessTemplate(mapped)
                 } else {
                     // Fallback to localStorage
@@ -505,7 +506,7 @@ function FormLetterContent() {
                     return `• ${formatDateLong(e.date || e.start_date)} — ${detail}`;
                 }).join('\n')
 
-                // Form 1 body
+                // Form 1 body (Supervisor)
                 let initialF1 = ""
                 if (customSupervisorTemplate) {
                     initialF1 = customSupervisorTemplate.body
@@ -516,13 +517,19 @@ function FormLetterContent() {
                         .replace(/{{instances_count}}/g, String(totalCount))
                         .replace(/{{pronoun_he_she}}/g, employee.gender?.toLowerCase() === 'female' ? 'She' : 'He')
                         .replace(/{{pronoun_his_her}}/g, employee.gender?.toLowerCase() === 'female' ? 'her' : 'his')
+                        .replace(/{{grace_period}}/g, gracePeriod)
+                        .replace(/{{instances_count_ordinal}}/g, totalCount === 1 ? '1st' : totalCount === 2 ? '2nd' : totalCount === 3 ? '3rd' : `${totalCount}th`)
                         .replace(/{{entries_list}}/g, entryListStr)
+
+                    // Reminders are always included for Supervisor Form
                 } else {
                     const issueType = type === 'late' ? 'tardiness' : 'leave/absences'
-                    initialF1 = `Dear Ma'am Angely,\n\nThis letter serves as a Formal Warning regarding the ${issueType} of ${salutationPrefix} ${employee.name}. ${employee.gender?.toLowerCase() === 'male' ? 'He' : 'She'} has accumulated ${numberToText(totalCount)} (${totalCount}) ${totalCount === 1 ? (type === 'late' ? 'occurrence' : 'day') : (type === 'late' ? 'occurrences' : 'days')} of ${issueType} ${type === 'late' ? `beyond the grace period of ${gracePeriod}` : ''} within the current cut-off period.\n\n` +
+                    let reminders = `\n\nPlease be reminded of the following:\n1. ${salutationPrefix} ${lastName} is expected to correct ${employee.gender?.toLowerCase() === 'female' ? 'her' : 'his'} attendance behavior immediately.\n2. Future occurrences of tardiness may result in stricter disciplinary action.\n\n`
+
+                    initialF1 = `Dear Ma'am Angely,\n\nThis letter serves as a Formal Warning regarding the ${issueType} of ${salutationPrefix} ${employee.name}. ${employee.gender?.toLowerCase() === 'male' ? 'He' : 'She'} has accumulated ${numberToText(totalCount)} (${totalCount}) ${totalCount === 1 ? (type === 'late' ? 'occurrence' : 'day') : (type === 'late' ? 'occurrences' : 'days')} of ${issueType} within the current cut-off period.\n\n` +
                         `In accordance with company policy, reaching this threshold within a single cut-off period is subject to appropriate coaching, warning, and/or sanction. We request that you address this matter with the concerned employee.\n\n` +
-                        `Specific dates recorded:\n${entryListStr}\n\n` +
-                        `Consistent ${issueType} affects team productivity and violates company policy. We expect the employee to correct this behavior immediately.\n\n` +
+                        `Specific dates recorded:\n${entryListStr}${reminders}` +
+                        `Kindly ensure that the employee is informed and that corrective action is enforced appropriately.\n\n` +
                         `Thank you.`
                 }
                 setF1Body(initialF1)
@@ -545,6 +552,11 @@ function FormLetterContent() {
                         .replace(/{{month}}/g, month)
                         .replace(/{{year}}/g, year)
                         .replace(/{{entries_list}}/g, entryListStr)
+
+                    // If Probee and is Leave template, remove the reminders section
+                    if (isProbee && type === 'leave') {
+                        initialF2 = initialF2.replace(/(Moving forward, you are expected to:|Please be reminded of the following:)[\s\S]*?(?=Thank you|Failure to comply|Please acknowledge)/gi, "")
+                    }
                 } else {
                     if (type === 'late') {
                         initialF2 = `Dear ${salutationPrefix} ${lastName},\n\n` +
@@ -569,7 +581,7 @@ function FormLetterContent() {
             generateInitialBodies()
             setHasInitializedContent(true)
         }
-    }, [employee, entries, hasInitializedContent, isLoading, customSupervisorTemplate, customTardinessTemplate, customLeaveTemplate])
+    }, [employee, entries, hasInitializedContent, isLoading, isProbee, customSupervisorTemplate, customTardinessTemplate, customLeaveTemplate])
 
     const handlePrint = () => {
         window.print()
@@ -646,153 +658,176 @@ function FormLetterContent() {
     return (
         <div className="min-h-screen bg-neutral-100 pb-20 print:bg-white print:pb-0">
             {/* Action Bar */}
-            <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm print:hidden">
-                <div className="flex items-center gap-4">
-                    <Button variant="ghost" onClick={() => router.back()} className="rounded-full h-10 w-10 p-0 text-slate-500 hover:text-[#A4163A] hover:bg-rose-50">
-                        <ChevronLeft className="w-6 h-6" />
-                    </Button>
-                    <h1 className="font-bold text-slate-800">Preview Warning Letter</h1>
-                </div>
-                <div className="flex items-center gap-3">
-                    <Button
-                        onClick={() => setIsEditMode(!isEditMode)}
-                        variant={isEditMode ? "default" : "outline"}
-                        className={cn(
-                            "rounded-xl font-bold gap-2 active:scale-95 transition-all shadow-sm",
-                            isEditMode ? "bg-amber-600 hover:bg-amber-700 text-white" : "text-slate-600 border-slate-200"
-                        )}
-                    >
-                        {isEditMode ? <Check className="w-4 h-4" /> : <Edit3 className="w-4 h-4" />}
-                        {isEditMode ? "Finish Editing" : "Customize Content"}
-                    </Button>
-
-                    <Button variant="outline" onClick={handlePrint} className="rounded-xl font-bold gap-2 text-slate-600 border-slate-200">
-                        <Printer className="w-4 h-4" />
-                        Print PDF
-                    </Button>
-
-                    <Popover open={isActionOpen} onOpenChange={setIsActionOpen}>
-                        <PopoverTrigger asChild>
-                            <Button
-                                className="rounded-xl font-extrabold gap-2 bg-[#A4163A] hover:bg-[#7B0F2B] text-white shadow-lg active:scale-95 transition-all w-48"
-                            >
-                                <Mail className="w-4 h-4" />
-                                Send via Email
-                                <ChevronDown className="w-4 h-4" />
+            <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md mb-6 sticky top-0 z-50 print:hidden">
+                {/* Main Header Row */}
+                <div className="w-full px-4 md:px-8 py-6">
+                    <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                        <div className="flex items-center gap-4">
+                            <Button variant="ghost" onClick={() => router.back()} className="rounded-full h-10 w-10 p-0 text-white/70 hover:text-white hover:bg-white/10 transition-colors">
+                                <ChevronLeft className="w-6 h-6" />
                             </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-72 p-0 rounded-2xl border-slate-200 shadow-2xl overflow-hidden" align="end">
-                            <div className="p-4 space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <Checkbox
-                                            id="select-all"
-                                            checked={selectedForms.length === 2}
-                                            onCheckedChange={selectAll}
-                                        />
-                                        <Label htmlFor="select-all" className="font-bold cursor-pointer">Select all</Label>
-                                    </div>
-                                    <span className="text-xs text-slate-400 font-medium">{selectedForms.length} selected</span>
-                                </div>
-
-                                <Separator className="bg-slate-100" />
-
-                                <div className="space-y-3">
-                                    <div className={`p-3 rounded-xl flex items-center gap-3 transition-colors ${selectedForms.includes('form1') ? 'bg-rose-50 border border-rose-100' : 'hover:bg-slate-50'}`}>
-                                        <Checkbox
-                                            id="form1"
-                                            checked={selectedForms.includes('form1')}
-                                            onCheckedChange={() => toggleForm('form1')}
-                                        />
-                                        <div className="flex-1 cursor-pointer" onClick={() => toggleForm('form1')}>
-                                            <p className="font-bold text-sm leading-none">Form 1</p>
-                                            <p className="text-[10px] text-slate-400 mt-1">Supervisor Notification</p>
-                                        </div>
-                                    </div>
-
-                                    <div className={`p-3 rounded-xl flex items-center gap-3 transition-colors ${selectedForms.includes('form2') ? 'bg-rose-50 border border-rose-100' : 'hover:bg-slate-50'}`}>
-                                        <Checkbox
-                                            id="form2"
-                                            checked={selectedForms.includes('form2')}
-                                            onCheckedChange={() => toggleForm('form2')}
-                                        />
-                                        <div className="flex-1 cursor-pointer" onClick={() => toggleForm('form2')}>
-                                            <p className="font-bold text-sm leading-none">Form 2</p>
-                                            <p className="text-[10px] text-slate-400 mt-1">Employee Warning</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <Separator className="bg-slate-100" />
-
-                                <div className="space-y-3 px-1">
-                                    <div className="flex items-center justify-between">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Recipients:</p>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-6 text-[10px] font-bold text-[#A4163A] hover:bg-rose-50 rounded-lg gap-1 border border-rose-100"
-                                            onClick={handleAddRecipient}
-                                        >
-                                            <Plus className="w-3 h-3" />
-                                            Add New
-                                        </Button>
-                                    </div>
-
-                                    <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1 customize-scrollbar font-sans">
-                                        {selectedForms.includes('form1') && (
-                                            <div className="px-3 py-2 bg-amber-50 border border-amber-100 rounded-xl flex items-start gap-2">
-                                                <div className="w-4 h-4 mt-0.5 rounded-full bg-amber-200 flex items-center justify-center text-[10px] font-bold text-amber-700">!</div>
-                                                <p className="text-[10px] leading-tight text-amber-700 font-medium">
-                                                    Employee recipient disabled. Form 1 contains confidential supervisor information.
-                                                </p>
-                                            </div>
-                                        )}
-                                        {recipients.map((r, idx) => (
-                                            <div key={idx} className="flex flex-col gap-1.5 p-3 rounded-xl border border-slate-100 bg-slate-50/50 group">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className={`w-5 h-5 rounded-md flex items-center justify-center ${r.type === 'employee' ? 'bg-rose-100' : 'bg-slate-200'}`}>
-                                                            {r.type === 'employee' ? <User className="w-3 h-3 text-[#A4163A]" /> : <Mail className="w-3 h-3 text-slate-500" />}
-                                                        </div>
-                                                        <span className="text-[10px] font-bold text-slate-500 uppercase">
-                                                            {r.type === 'employee' ? `Employee (${employee.name.split(' ').pop()})` : 'Custom Email'}
-                                                        </span>
-                                                    </div>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="h-5 w-5 p-0 text-slate-400 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        onClick={() => handleRemoveRecipient(idx)}
-                                                    >
-                                                        <Trash2 className="w-3 h-3" />
-                                                    </Button>
-                                                </div>
-                                                <Input
-                                                    type="email"
-                                                    placeholder="Enter email address"
-                                                    value={r.email}
-                                                    onChange={(e) => updateRecipient(idx, e.target.value)}
-                                                    className="h-9 text-xs rounded-lg border-slate-200 focus-visible:ring-[#A4163A] bg-white shadow-sm"
-                                                />
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
+                            <div>
+                                <h1 className="text-2xl md:text-3xl font-bold mb-2">Preview Warning Letter</h1>
+                                <p className="text-white/80 text-sm md:text-base flex items-center gap-2">
+                                    <Calendar className="w-4 h-4" />
+                                    ABIC REALTY & CONSULTANCY
+                                </p>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Secondary Toolbar */}
+                <div className="border-t border-white/10 bg-white/5 backdrop-blur-sm overflow-x-auto no-scrollbar">
+                    <div className="w-full px-4 md:px-8 py-3">
+                        <div className="flex items-center gap-3 md:gap-4 min-w-max md:min-w-0">
+                            <Button
+                                onClick={() => setIsEditMode(!isEditMode)}
+                                variant="outline"
+                                className={cn(
+                                    "h-10 px-4 rounded-lg font-bold gap-2 active:scale-95 transition-all text-sm uppercase tracking-wider",
+                                    isEditMode
+                                        ? "bg-amber-100 text-amber-900 border-amber-200 hover:bg-amber-200"
+                                        : "bg-white border-transparent text-[#7B0F2B] hover:bg-rose-50 hover:text-[#4A081A]"
+                                )}
+                            >
+                                {isEditMode ? <Check className="w-4 h-4" /> : <Edit3 className="w-4 h-4" />}
+                                {isEditMode ? "Finish Editing" : "Customize Content"}
+                            </Button>
 
                             <Button
-                                onClick={() => {
-                                    handleSendEmail()
-                                    setIsActionOpen(false)
-                                }}
-                                disabled={isSending || selectedForms.length === 0}
-                                className="w-full rounded-none h-12 font-bold bg-[#A4163A] hover:bg-[#7B0F2B] text-white gap-2"
+                                variant="outline"
+                                onClick={handlePrint}
+                                className="bg-white border-transparent text-[#7B0F2B] hover:bg-rose-50 hover:text-[#4A081A] shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg flex items-center gap-2"
                             >
-                                {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'SEND'}
+                                <Printer className="w-4 h-4" />
+                                <span>Print PDF</span>
                             </Button>
-                        </PopoverContent>
-                    </Popover>
+
+                            <Popover open={isActionOpen} onOpenChange={setIsActionOpen}>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        className="h-10 px-6 rounded-lg font-black gap-2 bg-white border-transparent text-[#A4163A] hover:bg-rose-100 shadow-md active:scale-95 transition-all w-auto uppercase tracking-widest"
+                                    >
+                                        <Mail className="w-4 h-4" />
+                                        Send via Email
+                                        <ChevronDown className="w-4 h-4" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-72 p-0 rounded-2xl border-stone-200 shadow-2xl overflow-hidden" align="start">
+                                    <div className="p-4 space-y-4 text-slate-900">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <Checkbox
+                                                    id="select-all"
+                                                    checked={selectedForms.length === 2}
+                                                    onCheckedChange={selectAll}
+                                                />
+                                                <Label htmlFor="select-all" className="font-bold cursor-pointer">Select all</Label>
+                                            </div>
+                                            <span className="text-xs text-slate-400 font-medium">{selectedForms.length} selected</span>
+                                        </div>
+
+                                        <Separator className="bg-slate-100" />
+
+                                        <div className="space-y-3">
+                                            <div className={`p-3 rounded-xl flex items-center gap-3 transition-colors ${selectedForms.includes('form1') ? 'bg-rose-50 border border-rose-100' : 'hover:bg-slate-50'}`}>
+                                                <Checkbox
+                                                    id="form1"
+                                                    checked={selectedForms.includes('form1')}
+                                                    onCheckedChange={() => toggleForm('form1')}
+                                                />
+                                                <div className="flex-1 cursor-pointer" onClick={() => toggleForm('form1')}>
+                                                    <p className="font-bold text-sm leading-none">Form 1</p>
+                                                    <p className="text-[10px] text-slate-400 mt-1">Supervisor Notification</p>
+                                                </div>
+                                            </div>
+
+                                            <div className={`p-3 rounded-xl flex items-center gap-3 transition-colors ${selectedForms.includes('form2') ? 'bg-rose-50 border border-rose-100' : 'hover:bg-slate-50'}`}>
+                                                <Checkbox
+                                                    id="form2"
+                                                    checked={selectedForms.includes('form2')}
+                                                    onCheckedChange={() => toggleForm('form2')}
+                                                />
+                                                <div className="flex-1 cursor-pointer" onClick={() => toggleForm('form2')}>
+                                                    <p className="font-bold text-sm leading-none">Form 2</p>
+                                                    <p className="text-[10px] text-slate-400 mt-1">Employee Warning</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <Separator className="bg-slate-100" />
+
+                                        <div className="space-y-3 px-1">
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Recipients:</p>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-6 text-[10px] font-bold text-[#A4163A] hover:bg-rose-50 rounded-lg gap-1 border border-rose-100"
+                                                    onClick={handleAddRecipient}
+                                                >
+                                                    <Plus className="w-3 h-3" />
+                                                    Add New
+                                                </Button>
+                                            </div>
+
+                                            <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1 customize-scrollbar font-sans">
+                                                {selectedForms.includes('form1') && (
+                                                    <div className="px-3 py-2 bg-amber-50 border border-amber-100 rounded-xl flex items-start gap-2">
+                                                        <div className="w-4 h-4 mt-0.5 rounded-full bg-amber-200 flex items-center justify-center text-[10px] font-bold text-amber-700">!</div>
+                                                        <p className="text-[10px] leading-tight text-amber-700 font-medium">
+                                                            Employee recipient disabled. Form 1 contains confidential supervisor information.
+                                                        </p>
+                                                    </div>
+                                                )}
+                                                {recipients.map((r, idx) => (
+                                                    <div key={idx} className="flex flex-col gap-1.5 p-3 rounded-xl border border-slate-100 bg-slate-50/50 group">
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className={`w-5 h-5 rounded-md flex items-center justify-center ${r.type === 'employee' ? 'bg-rose-100' : 'bg-slate-200'}`}>
+                                                                    {r.type === 'employee' ? <User className="w-3 h-3 text-[#A4163A]" /> : <Mail className="w-3 h-3 text-slate-500" />}
+                                                                </div>
+                                                                <span className="text-[10px] font-bold text-slate-500 uppercase">
+                                                                    {r.type === 'employee' ? `Employee (${employee.name.split(' ').pop()})` : 'Custom Email'}
+                                                                </span>
+                                                            </div>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="h-5 w-5 p-0 text-slate-400 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                onClick={() => handleRemoveRecipient(idx)}
+                                                            >
+                                                                <Trash2 className="w-3 h-3" />
+                                                            </Button>
+                                                        </div>
+                                                        <Input
+                                                            type="email"
+                                                            placeholder="Enter email address"
+                                                            value={r.email}
+                                                            onChange={(e) => updateRecipient(idx, e.target.value)}
+                                                            className="h-9 text-xs rounded-lg border-slate-200 focus-visible:ring-[#A4163A] bg-white shadow-sm"
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <Button
+                                        onClick={() => {
+                                            handleSendEmail()
+                                            setIsActionOpen(false)
+                                        }}
+                                        disabled={isSending || selectedForms.length === 0}
+                                        className="w-full rounded-none h-12 font-bold bg-[#A4163A] hover:bg-[#7B0F2B] text-white gap-2 uppercase tracking-widest"
+                                    >
+                                        {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'SEND EMAIL NOW'}
+                                    </Button>
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -916,10 +951,14 @@ function FormOneTemplate({
                     <div className="flex justify-end">
                         <p className="font-bold">Date: <span className="font-bold">{today}</span></p>
                     </div>
-                    <p className="font-bold">Employee Name: <span className="font-bold">{employee.name}</span></p>
+                    {/* Form 1 Top Metadata matches edit_forms preview */}
                     <p className="font-bold">Position: <span className="font-bold">{employee.position || 'Employee'}</span></p>
                     {(employee.department || employee.office_name) && (
                         <p className="font-bold">Department: <span className="font-bold">{employee.department || employee.office_name}</span></p>
+                    )}
+
+                    {customTemplate?.subject && (
+                        <p className="mt-4 font-bold uppercase tracking-tight">RE: {customTemplate.subject}</p>
                     )}
                 </div>
 
@@ -989,24 +1028,25 @@ function FormOneTemplate({
                     </div>
                 </div>
 
-                <Separator className="my-10 border-slate-200" />
-
-                <div className="mt-8 space-y-4">
-                    <p className="font-bold mb-4">Employee Acknowledgment:</p>
-                    <p className="mb-8">
-                        I, <span className="font-bold">{employee.name}</span>, hereby acknowledge receipt of this Formal Warning Letter.
-                    </p>
-                    <div className="space-y-6 pt-6">
-                        <div className="flex items-end gap-2 max-w-[400px]">
-                            <span className="font-bold whitespace-nowrap">Employee Signature:</span>
-                            <div className="flex-1 border-b-[1.5px] border-black h-5"></div>
-                        </div>
-                        <div className="flex items-end gap-2 max-w-[250px]">
-                            <span className="font-bold whitespace-nowrap">Date:</span>
-                            <div className="flex-1 border-b-[1.5px] border-black h-5"></div>
+                {/* Acknowledgment Section - Only show if it's NOT in the body already */}
+                {(!body.includes('Acknowledgment') && !body.includes('Receipt')) && (
+                    <div className="mt-8 border-t border-slate-100 pt-8 space-y-4">
+                        <p className="font-bold mb-4">Employee Acknowledgment:</p>
+                        <p className="mb-8">
+                            I, <span className="font-bold">{employee.name}</span>, hereby acknowledge receipt of this Formal Warning Letter.
+                        </p>
+                        <div className="space-y-6 pt-6">
+                            <div className="flex items-end gap-2 max-w-[400px]">
+                                <span className="font-bold whitespace-nowrap">Employee Signature:</span>
+                                <div className="flex-1 border-b-[1.5px] border-black h-5"></div>
+                            </div>
+                            <div className="flex items-end gap-2 max-w-[250px]">
+                                <span className="font-bold whitespace-nowrap">Date:</span>
+                                <div className="flex-1 border-b-[1.5px] border-black h-5"></div>
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
             </CardContent>
         </Card>
     );
@@ -1060,6 +1100,10 @@ function FormTwoTemplate({
                         <p className="font-bold">Position: <span className="font-bold">{employee.position || 'Employee'}</span></p>
                         {(employee.department || employee.office_name) && (
                             <p className="font-bold">Department: <span className="font-bold">{employee.department || employee.office_name}</span></p>
+                        )}
+
+                        {customTemplate?.subject && (
+                            <p className="mt-4 font-bold uppercase tracking-tight">RE: {customTemplate.subject}</p>
                         )}
                     </div>
                 </div>

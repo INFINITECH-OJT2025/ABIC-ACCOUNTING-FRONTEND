@@ -10,7 +10,7 @@ class LeaveController extends Controller
 {
     public function index(Request $request)
     {
-        $query = LeaveEntry::query();
+        $query = LeaveEntry::with('employee.evaluation');
 
         if ($request->has('month') && $request->has('year')) {
             $query->whereMonth('start_date', $request->month)

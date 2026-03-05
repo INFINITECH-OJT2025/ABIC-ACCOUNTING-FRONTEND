@@ -23,4 +23,9 @@ class LeaveEntry extends Model
         'cite_reason',
         'status',
     ];
+
+    public function employee()
+    {
+        return $this->belongsTo(Employee::class, 'employee_id', 'id');
+    }
 }

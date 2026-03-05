@@ -1648,14 +1648,14 @@ export default function AttendanceDashboard() {
 
 
         {/* ----- INTEGRATED HEADER & TOOLBAR ----- */}
-        <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md mb-6">
+        <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md mb-6 sticky top-0 z-50">
           {/* Main Header Row */}
           <div className="w-full px-4 md:px-8 py-6">
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
               <div>
                 <h1 className="text-2xl md:text-3xl font-bold mb-2">Tardiness Monitoring</h1>
                 <p className="text-white/80 text-sm md:text-base flex items-center gap-2">
-                  <Clock className="w-4 h-4" />
+                  <Calendar className="w-4 h-4" />
                   ABIC REALTY & CONSULTANCY
                 </p>
               </div>
@@ -1692,9 +1692,9 @@ export default function AttendanceDashboard() {
 
 
           {/* Secondary Toolbar */}
-          <div className="border-t border-white/10 bg-white/5 backdrop-blur-sm">
+          <div className="border-t border-white/10 bg-white/5 backdrop-blur-sm overflow-x-auto no-scrollbar">
             <div className="w-full px-4 md:px-8 py-3">
-              <div className="flex flex-wrap items-center gap-3 md:gap-4">
+              <div className="flex items-center gap-3 md:gap-4 min-w-max md:min-w-0">
 
 
                 {/* Year Selection */}
@@ -1810,16 +1810,17 @@ export default function AttendanceDashboard() {
 
 
                 {/* Global Search Input */}
-                <div className="relative w-full md:w-[350px]">
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-[#A0153E]" />
-                  <Input
-                    placeholder="Search employee..."
-                    value={searchQuery}
-                    onChange={(e) => {
-                      setSearchQuery(e.target.value)
-                    }}
-                    className="bg-white border-2 border-[#FFE5EC] text-slate-700 placeholder:text-slate-400 pl-10 h-10 w-full focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A] shadow-sm rounded-lg transition-all"
-                  />
+                <div className="flex items-center gap-3 flex-1 min-w-[200px] max-w-[400px]">
+                  <span className="text-sm font-bold text-white/70 uppercase tracking-wider hidden 2xl:block">Search</span>
+                  <div className="relative w-full">
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      placeholder="Search employee..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 h-10 w-full bg-white border-2 border-[#FFE5EC] text-[#800020] placeholder:text-slate-400 font-medium rounded-lg shadow-sm focus-visible:ring-rose-200 transition-all duration-200"
+                    />
+                  </div>
                 </div>
 
 

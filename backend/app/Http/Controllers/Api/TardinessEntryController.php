@@ -25,7 +25,8 @@ class TardinessEntryController extends Controller
                 ], 400);
             }
 
-            $results = TardinessEntry::where('month', $month)
+            $results = TardinessEntry::with('employee.evaluation')
+                ->where('month', $month)
                 ->where('year', (int)$year)
                 ->orderBy('date', 'desc')
                 ->orderBy('created_at', 'desc')
