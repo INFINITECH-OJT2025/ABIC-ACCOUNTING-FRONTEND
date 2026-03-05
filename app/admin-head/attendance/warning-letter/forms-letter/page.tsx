@@ -14,8 +14,11 @@ import {
     FileText,
     Plus,
     Trash2,
-    User
+    User,
+    Edit3,
+    Check
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -31,6 +34,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Textarea } from '@/components/ui/textarea'
 
 // --- Skeleton Component ---
 const LetterSkeleton = () => (
@@ -183,6 +187,10 @@ function FormLetterContent() {
     const [customLeaveTemplate, setCustomLeaveTemplate] = useState<any>(null)
     const [customSupervisorTemplate, setCustomSupervisorTemplate] = useState<any>(null)
     const [isProbee, setIsProbee] = useState(true)
+    const [isEditMode, setIsEditMode] = useState(false)
+    const [f1Body, setF1Body] = useState('')
+    const [f2Body, setF2Body] = useState('')
+    const [hasInitializedContent, setHasInitializedContent] = useState(false)
 
     useEffect(() => {
         const fetchTemplates = async () => {
@@ -196,7 +204,8 @@ function FormLetterContent() {
                         mapped[slug] = {
                             title: template.title,
                             subject: template.subject,
-                            headerLogo: template.header_logo,
+                            headerLogoImage: template.header_logo_image,
+                            headerDetails: template.header_details,
                             body: template.body,
                             footer: template.footer,
                             signatoryName: template.signatory_name
@@ -210,9 +219,17 @@ function FormLetterContent() {
                     const saved = localStorage.getItem('warning_letter_templates')
                     if (saved) {
                         const allTemplates = JSON.parse(saved)
-                        setCustomLeaveTemplate(allTemplates['leave'])
-                        setCustomSupervisorTemplate(allTemplates['supervisor'])
-                        setCustomTardinessTemplate(allTemplates)
+                        const mapped: any = {}
+                        Object.entries(allTemplates).forEach(([slug, t]: [string, any]) => {
+                            mapped[slug] = {
+                                ...t,
+                                headerLogoImage: t.headerLogoImage || t.header_logo_image,
+                                headerDetails: t.headerDetails || t.header_details
+                            }
+                        })
+                        setCustomLeaveTemplate(mapped['leave'])
+                        setCustomSupervisorTemplate(mapped['supervisor'])
+                        setCustomTardinessTemplate(mapped)
                     }
                 }
             } catch (e) {
@@ -420,6 +437,140 @@ function FormLetterContent() {
         }
     }, [selectedForms, employee])
 
+    // --- Content Initialization for Editing ---
+    useEffect(() => {
+        if (employee && entries.length > 0 && !hasInitializedContent && !isLoading) {
+            // Helper to process template or fallback
+            const generateInitialBodies = () => {
+                const totalCount = type === 'leave'
+                    ? entries.reduce((acc: number, curr: any) => acc + (Number(curr.number_of_days) || 0), 0)
+                    : entries.length;
+
+                const salutationPrefix = employee.gender?.toLowerCase() === 'male' ? 'Mr.' : 'Ms.'
+                const lastName = employee.last_name || employee.name.split(' ').pop()
+                const cutoffText = cutoff === 'cutoff1' ? 'first cutoff' : 'second cutoff'
+
+                // Resolve Shift Info
+                const department = employee?.department || employee?.office_name
+                let currentShift = dynamicSchedules['ABIC'] || DEFAULT_SHIFT_SCHEDULES['ABIC']
+                if (department) {
+                    const normalized = department.toUpperCase().trim()
+                    if (dynamicSchedules[normalized]) currentShift = dynamicSchedules[normalized]
+                    else {
+                        const mappedOffice = deptMap[normalized]
+                        if (mappedOffice && dynamicSchedules[mappedOffice]) currentShift = dynamicSchedules[mappedOffice]
+                    }
+                }
+                const shiftTime = currentShift.displayName
+                const gracePeriodMinutes = currentShift.gracePeriodMinutes
+                const gracePeriodHours = Math.floor(gracePeriodMinutes / 60)
+                const gracePeriodMins = gracePeriodMinutes % 60
+                const gracePeriod = `${gracePeriodHours % 12 || 12}:${String(gracePeriodMins).padStart(2, '0')} ${gracePeriodHours >= 12 ? 'PM' : 'AM'}`
+
+                // 3. Process and Clean Entry List (with Expansion for multi-day Leave)
+                const processedEntries = type === 'leave' ? (() => {
+                    const expanded: any[] = [];
+                    entries.forEach((entry: any) => {
+                        const isPersonalLeave = entry.remarks?.toUpperCase() === 'PERSONAL LEAVE';
+                        const reasonDetail = isPersonalLeave
+                            ? `Personal Leave (${entry.cite_reason || 'no stated reason'})`
+                            : (entry.remarks || entry.cite_reason || 'No stated reason');
+
+                        if (entry.start_date && entry.number_of_days) {
+                            const count = Number(entry.number_of_days);
+                            const startDate = new Date(entry.start_date);
+                            for (let i = 0; i < count; i++) {
+                                const currentDate = new Date(startDate);
+                                currentDate.setDate(startDate.getDate() + i);
+                                expanded.push({
+                                    ...entry,
+                                    date: currentDate.toISOString().split('T')[0],
+                                    displayRemarks: reasonDetail
+                                });
+                            }
+                        } else {
+                            expanded.push({
+                                ...entry,
+                                displayRemarks: reasonDetail
+                            });
+                        }
+                    });
+                    return expanded.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                })() : entries;
+
+                const entryListStr = processedEntries.map((e: any) => {
+                    const detail = type === 'late'
+                        ? formatTime(e.actual_in)
+                        : (e.displayRemarks || e.remarks || e.cite_reason || 'No stated reason');
+                    return `• ${formatDateLong(e.date || e.start_date)} — ${detail}`;
+                }).join('\n')
+
+                // Form 1 body
+                let initialF1 = ""
+                if (customSupervisorTemplate) {
+                    initialF1 = customSupervisorTemplate.body
+                        .replace(/{{employee_name}}/g, employee.name)
+                        .replace(/{{last_name}}/g, lastName)
+                        .replace(/{{salutation}}/g, salutationPrefix)
+                        .replace(/{{instances_text}}/g, numberToText(totalCount))
+                        .replace(/{{instances_count}}/g, String(totalCount))
+                        .replace(/{{pronoun_he_she}}/g, employee.gender?.toLowerCase() === 'female' ? 'She' : 'He')
+                        .replace(/{{pronoun_his_her}}/g, employee.gender?.toLowerCase() === 'female' ? 'her' : 'his')
+                        .replace(/{{entries_list}}/g, entryListStr)
+                } else {
+                    const issueType = type === 'late' ? 'tardiness' : 'leave/absences'
+                    initialF1 = `Dear Ma'am Angely,\n\nThis letter serves as a Formal Warning regarding the ${issueType} of ${salutationPrefix} ${employee.name}. ${employee.gender?.toLowerCase() === 'male' ? 'He' : 'She'} has accumulated ${numberToText(totalCount)} (${totalCount}) ${totalCount === 1 ? (type === 'late' ? 'occurrence' : 'day') : (type === 'late' ? 'occurrences' : 'days')} of ${issueType} ${type === 'late' ? `beyond the grace period of ${gracePeriod}` : ''} within the current cut-off period.\n\n` +
+                        `In accordance with company policy, reaching this threshold within a single cut-off period is subject to appropriate coaching, warning, and/or sanction. We request that you address this matter with the concerned employee.\n\n` +
+                        `Specific dates recorded:\n${entryListStr}\n\n` +
+                        `Consistent ${issueType} affects team productivity and violates company policy. We expect the employee to correct this behavior immediately.\n\n` +
+                        `Thank you.`
+                }
+                setF1Body(initialF1)
+
+                // Form 2 body
+                let initialF2 = ""
+                const targetTemplate = type === 'late'
+                    ? (customTardinessTemplate?.[isProbee ? 'tardiness-probee' : 'tardiness-regular'])
+                    : customLeaveTemplate
+
+                if (targetTemplate) {
+                    initialF2 = targetTemplate.body
+                        .replace(/{{salutation}}/g, salutationPrefix)
+                        .replace(/{{last_name}}/g, lastName)
+                        .replace(/{{shift_time}}/g, shiftTime)
+                        .replace(/{{grace_period}}/g, gracePeriod)
+                        .replace(/{{instances_text}}/g, numberToText(totalCount))
+                        .replace(/{{instances_count}}/g, String(totalCount))
+                        .replace(/{{cutoff_text}}/g, cutoffText)
+                        .replace(/{{month}}/g, month)
+                        .replace(/{{year}}/g, year)
+                        .replace(/{{entries_list}}/g, entryListStr)
+                } else {
+                    if (type === 'late') {
+                        initialF2 = `Dear ${salutationPrefix} ${lastName},\n\n` +
+                            `This letter serves as a Formal Warning regarding your tardiness. Your scheduled time-in is ${shiftTime}, with a five (5)-minute grace period until ${gracePeriod}.\n\n` +
+                            `You have incurred ${numberToText(totalCount)} (${totalCount}) instances of tardiness within the current cut-off period, which constitutes a violation of the Company's Attendance and Punctuality Policy.\n\n` +
+                            `Recorded instances:\n${entryListStr}\n\n` +
+                            `Consistent tardiness disrupts workflow. You are expected to immediately correct your attendance behavior. Future occurrences may result in stricter disciplinary action.\n\n` +
+                            `Thank you.`
+                    } else {
+                        initialF2 = `Dear ${salutationPrefix} ${lastName},\n\n` +
+                            `This letter serves as a Formal Warning regarding your attendance record for the current cutoff period.\n\n` +
+                            `It has been noted that you incurred ${numberToText(totalCount)} (${totalCount}) days of leave within the ${cutoffText} of ${month} ${year}, specifically on the following dates:\n\n` +
+                            `${entryListStr}\n\n` +
+                            `These absences negatively affect work operations. Repeated absences may lead to further disciplinary action.\n\n` +
+                            `Moving forward, you are expected to improve your attendance immediately and avoid unapproved absences.\n\n` +
+                            `Thank you.`
+                    }
+                }
+                setF2Body(initialF2)
+            }
+
+            generateInitialBodies()
+            setHasInitializedContent(true)
+        }
+    }, [employee, entries, hasInitializedContent, isLoading, customSupervisorTemplate, customTardinessTemplate, customLeaveTemplate])
+
     const handlePrint = () => {
         window.print()
     }
@@ -503,6 +654,18 @@ function FormLetterContent() {
                     <h1 className="font-bold text-slate-800">Preview Warning Letter</h1>
                 </div>
                 <div className="flex items-center gap-3">
+                    <Button
+                        onClick={() => setIsEditMode(!isEditMode)}
+                        variant={isEditMode ? "default" : "outline"}
+                        className={cn(
+                            "rounded-xl font-bold gap-2 active:scale-95 transition-all shadow-sm",
+                            isEditMode ? "bg-amber-600 hover:bg-amber-700 text-white" : "text-slate-600 border-slate-200"
+                        )}
+                    >
+                        {isEditMode ? <Check className="w-4 h-4" /> : <Edit3 className="w-4 h-4" />}
+                        {isEditMode ? "Finish Editing" : "Customize Content"}
+                    </Button>
+
                     <Button variant="outline" onClick={handlePrint} className="rounded-xl font-bold gap-2 text-slate-600 border-slate-200">
                         <Printer className="w-4 h-4" />
                         Print PDF
@@ -626,7 +789,7 @@ function FormLetterContent() {
                                 disabled={isSending || selectedForms.length === 0}
                                 className="w-full rounded-none h-12 font-bold bg-[#A4163A] hover:bg-[#7B0F2B] text-white gap-2"
                             >
-                                {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Done'}
+                                {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'SEND'}
                             </Button>
                         </PopoverContent>
                     </Popover>
@@ -648,6 +811,9 @@ function FormLetterContent() {
                         type={type}
                         formatDateLong={formatDateLong}
                         customTemplate={customSupervisorTemplate}
+                        isEditMode={isEditMode}
+                        body={f1Body}
+                        setBody={setF1Body}
                     />
                 )}
 
@@ -672,6 +838,9 @@ function FormLetterContent() {
                             : customLeaveTemplate
                         }
                         isProbee={isProbee}
+                        isEditMode={isEditMode}
+                        body={f2Body}
+                        setBody={setF2Body}
                     />
                 )}
 
@@ -705,56 +874,34 @@ function FormLetterContent() {
 // --- Template Components ---
 
 function FormOneTemplate({
-    employee, entries, today, shiftTime, gracePeriod, salutationPrefix, lastName, numberToText, type, formatDateLong, customTemplate
+    employee, entries, today, shiftTime, gracePeriod, salutationPrefix, lastName, numberToText, type, formatDateLong, customTemplate, isEditMode, body, setBody
 }: any) {
     const totalCount = type === 'leave'
         ? entries.reduce((acc: number, curr: any) => acc + (Number(curr.number_of_days) || 0), 0)
         : entries.length;
 
-    const displayEntries = useMemo(() => {
-        if (type !== 'leave') return entries;
-
-        const expanded: any[] = [];
-        entries.forEach((entry: any) => {
-            const isPersonalLeave = entry.remarks?.toUpperCase() === 'PERSONAL LEAVE';
-            const enhancedRemarks = isPersonalLeave
-                ? `Personal Leave (${entry.cite_reason || 'no stated reason'})`
-                : (entry.remarks || entry.cite_reason || 'No stated reason');
-
-            if (entry.start_date) {
-                const count = Number(entry.number_of_days) || 1;
-                const startDate = new Date(entry.start_date);
-
-                for (let i = 0; i < count; i++) {
-                    const currentDate = new Date(startDate);
-                    currentDate.setDate(startDate.getDate() + i);
-                    expanded.push({
-                        ...entry,
-                        date: currentDate.toISOString().split('T')[0],
-                        remarks: enhancedRemarks
-                    });
-                }
-            } else {
-                expanded.push({
-                    ...entry,
-                    remarks: enhancedRemarks
-                });
-            }
-        });
-        return expanded.sort((a: any, b: any) => new Date(a.date || a.start_date).getTime() - new Date(b.date || b.start_date).getTime());
-    }, [entries, type]);
-
     const unit = type === 'late' ? 'occurrence' : 'day';
     const unitPlural = type === 'late' ? 'occurrences' : 'days';
     const issueType = type === 'late' ? 'tardiness' : 'leave/absences';
     const policyName = type === 'late' ? 'Attendance and Punctuality Policy' : 'Leave and Attendance Policy';
-
     return (
         <Card className="border-0 shadow-2xl rounded-none print:shadow-none min-h-[1056px] w-[816px] flex flex-col bg-white" id="form-letter-1">
             <CardContent className="px-16 py-12 flex-1 flex flex-col font-serif leading-relaxed text-[#333]">
-                {/* Header Image */}
-                <div className="flex justify-center mb-8" style={{ marginTop: '1.5cm' }}>
-                    <img src="/images/abic-header.png" alt="Company Header" className="max-w-[650px] w-full object-contain" />
+                {/* Header Branding */}
+                <div className="flex flex-col items-center mb-2 w-full" style={{ marginTop: '0.5cm' }}>
+                    {customTemplate?.headerLogoImage ? (
+                        <div className="flex flex-col items-center gap-2">
+                            <img src={customTemplate.headerLogoImage} alt="Custom Logo" className="max-w-[150px] max-h-[100px] object-contain" />
+                        </div>
+                    ) : (
+                        <img src="/images/abic-header.png" alt="Company Header" className="max-w-[650px] w-full object-contain" />
+                    )}
+
+                    {customTemplate?.headerDetails && (
+                        <div className="text-center mt-1 text-[10px] leading-tight text-slate-600 max-w-[500px] whitespace-pre-wrap">
+                            {customTemplate.headerDetails}
+                        </div>
+                    )}
                 </div>
 
                 {/* Title */}
@@ -780,60 +927,56 @@ function FormOneTemplate({
                 {!customTemplate && <p className="mb-6">Dear Ma&apos;am Angely,</p>}
 
                 {/* Body Content */}
-                <div className="text-black text-sm leading-relaxed space-y-4 text-justify">
-                    {customTemplate ? (
-                        <div className="whitespace-pre-wrap">
-                            {customTemplate.body
-                                .replace(/{{employee_name}}/g, employee.name || 'Employee')
-                                .replace(/{{last_name}}/g, (employee.name || '').split(' ').pop())
-                                .replace(/{{salutation}}/g, employee.gender?.toLowerCase() === 'female' ? 'Ms.' : 'Mr.')
-                                .replace(/{{instances_text}}/g, numberToText(totalCount))
-                                .replace(/{{instances_count}}/g, String(totalCount))
-                                .replace(/{{pronoun_he_she}}/g, employee.gender?.toLowerCase() === 'female' ? 'She' : 'He')
-                                .replace(/{{pronoun_his_her}}/g, employee.gender?.toLowerCase() === 'female' ? 'her' : 'his')
-                                .replace(/{{entries_list}}/g, displayEntries.map((e: any) =>
-                                    `• ${formatDateLong(e.date || e.start_date)} – ${e.remarks || (type === 'late' ? `Actual In: ${formatTime(e.actual_in)}` : e.cite_reason) || 'No stated reason'}`
-                                ).join('\n'))
-                            }
+                <div className="text-black text-sm leading-relaxed text-justify relative group/body">
+                    {isEditMode ? (
+                        <div className="relative">
+                            <Textarea
+                                value={body}
+                                onChange={(e) => setBody(e.target.value)}
+                                className="min-h-[400px] w-full border-2 border-amber-200 focus-visible:ring-amber-500 rounded-xl p-6 font-serif text-[15px] leading-relaxed resize-none bg-amber-50/10 shadow-inner"
+                                placeholder="Write the letter body here..."
+                            />
+                            <div className="absolute top-2 right-2 flex items-center gap-1 bg-amber-100 text-amber-700 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider animate-pulse">
+                                <Edit3 className="w-3 h-3" />
+                                Editing Mode
+                            </div>
                         </div>
                     ) : (
-                        <>
-                            <p>
-                                This letter serves as a <span className="font-bold">Formal Warning</span> regarding the {issueType} of <span className="font-bold">{salutationPrefix} {employee.name}</span>. {employee.gender?.toLowerCase() === 'male' ? 'He' : 'She'} has accumulated <span className="font-bold">{numberToText(totalCount)} ({totalCount}) {totalCount === 1 ? unit : unitPlural} of {issueType} {type === 'late' ? `beyond the grace period of ${gracePeriod}` : ''}</span> within the current cut-off period.
-                            </p>
+                        <div className="flex-1 space-y-0">
+                            {body.split('\n').map((line: string, idx: number) => {
+                                const trimmed = line.trim();
+                                if (!trimmed) return <div key={idx} className="h-4" />;
+                                if (trimmed.startsWith('•')) {
+                                    return (
+                                        <div key={idx} className="flex gap-4 pl-12 mb-2">
+                                            <span className="shrink-0">•</span>
+                                            <span>{trimmed.substring(1).trim()}</span>
+                                        </div>
+                                    );
+                                }
+                                const numMatch = trimmed.match(/^(\d+)\.\s*(.*)/);
+                                if (numMatch) {
+                                    return (
+                                        <div key={idx} className="flex gap-4 pl-12 mb-2">
+                                            <span className="shrink-0 font-bold">{numMatch[1]}.</span>
+                                            <span>{numMatch[2]}</span>
+                                        </div>
+                                    );
+                                }
+                                const isSalutation = trimmed.toLowerCase().startsWith('dear') || trimmed.endsWith(',');
+                                const isClosing = trimmed.toLowerCase() === 'thank you.' || trimmed.toLowerCase() === 'respectfully,' || trimmed.toLowerCase() === 'respectfully yours,';
 
-                            <p>
-                                In accordance with company policy, reaching the <span className="font-bold text-black">{numberToText(totalCount)} ({totalCount}) {totalCount === 1 ? unit : unitPlural} of {issueType} within a single cut-off period</span> is subject to appropriate <span className="font-bold">coaching, warning, and/or sanction</span>. We request that you address this matter with the concerned employee and coordinate with the HR/Admin Department for proper documentation and necessary action.
-                            </p>
+                                if (isSalutation || isClosing) {
+                                    return <div key={idx} className="mb-4">{line}</div>;
+                                }
 
-                            <p>Additionally, please note the specific dates of {issueType} recorded for this cut-off:</p>
-
-                            <ul className="list-disc ml-12 space-y-2 marker:text-red-600">
-                                {displayEntries.map((entry: any, idx: number) => (
-                                    <li key={idx} className="font-black text-red-600">
-                                        {formatDateLong(entry.date || entry.start_date)}
-                                        {type === 'late' && ` – ${formatTime(entry.actual_in)}`}
-                                        {type === 'leave' && entry.remarks && ` (${entry.remarks})`}
-                                    </li>
-                                ))}
-                            </ul>
-
-                            <p>
-                                Consistent {issueType} affects team productivity, disrupts workflow, and violates the company&apos;s <span className="font-bold">{policyName}</span>, which requires all employees to report to work on time and adhere to their scheduled working hours.
-                            </p>
-
-                            <div>
-                                <p className="font-bold mb-1">Please be reminded of the following:</p>
-                                <ol className="list-decimal ml-12 space-y-3">
-                                    <li className="font-medium"><span className="font-bold">{salutationPrefix} {lastName}</span> is expected to correct {employee.gender?.toLowerCase() === 'male' ? 'his' : 'her'} attendance behavior immediately.</li>
-                                    <li className="font-medium"><span className="font-bold">Future occurrences of {issueType} may result in stricter disciplinary action</span>, including suspension or termination, in accordance with company policy.</li>
-                                </ol>
-                            </div>
-
-                            <p>Kindly ensure that the employee is informed and that corrective action is enforced appropriately.</p>
-
-                            <p>Thank you.</p>
-                        </>
+                                return (
+                                    <div key={idx} className="text-justify mb-4" style={{ textIndent: '3.5rem' }}>
+                                        {line}
+                                    </div>
+                                );
+                            })}
+                        </div>
                     )}
                 </div>
 
@@ -870,52 +1013,30 @@ function FormOneTemplate({
 }
 
 function FormTwoTemplate({
-    employee, entries, today, shiftTime, gracePeriod, salutationPrefix, lastName, numberToText, type, letterTitle, cutoffText, month, year, formatDateLong, customTemplate, isProbee
+    employee, entries, today, shiftTime, gracePeriod, salutationPrefix, lastName, numberToText, type, letterTitle, cutoffText, month, year, formatDateLong, customTemplate, isProbee, isEditMode, body, setBody
 }: any) {
     const totalDays = type === 'leave'
         ? entries.reduce((acc: number, curr: any) => acc + (Number(curr.number_of_days) || 0), 0)
         : entries.length;
 
-    // Expand leave dates to show all individual days
-    const displayEntries = useMemo(() => {
-        if (type !== 'leave') return entries;
-
-        const expanded: any[] = [];
-        entries.forEach((entry: any) => {
-            const isPersonalLeave = entry.remarks?.toUpperCase() === 'PERSONAL LEAVE';
-            const enhancedRemarks = isPersonalLeave
-                ? `Personal Leave (${entry.cite_reason || 'no stated reason'})`
-                : (entry.remarks || entry.cite_reason || 'No stated reason');
-
-            if (entry.start_date) {
-                const count = Number(entry.number_of_days) || 1;
-                const startDate = new Date(entry.start_date);
-
-                for (let i = 0; i < count; i++) {
-                    const currentDate = new Date(startDate);
-                    currentDate.setDate(startDate.getDate() + i);
-                    expanded.push({
-                        ...entry,
-                        date: currentDate.toISOString().split('T')[0],
-                        remarks: enhancedRemarks
-                    });
-                }
-            } else {
-                expanded.push({
-                    ...entry,
-                    remarks: enhancedRemarks
-                });
-            }
-        });
-        return expanded.sort((a: any, b: any) => new Date(a.date || a.start_date).getTime() - new Date(b.date || b.start_date).getTime());
-    }, [entries, type]);
-
     return (
-        <Card className="border-0 shadow-2xl rounded-none print:shadow-none min-h-[1056px] w-[816px] flex flex-col bg-white">
+        <Card className="border-0 shadow-2xl rounded-none print:shadow-none min-h-[1056px] w-[816px] flex flex-col bg-white" id="form-letter-2">
             <CardContent className="px-16 py-12 flex-1 flex flex-col font-serif leading-relaxed text-[#333]">
-                {/* Header Image */}
-                <div className="flex justify-center mb-8" style={{ marginTop: '1.5cm' }}>
-                    <img src="/images/abic-header.png" alt="Company Header" className="max-w-[650px] w-full object-contain" />
+                {/* Header Branding */}
+                <div className="flex flex-col items-center mb-2 w-full" style={{ marginTop: '0.5cm' }}>
+                    {customTemplate?.headerLogoImage ? (
+                        <div className="flex flex-col items-center gap-2">
+                            <img src={customTemplate.headerLogoImage} alt="Custom Logo" className="max-w-[150px] max-h-[100px] object-contain" />
+                        </div>
+                    ) : (
+                        <img src="/images/abic-header.png" alt="Company Header" className="max-w-[650px] w-full object-contain" />
+                    )}
+
+                    {customTemplate?.headerDetails && (
+                        <div className="text-center mt-1 text-[10px] leading-tight text-slate-600 max-w-[500px] whitespace-pre-wrap">
+                            {customTemplate.headerDetails}
+                        </div>
+                    )}
                 </div>
 
                 {/* Title */}
@@ -952,121 +1073,56 @@ function FormTwoTemplate({
                 )}
 
                 {/* Body Content */}
-                <div className="space-y-4 text-justify text-sm">
-                    {customTemplate ? (
-                        <div className="whitespace-pre-wrap leading-relaxed text-slate-800">
-                            {customTemplate.body
-                                .replace(/{{salutation}}/g, salutationPrefix)
-                                .replace(/{{last_name}}/g, lastName)
-                                .replace(/{{shift_time}}/g, shiftTime)
-                                .replace(/{{grace_period}}/g, gracePeriod)
-                                .replace(/{{instances_text}}/g, numberToText(totalDays))
-                                .replace(/{{instances_count}}/g, String(totalDays))
-                                .replace(/{{cutoff_text}}/g, cutoffText)
-                                .replace(/{{month}}/g, month)
-                                .replace(/{{year}}/g, year)
-                                .replace(/{{entries_list}}/g, displayEntries.map((e: any) =>
-                                    `• ${formatDateLong(e.date || e.start_date)} – ${e.remarks || (type === 'late' ? `Actual In: ${formatTime(e.actual_in)}` : e.cite_reason) || 'No stated reason'}`
-                                ).join('\n'))
-                            }
+                <div className="text-black text-sm leading-relaxed text-justify relative group/body">
+                    {isEditMode ? (
+                        <div className="relative">
+                            <Textarea
+                                value={body}
+                                onChange={(e) => setBody(e.target.value)}
+                                className="min-h-[500px] w-full border-2 border-amber-200 focus-visible:ring-amber-500 rounded-xl p-8 font-serif text-[15px] leading-relaxed resize-none bg-amber-50/10 shadow-inner"
+                                placeholder="Write the letter body here..."
+                            />
+                            <div className="absolute top-2 right-2 flex items-center gap-1 bg-amber-100 text-amber-700 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider animate-pulse">
+                                <Edit3 className="w-3 h-3" />
+                                Editing Mode
+                            </div>
                         </div>
                     ) : (
-                        <>
-                            {type === 'late' ? (
-                                isProbee ? (
-                                    <>
-                                        <p>
-                                            This letter serves as a formal warning regarding your repeated tardiness. It has been recorded that you have reported late to work <span className="font-bold">{numberToText(totalDays)} ({totalDays}) times</span>, exceeding the company&apos;s <span className="font-bold">grace period of five (5) minutes</span>.
-                                        </p>
-                                        <p>
-                                            Please be reminded that further instances of tardiness may result in <span className="font-bold">stricter disciplinary action</span>, up to and including <span className="font-bold">suspension</span>, in accordance with company policies.
-                                        </p>
-                                        <p>
-                                            We trust that you will take this matter seriously and make the necessary adjustments to improve your attendance and punctuality moving forward.
-                                        </p>
-                                        <p>Additionally, please note the specific dates of tardiness recorded for this cut-off:</p>
+                        <div className="flex-1 space-y-0">
+                            {body.split('\n').map((line: string, idx: number) => {
+                                const trimmed = line.trim();
+                                if (!trimmed) return <div key={idx} className="h-4" />;
+                                if (trimmed.startsWith('•')) {
+                                    return (
+                                        <div key={idx} className="flex gap-4 pl-12 mb-2">
+                                            <span className="shrink-0">•</span>
+                                            <span>{trimmed.substring(1).trim()}</span>
+                                        </div>
+                                    );
+                                }
+                                const numMatch = trimmed.match(/^(\d+)\.\s*(.*)/);
+                                if (numMatch) {
+                                    return (
+                                        <div key={idx} className="flex gap-4 pl-12 mb-2">
+                                            <span className="shrink-0 font-bold">{numMatch[1]}.</span>
+                                            <span>{numMatch[2]}</span>
+                                        </div>
+                                    );
+                                }
+                                const isSalutation = trimmed.toLowerCase().startsWith('dear') || trimmed.endsWith(',');
+                                const isClosing = trimmed.toLowerCase() === 'thank you.' || trimmed.toLowerCase() === 'respectfully,' || trimmed.toLowerCase() === 'respectfully yours,';
 
-                                        <ul className="list-disc ml-12 space-y-2 marker:text-red-600">
-                                            {displayEntries.map((entry: any, idx: number) => (
-                                                <li key={idx} className="font-black text-red-600">
-                                                    {formatDateLong(entry.date || entry.start_date)} – {formatTime(entry.actual_in)}
-                                                </li>
-                                            ))}
-                                        </ul>
+                                if (isSalutation || isClosing) {
+                                    return <div key={idx} className="mb-4">{line}</div>;
+                                }
 
-                                        <p>
-                                            Consistent tardiness affects team productivity, disrupts workflow, and your evaluation needed for your regularization, which requires all employees to report to work on time and adhere to their scheduled working hours.
-                                        </p>
-                                        <p>Thank you.</p>
-                                    </>
-                                ) : (
-                                    <>
-                                        <p>
-                                            This letter serves as a <span className="font-bold">Formal Warning</span> regarding your tardiness. Please be reminded that your scheduled time-in is <span className="font-bold">{shiftTime}</span>, with a <span className="font-bold">five (5)-minute grace period until {gracePeriod}</span>, in accordance with company policy.
-                                        </p>
-                                        <p>
-                                            Despite this allowance, you have incurred <span className="font-bold">{numberToText(totalDays)} ({totalDays}) instances of tardiness beyond the allowable grace period within the current cut-off period</span>, which constitutes a violation of the Company&apos;s Attendance and Punctuality Policy.
-                                        </p>
-                                        <p>Below is the recorded instances for this cut-off period:</p>
-
-                                        <ul className="list-disc ml-12 space-y-2 marker:text-red-600">
-                                            {displayEntries.map((entry: any, idx: number) => (
-                                                <li key={idx} className="font-black text-red-600">
-                                                    {formatDateLong(entry.date || entry.start_date)} – {formatTime(entry.actual_in)}
-                                                </li>
-                                            ))}
-                                        </ul>
-
-                                        <p>
-                                            Consistent tardiness negatively affects team productivity, disrupts workflow, and fails to meet the company&apos;s standards for punctuality and professionalism.
-                                        </p>
-                                        <p>Please be reminded of the following:</p>
-                                        <ol className="list-decimal ml-12 space-y-3">
-                                            <li className="font-medium">You are expected to immediately correct your attendance behavior and strictly adhere to your scheduled working hours.</li>
-                                            <li className="font-medium">Any future occurrences of tardiness may result in stricter disciplinary action, up to and including suspension or termination, in accordance with company policy.</li>
-                                        </ol>
-                                        <p>This notice shall be documented accordingly. Your cooperation and compliance are expected.</p>
-                                        <p>Thank you.</p>
-                                    </>
-                                )
-                            ) : (
-                                <>
-                                    <p>
-                                        This letter serves as a <span className="font-bold">Formal Warning</span> regarding your <span className="font-bold">attendance record</span> for the current cutoff period.
-                                    </p>
-                                    <p>
-                                        It has been noted that you incurred <span className="font-bold">{numberToText(totalDays)} ({totalDays}) days of leave</span> within the <span className="font-bold">{cutoffText} of {month} {year}</span>, specifically on the following dates:
-                                    </p>
-
-                                    <ul className="list-disc ml-12 space-y-2 marker:text-red-600">
-                                        {displayEntries.map((entry: any, idx: number) => (
-                                            <li key={idx} className="font-black text-red-600">
-                                                {formatDateLong(entry.date || entry.start_date)} — {entry.remarks || entry.cite_reason || 'No stated reason'}
-                                            </li>
-                                        ))}
-                                    </ul>
-
-                                    <p>
-                                        These absences negatively affect work operations and your evaluation needed for your regularization. As stated in the company&apos;s Attendance and Punctuality Policy, employees are expected to maintain regular attendance and provide valid justification or prior notice for any absence.
-                                    </p>
-                                    <p>
-                                        Please be reminded that repeated absences, especially within a short period, may lead to further disciplinary action in accordance with company rules and regulations.
-                                    </p>
-                                    <div>
-                                        <p className="mb-4">Moving forward, you are expected to:</p>
-                                        <ol className="list-decimal ml-10 space-y-3 font-medium">
-                                            <li>Improve your attendance immediately;</li>
-                                            <li>Avoid unnecessary or unapproved absences, and;</li>
-                                            <li>Provide proper documentation or notice for any unavoidable absence.</li>
-                                        </ol>
+                                return (
+                                    <div key={idx} className="text-justify mb-4" style={{ textIndent: '3.5rem' }}>
+                                        {line}
                                     </div>
-                                    <p>
-                                        Failure to comply may result in stricter sanctions, up to and including suspension or termination.
-                                    </p>
-                                </>
-                            )}
-                            <p>Please acknowledge receipt of this {type === 'late' ? 'notice' : 'warning'} by signing below.</p>
-                        </>
+                                );
+                            })}
+                        </div>
                     )}
                 </div>
 
