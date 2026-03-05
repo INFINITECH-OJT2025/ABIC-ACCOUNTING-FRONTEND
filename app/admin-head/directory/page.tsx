@@ -300,6 +300,7 @@ export default function GovernmentDirectoryPage() {
   const [deleteCandidate, setDeleteCandidate] = useState<CloudinaryAsset | null>(null)
   const [deletingCloudinaryImage, setDeletingCloudinaryImage] = useState(false)
   const [agencyImageRefreshKey, setAgencyImageRefreshKey] = useState<Record<string, number>>({})
+  const [agencyImageRetryCount, setAgencyImageRetryCount] = useState<Record<string, number>>({})
   const [generalContacts, setGeneralContacts] = useState<GeneralContact[]>([])
   const [generalContactsDraft, setGeneralContactsDraft] = useState<EditableGeneralContact[]>([])
   const [generalContactsSearch, setGeneralContactsSearch] = useState('')
@@ -411,14 +412,18 @@ export default function GovernmentDirectoryPage() {
   useEffect(() => {
     if (!directoryQuery.data) return
     setAgenciesByCode(directoryQuery.data)
-    if (!activeAgency) {
-      if (directoryQuery.data['philhealth']) {
-        setActiveAgency('philhealth')
-      } else {
-        const firstCode = Object.keys(directoryQuery.data)[0] ?? ''
-        if (firstCode) setActiveAgency(firstCode)
-      }
+  }, [directoryQuery.data])
+
+  useEffect(() => {
+    if (!directoryQuery.data) return
+    if (activeAgency === GENERAL_CONTACTS_KEY) return
+    if (activeAgency && directoryQuery.data[activeAgency]) return
+    if (directoryQuery.data['philhealth']) {
+      setActiveAgency('philhealth')
+      return
     }
+    const firstCode = Object.keys(directoryQuery.data)[0] ?? ''
+    if (firstCode) setActiveAgency(firstCode)
   }, [directoryQuery.data, activeAgency])
 
 
@@ -473,6 +478,12 @@ export default function GovernmentDirectoryPage() {
     [activeAgency, mergedAgencies]
   )
   const isGeneralContactsView = activeAgency === GENERAL_CONTACTS_KEY
+
+  useEffect(() => {
+    if (!agency?.key || !agency?.image) return
+    setImageError((prev) => ({ ...prev, [agency.key]: false }))
+    setAgencyImageRetryCount((prev) => ({ ...prev, [agency.key]: 0 }))
+  }, [agency?.key, agency?.image])
 
 
   const currentSteps = useMemo(() => {
@@ -787,13 +798,58 @@ export default function GovernmentDirectoryPage() {
 
 
     const result = await response.json()
-    const updated = result?.data as BackendAgency | undefined
-    const code = normalizeCode(updated?.code ?? '')
-    if (updated && code) {
-      setAgenciesByCode((prev) => ({ ...prev, [code]: updated }))
-      setImageError((prev) => ({ ...prev, [code]: false }))
-      setAgencyImageRefreshKey((prev) => ({ ...prev, [code]: Date.now() }))
+    const updated = result?.data as Partial<BackendAgency> | undefined
+    const code = normalizeCode(String(updated?.code ?? targetAgencyCode))
+
+    setAgenciesByCode((prev) => {
+      const existing = prev[code] ?? prev[targetAgencyCode]
+      const fallback: BackendAgency = existing ?? {
+        id: Number(updated?.id ?? 0),
+        code,
+        name: String(updated?.name ?? code.toUpperCase()),
+        full_name: (updated?.full_name as string | null | undefined) ?? null,
+        summary: (updated?.summary as string | null | undefined) ?? null,
+        image_url: null,
+        image_public_id: null,
+        updated_at: null,
+        contacts: [],
+        processes: [],
+      }
+
+      const merged: BackendAgency = {
+        ...fallback,
+        ...(updated as Partial<BackendAgency>),
+        code,
+        image_url: params.imageUrl,
+        image_public_id: params.publicId ?? null,
+        updated_at:
+          typeof updated?.updated_at === 'string' || updated?.updated_at === null
+            ? (updated?.updated_at ?? new Date().toISOString())
+            : new Date().toISOString(),
+        contacts: Array.isArray(updated?.contacts) ? (updated.contacts as BackendContact[]) : fallback.contacts,
+        processes: Array.isArray(updated?.processes) ? (updated.processes as BackendProcess[]) : fallback.processes,
+      }
+
+      return { ...prev, [code]: merged }
+    })
+    setImageError((prev) => ({ ...prev, [code]: false }))
+    setAgencyImageRetryCount((prev) => ({ ...prev, [code]: 0 }))
+    setAgencyImageRefreshKey((prev) => ({ ...prev, [code]: Date.now() }))
+  }
+
+  const handleAgencyImageLoad = (agencyCode: string) => {
+    setImageError((prev) => ({ ...prev, [agencyCode]: false }))
+    setAgencyImageRetryCount((prev) => ({ ...prev, [agencyCode]: 0 }))
+  }
+
+  const handleAgencyImageError = (agencyCode: string) => {
+    const attempts = agencyImageRetryCount[agencyCode] ?? 0
+    if (attempts < 3) {
+      setAgencyImageRetryCount((prev) => ({ ...prev, [agencyCode]: attempts + 1 }))
+      setAgencyImageRefreshKey((prev) => ({ ...prev, [agencyCode]: Date.now() }))
+      return
     }
+    setImageError((prev) => ({ ...prev, [agencyCode]: true }))
   }
 
 
@@ -970,6 +1026,31 @@ export default function GovernmentDirectoryPage() {
     void loadCloudinaryImages({ type: 'general-contact', index })
   }
 
+  const uploadDirectoryImage = async (file: File, sectionCode: string) => {
+    const payload = new FormData()
+    payload.set('file', file)
+    payload.set('sectionCode', sectionCode)
+
+    const response = await fetch('/api/cloudinary/upload-directory-image', {
+      method: 'POST',
+      body: payload,
+    })
+    const data = await response.json().catch(() => null)
+    if (!response.ok) {
+      const message = data?.message || 'Unable to upload image.'
+      throw new Error(message)
+    }
+    const secureUrl = String(data?.secure_url || '')
+    const publicId = String(data?.public_id || '')
+    const format = String(data?.format || '')
+    const bytes = Number(data?.bytes || 0)
+    if (!secureUrl || !publicId) {
+      throw new Error('Upload did not return image details.')
+    }
+    validateImageRestrictions(format, bytes)
+    return { secureUrl, publicId, format, bytes }
+  }
+
   const startGeneralContactUpload = (index: number) => {
     generalContactUploadTargetRef.current = index
     generalContactUploadInputRef.current?.click()
@@ -982,28 +1063,9 @@ export default function GovernmentDirectoryPage() {
       const format = dotIndex >= 0 ? rawName.slice(dotIndex + 1).toLowerCase() : ''
       const bytes = Number(file?.size || 0)
       validateImageRestrictions(format, bytes)
-
       setUpdatingImage(true)
-      const payload = new FormData()
-      payload.set('file', file)
-      const response = await fetch('/api/cloudinary/upload-general-contact', {
-        method: 'POST',
-        body: payload,
-      })
-
-      const data = await response.json().catch(() => null)
-      if (!response.ok) {
-        const message = data?.message || 'Unable to upload general contact avatar.'
-        throw new Error(message)
-      }
-
-      const imageUrl = String(data?.secure_url || '')
-      const publicId = String(data?.public_id || '')
-      if (!imageUrl || !publicId) {
-        throw new Error('Upload did not return image details.')
-      }
-
-      setGeneralContactAvatarAt(index, imageUrl, publicId)
+      const uploaded = await uploadDirectoryImage(file, GENERAL_CONTACTS_KEY)
+      setGeneralContactAvatarAt(index, uploaded.secureUrl, uploaded.publicId)
       toast.success('Avatar selected. Save contacts to apply changes.')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to set avatar'
@@ -1086,7 +1148,6 @@ export default function GovernmentDirectoryPage() {
     }
   }
 
-
   const handleImageUpdate = async (uploadResult: any, agencyCode: string) => {
     try {
       const info = uploadResult?.info ?? uploadResult
@@ -1094,23 +1155,10 @@ export default function GovernmentDirectoryPage() {
       const publicId = info?.public_id
       const format = String(info?.format || '').toLowerCase()
       const bytes = Number(info?.bytes || 0)
-
-
       if (!imageUrl) {
         throw new Error('Upload did not return an image URL.')
       }
-
-
-      if (!ALLOWED_UPLOAD_FORMATS.includes(format as (typeof ALLOWED_UPLOAD_FORMATS)[number])) {
-        throw new Error('Only JPEG/JPG, PNG, GIF, WebP, and HEIC/HEIF are allowed.')
-      }
-
-
-      if (bytes > MAX_IMAGE_BYTES) {
-        throw new Error('File exceeds the 20MB upload limit.')
-      }
-
-
+      validateImageRestrictions(format, bytes)
       setUpdatingImage(true)
       await persistAgencyImage({
         agencyCode,
@@ -1119,8 +1167,6 @@ export default function GovernmentDirectoryPage() {
         format,
         bytes,
       })
-
-
       toast.success('Agency picture updated successfully!')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update picture'
@@ -1664,7 +1710,8 @@ export default function GovernmentDirectoryPage() {
                 src={agency.image}
                 alt={agency.shortName}
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                onError={() => setImageError(p => ({ ...p, [agency.key]: true }))}
+                onLoad={() => handleAgencyImageLoad(agency.key)}
+                onError={() => handleAgencyImageError(agency.key)}
               />
             ) : (
               <div className="w-full h-full bg-slate-200 flex items-center justify-center">

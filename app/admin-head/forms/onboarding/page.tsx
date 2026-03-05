@@ -26,20 +26,16 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover"
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog'
-import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
-  Save, Lock, ChevronLeft, ChevronRight, Check, Trash2, Plus, LayoutDashboard, ClipboardList, FolderPlus, Filter, ArrowUpDown, ListFilter, CheckCircle2, CircleDashed, Clock3, History, ArrowUpAZ, ArrowDownAZ, ChevronDown, Users, Loader2, X, GripVertical
+  Save, Lock, ChevronLeft, ChevronRight, Check, Trash2, Plus, LayoutDashboard, ClipboardList, FolderPlus, Filter, ArrowUpDown, ListFilter, CheckCircle2, CircleDashed, Clock3, History, ArrowUpAZ, ArrowDownAZ, ChevronDown, Loader2, X, GripVertical
 } from 'lucide-react'
-import { Label } from '@/components/ui/label'
 import { cn } from "@/lib/utils"
 import { getApiUrl } from '@/lib/api'
 import { ensureOkResponse } from '@/lib/api/error-message'
 import { VALIDATION_CONSTRAINTS } from '@/lib/validation/constraints'
-import { checklistTemplateTasksSchema, onboardingRecordSchema } from '@/lib/validation/schemas'
+import { checklistTemplateTasksSchema } from '@/lib/validation/schemas'
 import { DeleteTaskDialog, UnsavedChangesDialog } from '@/components/checklist/confirm-dialogs'
 import { useChecklistTemplateSetup } from '@/lib/hooks/use-checklist-template-setup'
 import { PageEmptyState, PageErrorState } from '@/components/state/page-feedback'
@@ -205,19 +201,11 @@ function OnboardingChecklistPageContent() {
   const targetName = searchParams.get('name')
   const editMode = true
   const [saving, setSaving] = useState(false)
-  const [creatingRecord, setCreatingRecord] = useState(false)
-  const [addRecordOpen, setAddRecordOpen] = useState(false)
   const [taskIdToDelete, setTaskIdToDelete] = useState<number | null>(null)
   const [dragTaskId, setDragTaskId] = useState<number | null>(null)
   const [dragOverTaskId, setDragOverTaskId] = useState<number | null>(null)
   const [recentlyMovedTaskId, setRecentlyMovedTaskId] = useState<number | null>(null)
   const [open, setOpen] = useState(false)
-  const [newRecord, setNewRecord] = useState({
-    name: '',
-    position: '',
-    department: '',
-    startDate: '',
-  })
   const [recordStatusFilter, setRecordStatusFilter] = useState<RecordStatusFilter>('ALL')
   const [recordSort, setRecordSort] = useState<RecordSort>('UPDATED_DESC')
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false)
@@ -436,16 +424,6 @@ function OnboardingChecklistPageContent() {
     if (currentIndex > 0) {
       selectRecordByIndex(currentIndex - 1)
     }
-  }
-
-
-  const resetNewRecord = () => {
-    setNewRecord({
-      name: '',
-      position: '',
-      department: '',
-      startDate: '',
-    })
   }
 
 
@@ -694,63 +672,6 @@ function OnboardingChecklistPageContent() {
   }, [hasUnsavedChanges, router])
 
 
-  const handleCreateRecord = async () => {
-    const formValidation = onboardingRecordSchema.safeParse(newRecord)
-    if (!formValidation.success) {
-      const message = formValidation.error.issues[0]?.message || 'Please complete all required fields.'
-      toast.warning('Incomplete Form', {
-        description: message,
-      })
-      return
-    }
-
-
-    try {
-      setCreatingRecord(true)
-      const payload = {
-        name: newRecord.name.trim(),
-        position: newRecord.position.trim(),
-        department: newRecord.department.trim(),
-        startDate: newRecord.startDate,
-        tasks: [],
-      }
-
-
-      const response = await fetch(`${getApiUrl()}/api/onboarding-checklist`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      })
-
-
-      await ensureOkResponse(response, 'Unable to create the onboarding record.')
-
-
-      const result = await response.json()
-      const created = normalizeRecord(result?.data)
-      setRecords(prev => {
-        const next = [...prev, created]
-        setCurrentIndex(next.length - 1)
-        return next
-      })
-      setEmployeeInfo(created)
-      setTasks(created.tasks)
-      setAddRecordOpen(false)
-      resetNewRecord()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to create onboarding record'
-      toast.error('Create Record Failed', {
-        description: message,
-      })
-    } finally {
-      setCreatingRecord(false)
-    }
-  }
-
-
   if (loading) {
     return <ChecklistPageSkeleton />
   }
@@ -780,10 +701,8 @@ function OnboardingChecklistPageContent() {
 
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-12">
-      {/* ----- INTEGRATED HEADER & TOOLBAR ----- */}
-      {/* ----- INTEGRATED HEADER & TOOLBAR ----- */}
-      <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md mb-8">
+    <div className="min-h-screen w-full bg-[#F5F6F8] text-stone-900 font-sans pb-10">
+      <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-xl mb-6">
         {/* Main Header Row */}
         <div className="w-full px-4 md:px-8 py-6">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
@@ -796,15 +715,7 @@ function OnboardingChecklistPageContent() {
             </div>
 
 
-            <div>
-              <Button
-                onClick={() => setAddRecordOpen(true)}
-                className="h-10 px-5 font-black text-xs uppercase tracking-wider bg-white text-[#800020] hover:bg-rose-50 rounded-lg border border-white/50"
-              >
-                <Users className="w-3.5 h-3.5 mr-2" />
-                Initiate Record
-              </Button>
-            </div>
+            <div />
           </div>
         </div>
 
@@ -825,7 +736,7 @@ function OnboardingChecklistPageContent() {
                   value={String(employeeInfo?.department || '').trim() || undefined}
                   onValueChange={requestDepartmentChange}
                 >
-                  <SelectTrigger className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 min-w-[240px] shadow-sm font-bold rounded-lg border-2 ring-0 focus:ring-0">
+                  <SelectTrigger aria-label="Select department" className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 min-w-[240px] shadow-sm font-bold rounded-lg border-2 ring-0 focus:ring-0">
                     <SelectValue placeholder="Select Department" />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl border-stone-200 shadow-xl">
@@ -857,12 +768,12 @@ function OnboardingChecklistPageContent() {
       </div>
 
 
-      <main className="w-full px-4 md:px-8 relative mb-20 transition-all duration-500 animate-in fade-in slide-in-from-bottom-5">
+      <main className="w-full max-w-[1600px] mx-auto px-4 md:px-8 relative mb-16 transition-all duration-500 animate-in fade-in slide-in-from-bottom-5">
 
 
 
 
-        <Card className="rounded-2xl border-2 border-[#FFE5EC] shadow-lg overflow-hidden bg-white mb-6 transition-all hover:shadow-xl">
+        <Card className="rounded-2xl border border-[#FFE5EC] shadow-lg overflow-hidden bg-white mb-6 transition-all hover:shadow-xl">
           <div className="p-5 bg-rose-50/20">
             <div className="flex items-center justify-between gap-3 mb-2">
               <p className="text-[11px] font-black text-[#800020]/60 uppercase tracking-widest">Selected Department</p>
@@ -883,7 +794,7 @@ function OnboardingChecklistPageContent() {
 
 
         {/* Task List Section */}
-        <Card className="rounded-2xl border-2 border-[#FFE5EC] shadow-2xl bg-white overflow-hidden mb-12">
+        <Card className="rounded-2xl border border-[#FFE5EC] shadow-2xl bg-white overflow-hidden mb-12">
           <div className="p-4 md:px-8 bg-slate-50/50 border-b border-[#FFE5EC] flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-3">
               <Button onClick={addTask} size="sm" className="bg-[#A4163A] hover:bg-[#800020] text-white font-black text-xs h-9 px-6 rounded-xl shadow-md active:scale-95 transition-all">
@@ -902,7 +813,7 @@ function OnboardingChecklistPageContent() {
                 className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg active:scale-95 transition-all rounded-xl"
               >
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <Save className="w-3.5 h-3.5 mr-2" />}
-                {saving ? 'UPDATING...' : 'FINALIZE SAVE'}
+                {saving ? 'UPDATING...' : 'SAVE CHECKLIST'}
               </Button>
             </div>
           </div>
@@ -1051,95 +962,12 @@ function OnboardingChecklistPageContent() {
                 className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg active:scale-95 transition-all rounded-xl"
               >
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <Save className="w-3.5 h-3.5 mr-2" />}
-                {saving ? 'UPDATING...' : 'FINALIZE SAVE'}
+                {saving ? 'UPDATING...' : 'SAVE CHECKLIST'}
               </Button>
             </div>
           </div>
         </Card>
       </main>
-
-
-      {/* Modals & Dialogs */}
-      <Dialog open={addRecordOpen} onOpenChange={setAddRecordOpen}>
-        <DialogContent className="sm:max-w-[560px] border-4 border-[#FFE5EC] p-0 overflow-hidden rounded-3xl shadow-2xl">
-          <DialogHeader className="bg-gradient-to-r from-[#800020] via-[#A0153E] to-[#C9184A] p-8 text-white relative">
-            <div className="absolute top-0 right-0 p-8 opacity-10">
-              <Users className="w-24 h-24" />
-            </div>
-            <DialogTitle className="text-3xl font-black tracking-tight italic">Initiate Record</DialogTitle>
-            <DialogDescription className="text-rose-100 text-lg font-medium">
-              Create a fresh onboarding checklist pathway.
-            </DialogDescription>
-          </DialogHeader>
-
-
-          <div className="p-8 space-y-6 bg-white">
-            <div className="space-y-2">
-              <Label className="text-[11px] font-black text-[#800020] uppercase tracking-[0.2em]">Employee Full Name</Label>
-              <Input
-                value={newRecord.name}
-                onChange={(e) => setNewRecord(prev => ({ ...prev, name: e.target.value }))}
-                minLength={VALIDATION_CONSTRAINTS.onboardingRecord.name.min}
-                maxLength={VALIDATION_CONSTRAINTS.onboardingRecord.name.max}
-                title={`Name must be ${VALIDATION_CONSTRAINTS.onboardingRecord.name.min} to ${VALIDATION_CONSTRAINTS.onboardingRecord.name.max} characters.`}
-                placeholder="Ex. Juan Dela Cruz"
-                className="rounded-xl border-[#FFE5EC] border-2 h-14 text-lg font-bold focus:ring-[#800020]/10 focus:border-[#800020]"
-              />
-              <TextFieldStatus value={newRecord.name} min={VALIDATION_CONSTRAINTS.onboardingRecord.name.min} max={VALIDATION_CONSTRAINTS.onboardingRecord.name.max} />
-              <p className="text-[11px] font-semibold text-slate-500">Minimum {VALIDATION_CONSTRAINTS.onboardingRecord.name.min}, maximum {VALIDATION_CONSTRAINTS.onboardingRecord.name.max} characters.</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label className="text-[11px] font-black text-[#800020] uppercase tracking-[0.2em]">Official Position</Label>
-                <Input
-                  value={newRecord.position}
-                  onChange={(e) => setNewRecord(prev => ({ ...prev, position: e.target.value }))}
-                  minLength={VALIDATION_CONSTRAINTS.onboardingRecord.position.min}
-                  maxLength={VALIDATION_CONSTRAINTS.onboardingRecord.position.max}
-                  title={`Position must be ${VALIDATION_CONSTRAINTS.onboardingRecord.position.min} to ${VALIDATION_CONSTRAINTS.onboardingRecord.position.max} characters.`}
-                  placeholder="Ex. Senior Accountant"
-                  className="rounded-xl border-[#FFE5EC] border-2 h-14 text-lg font-bold focus:ring-[#800020]/10 focus:border-[#800020]"
-                />
-                <TextFieldStatus value={newRecord.position} min={VALIDATION_CONSTRAINTS.onboardingRecord.position.min} max={VALIDATION_CONSTRAINTS.onboardingRecord.position.max} />
-                <p className="text-[11px] font-semibold text-slate-500">Minimum {VALIDATION_CONSTRAINTS.onboardingRecord.position.min}, maximum {VALIDATION_CONSTRAINTS.onboardingRecord.position.max} characters.</p>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-[11px] font-black text-[#800020] uppercase tracking-[0.2em]">Department</Label>
-                <Input
-                  value={newRecord.department}
-                  onChange={(e) => setNewRecord(prev => ({ ...prev, department: e.target.value }))}
-                  minLength={VALIDATION_CONSTRAINTS.onboardingRecord.department.min}
-                  maxLength={VALIDATION_CONSTRAINTS.onboardingRecord.department.max}
-                  title={`Department must be ${VALIDATION_CONSTRAINTS.onboardingRecord.department.min} to ${VALIDATION_CONSTRAINTS.onboardingRecord.department.max} characters.`}
-                  placeholder="Ex. Finance"
-                  className="rounded-xl border-[#FFE5EC] border-2 h-14 text-lg font-bold focus:ring-[#800020]/10 focus:border-[#800020]"
-                />
-                <TextFieldStatus value={newRecord.department} min={VALIDATION_CONSTRAINTS.onboardingRecord.department.min} max={VALIDATION_CONSTRAINTS.onboardingRecord.department.max} />
-                <p className="text-[11px] font-semibold text-slate-500">Minimum {VALIDATION_CONSTRAINTS.onboardingRecord.department.min}, maximum {VALIDATION_CONSTRAINTS.onboardingRecord.department.max} characters.</p>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-[11px] font-black text-[#800020] uppercase tracking-[0.2em]">Onboarding Start Date</Label>
-              <Input
-                type="date"
-                value={newRecord.startDate}
-                onChange={(e) => setNewRecord(prev => ({ ...prev, startDate: e.target.value }))}
-                className="rounded-xl border-[#FFE5EC] border-2 h-14 text-lg font-bold focus:ring-[#800020]/10 focus:border-[#800020]"
-              />
-            </div>
-          </div>
-
-
-          <DialogFooter className="px-8 pb-8 pt-2 bg-white flex flex-row gap-4">
-            <Button variant="ghost" onClick={() => { setAddRecordOpen(false); resetNewRecord(); }} className="flex-1 rounded-xl h-14 font-black text-slate-400 hover:text-slate-600 hover:bg-rose-50 transition-all">
-              DISCARD
-            </Button>
-            <Button onClick={handleCreateRecord} disabled={creatingRecord} className="flex-2 px-10 rounded-xl bg-gradient-to-r from-[#A4163A] to-[#630C22] hover:shadow-xl active:scale-95 text-white font-black h-14 transition-all uppercase tracking-widest text-xs">
-              {creatingRecord ? <Loader2 className="animate-spin h-5 w-5" /> : 'Create Record'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <AlertDialog open={saveConfirmOpen} onOpenChange={setSaveConfirmOpen}>
         <AlertDialogContent className="border-4 border-[#FFE5EC] rounded-3xl p-8 bg-white shadow-2xl">

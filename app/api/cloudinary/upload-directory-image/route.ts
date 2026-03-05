@@ -3,6 +3,23 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
 
+const GENERAL_CONTACTS_KEY = 'general-contacts'
+const DIRECTORY_FOLDER_ALIASES: Record<string, string> = {
+  sss: 'sss',
+  philhealth: 'philhealth',
+  tin: 'bir',
+  pagibig: 'pagibig',
+  [GENERAL_CONTACTS_KEY]: 'general-contacts',
+}
+
+const normalizeCode = (value: string): string => String(value || '').trim().toLowerCase()
+
+const getDirectoryFolderPath = (sectionCode: string): string => {
+  const normalized = normalizeCode(sectionCode)
+  const mapped = DIRECTORY_FOLDER_ALIASES[normalized] || normalized || 'misc'
+  return `directory/${mapped}`
+}
+
 const buildSignature = (params: Record<string, string>, apiSecret: string): string => {
   const serialized = Object.keys(params)
     .sort()
@@ -23,12 +40,16 @@ export async function POST(request: NextRequest) {
 
     const body = await request.formData()
     const file = body.get('file')
+    const sectionCodeRaw = String(body.get('sectionCode') || '').trim()
     if (!(file instanceof File)) {
       return NextResponse.json({ message: 'A file is required.' }, { status: 400 })
     }
+    if (!sectionCodeRaw) {
+      return NextResponse.json({ message: 'sectionCode is required.' }, { status: 400 })
+    }
 
+    const folder = getDirectoryFolderPath(sectionCodeRaw)
     const timestamp = String(Math.floor(Date.now() / 1000))
-    const folder = 'directory/general-contacts'
     const signatureParams: Record<string, string> = {
       asset_folder: folder,
       folder,
@@ -39,7 +60,7 @@ export async function POST(request: NextRequest) {
     const signature = buildSignature(signatureParams, apiSecret)
 
     const uploadForm = new FormData()
-    uploadForm.set('file', file, file.name || `general-contact-${Date.now()}`)
+    uploadForm.set('file', file, file.name || `directory-image-${Date.now()}`)
     uploadForm.set('api_key', apiKey)
     uploadForm.set('timestamp', timestamp)
     uploadForm.set('signature', signature)
@@ -66,7 +87,7 @@ export async function POST(request: NextRequest) {
       bytes: Number(payload?.bytes || 0),
     })
   } catch {
-    return NextResponse.json({ message: 'Unable to upload general contact avatar.' }, { status: 500 })
+    return NextResponse.json({ message: 'Unable to upload directory image.' }, { status: 500 })
   }
 }
 
