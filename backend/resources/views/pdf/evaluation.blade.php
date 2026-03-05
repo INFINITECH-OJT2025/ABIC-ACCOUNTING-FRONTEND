@@ -13,7 +13,7 @@
         .meta { margin-bottom: 10px; }
         .meta-row { margin-bottom: 4px; white-space: nowrap; }
         .meta-label { font-weight: 700; display: inline-block; min-width: 145px; font-size: 10px; }
-        .meta-value-line { display: inline-block; width: 78%; border-bottom: 1px solid #000; vertical-align: bottom; }
+        .meta-value-line { display: inline-block; width: auto; max-width: 78%; border-bottom: 1px solid #000; vertical-align: bottom; padding-right: 4px; }
         .meta-value { color: #c42020; font-weight: 700; font-size: 10px; }
         .eval-tag { color: #708090; font-style: italic; font-size: 8.5px; margin-left: 5px; }
 

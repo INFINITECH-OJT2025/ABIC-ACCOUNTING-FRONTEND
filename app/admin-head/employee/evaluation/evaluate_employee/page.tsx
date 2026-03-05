@@ -667,26 +667,24 @@ function EvaluateEmployeeForm() {
             <div className="space-y-2 mb-10">
               <div className="flex gap-2">
                 <span className="font-bold whitespace-nowrap">NAME</span>
-                <span className="w-full relative border-b border-black">
-                  <span className="absolute left-0 -top-0.5 text-[#D32F2F] font-bold">
+                <span className="relative inline-flex max-w-full border-b border-black pr-1">
+                  <span className="text-[#D32F2F] font-bold">
                     {selectedEmployee ? `${selectedEmployee.first_name} ${selectedEmployee.last_name}` : ''}
                   </span>
-                  <span className="ml-[180px] font-bold">:</span>
                 </span>
               </div>
               <div className="flex gap-2">
                 <span className="font-bold whitespace-nowrap">DEPARTMENT/JOB TITLE</span>
-                <span className="w-full relative border-b border-black">
-                  <span className="absolute left-0 -top-0.5 text-[#D32F2F] font-bold">
+                <span className="relative inline-flex max-w-full border-b border-black pr-1">
+                  <span className="text-[#D32F2F] font-bold">
                     {selectedEmployee ? `${employeeDetails?.department} / ${employeeDetails?.position}` : ''}
                   </span>
-                  <span className="ml-[180px] font-bold">:</span>
                 </span>
               </div>
               <div className="flex gap-2">
                 <span className="font-bold whitespace-nowrap">RATING PERIOD</span>
-                <span className="w-full relative border-b border-black">
-                  <span className="absolute left-0 -top-0.5 text-[#D32F2F] font-bold">
+                <span className="relative inline-flex max-w-full border-b border-black pr-1">
+                  <span className="text-[#D32F2F] font-bold">
                     {selectedEmployee && (
                       <>
                         {firstEvaluationDate}
@@ -694,7 +692,6 @@ function EvaluateEmployeeForm() {
                       </>
                     )}
                   </span>
-                  <span className="ml-[180px] font-bold">:</span>
                 </span>
               </div>
             </div>
@@ -870,8 +867,8 @@ function EvaluateEmployeeForm() {
         <div className="space-y-2 mb-10">
           <div className="flex gap-2">
             <span className="font-bold whitespace-nowrap">NAME</span>
-            <span className="w-full relative border-b border-black">
-              <span className="absolute left-0 -top-1 w-full text-[#D32F2F] font-bold">
+            <span className={`${isViewDetailsMode ? 'relative inline-flex max-w-full border-b border-black pr-1' : 'w-full relative border-b border-black'}`}>
+              <span className={`${isViewDetailsMode ? 'text-[#D32F2F] font-bold' : 'absolute left-0 -top-1 w-full text-[#D32F2F] font-bold'}`}>
                 {isViewDetailsMode ? (
                   <span className="block h-6 leading-6">
                     {selectedEmployee ? `${selectedEmployee.first_name} ${selectedEmployee.last_name}` : '[Loading Employee]'}
@@ -889,23 +886,20 @@ function EvaluateEmployeeForm() {
                   </Select>
                 )}
               </span>
-              <span className="ml-[180px] font-bold opacity-0 invisible">:</span>
-              <span className="absolute right-0 top-0 font-bold">:</span>
             </span>
           </div>
           <div className="flex gap-2">
             <span className="font-bold whitespace-nowrap">DEPARTMENT/JOB TITLE</span>
-            <span className="w-full relative border-b border-black">
-              <span className="absolute left-0 -top-0.5 text-[#D32F2F] font-bold">
+            <span className="relative inline-flex max-w-full border-b border-black pr-1">
+              <span className="text-[#D32F2F] font-bold">
                 {selectedEmployee ? `${employeeDetails?.department} / ${employeeDetails?.position}` : ''}
               </span>
-              <span className="ml-[180px] font-bold">:</span>
             </span>
           </div>
           <div className="flex gap-2">
             <span className="font-bold whitespace-nowrap">RATING PERIOD</span>
-            <span className="w-full relative border-b border-black">
-              <span className="absolute left-0 -top-0.5 text-[#D32F2F] font-bold">
+            <span className="relative inline-flex max-w-full border-b border-black pr-1">
+              <span className="text-[#D32F2F] font-bold">
                 {selectedEmployee && (
                   <>
                     {evaluationContext.ratingPeriod}
@@ -915,7 +909,6 @@ function EvaluateEmployeeForm() {
                   </>
                 )}
               </span>
-              <span className="ml-[180px] font-bold">:</span>
             </span>
           </div>
         </div>
