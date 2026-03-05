@@ -217,6 +217,7 @@ function EvaluateEmployeeForm() {
   const showFirstEvaluationPanel = failedFirstEvaluation && (evaluationView === 'first' || evaluationView === 'both')
   const showSecondEvaluationPanel = !failedFirstEvaluation || evaluationView === 'second' || evaluationView === 'both'
   const showSideBySide = failedFirstEvaluation && evaluationView === 'both'
+  const isViewDetailsMode = Boolean(searchParams?.get('id'))
 
   const buildFallbackBreakdownFromTotal = (total?: number | null): Record<CriteriaId, number> | null => {
     if (typeof total !== 'number') return null
@@ -880,6 +881,11 @@ function EvaluateEmployeeForm() {
             <span className="font-bold whitespace-nowrap">NAME</span>
             <span className="w-full relative border-b border-black">
               <span className="absolute left-0 -top-1 w-full text-[#D32F2F] font-bold">
+                {isViewDetailsMode ? (
+                  <span className="block h-6 leading-6">
+                    {selectedEmployee ? `${selectedEmployee.first_name} ${selectedEmployee.last_name}` : '[Loading Employee]'}
+                  </span>
+                ) : (
                   <Select value={selectedEmployeeId} onValueChange={handleEmployeeChange}>
                     <SelectTrigger className="h-6 border-none bg-transparent p-0 shadow-none text-[#D32F2F] font-bold focus:ring-0 w-full hover:bg-transparent hover:text-rose-800 transition-colors">
                       <SelectValue placeholder="[Select Employee Here]" />
@@ -890,6 +896,7 @@ function EvaluateEmployeeForm() {
                       ))}
                     </SelectContent>
                   </Select>
+                )}
               </span>
               <span className="ml-[180px] font-bold opacity-0 invisible">:</span>
               <span className="absolute right-0 top-0 font-bold">:</span>
