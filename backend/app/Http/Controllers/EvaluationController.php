@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\Evaluation;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 class EvaluationController extends Controller
@@ -99,41 +100,55 @@ class EvaluationController extends Controller
 
     public function emailPdf(Request $request, string $employeeId)
     {
-        $employee = Employee::findOrFail($employeeId);
-        $evaluation = Evaluation::where('employee_id', $employeeId)->firstOrFail();
+        try {
+            $employee = Employee::findOrFail($employeeId);
+            $evaluation = Evaluation::where('employee_id', $employeeId)->firstOrFail();
 
-        $recipient = trim((string) ($employee->email_address ?: $employee->email));
-        if ($recipient === '') {
+            $recipient = trim((string) ($employee->email_address ?: $employee->email));
+            if ($recipient === '') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Employee has no email address.',
+                ], 422);
+            }
+
+            $viewMode = (string) $request->input('view', 'current');
+            if (!in_array($viewMode, ['first', 'second', 'both', 'current'], true)) {
+                $viewMode = 'current';
+            }
+
+            $payload = $this->buildPdfPayload($employee, $evaluation, $viewMode);
+            // Long bond paper: 8.5in x 13in (portrait)
+            $pdf = Pdf::loadView('pdf.evaluation', $payload)->setPaper('a4', 'portrait');
+            $pdfBinary = $pdf->output();
+            $filename = 'evaluation_' . $employee->id . '.pdf';
+
+            Mail::send([], [], function ($message) use ($recipient, $employee, $pdfBinary, $filename) {
+                $fullName = trim((string) ($employee->first_name . ' ' . $employee->last_name));
+                $message
+                    ->to($recipient)
+                    ->subject('Performance Appraisal PDF - ' . ($fullName !== '' ? $fullName : $employee->id))
+                    ->text("Hello,\n\nAttached is your performance appraisal PDF.\n\nRegards,\nABIC Realty")
+                    ->attachData($pdfBinary, $filename, ['mime' => 'application/pdf']);
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Evaluation PDF sent to employee email.',
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Failed to send evaluation PDF email', [
+                'employee_id' => $employeeId,
+                'error' => $e->getMessage(),
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Employee has no email address.',
-            ], 422);
+                'message' => app()->isLocal()
+                    ? ('Unable to send evaluation email: ' . $e->getMessage())
+                    : 'Unable to send evaluation email right now. Please contact support.',
+            ], 500);
         }
-
-        $viewMode = (string) $request->input('view', 'current');
-        if (!in_array($viewMode, ['first', 'second', 'both', 'current'], true)) {
-            $viewMode = 'current';
-        }
-
-        $payload = $this->buildPdfPayload($employee, $evaluation, $viewMode);
-        // Long bond paper: 8.5in x 13in (portrait)
-        $pdf = Pdf::loadView('pdf.evaluation', $payload)->setPaper('a4', 'portrait');
-        $pdfBinary = $pdf->output();
-        $filename = 'evaluation_' . $employee->id . '.pdf';
-
-        Mail::send([], [], function ($message) use ($recipient, $employee, $pdfBinary, $filename) {
-            $fullName = trim((string) ($employee->first_name . ' ' . $employee->last_name));
-            $message
-                ->to($recipient)
-                ->subject('Performance Appraisal PDF - ' . ($fullName !== '' ? $fullName : $employee->id))
-                ->text("Hello,\n\nAttached is your performance appraisal PDF.\n\nRegards,\nABIC Realty")
-                ->attachData($pdfBinary, $filename, ['mime' => 'application/pdf']);
-        });
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Evaluation PDF sent to employee email.',
-        ]);
     }
 
     private function buildPdfPayload(Employee $employee, Evaluation $evaluation, string $viewMode): array

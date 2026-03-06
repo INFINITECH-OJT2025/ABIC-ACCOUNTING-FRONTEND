@@ -468,13 +468,21 @@ function EvaluateEmployeeForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ view: evaluationView })
       })
-      const data = await response.json()
-      if (!response.ok || !data.success) {
-        throw new Error(data?.message || 'Failed to send PDF to email')
+      const raw = await response.text()
+      let data: any = null
+      try {
+        data = raw ? JSON.parse(raw) : null
+      } catch {
+        data = null
+      }
+
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || raw || 'Failed to send PDF to email')
       }
       toast.success('Evaluation PDF sent to employee email')
     } catch (error) {
-      toast.error('Failed to send PDF to employee email')
+      const message = error instanceof Error ? error.message : 'Failed to send PDF to employee email'
+      toast.error(message)
     } finally {
       setIsEmailSending(false)
     }
