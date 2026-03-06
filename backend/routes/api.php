@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\EmployeeAdditionalFieldController;
-use App\Http\Controllers\Api\PositionController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\OnboardingChecklistController;
@@ -19,10 +18,6 @@ Route::get('/user', function (Request $request) {
 Route::get('/employees/check-email', [EmployeeController::class, 'checkEmail']);
 Route::get('/employees/check-name', [EmployeeController::class, 'checkName']);
 Route::apiResource('employees', EmployeeController::class);
-
-// Positions API Routes
-Route::apiResource('positions', PositionController::class);
-Route::post('/positions/bulk', [PositionController::class, 'bulkCreate']);
 
 // Hierarchies API Routes
 use App\Http\Controllers\HierarchyController;

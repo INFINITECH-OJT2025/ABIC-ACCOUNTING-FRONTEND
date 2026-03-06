@@ -225,16 +225,16 @@ export default function ClearanceChecklistPage() {
   useEffect(() => {
     const fetchOptions = async () => {
       try {
-        const [positionsResponse, departmentsResponse] = await Promise.all([
-          fetch(`${getApiUrl()}/api/positions`, { headers: { Accept: 'application/json' } }),
+        const [hierarchiesResponse, departmentsResponse] = await Promise.all([
+          fetch(`${getApiUrl()}/api/hierarchies`, { headers: { Accept: 'application/json' } }),
           fetch(`${getApiUrl()}/api/departments`, { headers: { Accept: 'application/json' } }),
         ])
 
 
-        if (positionsResponse.ok) {
-          const positionsData = await positionsResponse.json()
-          const names = Array.isArray(positionsData?.data)
-            ? (positionsData.data as NamedOption[]).map((item) => item.name).filter((name): name is string => !!name)
+        if (hierarchiesResponse.ok) {
+          const hierarchiesData = await hierarchiesResponse.json()
+          const names = Array.isArray(hierarchiesData?.data)
+            ? (hierarchiesData.data as NamedOption[]).map((item) => item.name).filter((name): name is string => !!name)
             : []
           setPositionOptions([...new Set(names)])
         }

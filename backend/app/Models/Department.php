@@ -15,11 +15,6 @@ class Department extends Model
         return $this->belongsTo(Office::class);
     }
 
-    public function positions()
-    {
-        return $this->hasMany(Position::class);
-    }
-
     public function hierarchies()
     {
         return $this->hasMany(Hierarchy::class);

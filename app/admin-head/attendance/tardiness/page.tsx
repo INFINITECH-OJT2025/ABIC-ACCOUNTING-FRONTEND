@@ -1187,11 +1187,10 @@ export default function AttendanceDashboard() {
         await initializeShiftSchedules()
 
         // 2. Fetch all required supporting data
-        const [empRes, hierRes, deptRes, posRes, leavesRes, offRes] = await Promise.all([
+        const [empRes, hierRes, deptRes, leavesRes, offRes] = await Promise.all([
           fetch('/api/admin-head/employees?status=employed,rehired'),
           fetch(`${getApiUrl()}/api/hierarchies`),
           fetch(`${getApiUrl()}/api/departments`),
-          fetch(`${getApiUrl()}/api/positions`),
           fetch(`${getApiUrl()}/api/leaves`),
           fetch(`${getApiUrl()}/api/offices`)
         ])
@@ -1199,7 +1198,6 @@ export default function AttendanceDashboard() {
         const empData = await empRes.json()
         const hierData = await hierRes.json()
         const deptData = await deptRes.json()
-        const posData = await posRes.json()
         const leavesData = await leavesRes.json()
         const offData = await offRes.json()
 
@@ -1208,21 +1206,17 @@ export default function AttendanceDashboard() {
 
         if (empData.success) {
           const hierarchies = hierData.success ? hierData.data : []
-          const positions = posData.success ? posData.data : []
           const departments = deptData.success ? deptData.data : []
           const offices = offData.success ? offData.data : []
 
           // 3. Resolve department and names for all employees immediately
           const resolvedEmployees = empData.data.map((e: any) => {
             let deptName = e.department
-            if (!deptName && e.position && positions.length > 0 && hierarchies.length > 0) {
-              const pos = positions.find((p: any) => p.name.toLowerCase() === e.position?.toLowerCase())
-              if (pos) {
-                const hier = hierarchies.find((h: any) => String(h.position_id) === String(pos.id))
-                if (hier && hier.department_id) {
-                  const d = departments.find((d: any) => String(d.id) === String(hier.department_id))
-                  if (d) deptName = d.name
-                }
+            if (!deptName && e.position && hierarchies.length > 0) {
+              const hier = hierarchies.find((h: any) => h.name.toLowerCase() === e.position?.toLowerCase())
+              if (hier && hier.department_id) {
+                const d = departments.find((d: any) => String(d.id) === String(hier.department_id))
+                if (d) deptName = d.name
               }
             }
 

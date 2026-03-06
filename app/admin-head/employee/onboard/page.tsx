@@ -50,10 +50,12 @@ interface EmployeeDetails {
   [key: string]: any
 }
 
-interface Position {
+interface Hierarchy {
   id: number
   name: string
-  department_id?: number
+  is_custom: boolean
+  department_id?: number | null
+  parent_id?: number | null
 }
 
 interface Department {
@@ -141,7 +143,7 @@ function OnboardPageContent() {
   const [savedTasks, setSavedTasks] = useState<Set<string>>(new Set())
 
   // Dropdown Data
-  const [positions, setPositions] = useState<Position[]>([])
+  const [positions, setPositions] = useState<Hierarchy[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
   const [regions, setRegions] = useState<{ code: string; name: string }[]>([])
   const [currentProvinces, setCurrentProvinces] = useState<{ code: string; name: string }[]>([])
@@ -796,10 +798,10 @@ function OnboardPageContent() {
   // Fetch Functions
   const fetchPositions = async () => {
     try {
-      const response = await apiFetch('/api/positions', { headers: { Accept: 'application/json' } })
+      const response = await apiFetch('/api/hierarchies', { headers: { Accept: 'application/json' } })
       
       if (!response.ok) {
-        console.error('Failed to fetch positions. Status:', response.status, response.statusText)
+        console.error('Failed to fetch hierarchies. Status:', response.status, response.statusText)
         const errorText = await response.text()
         console.error('Error response:', errorText)
         setPositions([])
@@ -807,7 +809,7 @@ function OnboardPageContent() {
       }
       
       const data = await parseJsonFromResponse(response)
-      console.log('Positions API response:', data)
+      console.log('Hierarchies API response:', data)
       
       if (!data) {
         console.error('Failed to parse positions response')

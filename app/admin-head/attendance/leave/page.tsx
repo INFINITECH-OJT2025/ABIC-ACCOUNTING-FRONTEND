@@ -33,8 +33,7 @@ import { ConfirmationModal } from '@/components/ConfirmationModal'
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Department { id: number; name: string; office_id?: number }
 interface Office { id: number; name: string }
-interface Position { id: number; name: string }
-interface Hierarchy { id: number; position_id: number; department_id: number | null; parent_id: number | null; role: string; position_name?: string; position?: Position }
+interface Hierarchy { id: number; name: string; is_custom: boolean; department_id: number | null; parent_id: number | null }
 interface Employee { id: string; name: string; department?: string | null; department_id?: number; position?: string | null }
 
 interface LeaveEntry {
@@ -708,7 +707,6 @@ export default function LeavePage() {
 
   // State for hierarchies and positions
   const [hierarchies, setHierarchies] = useState<Hierarchy[]>([])
-  const [positions, setPositions] = useState<Position[]>([])
 
   const emptyForm = {
     id: null as number | null,
@@ -835,13 +833,6 @@ export default function LeavePage() {
                 setHierarchies(fetchedHierarchies)
               }
             }),
-          fetch(`${getApiUrl()}/api/positions`).then(r => r.json())
-            .then(posJson => {
-              if (typeof posJson === 'object' && posJson !== null) {
-                const fetchedPositions = Array.isArray(posJson.data) ? posJson.data : (Array.isArray(posJson) ? posJson : [])
-                setPositions(fetchedPositions)
-              }
-            }),
           fetch(`${getApiUrl()}/api/offices`)
             .then(r => r.json())
             .then(d => { if (d.success) setOffices(d.data) }),
@@ -944,14 +935,11 @@ export default function LeavePage() {
     let deptId = emp?.department_id
 
     // If no deptId on employee, try to find it via their position in the hierarchy
-    if (!deptId && emp?.position && positions.length > 0 && hierarchies.length > 0) {
-      const pos = positions.find(p => p.name.toLowerCase() === emp.position?.toLowerCase())
-      if (pos) {
-        // Find hierarchy entry for this position
-        const hier = hierarchies.find(h => String(h.position_id) === String(pos.id))
-        if (hier && hier.department_id) {
-          deptId = hier.department_id
-        }
+    if (!deptId && emp?.position && hierarchies.length > 0) {
+      // Find hierarchy entry for this position
+      const hier = hierarchies.find(h => h.name.toLowerCase() === emp.position?.toLowerCase())
+      if (hier && hier.department_id) {
+        deptId = hier.department_id
       }
     }
 
@@ -1029,19 +1017,13 @@ export default function LeavePage() {
     const empPosName = String(emp.position || '').toLowerCase().trim()
 
     // 1. Find hierarchy node for the employee's position
-    // Matches position name from nested object or direct label
+    // Matches position name from hierarchy
     const node = hierarchies.find(h => {
-      const posName = String(h.position_name || h.position?.name || '').toLowerCase().trim()
-      if (posName === empPosName) return true
-      if (h.position_id) {
-        const pObj = positions.find(p => String(p.id) === String(h.position_id))
-        return pObj && pObj.name.toLowerCase().trim() === empPosName
-      }
-      return false
+      const posName = String(h.name || '').toLowerCase().trim()
+      return posName === empPosName
     })
 
     const ancestorPositionNames = new Set<string>()
-    const supervisorPositionIds = new Set<string | number>()
 
     // Broad defaults for company-wide authority figures
     const globalAuthorityNames = ['admin head', 'admin supervisor', 'executive officer', 'acting executive officer', 'hr head', 'president', 'v-p', 'vp', 'chief']
@@ -1053,14 +1035,8 @@ export default function LeavePage() {
       while (currentParentId && safety < 20) {
         const parentNode = hierarchies.find(h => String(h.id) === String(currentParentId))
         if (parentNode) {
-          const pName = String(parentNode.position_name || parentNode.position?.name || '').toLowerCase().trim()
+          const pName = String(parentNode.name || '').toLowerCase().trim()
           if (pName) ancestorPositionNames.add(pName)
-
-          if (parentNode.position_id) {
-            supervisorPositionIds.add(parentNode.position_id)
-            const pObj = positions.find(p => String(p.id) === String(parentNode.position_id))
-            if (pObj) ancestorPositionNames.add(pObj.name.toLowerCase().trim())
-          }
           currentParentId = parentNode.parent_id
         } else break
         safety++
