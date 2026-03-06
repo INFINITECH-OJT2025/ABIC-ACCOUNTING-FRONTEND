@@ -13,9 +13,10 @@ class WarningLetterTemplate extends Model
         'slug',
         'title',
         'subject',
-        'header_logo',
         'body',
         'footer',
-        'signatory_name'
+        'signatory_name',
+        'header_logo_image',
+        'header_details'
     ];
 }

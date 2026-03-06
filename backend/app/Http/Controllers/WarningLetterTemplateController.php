@@ -2,105 +2,76 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Controller;
 use App\Models\WarningLetterTemplate;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class WarningLetterTemplateController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index()
     {
-        return response()->json(WarningLetterTemplate::all()->keyBy('slug'));
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'slug' => 'required|string|unique:warning_letter_templates,slug',
-            'title' => 'required|string',
-            'subject' => 'required|string',
-            'header_logo' => 'nullable|string',
-            'body' => 'required|string',
-            'footer' => 'nullable|string',
-            'signatory_name' => 'nullable|string',
+        $templates = WarningLetterTemplate::all();
+        return response()->json([
+            'success' => true,
+            'data' => $templates
         ]);
-
-        $template = WarningLetterTemplate::create($validated);
-        return response()->json($template, 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $slug)
-    {
-        $template = WarningLetterTemplate::where('slug', $slug)->firstOrFail();
-        return response()->json($template);
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $slug)
+    public function show($slug)
     {
         $template = WarningLetterTemplate::where('slug', $slug)->first();
-        
-        $validated = $request->validate([
-            'title' => 'required|string',
-            'subject' => 'required|string',
-            'header_logo' => 'nullable|string',
-            'body' => 'required|string',
-            'footer' => 'nullable|string',
-            'signatory_name' => 'nullable|string',
-        ]);
-
-        if ($template) {
-            $template->update($validated);
-        } else {
-            $template = WarningLetterTemplate::create(array_merge($validated, ['slug' => $slug]));
+        if (!$template) {
+            return response()->json(['success' => false, 'message' => 'Template not found'], 404);
         }
-
-        return response()->json($template);
+        return response()->json(['success' => true, 'data' => $template]);
     }
 
-    /**
-     * Bulk update or create templates.
-     */
     public function bulkUpdate(Request $request)
     {
-        $templatesData = $request->all();
-        $updatedTemplates = [];
-
-        foreach ($templatesData as $slug => $data) {
-            $template = WarningLetterTemplate::updateOrCreate(
-                ['slug' => $slug],
-                [
-                    'title' => $data['title'],
-                    'subject' => $data['subject'],
-                    'header_logo' => $data['headerLogo'] ?? $data['header_logo'] ?? 'ABIC Realty',
-                    'body' => $data['body'],
-                    'footer' => $data['footer'],
-                    'signatory_name' => $data['signatoryName'] ?? $data['signatory_name'] ?? 'AIZLE MARIE M. ATIENZA',
-                ]
-            );
-            $updatedTemplates[$slug] = $template;
+        $data = $request->all();
+        
+        DB::beginTransaction();
+        try {
+            foreach ($data as $slug => $content) {
+                WarningLetterTemplate::updateOrCreate(
+                    ['slug' => $slug],
+                    [
+                        'title' => $content['title'] ?? '',
+                        'subject' => $content['subject'] ?? '',
+                        'body' => $content['body'] ?? '',
+                        'footer' => $content['footer'] ?? null,
+                        'signatory_name' => $content['signatoryName'] ?? ($content['signatory_name'] ?? null),
+                        'header_logo_image' => $content['headerLogoImage'] ?? ($content['header_logo_image'] ?? null),
+                        'header_details' => $content['headerDetails'] ?? ($content['header_details'] ?? null),
+                    ]
+                );
+            }
+            DB::commit();
+            return response()->json(['success' => true, 'message' => 'Templates updated successfully']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => 'Failed to update templates', 'error' => $e->getMessage()], 500);
         }
-
-        return response()->json($updatedTemplates);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $slug)
+    public function update(Request $request, $slug)
     {
-        $template = WarningLetterTemplate::where('slug', $slug)->firstOrFail();
-        $template->delete();
-        return response()->json(null, 204);
+        $template = WarningLetterTemplate::where('slug', $slug)->first();
+        if (!$template) {
+            return response()->json(['success' => false, 'message' => 'Template not found'], 404);
+        }
+
+        $template->update([
+            'title' => $request->title,
+            'subject' => $request->subject,
+            'body' => $request->body,
+            'footer' => $request->footer,
+            'signatory_name' => $request->signatoryName ?? $request->signatory_name,
+            'header_logo_image' => $request->headerLogoImage ?? $request->header_logo_image,
+            'header_details' => $request->headerDetails ?? $request->header_details,
+        ]);
+
+        return response()->json(['success' => true, 'data' => $template]);
     }
 }
