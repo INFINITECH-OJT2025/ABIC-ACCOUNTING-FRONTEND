@@ -5,21 +5,20 @@
 
 
 import React, { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table"
 import { Card } from "@/components/ui/card"
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Checkbox } from '@/components/ui/checkbox'
+import { TextFieldStatus } from '@/components/ui/text-field-status'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
-} from "@/components/ui/select"
-import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from "@/components/ui/command"
+import { Separator } from '@/components/ui/separator'
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover"
@@ -27,10 +26,17 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
-  Save, Lock, ChevronLeft, ChevronRight, Check, Trash2, Plus, Target, UserPlus, ClipboardList, TriangleAlert, FolderPlus, Filter, ArrowUpDown, Users, CheckCircle2, Loader2, ChevronDown
+  Save, Lock, ChevronLeft, ChevronRight, Check, Trash2, Plus, Target, UserPlus, ClipboardList, FolderPlus, Filter, ArrowUpDown, Users, CheckCircle2, Loader2, ChevronDown, GripVertical, TriangleAlert
 } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { getApiUrl } from '@/lib/api'
+import { ensureOkResponse } from '@/lib/api/error-message'
+import { VALIDATION_CONSTRAINTS } from '@/lib/validation/constraints'
+import { checklistTemplateTasksSchema } from '@/lib/validation/schemas'
+import { DeleteTaskDialog, UnsavedChangesDialog } from '@/components/checklist/confirm-dialogs'
+import { useChecklistTemplateSetup } from '@/lib/hooks/use-checklist-template-setup'
+import { PageEmptyState, PageErrorState } from '@/components/state/page-feedback'
+import { ChecklistPageSkeleton } from '@/components/state/checklist-page-skeleton'
 import { toast } from 'sonner'
 
 
@@ -61,15 +67,6 @@ interface ClearanceRecord {
 }
 
 
-interface NamedOption {
-  name: string
-}
-
-interface DepartmentOption {
-  id: number
-  name: string
-}
-
 const buildBlankRecord = (departmentName: string): ClearanceRecord => ({
   id: '',
   name: '',
@@ -82,6 +79,11 @@ const buildBlankRecord = (departmentName: string): ClearanceRecord => ({
   updatedAt: '',
   tasks: [],
 })
+
+interface DepartmentOption {
+  id: number
+  name: string
+}
 
 
 const normalizeTasks = (input: unknown): ChecklistTask[] => {
@@ -157,106 +159,76 @@ const getRecordCompletionPercentage = (record: ClearanceRecord) => {
 const isRecordDone = (record: ClearanceRecord) =>
   String(record.status).toUpperCase() === 'DONE' || getRecordCompletionPercentage(record) === 100
 
+const CLEARANCE_DEFAULT_TASKS = [
+  'Return Company ID',
+  'Return Office Keys',
+  'Return Company Laptop / Computer (if any)',
+  'Return Company Mobile Phone (if any)',
+  'Return Documents / Client Files',
+  'Return Access Cards / Gate Pass',
+  'Return Company Uniform (if any)',
+  'Return Other Company Property (if any)',
+  'Endorse All Pending Tasks to Immediate Supervisor',
+  'Return All Company Documents and Confidential Files',
+  'Endorse Email and System Access for Deactivation',
+  'Complete Liquidation of Cash Advances (if any)',
+  'Settle Company Loans / Accountabilities (if any)',
+  'Process Certificate of Employment (COE)',
+  'HR Final Review: Cleared for Final Pay Processing',
+  'HR Final Review: With Pending Accountabilities (if any)',
+] as const
+
+const createChecklistTask = (task = '', idSeed = Date.now()): ChecklistTask => ({
+  id: idSeed,
+  task,
+  status: 'PENDING',
+  date: '',
+})
+
+const buildChecklistTasks = (taskLabels: readonly string[]): ChecklistTask[] => {
+  const baseId = Date.now()
+  return taskLabels.map((task, index) => createChecklistTask(task, baseId + index + 1))
+}
+
 
 export default function ClearanceChecklistPage() {
+  const router = useRouter()
   const editMode = true
   const [saving, setSaving] = useState(false)
-  const [tasks, setTasks] = useState<ChecklistTask[]>([])
   const [taskIdToDelete, setTaskIdToDelete] = useState<number | null>(null)
+  const [dragTaskId, setDragTaskId] = useState<number | null>(null)
+  const [dragOverTaskId, setDragOverTaskId] = useState<number | null>(null)
+  const [recentlyMovedTaskId, setRecentlyMovedTaskId] = useState<number | null>(null)
   const [open, setOpen] = useState(false)
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [records, setRecords] = useState<ClearanceRecord[]>([])
-  const [employeeInfo, setEmployeeInfo] = useState<ClearanceRecord | null>(null)
-  const [departmentsData, setDepartmentsData] = useState<DepartmentOption[]>([])
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | null>(null)
-  const [positionOptions, setPositionOptions] = useState<string[]>([])
-  const [departmentOptions, setDepartmentOptions] = useState<string[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [recordStatusFilter, setRecordStatusFilter] = useState<RecordStatusFilter>('ALL')
   const [recordSort, setRecordSort] = useState<RecordSort>('UPDATED_DESC')
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false)
+  const [startChecklistOpen, setStartChecklistOpen] = useState(false)
   const [unsavedPromptOpen, setUnsavedPromptOpen] = useState(false)
   const [pendingDepartmentSelection, setPendingDepartmentSelection] = useState<string | null>(null)
   const [pendingNavigationUrl, setPendingNavigationUrl] = useState<string | null>(null)
-
-
-  useEffect(() => {
-    const fetchChecklists = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        const response = await fetch(`${getApiUrl()}/api/department-checklist-templates?checklist_type=CLEARANCE`, {
-          headers: { Accept: 'application/json' },
-        })
-
-
-        if (!response.ok) throw new Error(`HTTP ${response.status}`)
-
-
-        const result = await response.json()
-        const data = Array.isArray(result?.data) ? result.data.map(normalizeTemplateRecord) : []
-        setRecords(data)
-
-
-        if (data.length > 0) {
-          const selected = data[0]
-          setCurrentIndex(0)
-          setEmployeeInfo(selected)
-          setTasks(selected.tasks)
-          if (selected?.department) {
-            const departmentMatch = departmentsData.find((item) => item.name === selected.department)
-            setSelectedDepartmentId(departmentMatch?.id ?? null)
-          }
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to load checklists'
-        setError(message)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-
-    fetchChecklists()
-  }, [])
-
-
-  useEffect(() => {
-    const fetchOptions = async () => {
-      try {
-        const [hierarchiesResponse, departmentsResponse] = await Promise.all([
-          fetch(`${getApiUrl()}/api/hierarchies`, { headers: { Accept: 'application/json' } }),
-          fetch(`${getApiUrl()}/api/departments`, { headers: { Accept: 'application/json' } }),
-        ])
-
-
-        if (hierarchiesResponse.ok) {
-          const hierarchiesData = await hierarchiesResponse.json()
-          const names = Array.isArray(hierarchiesData?.data)
-            ? (hierarchiesData.data as NamedOption[]).map((item) => item.name).filter((name): name is string => !!name)
-            : []
-          setPositionOptions([...new Set(names)])
-        }
-
-
-        if (departmentsResponse.ok) {
-          const departmentsData = await departmentsResponse.json()
-          const rows = Array.isArray(departmentsData?.data)
-            ? (departmentsData.data as DepartmentOption[])
-              .filter((item): item is DepartmentOption => Number.isFinite(Number(item?.id)) && typeof item?.name === 'string')
-            : []
-          const sortedRows = [...rows].sort((a, b) => a.name.localeCompare(b.name))
-          setDepartmentsData(sortedRows)
-          setDepartmentOptions(sortedRows.map((item) => item.name))
-        }
-      } catch {
-      }
-    }
-
-
-    fetchOptions()
-  }, [])
+  const {
+    records,
+    setRecords,
+    employeeInfo,
+    setEmployeeInfo,
+    tasks,
+    setTasks,
+    currentIndex,
+    setCurrentIndex,
+    departmentsData,
+    selectedDepartmentId,
+    setSelectedDepartmentId,
+    positionOptions,
+    departmentOptions,
+    loading,
+    error,
+    setReloadToken,
+  } = useChecklistTemplateSetup<ChecklistTask, ClearanceRecord>({
+    checklistType: 'CLEARANCE',
+    normalizeTemplateRecord,
+    buildBlankRecord,
+  })
 
   useEffect(() => {
     if (!employeeInfo?.department) return
@@ -291,6 +263,7 @@ export default function ClearanceChecklistPage() {
   }, [employeeInfo?.updatedAt])
 
   const hasUnsavedChanges = useMemo(() => {
+    if (String(employeeInfo?.id || '') === '' && tasks.length === 0) return false
     const departmentName = String(employeeInfo?.department || '').trim()
     if (!departmentName) return false
     const savedRecord = records.find((record) => String(record.department || '').trim() === departmentName)
@@ -302,6 +275,51 @@ export default function ClearanceChecklistPage() {
       .filter((task) => task.length > 0)
     return JSON.stringify(currentTasks) !== JSON.stringify(savedTasks)
   }, [employeeInfo?.department, records, tasks])
+
+  const duplicateTaskIds = useMemo(() => {
+    const counts = new Map<string, number>()
+    tasks.forEach((row) => {
+      const normalized = String(row.task || '').trim().toLowerCase()
+      if (!normalized) return
+      counts.set(normalized, (counts.get(normalized) ?? 0) + 1)
+    })
+
+    const duplicates = new Set<number>()
+    tasks.forEach((row) => {
+      const normalized = String(row.task || '').trim().toLowerCase()
+      if (!normalized) return
+      if ((counts.get(normalized) ?? 0) > 1) duplicates.add(row.id)
+    })
+    return duplicates
+  }, [tasks])
+
+  const editedTaskLabels = useMemo(() => {
+    const labels = new Map<number, 'Edited' | 'Added'>()
+    if (!hasUnsavedChanges) return labels
+
+    const departmentName = String(employeeInfo?.department || '').trim()
+    if (!departmentName) return labels
+    const savedRecord = records.find((record) => String(record.department || '').trim() === departmentName)
+    const savedRows = savedRecord?.tasks ?? []
+
+    tasks.forEach((row, index) => {
+      const currentTask = String(row.task || '').trim()
+      const savedTask = String(savedRows[index]?.task || '').trim()
+      if (currentTask !== savedTask) {
+        labels.set(row.id, index >= savedRows.length ? 'Added' : 'Edited')
+      }
+    })
+
+    return labels
+  }, [employeeInfo?.department, hasUnsavedChanges, records, tasks])
+
+  const savedTaskCount = useMemo(() => {
+    const departmentName = String(employeeInfo?.department || '').trim()
+    if (!departmentName) return 0
+    const selected = records.find((record) => String(record.department || '').trim() === departmentName)
+    if (!selected) return 0
+    return selected.tasks.filter((row) => String(row.task || '').trim().length > 0).length
+  }, [employeeInfo?.department, records])
 
 
   const positionSelectOptions = useMemo(() => {
@@ -420,7 +438,7 @@ export default function ClearanceChecklistPage() {
       return
     }
     if (route) {
-      window.location.href = route
+      router.push(route)
     }
   }
 
@@ -440,8 +458,20 @@ export default function ClearanceChecklistPage() {
 
 
   const addTask = () => {
-    setTasks([...tasks, { id: Date.now() + Math.floor(Math.random() * 1000), task: '', status: 'PENDING', date: '' }]);
-  };
+    setTasks([...tasks, createChecklistTask('', Date.now() + Math.floor(Math.random() * 1000))])
+  }
+
+  const startChecklistWithoutDefaultTasks = () => {
+    setTasks([])
+    setStartChecklistOpen(false)
+    toast.info('Checklist started with no default tasks. Add rows to build your own list.')
+  }
+
+  const startChecklistWithDefaultTasks = () => {
+    setTasks(buildChecklistTasks(CLEARANCE_DEFAULT_TASKS))
+    setStartChecklistOpen(false)
+    toast.success('Clearance default tasks loaded.')
+  }
 
 
   const removeTask = (id: number) => {
@@ -452,6 +482,27 @@ export default function ClearanceChecklistPage() {
   const updateTaskText = (id: number, text: string) => {
     setTasks(tasks.map(t => t.id === id ? { ...t, task: text } : t));
   };
+
+  const reorderTasksById = (sourceId: number, targetId: number) => {
+    if (sourceId === targetId) return
+    setTasks((prev) => {
+      const sourceIndex = prev.findIndex((row) => row.id === sourceId)
+      const targetIndex = prev.findIndex((row) => row.id === targetId)
+      if (sourceIndex === -1 || targetIndex === -1) return prev
+
+      const next = [...prev]
+      const [moved] = next.splice(sourceIndex, 1)
+      next.splice(targetIndex, 0, moved)
+      setRecentlyMovedTaskId(moved.id)
+      return next
+    })
+  }
+
+  useEffect(() => {
+    if (recentlyMovedTaskId === null) return
+    const timer = setTimeout(() => setRecentlyMovedTaskId(null), 220)
+    return () => clearTimeout(timer)
+  }, [recentlyMovedTaskId])
 
 
   const persistTaskStatus = async (updatedTasks: ChecklistTask[], previousTasks: ChecklistTask[]) => {
@@ -469,7 +520,7 @@ export default function ClearanceChecklistPage() {
       })
 
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      await ensureOkResponse(response, 'Unable to update this task status right now.')
 
 
       const result = await response.json()
@@ -514,16 +565,45 @@ export default function ClearanceChecklistPage() {
         throw new Error('Please select a valid department before saving.')
       }
 
+      const payloadTasks = tasks
+        .map((row, index) => ({
+          task: row.task.trim(),
+          sort_order: index + 1,
+          is_active: true,
+        }))
+        .filter((row) => row.task.length > 0)
+
+      if (payloadTasks.length === 0) {
+        throw new Error('Please add at least one checklist task before saving.')
+      }
+
+      const tasksValidation = checklistTemplateTasksSchema.safeParse(payloadTasks)
+      if (!tasksValidation.success) {
+        const message = tasksValidation.error.issues[0]?.message || 'Some checklist tasks are invalid.'
+        throw new Error(message)
+      }
+
+      const duplicateTask = (() => {
+        const seen = new Set<string>()
+        for (const row of payloadTasks) {
+          const normalized = row.task.toLowerCase()
+          if (seen.has(normalized)) return row.task
+          seen.add(normalized)
+        }
+        return null
+      })()
+
+      if (duplicateTask) {
+        toast.warning('Duplicate Tasks Detected', {
+          description: `The task "${duplicateTask}" is duplicated. Remove highlighted duplicates before saving.`,
+        })
+        return false
+      }
+
       const payload = {
         department_id: departmentId,
         checklist_type: 'CLEARANCE',
-        tasks: tasks
-          .map((row, index) => ({
-            task: row.task.trim(),
-            sort_order: index + 1,
-            is_active: true,
-          }))
-          .filter((row) => row.task.length > 0),
+        tasks: payloadTasks,
       }
 
 
@@ -537,7 +617,7 @@ export default function ClearanceChecklistPage() {
       })
 
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      await ensureOkResponse(response, 'Unable to save the checklist template.')
 
 
       const result = await response.json()
@@ -576,7 +656,7 @@ export default function ClearanceChecklistPage() {
       return
     }
     if (route) {
-      window.location.href = route
+      router.push(route)
     }
   }
 
@@ -598,68 +678,47 @@ export default function ClearanceChecklistPage() {
       if (current === next) return
 
       event.preventDefault()
-      setPendingNavigationUrl(url.toString())
+      setPendingNavigationUrl(next)
       setPendingDepartmentSelection(null)
       setUnsavedPromptOpen(true)
     }
 
     document.addEventListener('click', handleDocumentClick, true)
     return () => document.removeEventListener('click', handleDocumentClick, true)
-  }, [hasUnsavedChanges])
+  }, [hasUnsavedChanges, router])
 
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-stone-50 via-white to-red-50 pb-12 font-sans">
-        <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md mb-8">
-          <div className="w-full px-4 md:px-8 py-6">
-            <Skeleton className="h-8 w-72 bg-white/25" />
-            <Skeleton className="h-4 w-56 mt-3 bg-white/20" />
-          </div>
-          <div className="border-t border-white/10 bg-white/5 backdrop-blur-sm">
-            <div className="w-full px-4 md:px-8 py-3">
-              <Skeleton className="h-10 w-[320px] bg-white/20" />
-            </div>
-          </div>
-        </div>
-        <main className="w-full px-4 md:px-8 relative mb-20">
-          <Card className="rounded-2xl border-2 border-[#FFE5EC] shadow-lg overflow-hidden bg-white mb-6">
-            <div className="p-5">
-              <Skeleton className="h-4 w-40 mb-3" />
-              <Skeleton className="h-8 w-72" />
-            </div>
-          </Card>
-          <Card className="rounded-2xl border-2 border-[#FFE5EC] shadow-2xl bg-white overflow-hidden mb-12">
-            <div className="p-5 border-b border-[#FFE5EC]">
-              <Skeleton className="h-4 w-56" />
-            </div>
-            <div className="p-5 space-y-4">
-              {Array.from({ length: 6 }).map((_, idx) => (
-                <div key={`clearance-task-skeleton-${idx}`} className="flex items-center gap-4">
-                  <Skeleton className="h-8 flex-1" />
-                  <Skeleton className="h-8 w-8" />
-                </div>
-              ))}
-            </div>
-            <div className="p-4 border-t border-[#FFE5EC] flex items-center justify-between">
-              <Skeleton className="h-9 w-28" />
-              <Skeleton className="h-9 w-40" />
-            </div>
-          </Card>
-        </main>
-      </div>
-    )
+    return <ChecklistPageSkeleton />
   }
 
 
   if (error) {
-    return <div className="p-8 text-rose-600">Failed to load clearance checklist: {error}</div>
+    return (
+      <PageErrorState
+        title="Failed to load clearance checklist"
+        description={error}
+        onRetry={() => setReloadToken((prev) => prev + 1)}
+        onBack={() => router.back()}
+      />
+    )
+  }
+
+  if (!employeeInfo) {
+    return (
+      <PageEmptyState
+        title="No clearance template available"
+        description="Create or seed department checklist templates to start clearance workflows."
+        actionLabel="Reload"
+        onAction={() => setReloadToken((prev) => prev + 1)}
+      />
+    )
   }
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-stone-50 via-white to-red-50 pb-12 font-sans">
-      <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md mb-8">
+    <div className="min-h-screen w-full bg-[#F5F6F8] text-stone-900 font-sans pb-10">
+      <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-xl mb-6">
         {/* Main Header Row */}
         <div className="w-full px-4 md:px-8 py-6">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
@@ -683,31 +742,58 @@ export default function ClearanceChecklistPage() {
             <div className="flex flex-wrap items-center gap-4">
 
 
-
+              
 
 
               {/* Department Selector */}
               <div className="flex items-center gap-3">
                 <span className="text-sm font-bold text-white/70 uppercase tracking-wider">Department</span>
-                <Select
-                  value={String(employeeInfo?.department || '').trim() || undefined}
-                  onValueChange={requestDepartmentChange}
-                >
-                  <SelectTrigger className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 min-w-[240px] shadow-sm font-bold rounded-lg border-2 ring-0 focus:ring-0">
-                    <SelectValue placeholder="Select Department" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-stone-200 shadow-xl">
-                    {departmentSelectOptions.map((department) => (
-                      <SelectItem key={department} value={department}>
-                        {department}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={open} onOpenChange={setOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={open}
+                      aria-label="Select department"
+                      className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 min-w-[240px] shadow-sm font-bold rounded-lg border-2 ring-0 focus:ring-0 justify-between"
+                    >
+                      <span className="truncate">{String(employeeInfo?.department || '').trim() || 'Select Department'}</span>
+                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-70" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0 rounded-xl border-stone-200 shadow-xl">
+                    <Command>
+                      <CommandInput placeholder="Search department..." />
+                      <CommandList>
+                        <CommandEmpty>No department found.</CommandEmpty>
+                        <CommandGroup>
+                          {departmentSelectOptions.map((department) => (
+                            <CommandItem
+                              key={department}
+                              value={department}
+                              onSelect={() => {
+                                requestDepartmentChange(department)
+                                setOpen(false)
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  String(employeeInfo?.department || '').trim() === department ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {department}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
 
-
+              
 
 
               {/* Updated At */}
@@ -725,18 +811,23 @@ export default function ClearanceChecklistPage() {
       </div>
 
 
-      <main className="w-full px-4 md:px-8 relative mb-20 transition-all duration-500 animate-in fade-in slide-in-from-bottom-5">
+      <main className="w-full max-w-[1600px] mx-auto px-4 md:px-8 relative mb-16 transition-all duration-500 animate-in fade-in slide-in-from-bottom-5">
 
 
-        <Card className="rounded-2xl border-2 border-[#FFE5EC] shadow-lg overflow-hidden bg-white mb-6 transition-all hover:shadow-xl">
+        <Card className="rounded-2xl border border-[#FFE5EC] shadow-lg overflow-hidden bg-white mb-6 transition-all hover:shadow-xl">
           <div className="p-5 bg-rose-50/20">
             <div className="flex items-center justify-between gap-3 mb-2">
               <p className="text-[11px] font-black text-[#800020]/60 uppercase tracking-widest">Selected Department</p>
-              {hasUnsavedChanges && (
-                <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-amber-700">
-                  Unsaved Changes
+              <div className="flex items-center gap-2">
+                {hasUnsavedChanges && (
+                  <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-amber-700">
+                    Unsaved Changes
+                  </span>
+                )}
+                <span className="inline-flex items-center rounded-full border border-[#FFE5EC] bg-white px-3 py-1 text-[11px] font-black uppercase tracking-wider text-[#A4163A]">
+                  {savedTaskCount} Saved Tasks
                 </span>
-              )}
+              </div>
             </div>
             <p className="text-2xl font-black text-slate-800 leading-tight">{employeeInfo?.department || '-'}</p>
           </div>
@@ -744,32 +835,134 @@ export default function ClearanceChecklistPage() {
 
 
         {/* Task List Section */}
-        <Card className="rounded-2xl border-2 border-[#FFE5EC] shadow-2xl bg-white overflow-hidden mb-12">
+        <Card className="rounded-2xl border border-[#FFE5EC] shadow-2xl bg-white overflow-hidden mb-12">
+          <div className="p-4 md:px-8 bg-slate-50/50 border-b border-[#FFE5EC] flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex items-center gap-3">
+              <Button onClick={addTask} size="sm" className="bg-[#A4163A] hover:bg-[#800020] text-white font-black text-xs h-9 px-6 rounded-xl shadow-md active:scale-95 transition-all">
+                <Plus className="w-3.5 h-3.5 mr-2" /> ADD ROW
+              </Button>
+              <Separator orientation="vertical" className="h-4 bg-slate-200" />
+              <p className="text-[8px] font-black text-slate-300 uppercase tracking-[0.2em] italic">
+                ADMINISTRATION FRAMEWORK - ABIC HR
+              </p>
+            </div>
 
+            <div className="flex gap-3">
+              <Button
+                onClick={() => setSaveConfirmOpen(true)}
+                disabled={saving || !employeeInfo}
+                className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg active:scale-95 transition-all rounded-xl"
+              >
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <Save className="w-3.5 h-3.5 mr-2" />}
+                {saving ? 'UPDATING...' : 'SAVE CHECKLIST'}
+              </Button>
+            </div>
+          </div>
+          {duplicateTaskIds.size > 0 && (
+            <div className="mx-4 md:mx-8 mt-3 mb-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] font-bold text-rose-700 flex items-center gap-2">
+              <TriangleAlert className="h-4 w-4 shrink-0" />
+              {duplicateTaskIds.size} duplicate task{duplicateTaskIds.size > 1 ? 's are' : ' is'} highlighted in red. Remove duplicates before saving.
+            </div>
+          )}
 
           <Table>
             <TableHeader className="bg-[#FFE5EC]/40">
               <TableRow className="border-b border-[#FFE5EC] hover:bg-transparent">
-                <TableHead className="font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">
-                  Required Clearance Tasks
+                <TableHead className="font-black text-[#800020] uppercase tracking-[0.12em] text-[12px] py-3">
+                  <span>Required Clearance Tasks</span>
+                  <p className="mt-1 text-[10px] normal-case font-semibold tracking-normal text-[#800020]/70">
+                    Task length: {VALIDATION_CONSTRAINTS.checklistTemplate.task.min} to {VALIDATION_CONSTRAINTS.checklistTemplate.task.max} characters.
+                  </p>
                 </TableHead>
-                <TableHead className="w-[80px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[9px] py-3">Action</TableHead>
+                <TableHead className="w-[80px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[12px] py-3">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {tasks.map((item) => (
-                <TableRow key={item.id} className="border-b border-rose-50/30 last:border-0 hover:bg-[#FFE5EC]/5 transition-colors group">
+                <TableRow
+                  key={item.id}
+                  onDragOver={(event) => {
+                    if (!editMode || tasks.length <= 1) return
+                    event.preventDefault()
+                    event.dataTransfer.dropEffect = 'move'
+                  }}
+                  onDragEnter={(event) => {
+                    if (!editMode || tasks.length <= 1) return
+                    event.preventDefault()
+                    setDragOverTaskId(item.id)
+                    if (dragTaskId !== null && dragTaskId !== item.id) {
+                      reorderTasksById(dragTaskId, item.id)
+                    }
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault()
+                    if (!editMode || tasks.length <= 1) return
+                    const sourceId = dragTaskId ?? Number(event.dataTransfer.getData('text/plain'))
+                    if (!Number.isFinite(sourceId)) return
+                    reorderTasksById(sourceId, item.id)
+                    setDragOverTaskId(null)
+                    setDragTaskId(null)
+                  }}
+                  onDragEnd={() => {
+                    setDragTaskId(null)
+                    setDragOverTaskId(null)
+                  }}
+                  className={cn(
+                    "border-b border-rose-50/30 last:border-0 hover:bg-[#FFE5EC]/5 transition-all duration-200 ease-out group",
+                    duplicateTaskIds.has(item.id) ? "bg-rose-50/70 ring-1 ring-rose-300/90" : "",
+                    !duplicateTaskIds.has(item.id) && editedTaskLabels.has(item.id) ? "bg-amber-50/50 ring-1 ring-amber-200/80" : "",
+                    dragTaskId === item.id ? "opacity-45" : "",
+                    dragOverTaskId === item.id && dragTaskId !== item.id ? "bg-rose-50/60 ring-1 ring-rose-200" : "",
+                    recentlyMovedTaskId === item.id ? "bg-rose-50/40" : ""
+                  )}
+                >
                   <TableCell className="py-2.5">
                     {editMode ? (
-                      <Input
-                        value={item.task}
-                        onChange={(e) => updateTaskText(item.id, e.target.value)}
-                        className={cn(
-                          "h-8 border-transparent bg-transparent hover:border-[#FFE5EC]/50 focus:border-[#A4163A] focus-visible:ring-0 transition-all font-bold px-0 text-sm",
-                          item.status === 'DONE' ? "text-slate-300 line-through" : "text-slate-700"
-                        )}
-                        placeholder="Define clearance task..."
-                      />
+                      <div className="flex items-start gap-2">
+                        <button
+                          type="button"
+                          draggable={tasks.length > 1}
+                          onDragStart={(event) => {
+                            setDragTaskId(item.id)
+                            event.dataTransfer.effectAllowed = 'move'
+                            event.dataTransfer.setData('text/plain', String(item.id))
+                          }}
+                          aria-label="Drag to reorder task"
+                          title="Drag to reorder"
+                          className="mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-md border border-rose-100 bg-rose-50/70 text-[#A4163A] shadow-sm transition-all hover:scale-105 hover:bg-rose-100 cursor-grab active:cursor-grabbing"
+                        >
+                          <GripVertical className="h-3.5 w-3.5" />
+                        </button>
+                        <div className="flex-1">
+                        {duplicateTaskIds.has(item.id) ? (
+                          <p className="mb-1 text-[10px] font-black uppercase tracking-wider text-rose-700 inline-flex items-center gap-1">
+                            <TriangleAlert className="h-3 w-3" />
+                            Duplicate
+                          </p>
+                        ) : editedTaskLabels.has(item.id) ? (
+                          <p className="mb-1 text-[10px] font-black uppercase tracking-wider text-amber-700">
+                            {editedTaskLabels.get(item.id)}
+                          </p>
+                        ) : null}
+                        <Input
+                          value={item.task}
+                          onChange={(e) => updateTaskText(item.id, e.target.value)}
+                          minLength={VALIDATION_CONSTRAINTS.checklistTemplate.task.min}
+                          maxLength={VALIDATION_CONSTRAINTS.checklistTemplate.task.max}
+                          title={`Task must be ${VALIDATION_CONSTRAINTS.checklistTemplate.task.min} to ${VALIDATION_CONSTRAINTS.checklistTemplate.task.max} characters.`}
+                          className={cn(
+                            "h-8 border-transparent bg-transparent hover:border-[#FFE5EC]/50 focus:border-[#A4163A] focus-visible:ring-0 transition-all font-bold px-0 text-lg",
+                            item.status === 'DONE' ? "text-slate-300 line-through" : "text-slate-700"
+                          )}
+                          placeholder="Define clearance task..."
+                        />
+                        <TextFieldStatus
+                          value={item.task}
+                          min={VALIDATION_CONSTRAINTS.checklistTemplate.task.min}
+                          max={VALIDATION_CONSTRAINTS.checklistTemplate.task.max}
+                        />
+                        </div>
+                      </div>
                     ) : (
                       <span className={cn(
                         "text-sm font-bold transition-all duration-300",
@@ -786,7 +979,7 @@ export default function ClearanceChecklistPage() {
                       onClick={() => setTaskIdToDelete(item.id)}
                       className="h-7 w-7 text-slate-300 hover:text-rose-500 transition-colors rounded-lg group-hover:bg-rose-50"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-5.5 w-5.5" />
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -798,7 +991,7 @@ export default function ClearanceChecklistPage() {
                   <TableCell colSpan={2} className="py-24 text-center">
                     <ClipboardList className="w-12 h-12 text-slate-200 mx-auto mb-4" />
                     <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">No tasks initialized</p>
-                    <Button onClick={addTask} variant="outline" size="sm" className="mt-4 border-[#FFE5EC] text-[#A4163A] font-black h-9 rounded-xl">
+                    <Button onClick={() => setStartChecklistOpen(true)} variant="outline" size="sm" className="mt-4 border-[#FFE5EC] text-[#A4163A] font-black h-9 rounded-xl">
                       <Plus className="w-4 h-4 mr-1" /> START CHECKLIST
                     </Button>
                   </TableCell>
@@ -809,14 +1002,14 @@ export default function ClearanceChecklistPage() {
 
 
           {/* Table Footer */}
-          <div className="p-4 md:px-8 bg-slate-50/50 border-t border-[#FFE5EC] flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="hidden p-4 md:px-8 bg-slate-50/50 border-t border-[#FFE5EC] flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-3">
               <Button onClick={addTask} size="sm" className="bg-[#A4163A] hover:bg-[#800020] text-white font-black text-xs h-9 px-6 rounded-xl shadow-md active:scale-95 transition-all">
                 <Plus className="w-3.5 h-3.5 mr-2" /> ADD ROW
               </Button>
-              <div className="h-4 w-px bg-slate-200 hidden md:block" />
-              <p className="text-[8px] font-black text-slate-300 uppercase tracking-[0.2em] italic hidden md:block">
-                ADMINISTRATION FRAMEWORK • ABIC HR
+              <Separator orientation="vertical" className="h-4 bg-slate-200" />
+              <p className="text-[8px] font-black text-slate-300 uppercase tracking-[0.2em] italic">
+                ADMINISTRATION FRAMEWORK - ABIC HR
               </p>
             </div>
 
@@ -828,7 +1021,7 @@ export default function ClearanceChecklistPage() {
                 className="h-9 px-8 font-black text-xs uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg active:scale-95 transition-all rounded-xl"
               >
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <Save className="w-3.5 h-3.5 mr-2" />}
-                {saving ? 'UPDATING...' : 'FINALIZE SAVE'}
+                {saving ? 'UPDATING...' : 'SAVE CHECKLIST'}
               </Button>
             </div>
           </div>
@@ -836,17 +1029,17 @@ export default function ClearanceChecklistPage() {
       </main>
 
       <AlertDialog open={saveConfirmOpen} onOpenChange={setSaveConfirmOpen}>
-        <AlertDialogContent className="border-2 border-[#FFE5EC]">
+        <AlertDialogContent className="border-4 border-[#FFE5EC] rounded-3xl p-8 bg-white shadow-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Save Department Tasks?</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle className="text-2xl font-black text-slate-900">Save Department Tasks?</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-600">
               You are about to save changes for {employeeInfo?.department || 'the selected department'}.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="rounded-lg border border-[#FFE5EC] bg-rose-50/30 p-3 text-sm font-semibold text-slate-700">
+          <div className="rounded-xl border border-[#FFE5EC] bg-rose-50/30 p-4 text-sm font-semibold text-slate-700">
             Tasks to save: {tasks.filter((row) => row.task.trim().length > 0).length}
           </div>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-3 mt-2">
             <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-emerald-600 text-white hover:bg-emerald-700"
@@ -861,71 +1054,55 @@ export default function ClearanceChecklistPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={unsavedPromptOpen} onOpenChange={setUnsavedPromptOpen}>
-        <AlertDialogContent className="max-w-2xl border-4 border-amber-300 rounded-3xl p-0 bg-white shadow-2xl overflow-hidden">
-          <div className="h-2 w-full bg-gradient-to-r from-amber-300 via-amber-400 to-amber-300" />
-          <div className="p-8">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="text-3xl font-black text-slate-900 tracking-tight">Unsaved Changes Detected</AlertDialogTitle>
-              <AlertDialogDescription className="text-slate-600 text-base leading-relaxed mt-2">
-                You have unsaved changes. You can save first, or continue without saving.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter className="flex-col sm:flex-row gap-3 mt-6">
-              <AlertDialogCancel
-                className="h-12 rounded-xl border border-slate-300 text-slate-700 font-semibold hover:bg-slate-100"
-                onClick={() => {
-                  setUnsavedPromptOpen(false)
-                  clearUnsavedIntents()
-                }}
-              >
-                Stay
-              </AlertDialogCancel>
-              <AlertDialogAction
-                className="h-12 rounded-xl bg-[#A4163A] text-white hover:bg-[#800020] font-bold shadow-md"
-                onClick={proceedWithoutSaving}
-              >
-                Proceed Without Saving
-              </AlertDialogAction>
-              <AlertDialogAction
-                className="h-12 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 font-bold shadow-md"
-                onClick={() => void handleSaveAndContinue()}
-              >
-                Save and Continue
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </div>
-        </AlertDialogContent>
-      </AlertDialog>
-
-
-      <AlertDialog open={taskIdToDelete !== null} onOpenChange={(open) => { if (!open) setTaskIdToDelete(null) }}>
-        <AlertDialogContent className="border-2 border-rose-200">
+      <AlertDialog open={startChecklistOpen} onOpenChange={setStartChecklistOpen}>
+        <AlertDialogContent className="border-4 border-[#FFE5EC] rounded-3xl p-8 bg-white shadow-2xl">
           <AlertDialogHeader>
-            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-rose-50 text-rose-600">
-              <TriangleAlert className="h-6 w-6" />
-            </div>
-            <AlertDialogTitle>Delete this task?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This task will be removed from the current checklist.
+            <AlertDialogTitle className="text-2xl font-black text-slate-900">Start Clearance Checklist</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-600">
+              Choose how you want to initialize this department&apos;s checklist.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setTaskIdToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-rose-600 text-white hover:bg-rose-700"
-              onClick={() => {
-                if (taskIdToDelete !== null) removeTask(taskIdToDelete)
-                setTaskIdToDelete(null)
-              }}
-            >
-              Delete Task
+          <div className="rounded-xl border border-[#FFE5EC] bg-rose-50/30 p-4 text-sm font-semibold text-slate-700">
+            You can either begin with no tasks and add your own, or preload the clearance default tasks.
+          </div>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-3 mt-2">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button variant="outline" onClick={startChecklistWithoutDefaultTasks}>
+              Start With No Tasks
+            </Button>
+            <AlertDialogAction className="bg-[#A4163A] text-white hover:bg-[#800020]" onClick={startChecklistWithDefaultTasks}>
+              Use Default Tasks
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
+      <UnsavedChangesDialog
+        open={unsavedPromptOpen}
+        onOpenChange={setUnsavedPromptOpen}
+        onStay={() => {
+          setUnsavedPromptOpen(false)
+          clearUnsavedIntents()
+        }}
+        onProceedWithoutSaving={proceedWithoutSaving}
+        onSaveAndContinue={() => void handleSaveAndContinue()}
+      />
+
+      <DeleteTaskDialog
+        open={taskIdToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setTaskIdToDelete(null)
+        }}
+        onCancel={() => setTaskIdToDelete(null)}
+        onDelete={() => {
+          if (taskIdToDelete !== null) removeTask(taskIdToDelete)
+          setTaskIdToDelete(null)
+        }}
+      />
+
 
     </div>
   )
 }
+
+

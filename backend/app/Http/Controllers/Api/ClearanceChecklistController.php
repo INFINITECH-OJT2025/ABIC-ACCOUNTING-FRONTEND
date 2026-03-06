@@ -20,14 +20,22 @@ class ClearanceChecklistController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'position' => 'required|string|max:255',
-            'department' => 'required|string|max:255',
+            'name' => 'required|string|min:2|max:255',
+            'position' => 'required|string|min:2|max:255',
+            'department' => 'required|string|min:2|max:255',
             'startDate' => 'required|date',
-            'resignationDate' => 'required|date',
-            'lastDay' => 'required|date',
-            'tasks' => 'nullable|array',
-            'status' => 'nullable|string|max:255',
+            'resignationDate' => 'required|date|after_or_equal:startDate',
+            'lastDay' => 'required|date|after_or_equal:resignationDate',
+            'tasks' => 'nullable|array|max:200',
+            'status' => 'nullable|string|in:PENDING,DONE',
+        ], [
+            'name.required' => 'Employee name is required.',
+            'position.required' => 'Position is required.',
+            'department.required' => 'Department is required.',
+            'startDate.required' => 'Start date is required.',
+            'resignationDate.after_or_equal' => 'Resignation date cannot be earlier than start date.',
+            'lastDay.after_or_equal' => 'Last day cannot be earlier than resignation date.',
+            'status.in' => 'Status must be either PENDING or DONE.',
         ]);
 
         try {
@@ -68,14 +76,16 @@ class ClearanceChecklistController extends Controller
         }
 
         $validated = $request->validate([
-            'name' => 'sometimes|string|max:255',
-            'position' => 'sometimes|string|max:255',
-            'department' => 'sometimes|string|max:255',
+            'name' => 'sometimes|string|min:2|max:255',
+            'position' => 'sometimes|string|min:2|max:255',
+            'department' => 'sometimes|string|min:2|max:255',
             'startDate' => 'sometimes|date',
             'resignationDate' => 'sometimes|date',
             'lastDay' => 'sometimes|date',
-            'tasks' => 'sometimes|array',
-            'status' => 'sometimes|string|max:255',
+            'tasks' => 'sometimes|array|max:200',
+            'status' => 'sometimes|string|in:PENDING,DONE',
+        ], [
+            'status.in' => 'Status must be either PENDING or DONE.',
         ]);
 
         try {

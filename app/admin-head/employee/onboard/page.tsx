@@ -1665,7 +1665,7 @@ function OnboardPageContent() {
   }, [hasUnsavedProgress])
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans pb-12 relative">
+    <div className="min-h-screen w-full bg-[#F5F6F8] text-stone-900 font-sans pb-10 relative">
       {/* ----- GLOBAL LOADING OVERLAY (For Actions Only) ----- */}
       {isSaving && (
         <div className="fixed inset-0 z-[100] bg-white/40 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-500">
