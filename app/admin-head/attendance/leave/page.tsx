@@ -705,7 +705,7 @@ export default function LeavePage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [entries, setEntries] = useState<LeaveEntry[]>([])
 
-  // State for hierarchies and positions
+  // State for hierarchies
   const [hierarchies, setHierarchies] = useState<Hierarchy[]>([])
 
   const emptyForm = {
@@ -980,7 +980,7 @@ export default function LeavePage() {
       const deptLow = inlineForm.department.toLowerCase()
       return words.some(w => w.length > 2 && deptLow.includes(w))
     })
-  }, [inlineForm.employee_id, inlineForm.department, employees, departments, offices, shiftSchedules, hierarchies, positions])
+  }, [inlineForm.employee_id, inlineForm.department, employees, departments, offices, shiftSchedules, hierarchies])
 
   const inlineAvailableShifts: string[] = _shiftRow?.shift_options ?? []
   const inlineShiftLabel: string = _shiftRow ? _shiftRow.office_name : ''
@@ -1096,7 +1096,7 @@ export default function LeavePage() {
       ...APPROVAL_OPTIONS,
       ...getSuperiorsForEmployee(inlineForm.employee_id)
     ]
-  }, [employees, hierarchies, positions, inlineForm.employee_id])
+  }, [employees, hierarchies, inlineForm.employee_id])
 
   const inlineRemarkOptions = LEAVE_REMARKS.map(r => ({ label: r, value: r }))
 

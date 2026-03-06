@@ -817,7 +817,7 @@ function OnboardPageContent() {
         return
       }
       
-      const rows = extractArrayPayload<Position>(data)
+      const rows = extractArrayPayload<Hierarchy>(data)
       console.log('Extracted positions:', rows.length, 'items')
       
       if (rows.length === 0) {
