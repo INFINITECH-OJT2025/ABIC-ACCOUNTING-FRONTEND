@@ -50,7 +50,7 @@ class DepartmentChecklistTemplateController extends Controller
         $validated = $request->validate([
             'department_id' => 'required|integer|exists:departments,id',
             'checklist_type' => 'required|string|in:ONBOARDING,CLEARANCE',
-            'tasks' => 'required|array|min:1|max:' . AppLimits::CHECKLIST_TASK_ROWS_APP_MAX,
+            'tasks' => 'present|array|max:' . AppLimits::CHECKLIST_TASK_ROWS_APP_MAX,
             'tasks.*.task' => [
                 'required',
                 'string',
@@ -65,9 +65,8 @@ class DepartmentChecklistTemplateController extends Controller
             'department_id.exists' => 'The selected department is no longer available. Please refresh and try again.',
             'checklist_type.required' => 'Checklist type is required.',
             'checklist_type.in' => 'Checklist type must be either ONBOARDING or CLEARANCE.',
-            'tasks.required' => 'Please add at least one checklist task before saving.',
+            'tasks.present' => 'Checklist tasks payload is required.',
             'tasks.array' => 'Checklist tasks must be sent as a list.',
-            'tasks.min' => 'Please add at least one checklist task before saving.',
             'tasks.max' => 'You can save up to ' . AppLimits::CHECKLIST_TASK_ROWS_APP_MAX . ' tasks per checklist template.',
             'tasks.*.task.required' => 'Each task row must include a task description.',
             'tasks.*.task.min' => 'Each task must be at least ' . AppLimits::CHECKLIST_TASK_APP_MIN . ' characters long.',
