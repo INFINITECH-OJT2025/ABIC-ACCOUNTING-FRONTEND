@@ -393,6 +393,16 @@ function OnboardingChecklistPageContent() {
     return Array.from(latestByDepartment.values()).sort((a, b) => a.department.localeCompare(b.department))
   }, [records])
 
+  const departmentTaskCountMap = useMemo(() => {
+    const counts = new Map<string, number>()
+    departmentTemplateRecords.forEach(({ department, record }) => {
+      const key = String(department || '').trim().toLowerCase()
+      const taskCount = record.tasks.filter((row) => String(row.task || '').trim().length > 0).length
+      counts.set(key, taskCount)
+    })
+    return counts
+  }, [departmentTemplateRecords])
+
 
   const filteredAndSortedRecords = useMemo(() => {
     const rows = records.map((record, index) => ({ record, index }))
@@ -980,24 +990,32 @@ function OnboardingChecklistPageContent() {
                       <CommandList>
                         <CommandEmpty>No department found.</CommandEmpty>
                         <CommandGroup>
-                          {departmentSelectOptions.map((department) => (
-                            <CommandItem
-                              key={department}
-                              value={department}
-                              onSelect={() => {
-                                requestDepartmentChange(department)
-                                setOpen(false)
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  String(employeeInfo?.department || '').trim() === department ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              {department}
-                            </CommandItem>
-                          ))}
+                          {departmentSelectOptions.map((department) => {
+                            const departmentTaskCount = departmentTaskCountMap.get(String(department || '').trim().toLowerCase()) ?? 0
+                            return (
+                              <CommandItem
+                                key={department}
+                                value={department}
+                                onSelect={() => {
+                                  requestDepartmentChange(department)
+                                  setOpen(false)
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    String(employeeInfo?.department || '').trim() === department ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex w-full items-center justify-between gap-2">
+                                  <span className="truncate">{department}</span>
+                                  <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                                    {departmentTaskCount}
+                                  </span>
+                                </div>
+                              </CommandItem>
+                            )
+                          })}
                         </CommandGroup>
                       </CommandList>
                     </Command>
