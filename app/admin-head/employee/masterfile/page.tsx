@@ -568,7 +568,9 @@ export default function MasterfilePage() {
       const [empRes, checkRes, clearanceRes, termRes] = await Promise.all([
         fetch(employeesUrl, { headers: { Accept: "application/json" } }),
         fetch(checklistsUrl, { headers: { Accept: "application/json" } }),
-        fetch(clearanceChecklistsUrl, { headers: { Accept: "application/json" } }),
+        fetch(clearanceChecklistsUrl, {
+          headers: { Accept: "application/json" },
+        }),
         fetch(terminationsUrl, { headers: { Accept: "application/json" } }),
       ]);
 
@@ -729,9 +731,7 @@ export default function MasterfilePage() {
                   ? rehireStartedAt
                   : rehireCycleFallbackStart;
               const checklistBelongsToCurrentRehire =
-                enhancedEmp.status !== "rehire_pending"
-                  ? true
-                  : true; // Bypass rehire date filtering temporarily to match individual checklist view
+                enhancedEmp.status !== "rehire_pending" ? true : true; // Bypass rehire date filtering temporarily to match individual checklist view
 
               enhancedEmp = {
                 ...enhancedEmp,
@@ -755,7 +755,11 @@ export default function MasterfilePage() {
               )
                 .trim()
                 .toLowerCase();
-              if (empId && checklistEmployeeId && checklistEmployeeId === empId) {
+              if (
+                empId &&
+                checklistEmployeeId &&
+                checklistEmployeeId === empId
+              ) {
                 return true;
               }
               const candidate = normalizeName(c?.name);
@@ -763,8 +767,7 @@ export default function MasterfilePage() {
               if (candidate === fullName) return true;
               if (firstName && lastName) {
                 return (
-                  candidate.includes(firstName) &&
-                  candidate.includes(lastName)
+                  candidate.includes(firstName) && candidate.includes(lastName)
                 );
               }
               return false;
@@ -772,12 +775,18 @@ export default function MasterfilePage() {
 
             if (clearanceMatches.length > 0) {
               const clearance = clearanceMatches.sort((a: any, b: any) => {
-                const aTime = new Date(a?.updated_at ?? a?.created_at ?? 0).getTime();
-                const bTime = new Date(b?.updated_at ?? b?.created_at ?? 0).getTime();
+                const aTime = new Date(
+                  a?.updated_at ?? a?.created_at ?? 0,
+                ).getTime();
+                const bTime = new Date(
+                  b?.updated_at ?? b?.created_at ?? 0,
+                ).getTime();
                 return bTime - aTime;
               })[0];
 
-              const tasks = Array.isArray(clearance.tasks) ? clearance.tasks : [];
+              const tasks = Array.isArray(clearance.tasks)
+                ? clearance.tasks
+                : [];
               const doneCount = tasks.filter(
                 (t: any) => String(t?.status ?? "").toUpperCase() === "DONE",
               ).length;
@@ -1654,10 +1663,19 @@ export default function MasterfilePage() {
                                     {displayStatus}
                                   </Badge>
                                   {(employee as any).clearance_progress &&
-                                    (employee as any).clearance_progress.total > 0 && (
+                                    (employee as any).clearance_progress.total >
+                                      0 && (
                                       <span className="text-[9px] font-bold text-rose-500 whitespace-nowrap">
-                                        Tasks: {(employee as any).clearance_progress.done}/
-                                        {(employee as any).clearance_progress.total}
+                                        Tasks:{" "}
+                                        {
+                                          (employee as any).clearance_progress
+                                            .done
+                                        }
+                                        /
+                                        {
+                                          (employee as any).clearance_progress
+                                            .total
+                                        }
                                       </span>
                                     )}
                                 </>
@@ -2026,7 +2044,11 @@ export default function MasterfilePage() {
                                       Employment Status
                                     </label>
                                     <div className="flex h-9 w-full rounded-md border border-slate-200 px-3 py-1 text-sm font-medium bg-slate-50 items-center text-slate-600">
-                                      {statusLabels[selectedEmployee.status || "pending"]}
+                                      {
+                                        statusLabels[
+                                          selectedEmployee.status || "pending"
+                                        ]
+                                      }
                                     </div>
                                   </div>
                                 </div>
@@ -2054,7 +2076,11 @@ export default function MasterfilePage() {
                                   />
                                   <DetailItem
                                     label="Employment Status"
-                                    value={statusLabels[selectedEmployee.status || "pending"]}
+                                    value={
+                                      statusLabels[
+                                        selectedEmployee.status || "pending"
+                                      ]
+                                    }
                                   />
                                 </div>
                               )}

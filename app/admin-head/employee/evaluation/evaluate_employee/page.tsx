@@ -505,7 +505,10 @@ function EvaluateEmployeeForm() {
     setIsSubmitting(true)
     try {
       const computedRemarks = totalScore >= 31 ? 'Passed' : 'Failed'
-      const derivedStatus = recommendation === 'yes' ? 'Regular' : 'Probee'
+      // Regular/Regularized must only happen after manual regularization date input on monitoring page.
+      const derivedStatus = computedRemarks === 'Passed'
+        ? 'For Recommendation'
+        : (evaluationContext.isSecond ? 'Failed' : 'Probee')
 
       const payload = {
         employee_id: selectedEmployeeId,
@@ -523,13 +526,7 @@ function EvaluateEmployeeForm() {
         [`${evaluationContext.isSecond ? 'reviewed_by_2' : 'reviewed_by'}`]: reviewedBy.trim() || undefined,
         [`${evaluationContext.isSecond ? 'approved_by_2' : 'approved_by'}`]: approvedBy.trim() || undefined,
         status: derivedStatus,
-        regularization_date: recommendation === 'yes' ? format(new Date(), 'yyyy-MM-dd') : undefined
-      }
-
-      // If it's the first eval and they passed, automatically fail the second one to skip it
-      if (evaluationContext.targetScore === 'score_1' && computedRemarks === 'Passed') {
-        payload.score_2 = 0
-        payload.remarks_2 = 'Failed'
+        regularization_date: undefined
       }
 
       const response = await fetch(`${getApiUrl()}/api/evaluations`, {

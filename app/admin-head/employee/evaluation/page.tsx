@@ -1,10 +1,9 @@
 "use client"
 
 import React, { useEffect, useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { X, Calendar, UserCheck, TrendingUp, PieChart, Search, Download, Plus } from 'lucide-react'
+import { X, Calendar, UserCheck, TrendingUp, PieChart, Search, Plus, ThumbsUp } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { Skeleton } from "@/components/ui/skeleton"
 import { getApiUrl } from '@/lib/api'
@@ -44,7 +43,9 @@ export default function EvaluationPage() {
   const [isActionLoading, setIsActionLoading] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'All' | 'Probee' | 'Regular' | 'Failed'>('All')
+  const [statusFilter, setStatusFilter] = useState<'All' | 'Probee' | 'For Recommendation' | 'Regular' | 'Failed'>('All')
+  const [editingRegularization, setEditingRegularization] = useState<Record<string, boolean>>({})
+  const [regularizationDates, setRegularizationDates] = useState<Record<string, string>>({})
 
   useEffect(() => {
     fetchData()
@@ -53,10 +54,13 @@ export default function EvaluationPage() {
   const deriveStatusFromRemarks = (evalData?: Partial<Evaluation>) => {
     const remarks1 = String(evalData?.remarks_1 ?? '').toLowerCase()
     const remarks2 = String(evalData?.remarks_2 ?? '').toLowerCase()
-    const hasFailed = remarks1 === 'failed' || remarks2 === 'failed'
-    const hasPassed = remarks1 === 'passed' || remarks2 === 'passed'
+    const secondEvalFailed = remarks2 === 'failed'
+    const hasPassedAtLeastOne = remarks1 === 'passed' || remarks2 === 'passed'
 
-    if (hasFailed) return 'Failed'
+    // Only show Failed if 2nd evaluation failed (final decision)
+    if (secondEvalFailed) return 'Failed'
+    // Show For Recommendation if they passed at least one evaluation
+    if (hasPassedAtLeastOne) return 'For Recommendation'
     return 'Probee'
   }
 
@@ -114,21 +118,33 @@ export default function EvaluationPage() {
     const firstEval = addMonths(hiredDate, 3)
     const secondEval = addMonths(hiredDate, 5)
     
-    const rawStatus = String(evaluation?.status ?? '').trim().toLowerCase()
-    let normalizedStatus = ''
-    if (rawStatus === 'regular' || rawStatus === 'regularized') normalizedStatus = 'Regular'
-    else if (rawStatus === 'for recommendation') normalizedStatus = 'For Recommendation'
-    else if (rawStatus === 'failed') normalizedStatus = 'Failed'
-    else if (rawStatus === 'probee') normalizedStatus = 'Probee'
-
-    let regularizationDate = null
-    if (normalizedStatus === 'Regular' && evaluation?.regularization_date) {
-      regularizationDate = new Date(evaluation.regularization_date)
-    } else if (normalizedStatus === 'Regular' && evaluation?.updated_at) {
-      regularizationDate = new Date(evaluation.updated_at)
+    // Check if employee has regularization date set
+    const hasRegularizationDate = evaluation?.regularization_date && evaluation.regularization_date !== ''
+    
+    // Check evaluation results
+    const remarks1 = String(evaluation?.remarks_1 ?? '').toLowerCase()
+    const remarks2 = String(evaluation?.remarks_2 ?? '').toLowerCase()
+    const secondEvalFailed = remarks2 === 'failed'
+    const hasPassedAtLeastOne = remarks1 === 'passed' || remarks2 === 'passed'
+    
+    // Status logic priority: 
+    // 1. If regularization date is set → Regular (admin manually sets)
+    // 2. If 2nd evaluation failed → Failed (final decision)
+    // 3. If passed at least 1 evaluation → For Recommendation (pending admin action)
+    // 4. Otherwise → Probee (default)
+    let status = 'Probee'
+    if (hasRegularizationDate) {
+      status = 'Regular'
+    } else if (secondEvalFailed) {
+      status = 'Failed'
+    } else if (hasPassedAtLeastOne) {
+      status = 'For Recommendation'
     }
 
-    const status = normalizedStatus || 'Probee'
+    let regularizationDate = null
+    if (hasRegularizationDate) {
+      regularizationDate = new Date(evaluation.regularization_date!)
+    }
     
     return {
       firstEval: format(firstEval, 'MMMM d, yyyy'),
@@ -180,19 +196,19 @@ export default function EvaluationPage() {
     })
   }
 
-  const saveEvaluation = async (employeeId: string, isRecommend = false) => {
+  const saveEvaluation = async (employeeId: string) => {
     const currentEval = evaluations[employeeId]
     if (!currentEval) return
 
     const evalData = { ...currentEval }
     const derivedStatus = deriveStatusFromRemarks(evalData)
-    if (isRecommend) {
-      evalData.status = 'Regular'
-      const today = new Date()
-      evalData.regularization_date = format(today, 'yyyy-MM-dd')
-    } else {
-      evalData.status = derivedStatus
-      evalData.regularization_date = undefined
+    // When saving evaluation, preserve existing regularization_date if it exists
+    // Status is derived from evaluation results, not from regularization date
+    evalData.status = derivedStatus
+    // Don't clear regularization_date if it already exists
+    const existingEval = persistedEvaluations[employeeId]
+    if (existingEval?.regularization_date) {
+      evalData.regularization_date = existingEval.regularization_date
     }
 
     setIsActionLoading(true)
@@ -204,7 +220,7 @@ export default function EvaluationPage() {
       })
       const data = await response.json()
       if (data.success) {
-        toast.success(isRecommend ? 'Employee recommended to Regular status' : 'Evaluation saved successfully')
+        toast.success('Evaluation saved successfully')
         setLockedScores(prev => ({ ...prev, [employeeId]: true }))
         setEditingScores(prev => ({ ...prev, [employeeId]: false }))
         fetchData() // Refresh to get updated regularization dates and status
@@ -219,6 +235,47 @@ export default function EvaluationPage() {
     }
   }
 
+  const handleRegularizationDateChange = async (employeeId: string, date: string) => {
+    setRegularizationDates(prev => ({ ...prev, [employeeId]: date }))
+    
+    // Auto-save when date is set
+    if (date) {
+      setIsActionLoading(true)
+      try {
+        const currentEval = evaluations[employeeId] || persistedEvaluations[employeeId] || {
+          employee_id: employeeId,
+          score_1: null,
+          remarks_1: null,
+          score_2: null,
+          remarks_2: null,
+          status: null
+        }
+        
+        const response = await fetch(`${getApiUrl()}/api/evaluations`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...currentEval,
+            regularization_date: date,
+            status: 'Regular'
+          })
+        })
+        const data = await response.json()
+        if (data.success) {
+          toast.success('Regularization date saved')
+          fetchData()
+        } else {
+          toast.error(data.message || 'Failed to save regularization date')
+        }
+      } catch (error) {
+        console.error('Error saving regularization date:', error)
+        toast.error('Connection failed')
+      } finally {
+        setIsActionLoading(false)
+      }
+    }
+  }
+
   const filteredEmployees = employees.filter(emp => {
     const matchesSearch =
       `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -230,10 +287,17 @@ export default function EvaluationPage() {
     const statusA = getStatusForFilter(a)
     const statusB = getStatusForFilter(b)
     
-    // Probee first, then Regular
-    const order: Record<string, number> = { 'Probee': 0, 'Regular': 1, 'Regularized': 1 }
+    // Sort order: Probee → For Recommendation → Failed → Regular
+    const order: Record<string, number> = { 'Probee': 0, 'For Recommendation': 1, 'Failed': 2, 'Regular': 3, 'Regularized': 3 }
     return (order[statusA] ?? 10) - (order[statusB] ?? 10)
   })
+
+  // Shared counters so navbar and table summaries stay consistent.
+  const totalEmployedCount = employees.length
+  const underProbationCount = employees.filter(e => getDatesForEmployee(e)?.status === 'Probee').length
+  const forRecommendationCount = employees.filter(e => getDatesForEmployee(e)?.status === 'For Recommendation').length
+  const regularEmployeesCount = employees.filter(e => ['Regular', 'Regularized'].includes(getDatesForEmployee(e)?.status || '')).length
+  const failedEmployeesCount = employees.filter(e => getDatesForEmployee(e)?.status === 'Failed').length
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -305,23 +369,27 @@ export default function EvaluationPage() {
             <div className="flex flex-wrap items-center gap-3 md:gap-4 text-xs font-bold uppercase tracking-wider text-white/85">
               <div className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2">
                 <UserCheck className="h-4 w-4" />
-                Total Employed: {employees.length}
+                Total Employed: {totalEmployedCount}
               </div>
               <div className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2">
                 <Calendar className="h-4 w-4" />
-                Under Probation: {employees.filter(e => getDatesForEmployee(e)?.status === 'Probee').length}
+                Under Probation: {underProbationCount}
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2">
+                <ThumbsUp className="h-4 w-4" />
+                For Recommendation: {forRecommendationCount}
               </div>
               <div className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2">
                 <TrendingUp className="h-4 w-4" />
-                Regular Employees: {employees.filter(e => ['Regular', 'Regularized'].includes(getDatesForEmployee(e)?.status || '')).length}
+                Regular Employees: {regularEmployeesCount}
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2">
+                <X className="h-4 w-4" />
+                Failed Employees: {failedEmployeesCount}
               </div>
             </div>
 
             <div className="flex items-center gap-3 w-full lg:w-auto">
-              <Button className="bg-white/10 hover:bg-white/20 text-white border border-white/30 px-4 h-10 rounded-lg font-bold transition-all flex items-center gap-2 text-xs md:text-sm w-full lg:w-auto">
-                <Download className="w-4 h-4" />
-                Export Report
-              </Button>
               <Button
                 onClick={() => router.push('/admin-head/employee/evaluation/evaluate_employee')}
                 className="bg-white text-[#7B0F2B] hover:bg-rose-50 px-4 h-10 rounded-lg font-bold transition-all flex items-center gap-2 text-xs md:text-sm w-full lg:w-auto"
@@ -335,27 +403,6 @@ export default function EvaluationPage() {
       </div>
 
       <div className="w-full px-8 pb-12">
-        {/* Quick Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          {[
-            { label: 'Total Employed', value: employees.length, icon: UserCheck, color: 'text-blue-600', bg: 'bg-blue-50' },
-            { label: 'Under Probation', value: employees.filter(e => getDatesForEmployee(e)?.status === 'Probee').length, icon: Calendar, color: 'text-amber-600', bg: 'bg-amber-50' },
-            { label: 'Regular Employees', value: employees.filter(e => ['Regular', 'Regularized'].includes(getDatesForEmployee(e)?.status || '')).length, icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-            { label: 'Failed Employees', value: employees.filter(e => getDatesForEmployee(e)?.status === 'Failed').length, icon: X, color: 'text-rose-600', bg: 'bg-rose-50' },
-          ].map((stat, i) => (
-            <Card key={i} className="border-none shadow-sm overflow-hidden">
-              <CardContent className="p-6 flex items-center gap-4">
-                <div className={`${stat.bg} p-4 rounded-2xl`}>
-                  <stat.icon className={`w-8 h-8 ${stat.color}`} />
-                </div>
-                <div>
-                  <p className="text-slate-500 text-sm font-bold uppercase tracking-wider">{stat.label}</p>
-                  <h3 className="text-3xl font-black text-slate-800">{stat.value}</h3>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
 
         {/* Monitoring Table Section matching Masterfile design */}
         <div className="bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-xl flex flex-col">
@@ -382,7 +429,7 @@ export default function EvaluationPage() {
                 />
               </div>
               <div className="flex items-center gap-2 bg-[#FFE5EC]/40 border border-[#FFE5EC] rounded-xl p-1 h-11">
-                {(['All', 'Probee', 'Regular', 'Failed'] as const).map((status) => (
+                {(['All', 'Probee', 'For Recommendation', 'Regular', 'Failed'] as const).map((status) => (
                   <button
                     key={status}
                     type="button"
@@ -408,38 +455,40 @@ export default function EvaluationPage() {
                   <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap">Name</th>
                   <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap">Date Hired</th>
                   <th className="px-6 py-4 text-center font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap">Status</th>
-                  <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap text-center">1st Evaluation</th>
+                  <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap text-center">Date of 1st Evaluation</th>
                   <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap text-center">Score</th>
                   <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap text-center">Remarks</th>
-                  <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap text-center">2nd Evaluation</th>
+                  <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap text-center">Date of 2nd Evaluation</th>
                   <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap text-center">Score</th>
                   <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap text-center">Remarks</th>
-                   <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap text-center">Regularization</th>
-                   <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap text-center">Eval Status</th>
+                   <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider border-r border-[#FFE5EC]/50 whitespace-nowrap text-center">Date of Regularization</th>
                    <th className="px-6 py-4 text-left font-bold text-[#800020] text-[11px] uppercase tracking-wider whitespace-nowrap text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100">
                 {filteredEmployees.length === 0 ? (
                   <tr>
-                    <td colSpan={13} className="px-6 py-12 text-center text-slate-400 italic">
+                    <td colSpan={12} className="px-6 py-12 text-center text-slate-400 italic">
                       No active records found matching your search.
                     </td>
                   </tr>
                 ) : (
                   filteredEmployees.map((emp) => {
                     const dates = getDatesForEmployee(emp)
-                    const currentEvalStatus = String(evaluations[emp.id]?.status ?? persistedEvaluations[emp.id]?.status ?? dates?.status ?? '')
-                    const persistedStatus = String(persistedEvaluations[emp.id]?.status ?? '').trim()
-                    const hasPersistedDecision = persistedStatus.length > 0
-                    const isRecommended = currentEvalStatus === 'Regular' || currentEvalStatus === 'Regularized'
-                    const isEditing = Boolean(editingScores[emp.id])
-                    const isLocked = (isRecommended || hasPersistedDecision || Boolean(lockedScores[emp.id])) && !isEditing
-                    const remarks1 = evaluations[emp.id]?.remarks_1 ?? persistedEvaluations[emp.id]?.remarks_1
-                    const remarks2 = evaluations[emp.id]?.remarks_2 ?? persistedEvaluations[emp.id]?.remarks_2
-                    const score1 = evaluations[emp.id]?.score_1 ?? persistedEvaluations[emp.id]?.score_1
-                    const score2 = evaluations[emp.id]?.score_2 ?? persistedEvaluations[emp.id]?.score_2
-                    const isForRecommendation = remarks1 === 'Passed' || remarks2 === 'Passed'
+                    const evalData = evaluations[emp.id] ?? persistedEvaluations[emp.id]
+                    const remarks1 = evalData?.remarks_1 ?? null
+                    const remarks2 = evalData?.remarks_2 ?? null
+                    const score1 = evalData?.score_1 ?? null
+                    const score2 = evalData?.score_2 ?? null
+                    const hasTakenFirstEvaluation = score1 !== null && score1 !== undefined
+                    const hasPassedFirstEvaluation = remarks1 === 'Passed'
+                    const shouldShowSecondEvaluationDetails = hasTakenFirstEvaluation && !hasPassedFirstEvaluation
+                    const hasRegularizationDate = evalData?.regularization_date && evalData.regularization_date !== ''
+                    const hasPassedEvaluation = remarks1 === 'Passed' || remarks2 === 'Passed'
+                    
+                    // Determine remarks display: only show 'Regularized' if they passed that specific evaluation AND regularization date is set
+                    const displayRemarks1 = (hasRegularizationDate && remarks1 === 'Passed') ? 'Regularized' : (remarks1 || 'Pending')
+                    const displayRemarks2 = (hasRegularizationDate && remarks2 === 'Passed') ? 'Regularized' : (remarks2 || 'Pending')
 
                     return (
                       <tr key={emp.id} className="hover:bg-[#FFE5EC] border-b border-rose-50 transition-colors duration-200 group">
@@ -456,7 +505,11 @@ export default function EvaluationPage() {
                         <td className="px-6 py-4 border-r border-rose-50/30 text-center">
                           <Badge className={`${
                             dates?.status === 'Regular' || dates?.status === 'Regularized'
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : dates?.status === 'For Recommendation'
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : dates?.status === 'Failed'
+                              ? 'bg-rose-50 text-rose-700 border-rose-200'
                               : 'bg-amber-50 text-amber-700 border-amber-200'
                           } border shadow-none font-bold px-3 py-1 uppercase text-[10px] pointer-events-none rounded-full`}>
                             {dates?.status}
@@ -465,58 +518,63 @@ export default function EvaluationPage() {
                         <td className="px-6 py-4 text-slate-500 font-semibold text-[13px] border-r border-rose-50/30 italic whitespace-nowrap text-center">
                           {dates?.firstEval || '-'}
                         </td>
-                        <td className="px-6 py-4 font-bold text-slate-700 text-[14px] border-r border-rose-50/30 text-center">
-                          {score1 ?? <span className="text-slate-300 italic text-xs font-normal">N/A</span>}
+                        <td className={`px-6 py-4 font-bold text-[14px] border-r border-rose-50/30 text-center ${
+                          remarks1 === 'Passed' ? 'text-emerald-600' : remarks1 === 'Failed' ? 'text-rose-600' : 'text-slate-700'
+                        }`}>
+                          {score1 ?? <span className="text-slate-300 italic text-xs font-normal">-</span>}
                         </td>
                         <td className="px-6 py-4 border-r border-rose-50/30 text-center">
-                          {remarks1 ? (
-                            <Badge variant="outline" className={`font-bold px-2 py-0.5 uppercase text-[9px] rounded-md ${
-                              remarks1 === 'Passed'
-                                ? 'border-emerald-200 text-emerald-700 bg-emerald-50'
-                                : 'border-rose-200 text-rose-700 bg-rose-50'
-                            }`}>
-                              {remarks1}
-                            </Badge>
-                          ) : <span className="text-slate-300 italic text-[10px]">N/A</span>}
+                          <Badge variant="outline" className={`font-bold px-2 py-0.5 uppercase text-[9px] rounded-md ${
+                            displayRemarks1 === 'Regularized'
+                              ? 'border-emerald-200 text-emerald-700 bg-emerald-50'
+                              : displayRemarks1 === 'Passed'
+                              ? 'border-emerald-200 text-emerald-700 bg-emerald-50'
+                              : displayRemarks1 === 'Failed'
+                              ? 'border-rose-200 text-rose-700 bg-rose-50'
+                              : 'border-amber-200 text-amber-700 bg-amber-50'
+                          }`}>
+                            {displayRemarks1}
+                          </Badge>
                         </td>
                         <td className="px-6 py-4 text-slate-500 font-semibold text-[13px] border-r border-rose-50/30 italic whitespace-nowrap text-center">
-                          {dates?.secondEval || '-'}
+                          {shouldShowSecondEvaluationDetails ? (dates?.secondEval || '-') : '-'}
                         </td>
-                        <td className="px-6 py-4 font-bold text-slate-700 text-[14px] border-r border-rose-50/30 text-center">
-                          {score2 ?? <span className="text-slate-300 italic text-xs font-normal">N/A</span>}
+                        <td className={`px-6 py-4 font-bold text-[14px] border-r border-rose-50/30 text-center ${
+                          remarks2 === 'Passed' ? 'text-emerald-600' : remarks2 === 'Failed' ? 'text-rose-600' : 'text-slate-700'
+                        }`}>
+                          {shouldShowSecondEvaluationDetails
+                            ? (score2 ?? <span className="text-slate-300 italic text-xs font-normal">-</span>)
+                            : <span className="text-slate-300 italic text-xs font-normal">-</span>}
                         </td>
                         <td className="px-6 py-4 border-r border-rose-50/30 text-center">
-                          {remarks2 ? (
+                          {shouldShowSecondEvaluationDetails ? (
                             <Badge variant="outline" className={`font-bold px-2 py-0.5 uppercase text-[9px] rounded-md ${
-                              remarks2 === 'Passed'
+                              displayRemarks2 === 'Regularized'
                                 ? 'border-emerald-200 text-emerald-700 bg-emerald-50'
-                                : 'border-rose-200 text-rose-700 bg-rose-50'
+                                : displayRemarks2 === 'Passed'
+                                ? 'border-emerald-200 text-emerald-700 bg-emerald-50'
+                                : displayRemarks2 === 'Failed'
+                                ? 'border-rose-200 text-rose-700 bg-rose-50'
+                                : 'border-amber-200 text-amber-700 bg-amber-50'
                             }`}>
-                              {remarks2}
+                              {displayRemarks2}
                             </Badge>
-                          ) : <span className="text-slate-300 italic text-[10px]">N/A</span>}
+                          ) : (
+                            <span className="text-slate-300 italic text-xs font-normal">-</span>
+                          )}
                         </td>
-                         <td className="px-6 py-4 font-bold text-[#A4163A] text-sm whitespace-nowrap text-center border-r border-rose-50/30">
-                           {dates?.regularization || '-'}
-                         </td>
-                         <td className="px-6 py-4 border-r border-rose-50/30 text-center">
-                           {currentEvalStatus === 'Regular' || currentEvalStatus === 'Regularized' ? (
-                             <Badge variant="outline" className="border-emerald-200 text-emerald-700 bg-emerald-50 font-bold px-2 py-0.5 uppercase text-[9px] rounded-md whitespace-nowrap">
-                               Recommended
-                             </Badge>
-                           ) : isForRecommendation ? (
-                             <Badge variant="outline" className="border-blue-200 text-blue-700 bg-blue-50 font-bold px-2 py-0.5 uppercase text-[9px] rounded-md">
-                               For Recommendation
-                             </Badge>
-                           ) : currentEvalStatus ? (
-                             <Badge variant="outline" className={`font-bold px-2 py-0.5 uppercase text-[9px] rounded-md ${
-                               currentEvalStatus === 'Failed'
-                                 ? 'border-rose-200 text-rose-700 bg-rose-50'
-                                 : 'border-amber-200 text-amber-700 bg-amber-50'
-                             }`}>
-                               {currentEvalStatus}
-                             </Badge>
-                           ) : <span className="text-slate-300 italic text-[10px]">None</span>}
+                         <td className="px-6 py-4 text-sm whitespace-nowrap text-center border-r border-rose-50/30">
+                           {hasPassedEvaluation ? (
+                             <Input
+                               type="date"
+                               value={regularizationDates[emp.id] || evalData?.regularization_date || ''}
+                               onChange={(e) => handleRegularizationDateChange(emp.id, e.target.value)}
+                               className="h-8 text-xs border-[#A4163A]/30 focus:border-[#A4163A]"
+                               placeholder="Set date"
+                             />
+                           ) : (
+                             <span className="text-slate-300 italic text-xs font-normal">-</span>
+                           )}
                          </td>
                         <td className="px-6 py-4 text-center">
                           <Button 
