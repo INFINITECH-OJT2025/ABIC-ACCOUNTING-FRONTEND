@@ -260,7 +260,7 @@ const EditorSkeleton = () => (
             <Skeleton className="h-8 w-48" />
             <Skeleton className="h-6 w-32 rounded-full" />
           </div>
-          <Card className="border-0 shadow-2xl rounded-none min-h-[1056px] w-[816px] bg-white mx-auto p-16 space-y-8">
+          <Card className="border-0 shadow-2xl rounded-none min-h-[1120px] w-[794px] bg-white mx-auto p-16 space-y-8">
             <div className="flex flex-col items-center gap-4 text-center">
               <Skeleton className="h-16 w-16 rotate-45" />
               <Skeleton className="h-8 w-64" />
@@ -560,7 +560,7 @@ export default function EditFormsPage() {
     const isSupervisor = type.startsWith("supervisor");
 
     return (
-      <div className="bg-white border-0 shadow-2xl px-16 py-12 w-[816px] mx-auto min-h-[1056px] font-serif flex flex-col items-center print:shadow-none print:p-0">
+      <div className="bg-white border-0 shadow-2xl px-16 py-12 w-[794px] mx-auto min-h-[1120px] font-serif flex flex-col items-center print:shadow-none print:p-0">
         {/* Header Branding */}
         <div
           className="flex flex-col items-center mb-2 w-full"

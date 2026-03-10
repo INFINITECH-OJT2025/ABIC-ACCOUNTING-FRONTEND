@@ -60,7 +60,7 @@ const LetterSkeleton = () => (
       {[1, 2].map((i) => (
         <Card
           key={i}
-          className="border-0 shadow-2xl rounded-none min-h-[1056px] w-[816px] bg-white p-16 space-y-8"
+          className="border-0 shadow-2xl rounded-none min-h-[1120px] w-[794px] bg-white p-16 space-y-8"
         >
           <div className="flex flex-col items-center gap-4">
             <Skeleton className="h-16 w-16 rotate-45" />
@@ -710,11 +710,10 @@ function FormLetterContent() {
         return;
       }
 
-      // ── Build the PDF doc ─────────────────────────────────────────────────
-      // Letter size in points: 612 × 792 pt (8.5" × 11" at 72dpi)
+      // A4 size in points: 595 × 842 pt (210mm × 297mm at 72dpi)
       const pdf = new jsPDF({
         unit: "pt",
-        format: "letter",
+        format: "a4",
         orientation: "portrait",
       });
       const pageW = pdf.internal.pageSize.getWidth();
@@ -829,17 +828,26 @@ function FormLetterContent() {
           },
         });
 
-        const imgData = canvas.toDataURL("image/jpeg", 0.92);
+        const imgData = canvas.toDataURL("image/jpeg", 0.95);
         const imgW = canvas.width;
         const imgH = canvas.height;
 
-        // Scale the captured image to fit the PDF page
-        const ratio = Math.min(pageW / imgW, pageH / imgH);
-        const finalW = imgW * ratio;
-        const finalH = imgH * ratio;
+        // Scale to fill the full page width (no right-side gap).
+        // If the scaled content height exceeds one A4 page, slice the same
+        // image across multiple pages by shifting the y-origin on each page.
+        const ratio = pageW / imgW;
+        const finalW = pageW;
+        const scaledH = imgH * ratio; // total rendered height in pt
+        // Add a 20pt buffer (approx 26px) to ignore tiny overflows that create blank pages
+        const totalSlices = Math.max(1, Math.ceil((scaledH - 20) / pageH));
 
-        if (i > 0) pdf.addPage();
-        pdf.addImage(imgData, "JPEG", 0, 0, finalW, finalH);
+        for (let p = 0; p < totalSlices; p++) {
+          // First slice of form 0 — no new page (PDF starts with page 1 already)
+          if (i > 0 || p > 0) pdf.addPage();
+          // Draw the full image but shifted up by (p * pageH) so this page's
+          // window shows the correct slice of content.
+          pdf.addImage(imgData, "JPEG", 0, -(p * pageH), finalW, scaledH);
+        }
       }
 
       // ── Convert to base64 (strip the data-uri prefix) ────────────────────
@@ -1631,7 +1639,7 @@ function FormLetterContent() {
         @media print {
           @page {
             margin: 0;
-            size: letter; /* 8.5" x 11" */
+            size: A4; /* 210mm × 297mm */
           }
           body {
             background: white;
@@ -1683,10 +1691,10 @@ function FormOneTemplate({
       : "Leave and Attendance Policy";
   return (
     <Card
-      className="border-0 shadow-2xl rounded-none print:shadow-none min-h-[1056px] w-[816px] flex flex-col bg-white"
+      className="border-0 shadow-2xl rounded-none print:shadow-none min-h-[1120px] w-[794px] flex flex-col bg-white"
       id="form-letter-1"
     >
-      <CardContent className="px-16 py-12 flex-1 flex flex-col font-serif leading-relaxed text-[#333]">
+      <CardContent className="px-14 py-8 flex-1 flex flex-col font-serif leading-snug text-[#333]">
         {/* Header Branding */}
         <div
           className="flex flex-col items-center mb-2 w-full"
@@ -1716,8 +1724,8 @@ function FormOneTemplate({
         </div>
 
         {/* Title */}
-        <div className="text-center mb-6">
-          <h1 className="text-xl font-black text-black tracking-wide uppercase">
+        <div className="text-center mb-3">
+          <h1 className="text-base font-black text-black tracking-wide uppercase">
             {(customTemplate?.title || letterTitle).replace(
               /{{Warning level}}/g,
               warningLevelText,
@@ -1726,7 +1734,7 @@ function FormOneTemplate({
         </div>
 
         {/* Metadata */}
-        <div className="space-y-0.5 mb-6 text-black text-sm">
+        <div className="space-y-0.5 mb-3 text-black text-xs">
           <div className="flex justify-end">
             <p className="font-bold">
               Date: <span className="font-bold">{today}</span>
@@ -1755,11 +1763,11 @@ function FormOneTemplate({
 
         {/* Salutation (only show if NO custom template, as custom includes it) */}
         {!customTemplate && (
-          <p className="mb-6">Dear {supervisorFirstName || "Supervisor"},</p>
+          <p className="mb-3">Dear {supervisorFirstName || "Supervisor"},</p>
         )}
 
         {/* Body Content */}
-        <div className="text-black text-sm leading-relaxed text-justify relative group/body">
+        <div className="text-black text-xs leading-snug text-justify relative group/body">
           {isEditMode ? (
             <div className="relative">
               <Textarea
@@ -1777,7 +1785,7 @@ function FormOneTemplate({
             <div className="flex-1 space-y-0">
               {body.split("\n").map((line: string, idx: number) => {
                 const trimmed = line.trim();
-                if (!trimmed) return <div key={idx} className="h-4" />;
+                if (!trimmed) return <div key={idx} className="h-2" />;
                 if (trimmed.startsWith("•")) {
                   return (
                     <div key={idx} className="flex gap-4 pl-12 mb-2">
@@ -1814,7 +1822,7 @@ function FormOneTemplate({
                 return (
                   <div
                     key={idx}
-                    className="text-justify mb-4"
+                    className="text-justify mb-2"
                     style={{ textIndent: "3.5rem" }}
                   >
                     {line}
@@ -1826,10 +1834,10 @@ function FormOneTemplate({
         </div>
 
         {/* Closing */}
-        <div className="mt-12">
+        <div className="mt-6">
           <p>Respectfully,</p>
-          <div className="mt-10">
-            <p className="font-black text-lg underline uppercase">
+          <div className="mt-5">
+            <p className="font-black text-sm underline uppercase">
               {customTemplate?.signatoryName || "AIZLE MARIE M. ATIENZA"}
             </p>
             <p className="font-medium text-slate-700">
@@ -1839,13 +1847,13 @@ function FormOneTemplate({
         </div>
 
         {/* Acknowledgment Section */}
-        <div className="mt-8 border-t border-slate-100 pt-8 space-y-4">
+        <div className="mt-4 border-t border-slate-100 pt-4 space-y-2">
           <p className="font-bold mb-4">Employee Acknowledgment:</p>
-          <p className="mb-8">
+          <p className="mb-4">
             I, <span className="font-bold">{employee.name}</span>, hereby
             acknowledge receipt of this Formal Warning Letter.
           </p>
-          <div className="space-y-6 pt-6">
+          <div className="space-y-4 pt-3">
             <div className="flex items-end gap-2 max-w-[400px]">
               <span className="font-bold whitespace-nowrap">
                 Employee Signature:
@@ -1895,10 +1903,10 @@ function FormTwoTemplate({
 
   return (
     <Card
-      className="border-0 shadow-2xl rounded-none print:shadow-none min-h-[1056px] w-[816px] flex flex-col bg-white"
+      className="border-0 shadow-2xl rounded-none print:shadow-none min-h-[1120px] w-[794px] flex flex-col bg-white"
       id="form-letter-2"
     >
-      <CardContent className="px-16 py-12 flex-1 flex flex-col font-serif leading-relaxed text-[#333]">
+      <CardContent className="px-14 py-8 flex-1 flex flex-col font-serif leading-snug text-[#333]">
         {/* Header Branding */}
         <div
           className="flex flex-col items-center mb-2 w-full"
@@ -1928,8 +1936,8 @@ function FormTwoTemplate({
         </div>
 
         {/* Title */}
-        <div className="text-center mb-6">
-          <h1 className="text-xl font-black text-black tracking-wide">
+        <div className="text-center mb-3">
+          <h1 className="text-base font-black text-black tracking-wide">
             {(
               customTemplate?.title ||
               (type === "late"
@@ -1940,7 +1948,7 @@ function FormTwoTemplate({
         </div>
 
         {/* Metadata Block */}
-        <div className="flex flex-col mb-6 text-black text-sm">
+        <div className="flex flex-col mb-3 text-black text-xs">
           <div className="flex justify-end">
             <p className="font-bold">
               Date: <span className="font-bold">{today}</span>
@@ -1975,7 +1983,7 @@ function FormTwoTemplate({
 
         {/* Salutation (Only show if NO custom template, as custom body includes it) */}
         {!customTemplate && (
-          <div className="mb-6">
+          <div className="mb-3">
             <p>
               Dear{" "}
               <span className="font-bold">
@@ -1990,7 +1998,7 @@ function FormTwoTemplate({
         )}
 
         {/* Body Content */}
-        <div className="text-black text-sm leading-relaxed text-justify relative group/body">
+        <div className="text-black text-xs leading-snug text-justify relative group/body">
           {isEditMode ? (
             <div className="relative">
               <Textarea
@@ -2008,7 +2016,7 @@ function FormTwoTemplate({
             <div className="flex-1 space-y-0">
               {body.split("\n").map((line: string, idx: number) => {
                 const trimmed = line.trim();
-                if (!trimmed) return <div key={idx} className="h-4" />;
+                if (!trimmed) return <div key={idx} className="h-2" />;
                 if (trimmed.startsWith("•")) {
                   return (
                     <div key={idx} className="flex gap-4 pl-12 mb-2">
@@ -2045,7 +2053,7 @@ function FormTwoTemplate({
                 return (
                   <div
                     key={idx}
-                    className="text-justify mb-4"
+                    className="text-justify mb-2"
                     style={{ textIndent: "3.5rem" }}
                   >
                     {line}
@@ -2057,10 +2065,10 @@ function FormTwoTemplate({
         </div>
 
         {/* Closing */}
-        <div className="mt-12">
+        <div className="mt-6">
           <p>Respectfully,</p>
-          <div className="mt-10">
-            <p className="font-black text-lg underline uppercase">
+          <div className="mt-5">
+            <p className="font-black text-sm underline uppercase">
               {customTemplate?.signatoryName || "AIZLE MARIE M. ATIENZA"}
             </p>
             <p className="font-medium text-slate-700">
@@ -2075,16 +2083,16 @@ function FormTwoTemplate({
         </div>
 
         {/* Separator */}
-        <div className="my-10 border-t-2 border-slate-200 border-dashed print:hidden"></div>
+        <div className="my-4 border-t-2 border-slate-200 border-dashed print:hidden"></div>
 
         {/* Acknowledgment */}
-        <div className="mt-8 space-y-4">
-          <p className="font-bold mb-4">Employee Acknowledgment:</p>
-          <p className="mb-8">
+        <div className="mt-3 space-y-2">
+          <p className="font-bold mb-2">Employee Acknowledgment:</p>
+          <p className="mb-4">
             I, <span className="font-bold">{employee.name}</span>, hereby
             acknowledge receipt of this Formal Warning Letter.
           </p>
-          <div className="space-y-6 pt-6">
+          <div className="space-y-4 pt-3">
             <div className="flex items-end gap-2 max-w-[400px]">
               <span className="font-bold whitespace-nowrap">
                 Employee Signature:
