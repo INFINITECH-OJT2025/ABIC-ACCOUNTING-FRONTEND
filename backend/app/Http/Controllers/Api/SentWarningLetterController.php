@@ -38,7 +38,7 @@ class SentWarningLetterController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'employee_id'    => 'required|integer',
+            'employee_id'    => 'required|string',
             'employee_name'  => 'required|string',
             'type'           => 'required|in:late,leave',
             'warning_level'  => 'required|integer|min:1',
@@ -46,7 +46,6 @@ class SentWarningLetterController extends Controller
             'year'           => 'required|integer',
             'cutoff'         => 'required|string',
             'recipients'     => 'required|array',
-            'recipients.*'   => 'email',
             'forms_included' => 'required|array',
         ]);
 

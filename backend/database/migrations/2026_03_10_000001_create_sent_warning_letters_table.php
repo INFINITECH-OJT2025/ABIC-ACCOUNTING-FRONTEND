@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('sent_warning_letters', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('employee_id');
+            $table->string('employee_id');
             $table->string('employee_name');
             $table->string('type');           // 'late' or 'leave'
             $table->unsignedTinyInteger('warning_level')->default(1);

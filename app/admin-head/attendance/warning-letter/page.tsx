@@ -152,7 +152,7 @@ interface SentLetter {
   month: string;
   year: number;
   cutoff: string;
-  recipients: string[];
+  recipients: (string | { email: string; type: string })[];
   forms_included: string[];
   sent_at: string;
 }
@@ -373,7 +373,6 @@ export default function WarningLetterPage() {
             remarks: entry.remarks_list.join("; "),
             cite_reason: entry.reasons_list.join("; "),
             is_regular: isRegular,
-            is_email_sent: Math.random() > 0.5,
           };
         });
 
@@ -466,7 +465,6 @@ export default function WarningLetterPage() {
             return {
               ...entry,
               is_regular: isRegular,
-              is_email_sent: Math.random() > 0.7, // Mock data for demonstration
             };
           }),
         );
@@ -699,7 +697,7 @@ export default function WarningLetterPage() {
                   </div>
                   <div>
                     <CardTitle className="text-xl font-bold text-slate-900 tracking-tight">
-                      Late Entries (Warnings Reached)
+                      Late Entries Warnings
                     </CardTitle>
                     <CardDescription className="text-slate-500 font-medium text-sm mt-0.5">
                       Warnings for {selectedMonth} {selectedYear} (
@@ -729,9 +727,6 @@ export default function WarningLetterPage() {
                     </TableHead>
                     <TableHead className="py-5 px-8 text-slate-500 font-bold uppercase tracking-wider text-[11px] text-center">
                       Manage
-                    </TableHead>
-                    <TableHead className="py-5 px-8 text-slate-500 font-bold uppercase tracking-wider text-[11px] text-center">
-                      Email Status
                     </TableHead>
                     <TableHead className="py-5 px-8 text-slate-500 font-bold uppercase tracking-wider text-[11px] text-center">
                       History
@@ -807,21 +802,7 @@ export default function WarningLetterPage() {
                             <ChevronRight className="w-3 h-3 ml-auto opacity-30 group-hover/row:translate-x-1 transition-transform" />
                           </Button>
                         </TableCell>
-                        <TableCell className="py-4 px-6 text-center">
-                          <div className="flex justify-center">
-                            {entry.is_email_sent ? (
-                              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-700 font-bold text-[10px] uppercase shadow-sm">
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                Sent
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-100 text-slate-400 font-bold text-[10px] uppercase">
-                                <Mail className="w-3.5 h-3.5 opacity-50" />
-                                Not Sent
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
+
                         <TableCell className="py-4 px-6 text-center">
                           <Button
                             size="sm"
@@ -844,7 +825,7 @@ export default function WarningLetterPage() {
                   ) : (
                     <TableRow>
                       <TableCell
-                        colSpan={5}
+                        colSpan={4}
                         className="py-20 text-center text-slate-400 italic text-xl"
                       >
                         No employees with attendance warnings found for this
@@ -867,7 +848,7 @@ export default function WarningLetterPage() {
                   </div>
                   <div>
                     <CardTitle className="text-xl font-bold text-slate-900 tracking-tight">
-                      Extended Leave Monitoring
+                      Leave Monitoring Warnings
                     </CardTitle>
                     <CardDescription className="text-slate-500 font-medium text-sm mt-0.5">
                       Approved leaves for {selectedMonth} {selectedYear} (
@@ -900,9 +881,6 @@ export default function WarningLetterPage() {
                     </TableHead>
                     <TableHead className="py-5 px-8 text-slate-500 font-bold uppercase tracking-wider text-[11px] text-center">
                       Manage
-                    </TableHead>
-                    <TableHead className="py-5 px-8 text-slate-500 font-bold uppercase tracking-wider text-[11px] text-center">
-                      Email Status
                     </TableHead>
                     <TableHead className="py-5 px-8 text-slate-500 font-bold uppercase tracking-wider text-[11px] text-center">
                       History
@@ -990,21 +968,7 @@ export default function WarningLetterPage() {
                             <ChevronRight className="w-3 h-3 ml-auto opacity-30 group-hover/row:translate-x-1 transition-transform" />
                           </Button>
                         </TableCell>
-                        <TableCell className="py-4 px-6 text-center">
-                          <div className="flex justify-center">
-                            {entry.is_email_sent ? (
-                              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-700 font-bold text-[10px] uppercase shadow-sm">
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                Sent
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-100 text-slate-400 font-bold text-[10px] uppercase">
-                                <Mail className="w-3.5 h-3.5 opacity-50" />
-                                Not Sent
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
+
                         <TableCell className="py-4 px-6 text-center">
                           <Button
                             size="sm"
@@ -1027,7 +991,7 @@ export default function WarningLetterPage() {
                   ) : (
                     <TableRow>
                       <TableCell
-                        colSpan={6}
+                        colSpan={5}
                         className="py-20 text-center text-slate-400 italic text-xl"
                       >
                         No approved extended leave requests (3+ days) found for
@@ -1065,9 +1029,7 @@ export default function WarningLetterPage() {
                   {historyEmployee?.name}
                 </p>
                 <p className="text-violet-200 text-[11px] uppercase tracking-wider mt-0.5">
-                  {historyEmployee?.type === "late"
-                    ? "Tardiness"
-                    : "Extended Leave"}{" "}
+                  {historyEmployee?.type === "late" ? "Tardiness" : "Leave"}{" "}
                   warnings
                 </p>
               </div>
@@ -1149,15 +1111,39 @@ export default function WarningLetterPage() {
                         Sent to
                       </p>
                       <div className="flex flex-wrap gap-1">
-                        {letter.recipients.map((email, i) => (
-                          <span
-                            key={i}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-slate-200 text-[10px] text-slate-600 font-medium"
-                          >
-                            <Mail className="w-2.5 h-2.5 opacity-50" />
-                            {email}
-                          </span>
-                        ))}
+                        {letter.recipients.map((recipient: any, i) => {
+                          const email =
+                            typeof recipient === "string"
+                              ? recipient
+                              : recipient.email;
+                          const type =
+                            typeof recipient === "string"
+                              ? null
+                              : recipient.type;
+                          return (
+                            <span
+                              key={i}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-slate-200 text-[10px] text-slate-600 font-medium shadow-sm"
+                            >
+                              <div
+                                className={cn(
+                                  "w-1.5 h-1.5 rounded-full",
+                                  type === "employee"
+                                    ? "bg-rose-400"
+                                    : type === "supervisor"
+                                      ? "bg-amber-400"
+                                      : "bg-slate-300",
+                                )}
+                              />
+                              <span className="opacity-70">
+                                {type
+                                  ? `${type.charAt(0).toUpperCase() + type.slice(1)}: `
+                                  : ""}
+                              </span>
+                              {email}
+                            </span>
+                          );
+                        })}
                       </div>
                     </div>
 

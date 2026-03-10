@@ -894,7 +894,10 @@ function FormLetterContent() {
             month: month,
             year: Number(year),
             cutoff: cutoff,
-            recipients: emailList,
+            recipients: recipients.map((r) => ({
+              email: r.email,
+              type: r.type,
+            })),
             forms_included: selectedForms,
           }),
         });

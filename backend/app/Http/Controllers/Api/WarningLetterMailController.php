@@ -52,7 +52,7 @@ class WarningLetterMailController extends Controller
             ], 422);
         }
 
-        $typeLabel = $letterType === 'late' ? 'Tardiness' : 'Extended Leave';
+        $typeLabel = $letterType === 'late' ? 'Tardiness' : 'Leave';
         $subject   = "Warning Letter – {$employeeName} ({$typeLabel})";
         $emailBody = $this->buildEmailBody($employeeName, $typeLabel);
 
