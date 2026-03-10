@@ -497,10 +497,6 @@ function EvaluateEmployeeForm() {
     if (Object.values(scores).some(s => s === '')) return toast.error('Please complete all rating criteria')
     if (!isEditMode) return toast.error('Click Edit Evaluation first to modify and save')
     if (!agreement) return toast.error('Please select agree or disagree')
-    if (!remarks.trim()) return toast.error('Please enter comments / remarks')
-    if (!ratedBy.trim()) return toast.error('Please enter the name of who rated this')
-    if (!reviewedBy.trim()) return toast.error('Please enter the name of who reviewed this')
-    if (!approvedBy.trim()) return toast.error('Please enter the name of who approved this')
 
     setIsSubmitting(true)
     try {
@@ -1064,10 +1060,10 @@ function EvaluateEmployeeForm() {
 
         {/* Manager Signatures */}
         <div className="mb-10">
-          <div className="font-bold uppercase mb-2 text-red-600 text-[12px]">Manager Approval Signatures <span className="text-xs">(Required)</span></div>
-          <div className="grid grid-cols-2 gap-x-20 gap-y-2 bg-red-50 border border-red-200 p-4">
+          <div className="font-bold uppercase mb-2 text-[12px]">Manager Approval Signatures</div>
+          <div className="grid grid-cols-2 gap-x-20 gap-y-2 bg-slate-50 border border-slate-200 p-4">
             <div className="flex gap-2 items-center">
-              <span className="min-w-[80px] font-semibold">Rated by: <span className="text-red-600">*</span></span>
+              <span className="min-w-[80px] font-semibold">Rated by:</span>
               <input 
                 type="text" 
                 className="flex-1 border-b border-black bg-transparent outline-none disabled:text-slate-500 disabled:cursor-not-allowed text-[13px]"
@@ -1083,7 +1079,7 @@ function EvaluateEmployeeForm() {
             </div>
             
             <div className="flex gap-2 items-center">
-              <span className="min-w-[80px] font-semibold">Reviewed by: <span className="text-red-600">*</span></span>
+              <span className="min-w-[80px] font-semibold">Reviewed by:</span>
               <input 
                 type="text" 
                 className="flex-1 border-b border-black bg-transparent outline-none disabled:text-slate-500 disabled:cursor-not-allowed text-[13px]"
@@ -1099,7 +1095,7 @@ function EvaluateEmployeeForm() {
             </div>
             
             <div className="flex gap-2 items-center">
-              <span className="min-w-[80px] font-semibold">Approved by: <span className="text-red-600">*</span></span>
+              <span className="min-w-[80px] font-semibold">Approved by:</span>
               <input 
                 type="text" 
                 className="flex-1 border-b border-black bg-transparent outline-none disabled:text-slate-500 disabled:cursor-not-allowed text-[13px]"
