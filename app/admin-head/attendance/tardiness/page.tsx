@@ -2014,6 +2014,7 @@ export default function AttendanceDashboard() {
               </div>
             </div>
           </div>
+
           {/* Secondary Toolbar */}
           <div className="border-t border-white/10 bg-white/5 backdrop-blur-sm overflow-x-auto no-scrollbar">
             <div className="w-full px-4 md:px-8 py-3">
@@ -2023,6 +2024,7 @@ export default function AttendanceDashboard() {
                   <span className="text-sm font-bold text-white/70 uppercase tracking-wider">
                     Year
                   </span>
+
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <div className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 min-w-[120px] justify-between shadow-sm font-bold inline-flex items-center whitespace-nowrap rounded-lg cursor-pointer group border-2">
@@ -2054,6 +2056,7 @@ export default function AttendanceDashboard() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
+
                 {/* Month Selection */}
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-bold text-white/70 uppercase tracking-wider">
@@ -2098,6 +2101,7 @@ export default function AttendanceDashboard() {
                   <span className="text-sm font-bold text-white/70 uppercase tracking-wider">
                     Period
                   </span>
+
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <div className="bg-white border-[#FFE5EC] text-[#800020] hover:bg-[#FFE5EC] transition-all duration-200 text-sm h-10 px-4 min-w-[180px] justify-between shadow-sm font-bold inline-flex items-center whitespace-nowrap rounded-lg cursor-pointer group border-2">
@@ -2111,6 +2115,7 @@ export default function AttendanceDashboard() {
                         <ChevronDown className="w-4 h-4 ml-2 opacity-50 group-hover:opacity-100 transition-opacity" />
                       </div>
                     </DropdownMenuTrigger>
+
                     <DropdownMenuContent
                       className="w-56 bg-white border-stone-200 shadow-xl rounded-xl p-1.5"
                       align="start"
@@ -2183,6 +2188,7 @@ export default function AttendanceDashboard() {
           </div>
         </div>
       </div>
+
       <div className="bg-white p-3 md:p-6 rounded-lg shadow-lg border-b-2 md:border-2 border-[#FFE5EC] space-y-6">
         <div
           className={cn(
@@ -2327,6 +2333,7 @@ export default function AttendanceDashboard() {
           </div>
         </div>
       </div>
+
       {/* Summary Sheet - only appears when Summary button is clicked */}
       {activeCutoffSummary && (
         <SummarySheet
@@ -2340,6 +2347,7 @@ export default function AttendanceDashboard() {
           leaves={leaves}
         />
       )}
+
       <Dialog open={showNewYearConfirm} onOpenChange={setShowNewYearConfirm}>
         <DialogContent className="bg-white border-2 border-[#FFE5EC] rounded-2xl max-w-sm">
           <DialogHeader className="flex flex-col items-center gap-4 text-center">

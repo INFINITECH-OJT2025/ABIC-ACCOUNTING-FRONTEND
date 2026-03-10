@@ -23,7 +23,6 @@ import { getApiUrl } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import {
   DropdownMenu,
@@ -1289,6 +1288,11 @@ export default function LeavePage() {
         }
       }
     }
+
+    // Ensure shift is cleared for whole-day leaves
+    if (inlineForm.category === "whole-day" && inlineForm.shift) {
+      setInlineForm((prev) => ({ ...prev, shift: "" }));
+    }
   }, [inlineForm.start_date, inlineForm.leave_end_date, inlineForm.category]);
 
   const getSuperiorsForEmployee = (empId: string | number | undefined) => {
@@ -1519,6 +1523,8 @@ export default function LeavePage() {
       leave_end_date: inlineForm.leave_end_date.split("T")[0],
       number_of_days: inlineForm.number_of_days,
       category: inlineForm.category as "half-day" | "whole-day",
+      shift:
+        inlineForm.category === "whole-day" ? "" : (inlineForm.shift ?? ""),
     };
     setPendingPayload(payload);
     setShowConfirm(true);
@@ -2191,38 +2197,40 @@ export default function LeavePage() {
                     <span className="text-[13px] font-extrabold text-[#4A081A] uppercase tracking-[0.05em] w-32 shrink-0 text-right">
                       START DATE:
                     </span>
-                    <DatePicker
+                    <Input
+                      type="date"
+                      max={inlineForm.leave_end_date || undefined}
                       value={inlineForm.start_date || ""}
-                      onChange={(date) => {
-                        if (date)
-                          setInlineForm((p) => ({
-                            ...p,
-                            start_date: date.toLocaleDateString("en-CA"),
-                          }));
-                      }}
-                      className="border-[#630C22] bg-white text-slate-700 flex-1 h-[48px] text-lg rounded-xl shadow-sm px-4 text-left w-full font-medium"
+                      onChange={(e) =>
+                        setInlineForm((p) => ({
+                          ...p,
+                          start_date: e.target.value,
+                        }))
+                      }
+                      className="border-[#630C22] bg-white text-slate-700 flex-1 h-[48px] text-lg rounded-xl shadow-sm px-4"
                     />
                   </div>
                   <div className="flex items-center gap-4">
                     <span className="text-[13px] font-extrabold text-[#4A081A] uppercase tracking-[0.05em] w-32 shrink-0 text-right">
                       LEAVE END:
                     </span>
-                    <DatePicker
+                    <Input
+                      type="date"
+                      min={inlineForm.start_date || undefined}
                       value={
                         inlineForm.category === "half-day"
                           ? inlineForm.start_date || ""
                           : inlineForm.leave_end_date || ""
                       }
                       disabled={inlineForm.category === "half-day"}
-                      onChange={(date) => {
-                        if (date)
-                          setInlineForm((p) => ({
-                            ...p,
-                            leave_end_date: date.toLocaleDateString("en-CA"),
-                          }));
-                      }}
+                      onChange={(e) =>
+                        setInlineForm((p) => ({
+                          ...p,
+                          leave_end_date: e.target.value,
+                        }))
+                      }
                       className={cn(
-                        "border-[#630C22] bg-white text-slate-700 flex-1 h-[48px] text-lg rounded-xl shadow-sm px-4 font-medium text-left w-full",
+                        "border-[#630C22] bg-white text-slate-700 flex-1 h-[48px] text-lg rounded-xl shadow-sm px-4 font-medium",
                         inlineForm.category === "half-day" &&
                           "opacity-60 cursor-not-allowed bg-slate-50 border-slate-300",
                       )}
@@ -2576,7 +2584,9 @@ export default function LeavePage() {
                             </span>
                           </td>
                           <td className="border border-rose-100 px-3 py-3 text-center text-slate-600 text-lg italic">
-                            {entry.shift || "—"}
+                            {entry.category === "whole-day"
+                              ? "—"
+                              : entry.shift || "—"}
                           </td>
                           <td className="border border-rose-100 px-3 py-3 text-center text-slate-600 text-lg font-medium">
                             {formatDisplayDate(entry.start_date)}
