@@ -19,6 +19,8 @@ class SentWarningLetter extends Model
         'cutoff',
         'recipients',     // JSON array of email addresses
         'forms_included', // JSON array e.g. ['form1','form2']
+        'form1_body',
+        'form2_body',
         'sent_at',
     ];
 

@@ -8,7 +8,6 @@ import {
   Printer,
   Mail,
   Loader2,
-  Download,
   CheckCircle2,
   ChevronDown,
   FileText,
@@ -16,9 +15,11 @@ import {
   Trash2,
   User,
   Edit3,
-  Check,
   Calendar,
   ShieldCheck,
+  History,
+  ScrollText,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 
 // --- Skeleton Component ---
@@ -107,6 +109,38 @@ const formatDateLong = (dateStr: string) => {
   });
 };
 
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+const numberToText = (n: number) => {
+  const texts = [
+    "zero",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+  ];
+  return texts[n] || n.toString();
+};
+
 // --- Dynamic Schedule Types & Helpers ---
 interface ShiftInfo {
   startTimeMinutes: number;
@@ -141,6 +175,100 @@ const DEFAULT_SHIFT_SCHEDULES: Record<string, ShiftInfo> = {
     gracePeriodMinutes: 10 * 60 + 5,
     displayName: "10:00 AM",
   },
+};
+
+const getFriendlyErrorMessage = (msg: string) => {
+  const lower = msg.toLowerCase();
+  if (
+    lower.includes("connection could not be established") ||
+    lower.includes("stream_socket_client") ||
+    lower.includes("unable to connect") ||
+    lower.includes("failed to respond")
+  ) {
+    return "Server Connection Error: Could not connect to the email server. This is often caused by network issues or firewall blocks. Please try again later or contact your IT representative.";
+  }
+  if (
+    lower.includes("authentication failed") ||
+    lower.includes("username and password not accepted") ||
+    lower.includes("5.7.8")
+  ) {
+    return "Email Login Error: The system was unable to log into the official email account. The password might have changed or expired. Please contact support.";
+  }
+  if (lower.includes("timed out") || lower.includes("timeout")) {
+    return "Connection Timeout: The email server is taking too long to respond. Please check your connection and try again.";
+  }
+  return msg;
+};
+
+// ── Convert oklch/lab/lch values → real hex using browser canvas ────
+const fixModernColors = (clonedDoc: Document) => {
+  const cvs = document.createElement("canvas");
+  cvs.width = cvs.height = 1;
+  const ctx2d = cvs.getContext("2d")!;
+  const cache = new Map<string, string>();
+
+  const toHex = (raw: string): string => {
+    if (cache.has(raw)) return cache.get(raw)!;
+    try {
+      ctx2d.clearRect(0, 0, 1, 1);
+      ctx2d.fillStyle = "#000";
+      ctx2d.fillStyle = raw;
+      ctx2d.fillRect(0, 0, 1, 1);
+      const [r, g, b, a] = ctx2d.getImageData(0, 0, 1, 1).data;
+      const hex =
+        a === 0
+          ? "transparent"
+          : "#" +
+            [r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("");
+      cache.set(raw, hex);
+      return hex;
+    } catch {
+      cache.set(raw, "#222222");
+      return "#222222";
+    }
+  };
+
+  const fixCss = (css: string): string => {
+    const FN = /\b(?:oklch|lab|lch|color-mix|color)\s*\([^()]*\)/gi;
+    let prev = "";
+    let out = css;
+    for (let pass = 0; pass < 8 && out !== prev; pass++) {
+      prev = out;
+      out = out.replace(FN, (m) => toHex(m));
+    }
+    return out;
+  };
+
+  clonedDoc.querySelectorAll("style").forEach((s) => {
+    if (s.textContent) s.textContent = fixCss(s.textContent);
+  });
+
+  const cloneWin = clonedDoc.defaultView ?? window;
+  const needsFix = (v: string | undefined) =>
+    !!v && /\b(?:oklch|lab|lch|color-mix)\s*\(/i.test(v);
+
+  (
+    [
+      "color",
+      "backgroundColor",
+      "borderTopColor",
+      "borderRightColor",
+      "borderBottomColor",
+      "borderLeftColor",
+      "outlineColor",
+      "textDecorationColor",
+    ] as const
+  ).forEach((prop) => {
+    clonedDoc.querySelectorAll<HTMLElement>("*").forEach((node) => {
+      const val = cloneWin.getComputedStyle(node)[
+        prop as keyof CSSStyleDeclaration
+      ] as string | undefined;
+      if (needsFix(val)) {
+        const css = prop.replace(/([A-Z])/g, "-$1").toLowerCase();
+        node.style.setProperty(css, toHex(val!), "important");
+      }
+    });
+  });
 };
 
 function formatTime(timeStr: string): string {
@@ -197,21 +325,10 @@ function FormLetterContent() {
   const month = searchParams.get("month");
   const year = searchParams.get("year");
   const cutoff = searchParams.get("cutoff");
+  const mode = searchParams.get("mode");
+  const letterId = searchParams.get("letterId");
+  const isReviewMode = mode === "review";
 
-  const months = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-  ];
   const [employee, setEmployee] = useState<any>(null);
   const [entries, setEntries] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -248,6 +365,85 @@ function FormLetterContent() {
   const [templatesLoaded, setTemplatesLoaded] = useState(false);
   const [hasSupervisor, setHasSupervisor] = useState(false);
   const [supervisorResolved, setSupervisorResolved] = useState(false);
+
+  // --- Memoized Helpers ---
+  const salutationPrefix = useMemo(
+    () => (employee?.gender?.toLowerCase() === "male" ? "Mr." : "Ms."),
+    [employee?.gender],
+  );
+
+  const lastName = useMemo(
+    () => employee?.last_name || employee?.name?.split(" ").pop() || "",
+    [employee?.name, employee?.last_name],
+  );
+
+  const { shiftTime, gracePeriod } = useMemo(() => {
+    if (!employee) return { shiftTime: "", gracePeriod: "" };
+    const department = employee?.department || employee?.office_name;
+    let currentShift =
+      dynamicSchedules["ABIC"] || DEFAULT_SHIFT_SCHEDULES["ABIC"];
+    if (department) {
+      const normalized = department.toUpperCase().trim();
+      if (dynamicSchedules[normalized])
+        currentShift = dynamicSchedules[normalized];
+      else {
+        const mappedOffice = deptMap[normalized];
+        if (mappedOffice && dynamicSchedules[mappedOffice])
+          currentShift = dynamicSchedules[mappedOffice];
+      }
+    }
+    const st = currentShift.displayName;
+    const gpMinutes = currentShift.gracePeriodMinutes;
+    const gpHours = Math.floor(gpMinutes / 60);
+    const gpMins = gpMinutes % 60;
+    const gp = `${gpHours % 12 || 12}:${String(gpMins).padStart(2, "0")} ${gpHours >= 12 ? "PM" : "AM"}`;
+    return { shiftTime: st, gracePeriod: gp };
+  }, [employee, dynamicSchedules, deptMap]);
+
+  const today = useMemo(
+    () =>
+      new Date().toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      }),
+    [],
+  );
+
+  const cutoffText = useMemo(
+    () => (cutoff === "cutoff1" ? "first cutoff" : "second cutoff"),
+    [cutoff],
+  );
+
+  // --- History Drawer State ---
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLetters, setHistoryLetters] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  const fetchHistory = async () => {
+    if (!employeeId) return;
+    setHistoryLoading(true);
+    try {
+      const res = await fetch(
+        `${getApiUrl()}/api/sent-warning-letters?employee_id=${employeeId}`,
+      );
+      const data = await res.json();
+      if (data.success) {
+        // Filter by type (tardiness or leave)
+        const filtered = data.data.filter((h: any) => h.type === type);
+        setHistoryLetters(filtered);
+      }
+    } catch (e) {
+      console.error("Failed to load history:", e);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const openHistory = () => {
+    setHistoryOpen(true);
+    fetchHistory();
+  };
 
   useEffect(() => {
     const fetchTemplates = async () => {
@@ -294,7 +490,6 @@ function FormLetterContent() {
                 slug.startsWith("supervisor") &&
                 t.body.includes("Dear Ma'am Angely,")
                   ? t.body.replace(
-                      /Dear Ma'am Angely,/g,
                       "Dear {{salutation}} {{supervisor first name}},",
                     )
                   : t.body;
@@ -613,12 +808,12 @@ function FormLetterContent() {
             const m = date.getMonth();
             const day = date.getDate();
             const co = day <= 15 ? "cutoff1" : "cutoff2";
-            const key = `${months[m]}-${co}`;
+            const key = `${MONTHS[m]}-${co}`;
 
             if (!leaveGroups.has(key)) {
               leaveGroups.set(key, {
                 ...e,
-                month: months[m],
+                month: MONTHS[m],
                 cutoff: co,
                 total_days: Number(e.number_of_days),
               });
@@ -650,6 +845,28 @@ function FormLetterContent() {
           );
 
           setEntries(filtered);
+        }
+      }
+      // --- Historical Data for Review ---
+      if (isReviewMode && letterId) {
+        try {
+          const res = await fetch(`${getApiUrl()}/api/sent-warning-letters`);
+          const data = await res.json();
+          if (data.success) {
+            const history = data.data.find(
+              (h: any) => String(h.id) === String(letterId),
+            );
+            if (history) {
+              if (history.form1_body) setF1Body(history.form1_body);
+              if (history.form2_body) setF2Body(history.form2_body);
+              if (history.recipients) setRecipients(history.recipients);
+              if (history.forms_included)
+                setSelectedForms(history.forms_included);
+              setHasInitializedContent(true);
+            }
+          }
+        } catch (e) {
+          console.error("Failed to load historical bodies:", e);
         }
       }
     } catch (error) {
@@ -724,98 +941,6 @@ function FormLetterContent() {
         const el = document.getElementById(id);
         if (!el) continue;
 
-        // ── Convert oklch/lab/lch values → real hex using browser canvas ────
-        // html2canvas can't parse oklch/lab, but the BROWSER can — we use an
-        // offscreen canvas as a colour parser: set fillStyle to the oklch value,
-        // read the sRGB pixel, get the proper hex colour back.
-        // This preserves exact brand colours (maroon stays maroon, etc.).
-        const fixModernColors = (clonedDoc: Document) => {
-          // ── a) Canvas-based colour converter ──────────────────────────────
-          const cvs = document.createElement("canvas");
-          cvs.width = cvs.height = 1;
-          const ctx2d = cvs.getContext("2d")!;
-          const cache = new Map<string, string>();
-
-          const toHex = (raw: string): string => {
-            if (cache.has(raw)) return cache.get(raw)!;
-            try {
-              ctx2d.clearRect(0, 0, 1, 1);
-              ctx2d.fillStyle = "#000"; // reset sentinel
-              ctx2d.fillStyle = raw; // browser parses oklch → sRGB internally
-              ctx2d.fillRect(0, 0, 1, 1);
-              const [r, g, b, a] = ctx2d.getImageData(0, 0, 1, 1).data;
-              const hex =
-                a === 0
-                  ? "transparent"
-                  : "#" +
-                    [r, g, b]
-                      .map((v) => v.toString(16).padStart(2, "0"))
-                      .join("");
-              cache.set(raw, hex);
-              return hex;
-            } catch {
-              cache.set(raw, "#222222");
-              return "#222222";
-            }
-          };
-
-          // ── b) Convert colour functions in a CSS string (handles nesting) ─
-          const fixCss = (css: string): string => {
-            // Multi-pass: each pass collapses one nesting level
-            //   e.g. color-mix(in oklch, oklch(0.5 0.2 120), white)
-            //   pass 1: oklch(0.5 0.2 120) → #559f49
-            //   pass 2: color-mix(in oklch, #559f49, white) → canvas
-            const FN = /\b(?:oklch|lab|lch|color-mix|color)\s*\([^()]*\)/gi;
-            let prev = "";
-            let out = css;
-            for (let pass = 0; pass < 8 && out !== prev; pass++) {
-              prev = out;
-              out = out.replace(FN, (m) => toHex(m));
-            }
-            return out;
-          };
-
-          // ── c) Patch all <style> textContent ──────────────────────────────
-          // In Next.js dev mode Turbopack injects ALL Tailwind CSS as <style>
-          // tags, so this covers the entire colour palette.
-          clonedDoc.querySelectorAll("style").forEach((s) => {
-            if (s.textContent) s.textContent = fixCss(s.textContent);
-          });
-
-          // ── d) <link> stylesheets — keep them (they're font imports in dev)
-          //    html2canvas fetches them but they won't contain oklch in dev mode.
-
-          // ── e) Safety pass: set inline styles on any element whose computed
-          //    color property still contains a modern color fn (e.g. from a CSS
-          //    custom-property that wasn't inlined in the style tag).
-          const cloneWin = clonedDoc.defaultView ?? window;
-          const needsFix = (v: string | undefined) =>
-            !!v && /\b(?:oklch|lab|lch|color-mix)\s*\(/i.test(v);
-
-          (
-            [
-              "color",
-              "backgroundColor",
-              "borderTopColor",
-              "borderRightColor",
-              "borderBottomColor",
-              "borderLeftColor",
-              "outlineColor",
-              "textDecorationColor",
-            ] as const
-          ).forEach((prop) => {
-            clonedDoc.querySelectorAll<HTMLElement>("*").forEach((node) => {
-              const val = cloneWin.getComputedStyle(node)[
-                prop as keyof CSSStyleDeclaration
-              ] as string | undefined;
-              if (needsFix(val)) {
-                const css = prop.replace(/([A-Z])/g, "-$1").toLowerCase();
-                node.style.setProperty(css, toHex(val!), "important");
-              }
-            });
-          });
-        };
-
         // Render the DOM element to a canvas at 2× for crisp output
         const canvas = await html2canvas(el as HTMLElement, {
           scale: 2,
@@ -867,13 +992,15 @@ function FormLetterContent() {
           pdf_base64: pdfBase64,
         }),
       });
-
       const data = await res.json();
       toast.dismiss(sendToast);
 
       if (!res.ok || !data.success) {
-        const msg = data.message || "Failed to send email.";
-        toast.error(`Email Error: ${msg}`);
+        const rawMsg = data.message || "Failed to send email.";
+        const userFriendlyMsg = getFriendlyErrorMessage(rawMsg);
+        toast.error(`Email Error: ${userFriendlyMsg}`, {
+          duration: 10000, // Show longer so user can read
+        });
         setIsSending(false);
         return;
       }
@@ -899,6 +1026,8 @@ function FormLetterContent() {
               type: r.type,
             })),
             forms_included: selectedForms,
+            form1_body: selectedForms.includes("form1") ? f1Body : null,
+            form2_body: selectedForms.includes("form2") ? f2Body : null,
           }),
         });
       } catch (e) {
@@ -906,7 +1035,20 @@ function FormLetterContent() {
       }
     } catch (err: any) {
       toast.dismiss();
-      toast.error(`Error: ${err?.message ?? "Unknown error"}`);
+      const rawMsg = err?.message || "Something went wrong.";
+      const lower = rawMsg.toLowerCase();
+      let userFriendly = rawMsg;
+
+      if (
+        lower.includes("failed to fetch") ||
+        lower.includes("network error") ||
+        lower.includes("internet")
+      ) {
+        userFriendly =
+          "Network connectivity issues. Please check your internet and try again.";
+      }
+
+      toast.error(`Error: ${userFriendly}`, { duration: 8000 });
     } finally {
       setIsSending(false);
     }
@@ -936,7 +1078,7 @@ function FormLetterContent() {
 
   // Confidentiality Logic: Remove employee if Form 1 is selected
   useEffect(() => {
-    if (!employee) return;
+    if (!employee || isReviewMode) return;
 
     const hasForm1 = selectedForms.includes("form1");
     const hasEmployeeRecipient = recipients.some(
@@ -974,7 +1116,7 @@ function FormLetterContent() {
     } else if (!hasForm1 && hasSupervisorRecipient) {
       setRecipients((prev) => prev.filter((r: any) => r.type !== "supervisor"));
     }
-  }, [selectedForms, employee, supervisorEmail]);
+  }, [selectedForms, employee, supervisorEmail, isReviewMode]);
 
   // --- Content Initialization for Editing ---
   useEffect(() => {
@@ -984,7 +1126,8 @@ function FormLetterContent() {
       !hasInitializedContent &&
       !isLoading &&
       templatesLoaded &&
-      supervisorResolved
+      supervisorResolved &&
+      !isReviewMode
     ) {
       // Helper to process template or fallback
       const generateInitialBodies = () => {
@@ -996,32 +1139,6 @@ function FormLetterContent() {
                 0,
               )
             : entries.length;
-
-        const salutationPrefix =
-          employee.gender?.toLowerCase() === "male" ? "Mr." : "Ms.";
-        const lastName = employee.last_name || employee.name.split(" ").pop();
-        const cutoffText =
-          cutoff === "cutoff1" ? "first cutoff" : "second cutoff";
-
-        // Resolve Shift Info
-        const department = employee?.department || employee?.office_name;
-        let currentShift =
-          dynamicSchedules["ABIC"] || DEFAULT_SHIFT_SCHEDULES["ABIC"];
-        if (department) {
-          const normalized = department.toUpperCase().trim();
-          if (dynamicSchedules[normalized])
-            currentShift = dynamicSchedules[normalized];
-          else {
-            const mappedOffice = deptMap[normalized];
-            if (mappedOffice && dynamicSchedules[mappedOffice])
-              currentShift = dynamicSchedules[mappedOffice];
-          }
-        }
-        const shiftTime = currentShift.displayName;
-        const gracePeriodMinutes = currentShift.gracePeriodMinutes;
-        const gracePeriodHours = Math.floor(gracePeriodMinutes / 60);
-        const gracePeriodMins = gracePeriodMinutes % 60;
-        const gracePeriod = `${gracePeriodHours % 12 || 12}:${String(gracePeriodMins).padStart(2, "0")} ${gracePeriodHours >= 12 ? "PM" : "AM"}`;
 
         // 3. Process and Clean Entry List (with Expansion for multi-day Leave)
         const processedEntries =
@@ -1241,61 +1358,6 @@ function FormLetterContent() {
     else letterTitle = "LEAVE WARNING LETTER";
   }
 
-  const today = new Date().toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
-  const cutoffText = cutoff === "cutoff1" ? "first cutoff" : "second cutoff";
-  const salutationPrefix =
-    employee.gender?.toLowerCase() === "male" ? "Mr." : "Ms.";
-  const lastName = employee.last_name || employee.name.split(" ").pop();
-
-  // Determine Dynamic Shift
-  const getEmployeeShift = (emp: any) => {
-    const department = emp?.department || emp?.office_name;
-    if (!department)
-      return dynamicSchedules["ABIC"] || DEFAULT_SHIFT_SCHEDULES["ABIC"];
-
-    const normalized = department.toUpperCase().trim();
-    if (dynamicSchedules[normalized]) return dynamicSchedules[normalized];
-
-    const mappedOffice = deptMap[normalized];
-    if (mappedOffice && dynamicSchedules[mappedOffice])
-      return dynamicSchedules[mappedOffice];
-
-    const partial = Object.keys(dynamicSchedules).find(
-      (off: string) => normalized.includes(off) || off.includes(normalized),
-    );
-    if (partial) return dynamicSchedules[partial];
-
-    return dynamicSchedules["ABIC"] || DEFAULT_SHIFT_SCHEDULES["ABIC"];
-  };
-
-  const currentShift = getEmployeeShift(employee);
-  const shiftTime = currentShift.displayName;
-  const gracePeriodMinutes = currentShift.gracePeriodMinutes;
-  const gracePeriodHours = Math.floor(gracePeriodMinutes / 60);
-  const gracePeriodMins = gracePeriodMinutes % 60;
-  const gracePeriod = `${gracePeriodHours % 12 || 12}:${String(gracePeriodMins).padStart(2, "0")} ${gracePeriodHours >= 12 ? "PM" : "AM"}`;
-
-  const numberToText = (n: number) => {
-    const texts = [
-      "zero",
-      "one",
-      "two",
-      "three",
-      "four",
-      "five",
-      "six",
-      "seven",
-      "eight",
-      "nine",
-      "ten",
-    ];
-    return texts[n] || n.toString();
-  };
-
   const toggleForm = (formId: string) => {
     setSelectedForms((prev) =>
       prev.includes(formId)
@@ -1336,7 +1398,7 @@ function FormLetterContent() {
             <Button
               variant="outline"
               onClick={() => router.back()}
-              className="bg-white border-transparent text-[#7B0F2B] hover:bg-rose-50 hover:text-[#4A081A] shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg flex items-center gap-2"
+              className="bg-white text-[#7B0F2B] hover:bg-white hover:text-[#7B0F2B] border-transparent shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg flex items-center gap-2"
             >
               <ChevronLeft className="w-4 h-4" />
               <span>BACK</span>
@@ -1348,6 +1410,12 @@ function FormLetterContent() {
         <div className="border-t border-white/10 bg-white/5 backdrop-blur-sm overflow-x-auto no-scrollbar">
           <div className="w-full px-4 md:px-8 py-3">
             <div className="flex items-center justify-end gap-3 md:gap-4 min-w-max md:min-w-0">
+              {isReviewMode && (
+                <Badge className="bg-amber-100 text-amber-700 border-amber-200 px-4 py-1.5 rounded-full font-black uppercase tracking-widest animate-pulse h-10 shadow-sm">
+                  Reviewing Sent Letter
+                </Badge>
+              )}
+
               <Button
                 onClick={() => setIsEditMode(!isEditMode)}
                 variant="outline"
@@ -1356,10 +1424,11 @@ function FormLetterContent() {
                   isEditMode
                     ? "bg-amber-100 text-amber-900 border-amber-200 hover:bg-amber-200"
                     : "bg-white border-transparent text-[#7B0F2B] hover:bg-rose-50 hover:text-[#4A081A]",
+                  isReviewMode && "hidden",
                 )}
               >
                 {isEditMode ? (
-                  <Check className="w-4 h-4" />
+                  <CheckCircle2 className="w-4 h-4" />
                 ) : (
                   <Edit3 className="w-4 h-4" />
                 )}
@@ -1367,21 +1436,32 @@ function FormLetterContent() {
               </Button>
 
               <Button
+                onClick={openHistory}
                 variant="outline"
+                className="h-10 px-4 rounded-lg font-bold bg-white border-transparent text-[#7B0F2B] hover:bg-rose-50 hover:text-[#4A081A] shadow-sm transition-all text-sm uppercase tracking-wider gap-2 active:scale-95"
+              >
+                <History className="w-4 h-4" />
+                View History
+              </Button>
+
+              <Button
                 onClick={handlePrint}
-                className="bg-white border-transparent text-[#7B0F2B] hover:bg-rose-50 hover:text-[#4A081A] shadow-sm transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg flex items-center gap-2"
+                variant="outline"
+                className="h-10 px-4 rounded-lg font-bold bg-white border-transparent text-[#7B0F2B] hover:bg-rose-50 hover:text-[#4A081A] shadow-sm transition-all text-sm uppercase tracking-wider gap-2 active:scale-95"
               >
                 <Printer className="w-4 h-4" />
-                <span>Print PDF</span>
+                Print Letter
               </Button>
 
               <Popover open={isActionOpen} onOpenChange={setIsActionOpen}>
                 <PopoverTrigger asChild>
-                  <Button className="h-10 px-6 rounded-lg font-black gap-2 bg-white border border-white text-[#A4163A] hover:bg-rose-100 shadow-md active:scale-95 transition-all w-auto uppercase tracking-widest">
-                    <Mail className="w-4 h-4" />
-                    Send via Email
-                    <ChevronDown className="w-4 h-4" />
-                  </Button>
+                  {!isReviewMode && (
+                    <Button className="h-10 px-6 rounded-lg font-black gap-2 bg-white border border-white text-[#A4163A] hover:bg-rose-100 shadow-md active:scale-95 transition-all w-auto uppercase tracking-widest">
+                      <Mail className="w-4 h-4" />
+                      Send via Email
+                      <ChevronDown className="w-4 h-4" />
+                    </Button>
+                  )}
                 </PopoverTrigger>
                 <PopoverContent
                   className="w-72 p-0 rounded-2xl border-stone-200 shadow-2xl overflow-hidden"
@@ -1652,6 +1732,199 @@ function FormLetterContent() {
           }
         }
       `}</style>
+
+      {/* -------- HISTORY DRAWER -------- */}
+      {historyOpen && (
+        <div className="fixed inset-0 z-[100] flex justify-end print:hidden">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/30 backdrop-blur-[2px]"
+            onClick={() => setHistoryOpen(false)}
+          />
+          {/* Panel */}
+          <div className="relative w-full max-w-lg bg-white shadow-2xl flex flex-col h-full overflow-hidden animate-in slide-in-from-right-8 duration-200">
+            {/* Panel Header */}
+            <div className="bg-gradient-to-r from-[#CB2F56] to-[#A4163A] px-6 py-5 flex items-start justify-between gap-4 shrink-0">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <ScrollText className="w-5 h-5 text-white/90" />
+                  <span className="text-white font-black text-base uppercase tracking-widest">
+                    Letter History
+                  </span>
+                </div>
+                <p className="text-white/90 text-sm font-semibold leading-tight">
+                  {employee?.name}
+                </p>
+                <p className="text-white/70 text-[11px] uppercase tracking-wider mt-0.5">
+                  {type === "late" ? "Tardiness" : "Leave"} warnings
+                </p>
+              </div>
+              <button
+                onClick={() => setHistoryOpen(false)}
+                className="rounded-full bg-white/10 hover:bg-white/20 p-1.5 transition-colors cursor-pointer mt-0.5"
+              >
+                <X className="w-4 h-4 text-white" />
+              </button>
+            </div>
+
+            {/* Panel Body */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-slate-50/50">
+              {historyLoading ? (
+                <div className="flex items-center justify-center py-20 gap-2 text-slate-400">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span className="text-sm font-medium">Loading history…</span>
+                </div>
+              ) : historyLetters.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
+                  <ScrollText className="w-10 h-10 opacity-30" />
+                  <p className="text-sm font-semibold text-center">
+                    No letters have been sent yet for this employee.
+                  </p>
+                </div>
+              ) : (
+                historyLetters.map((letter: any) => (
+                  <div
+                    key={letter.id}
+                    className="group p-5 rounded-2xl border border-slate-100 bg-white hover:border-rose-100 hover:bg-rose-50/20 transition-all duration-300 shadow-sm"
+                  >
+                    {/* Top row: warning badge + date */}
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <span
+                        className={cn(
+                          "px-2.5 py-1 rounded-md font-bold text-[10px] border tracking-wider uppercase",
+                          letter.warning_level === 1
+                            ? "bg-amber-50 text-amber-700 border-amber-200"
+                            : letter.warning_level === 2
+                              ? "bg-orange-50 text-orange-700 border-orange-200"
+                              : "bg-red-50 text-red-700 border-red-200",
+                        )}
+                      >
+                        {letter.warning_level === 1
+                          ? "1st Warning"
+                          : letter.warning_level === 2
+                            ? "2nd Warning"
+                            : "For Consultation"}
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        {new Date(letter.sent_at).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </div>
+
+                    {/* Period */}
+                    <div className="flex items-center gap-1.5 text-xs text-slate-700 mb-4 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                      <Calendar className="w-3.5 h-3.5 text-[#A4163A]" />
+                      <span className="font-bold">
+                        {letter.month} {letter.year}{" "}
+                        <span className="text-slate-400 font-normal">
+                          (
+                          {letter.cutoff === "cutoff1"
+                            ? "1st–15th"
+                            : "16th–End"}
+                          )
+                        </span>
+                      </span>
+                    </div>
+
+                    {/* Recipients */}
+                    <div className="space-y-2 mb-4">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        Sent to
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {letter.recipients.map((recipient: any, i: number) => {
+                          const email =
+                            typeof recipient === "string"
+                              ? recipient
+                              : recipient.email;
+                          const rType =
+                            typeof recipient === "string"
+                              ? null
+                              : recipient.type;
+                          return (
+                            <span
+                              key={i}
+                              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-100 text-[11px] text-slate-600 font-semibold shadow-sm"
+                            >
+                              <div
+                                className={cn(
+                                  "w-1.5 h-1.5 rounded-full",
+                                  rType === "employee"
+                                    ? "bg-[#A4163A]"
+                                    : rType === "supervisor"
+                                      ? "bg-amber-400"
+                                      : "bg-slate-300",
+                                )}
+                              />
+                              <span className="opacity-60">
+                                {rType
+                                  ? `${rType.charAt(0).toUpperCase() + rType.slice(1)}: `
+                                  : ""}
+                              </span>
+                              {email}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Forms included */}
+                    <div className="flex items-center justify-between border-t border-slate-50 pt-3">
+                      <div className="flex items-center gap-2">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                          Forms:
+                        </p>
+                        <div className="flex gap-1.5">
+                          {letter.forms_included.map((f: string) => (
+                            <span
+                              key={f}
+                              className="px-2.5 py-1 rounded-full bg-rose-50 border border-rose-100 text-[#A4163A] text-[10px] font-black uppercase tracking-wider"
+                            >
+                              {f === "form1" ? "Supervisor" : "Employee"}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          router.push(
+                            `/admin-head/attendance/warning-letter/forms-letter?employeeId=${letter.employee_id}&type=${letter.type}&month=${letter.month}&year=${letter.year}&cutoff=${letter.cutoff}&mode=review&letterId=${letter.id}`,
+                          );
+                          setHistoryOpen(false);
+                        }}
+                        className="h-8 text-xs font-bold text-[#A4163A] hover:bg-rose-50 px-3 rounded-lg flex items-center gap-1.5"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        Review
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Panel Footer */}
+            <div className="shrink-0 border-t border-slate-100 px-6 py-5 bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                  Total Records
+                </span>
+                <Badge className="bg-rose-50 text-[#A4163A] border-rose-100 font-bold px-3">
+                  {historyLetters.length} Letter
+                  {historyLetters.length !== 1 ? "s" : ""}
+                </Badge>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

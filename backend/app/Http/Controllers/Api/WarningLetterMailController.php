@@ -69,9 +69,25 @@ class WarningLetterMailController extends Controller
 
         if (!empty($errors)) {
             $firstError = array_values($errors)[0];
+            $friendly = $firstError;
+            $low = strtolower($firstError);
+
+            if (str_contains($low, 'connection could not be established') ||
+                str_contains($low, 'stream_socket_client') ||
+                str_contains($low, 'unable to connect') ||
+                str_contains($low, 'failed to respond')) {
+                $friendly = "Network Problem: The system cannot reach the email server. Please check your internet connection or contact maintenance if this persists.";
+            } elseif (str_contains($low, 'authentication failed') ||
+                       str_contains($low, '5.7.8') ||
+                       str_contains($low, 'password not accepted')) {
+                $friendly = "System Login Error: The email service refused the system's credentials. Please verify your email configuration or contact your admin.";
+            } elseif (str_contains($low, 'timed out') || str_contains($low, 'timeout')) {
+                $friendly = "Server Timeout: The email server took too long to respond. Please try again.";
+            }
+
             return response()->json([
                 'success' => false,
-                'message' => 'Email delivery failed: ' . $firstError,
+                'message' => 'Delivery Failed: ' . $friendly,
                 'errors'  => $errors,
             ], 500);
         }

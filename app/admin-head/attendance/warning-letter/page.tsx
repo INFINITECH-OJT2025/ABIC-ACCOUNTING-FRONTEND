@@ -154,6 +154,8 @@ interface SentLetter {
   cutoff: string;
   recipients: (string | { email: string; type: string })[];
   forms_included: string[];
+  form1_body?: string;
+  form2_body?: string;
   sent_at: string;
 }
 
@@ -814,7 +816,7 @@ export default function WarningLetterPage() {
                                 "late",
                               )
                             }
-                            className="text-violet-600 hover:text-violet-700 hover:bg-violet-50 rounded-xl font-bold gap-1.5 text-xs h-8 px-3 border border-transparent hover:border-violet-100 transition-all cursor-pointer"
+                            className="text-[#800020] hover:text-[#4A081A] hover:bg-rose-50 rounded-xl font-bold gap-1.5 text-xs h-8 px-3 border border-transparent hover:border-rose-100 transition-all cursor-pointer"
                           >
                             <History className="w-3.5 h-3.5" />
                             View
@@ -980,7 +982,7 @@ export default function WarningLetterPage() {
                                 "leave",
                               )
                             }
-                            className="text-violet-600 hover:text-violet-700 hover:bg-violet-50 rounded-xl font-bold gap-1.5 text-xs h-8 px-3 border border-transparent hover:border-violet-100 transition-all cursor-pointer"
+                            className="text-[#800020] hover:text-[#4A081A] hover:bg-rose-50 rounded-xl font-bold gap-1.5 text-xs h-8 px-3 border border-transparent hover:border-rose-100 transition-all cursor-pointer"
                           >
                             <History className="w-3.5 h-3.5" />
                             View
@@ -1015,9 +1017,9 @@ export default function WarningLetterPage() {
             onClick={() => setHistoryOpen(false)}
           />
           {/* Panel */}
-          <div className="relative w-full max-w-md bg-white shadow-2xl flex flex-col h-full overflow-hidden animate-in slide-in-from-right-8 duration-200">
+          <div className="relative w-full max-w-lg bg-white shadow-2xl flex flex-col h-full overflow-hidden animate-in slide-in-from-right-8 duration-200">
             {/* Panel Header */}
-            <div className="bg-gradient-to-r from-violet-600 to-violet-500 px-6 py-5 flex items-start justify-between gap-4 shrink-0">
+            <div className="bg-gradient-to-r from-[#CB2F56] to-[#A4163A] px-6 py-5 flex items-start justify-between gap-4 shrink-0">
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <ScrollText className="w-5 h-5 text-white/90" />
@@ -1025,10 +1027,10 @@ export default function WarningLetterPage() {
                     Letter History
                   </span>
                 </div>
-                <p className="text-violet-100 text-sm font-semibold leading-tight">
+                <p className="text-white/90 text-sm font-semibold leading-tight">
                   {historyEmployee?.name}
                 </p>
-                <p className="text-violet-200 text-[11px] uppercase tracking-wider mt-0.5">
+                <p className="text-white/70 text-[11px] uppercase tracking-wider mt-0.5">
                   {historyEmployee?.type === "late" ? "Tardiness" : "Leave"}{" "}
                   warnings
                 </p>
@@ -1059,7 +1061,7 @@ export default function WarningLetterPage() {
                 historyLetters.map((letter) => (
                   <div
                     key={letter.id}
-                    className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 space-y-3 hover:border-violet-100 hover:bg-violet-50/20 transition-colors"
+                    className="group p-5 rounded-2xl border border-slate-100 bg-white hover:border-rose-100 hover:bg-rose-50/20 transition-all duration-300 shadow-sm"
                   >
                     {/* Top row: warning badge + date */}
                     <div className="flex items-center justify-between gap-2">
@@ -1153,10 +1155,10 @@ export default function WarningLetterPage() {
                         Forms:
                       </p>
                       <div className="flex gap-1">
-                        {letter.forms_included.map((f) => (
+                        {letter.forms_included.map((f: any) => (
                           <span
                             key={f}
-                            className="px-2 py-0.5 rounded-full bg-violet-50 border border-violet-100 text-violet-600 text-[10px] font-bold uppercase tracking-wider"
+                            className="px-2 py-0.5 rounded-full bg-rose-50 border border-rose-100 text-[#A4163A] text-[10px] font-bold uppercase tracking-wider"
                           >
                             {f === "form1" ? "Supervisor" : "Employee"}
                           </span>

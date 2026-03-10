@@ -47,6 +47,8 @@ class SentWarningLetterController extends Controller
             'cutoff'         => 'required|string',
             'recipients'     => 'required|array',
             'forms_included' => 'required|array',
+            'form1_body'     => 'nullable|string',
+            'form2_body'     => 'nullable|string',
         ]);
 
         $letter = SentWarningLetter::create($validated);
