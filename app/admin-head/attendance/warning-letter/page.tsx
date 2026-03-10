@@ -18,6 +18,9 @@ import {
   ShieldAlert,
   ClipboardEdit,
   CheckCircle2,
+  History,
+  X,
+  ScrollText,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -140,6 +143,20 @@ interface LeaveEntry {
   is_email_sent?: boolean;
 }
 
+interface SentLetter {
+  id: number;
+  employee_id: string | number;
+  employee_name: string;
+  type: "late" | "leave";
+  warning_level: number;
+  month: string;
+  year: number;
+  cutoff: string;
+  recipients: string[];
+  forms_included: string[];
+  sent_at: string;
+}
+
 const months = [
   "January",
   "February",
@@ -172,6 +189,38 @@ export default function WarningLetterPage() {
     "cutoff1" | "cutoff2" | "both"
   >("both");
   const [evaluations, setEvaluations] = useState<any[]>([]);
+
+  // --- History Modal State ---
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyEmployee, setHistoryEmployee] = useState<{
+    id: string | number;
+    name: string;
+    type: "late" | "leave";
+  } | null>(null);
+  const [historyLetters, setHistoryLetters] = useState<SentLetter[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  const openHistory = async (
+    employeeId: string | number,
+    employeeName: string,
+    type: "late" | "leave",
+  ) => {
+    setHistoryEmployee({ id: employeeId, name: employeeName, type });
+    setHistoryOpen(true);
+    setHistoryLoading(true);
+    setHistoryLetters([]);
+    try {
+      const res = await fetch(
+        `${getApiUrl()}/api/sent-warning-letters?employee_id=${employeeId}&type=${type}`,
+      );
+      const data = await res.json();
+      if (data.success) setHistoryLetters(data.data);
+    } catch (e) {
+      console.error("Failed to load history:", e);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchYears = async () => {
@@ -684,6 +733,9 @@ export default function WarningLetterPage() {
                     <TableHead className="py-5 px-8 text-slate-500 font-bold uppercase tracking-wider text-[11px] text-center">
                       Email Status
                     </TableHead>
+                    <TableHead className="py-5 px-8 text-slate-500 font-bold uppercase tracking-wider text-[11px] text-center">
+                      History
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -751,7 +803,7 @@ export default function WarningLetterPage() {
                             className="text-[#800020] hover:text-[#800020] hover:bg-rose-50/50 rounded-xl font-bold gap-2 text-xs h-10 px-6 border border-transparent hover:border-rose-100 transition-all shadow-none hover:shadow-sm cursor-pointer"
                           >
                             <FileText className="w-4 h-4 text-[#800020]" />
-                            View Analysis
+                            View Form
                             <ChevronRight className="w-3 h-3 ml-auto opacity-30 group-hover/row:translate-x-1 transition-transform" />
                           </Button>
                         </TableCell>
@@ -770,12 +822,29 @@ export default function WarningLetterPage() {
                             )}
                           </div>
                         </TableCell>
+                        <TableCell className="py-4 px-6 text-center">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              openHistory(
+                                entry.employee_id,
+                                entry.employee_name,
+                                "late",
+                              )
+                            }
+                            className="text-violet-600 hover:text-violet-700 hover:bg-violet-50 rounded-xl font-bold gap-1.5 text-xs h-8 px-3 border border-transparent hover:border-violet-100 transition-all cursor-pointer"
+                          >
+                            <History className="w-3.5 h-3.5" />
+                            View
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
                       <TableCell
-                        colSpan={4}
+                        colSpan={5}
                         className="py-20 text-center text-slate-400 italic text-xl"
                       >
                         No employees with attendance warnings found for this
@@ -834,6 +903,9 @@ export default function WarningLetterPage() {
                     </TableHead>
                     <TableHead className="py-5 px-8 text-slate-500 font-bold uppercase tracking-wider text-[11px] text-center">
                       Email Status
+                    </TableHead>
+                    <TableHead className="py-5 px-8 text-slate-500 font-bold uppercase tracking-wider text-[11px] text-center">
+                      History
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -914,7 +986,7 @@ export default function WarningLetterPage() {
                             className="text-[#800020] hover:text-[#800020] hover:bg-rose-50/50 rounded-xl font-bold gap-2 text-xs h-10 px-6 border border-transparent hover:border-rose-100 transition-all shadow-none hover:shadow-sm cursor-pointer"
                           >
                             <FileText className="w-4 h-4 text-[#800020]" />
-                            View Analysis
+                            View Form
                             <ChevronRight className="w-3 h-3 ml-auto opacity-30 group-hover/row:translate-x-1 transition-transform" />
                           </Button>
                         </TableCell>
@@ -933,12 +1005,29 @@ export default function WarningLetterPage() {
                             )}
                           </div>
                         </TableCell>
+                        <TableCell className="py-4 px-6 text-center">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              openHistory(
+                                entry.employee_id,
+                                entry.employee_name,
+                                "leave",
+                              )
+                            }
+                            className="text-violet-600 hover:text-violet-700 hover:bg-violet-50 rounded-xl font-bold gap-1.5 text-xs h-8 px-3 border border-transparent hover:border-violet-100 transition-all cursor-pointer"
+                          >
+                            <History className="w-3.5 h-3.5" />
+                            View
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
                       <TableCell
-                        colSpan={5}
+                        colSpan={6}
                         className="py-20 text-center text-slate-400 italic text-xl"
                       >
                         No approved extended leave requests (3+ days) found for
@@ -952,6 +1041,157 @@ export default function WarningLetterPage() {
           </Card>
         </div>
       </div>
+
+      {/* -------- HISTORY DRAWER -------- */}
+      {historyOpen && (
+        <div className="fixed inset-0 z-[100] flex justify-end">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/30 backdrop-blur-[2px]"
+            onClick={() => setHistoryOpen(false)}
+          />
+          {/* Panel */}
+          <div className="relative w-full max-w-md bg-white shadow-2xl flex flex-col h-full overflow-hidden animate-in slide-in-from-right-8 duration-200">
+            {/* Panel Header */}
+            <div className="bg-gradient-to-r from-violet-600 to-violet-500 px-6 py-5 flex items-start justify-between gap-4 shrink-0">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <ScrollText className="w-5 h-5 text-white/90" />
+                  <span className="text-white font-black text-base uppercase tracking-widest">
+                    Letter History
+                  </span>
+                </div>
+                <p className="text-violet-100 text-sm font-semibold leading-tight">
+                  {historyEmployee?.name}
+                </p>
+                <p className="text-violet-200 text-[11px] uppercase tracking-wider mt-0.5">
+                  {historyEmployee?.type === "late"
+                    ? "Tardiness"
+                    : "Extended Leave"}{" "}
+                  warnings
+                </p>
+              </div>
+              <button
+                onClick={() => setHistoryOpen(false)}
+                className="rounded-full bg-white/10 hover:bg-white/20 p-1.5 transition-colors cursor-pointer mt-0.5"
+              >
+                <X className="w-4 h-4 text-white" />
+              </button>
+            </div>
+
+            {/* Panel Body */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-3">
+              {historyLoading ? (
+                <div className="flex items-center justify-center py-20 gap-2 text-slate-400">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span className="text-sm font-medium">Loading history…</span>
+                </div>
+              ) : historyLetters.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
+                  <ScrollText className="w-10 h-10 opacity-30" />
+                  <p className="text-sm font-semibold text-center">
+                    No letters have been sent yet for this employee.
+                  </p>
+                </div>
+              ) : (
+                historyLetters.map((letter) => (
+                  <div
+                    key={letter.id}
+                    className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 space-y-3 hover:border-violet-100 hover:bg-violet-50/20 transition-colors"
+                  >
+                    {/* Top row: warning badge + date */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className={cn(
+                          "px-2.5 py-1 rounded-md font-bold text-[10px] border tracking-wider uppercase",
+                          letter.warning_level === 1
+                            ? "bg-amber-50 text-amber-700 border-amber-200"
+                            : letter.warning_level === 2
+                              ? "bg-orange-50 text-orange-700 border-orange-200"
+                              : "bg-red-50 text-red-700 border-red-200",
+                        )}
+                      >
+                        {letter.warning_level === 1
+                          ? "1st Warning"
+                          : letter.warning_level === 2
+                            ? "2nd Warning"
+                            : "For Consultation"}
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        {new Date(letter.sent_at).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </div>
+
+                    {/* Period */}
+                    <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                      <Calendar className="w-3 h-3 shrink-0" />
+                      <span className="font-semibold">
+                        {letter.month} {letter.year}{" "}
+                        <span className="text-slate-400 font-normal">
+                          (
+                          {letter.cutoff === "cutoff1"
+                            ? "1st–15th"
+                            : "16th–End"}
+                          )
+                        </span>
+                      </span>
+                    </div>
+
+                    {/* Recipients */}
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        Sent to
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {letter.recipients.map((email, i) => (
+                          <span
+                            key={i}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-slate-200 text-[10px] text-slate-600 font-medium"
+                          >
+                            <Mail className="w-2.5 h-2.5 opacity-50" />
+                            {email}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Forms included */}
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        Forms:
+                      </p>
+                      <div className="flex gap-1">
+                        {letter.forms_included.map((f) => (
+                          <span
+                            key={f}
+                            className="px-2 py-0.5 rounded-full bg-violet-50 border border-violet-100 text-violet-600 text-[10px] font-bold uppercase tracking-wider"
+                          >
+                            {f === "form1" ? "Supervisor" : "Employee"}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Panel Footer */}
+            <div className="shrink-0 border-t border-slate-100 px-5 py-4 bg-white">
+              <p className="text-[11px] text-slate-400 text-center">
+                {historyLetters.length} letter
+                {historyLetters.length !== 1 ? "s" : ""} sent in total
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -117,3 +117,13 @@ Route::get('/warning-letter-templates', [WarningLetterTemplateController::class,
 Route::post('/warning-letter-templates/bulk', [WarningLetterTemplateController::class, 'bulkUpdate']);
 Route::get('/warning-letter-templates/{slug}', [WarningLetterTemplateController::class, 'show']);
 Route::put('/warning-letter-templates/{slug}', [WarningLetterTemplateController::class, 'update']);
+
+// Sent Warning Letter History Routes
+use App\Http\Controllers\Api\SentWarningLetterController;
+Route::get('/sent-warning-letters', [SentWarningLetterController::class, 'index']);
+Route::post('/sent-warning-letters', [SentWarningLetterController::class, 'store']);
+
+// Warning Letter Email (PDF via SMTP)
+use App\Http\Controllers\Api\WarningLetterMailController;
+Route::post('/warning-letter/send-email', [WarningLetterMailController::class, 'send']);
+

@@ -664,8 +664,14 @@ function FormLetterContent() {
     const emailList = recipients
       .map((r: any) => r.email.trim())
       .filter((e: string) => e !== "");
+
     if (emailList.length === 0) {
       toast.error("Please provide at least one recipient email address");
+      return;
+    }
+
+    if (selectedForms.length === 0) {
+      toast.error("Please select at least one form to send.");
       return;
     }
 
@@ -681,11 +687,218 @@ function FormLetterContent() {
     }
 
     setIsSending(true);
-    // Simulate email sending
-    await new Promise((resolve: any) => setTimeout(resolve, 2000));
-    setIsSending(false);
-    const recipientList = emailList.join(", ");
-    toast.success(`Letter successfully sent to: ${recipientList}`);
+    const sendingToast = toast.loading("Generating PDF…");
+
+    try {
+      // ── Dynamically import heavy PDF libs (tree-shaken at build time) ────
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
+
+      // ── Collect ordered form element IDs that are currently rendered ─────
+      const formIds: { id: string; key: string }[] = [];
+      if (selectedForms.includes("form1"))
+        formIds.push({ id: "form-letter-1", key: "form1" });
+      if (selectedForms.includes("form2"))
+        formIds.push({ id: "form-letter-2", key: "form2" });
+
+      if (formIds.length === 0) {
+        toast.dismiss(sendingToast);
+        toast.error("No form selected. Please select at least one form.");
+        setIsSending(false);
+        return;
+      }
+
+      // ── Build the PDF doc ─────────────────────────────────────────────────
+      // Letter size in points: 612 × 792 pt (8.5" × 11" at 72dpi)
+      const pdf = new jsPDF({
+        unit: "pt",
+        format: "letter",
+        orientation: "portrait",
+      });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+
+      for (let i = 0; i < formIds.length; i++) {
+        const { id } = formIds[i];
+        const el = document.getElementById(id);
+        if (!el) continue;
+
+        // ── Convert oklch/lab/lch values → real hex using browser canvas ────
+        // html2canvas can't parse oklch/lab, but the BROWSER can — we use an
+        // offscreen canvas as a colour parser: set fillStyle to the oklch value,
+        // read the sRGB pixel, get the proper hex colour back.
+        // This preserves exact brand colours (maroon stays maroon, etc.).
+        const fixModernColors = (clonedDoc: Document) => {
+          // ── a) Canvas-based colour converter ──────────────────────────────
+          const cvs = document.createElement("canvas");
+          cvs.width = cvs.height = 1;
+          const ctx2d = cvs.getContext("2d")!;
+          const cache = new Map<string, string>();
+
+          const toHex = (raw: string): string => {
+            if (cache.has(raw)) return cache.get(raw)!;
+            try {
+              ctx2d.clearRect(0, 0, 1, 1);
+              ctx2d.fillStyle = "#000"; // reset sentinel
+              ctx2d.fillStyle = raw; // browser parses oklch → sRGB internally
+              ctx2d.fillRect(0, 0, 1, 1);
+              const [r, g, b, a] = ctx2d.getImageData(0, 0, 1, 1).data;
+              const hex =
+                a === 0
+                  ? "transparent"
+                  : "#" +
+                    [r, g, b]
+                      .map((v) => v.toString(16).padStart(2, "0"))
+                      .join("");
+              cache.set(raw, hex);
+              return hex;
+            } catch {
+              cache.set(raw, "#222222");
+              return "#222222";
+            }
+          };
+
+          // ── b) Convert colour functions in a CSS string (handles nesting) ─
+          const fixCss = (css: string): string => {
+            // Multi-pass: each pass collapses one nesting level
+            //   e.g. color-mix(in oklch, oklch(0.5 0.2 120), white)
+            //   pass 1: oklch(0.5 0.2 120) → #559f49
+            //   pass 2: color-mix(in oklch, #559f49, white) → canvas
+            const FN = /\b(?:oklch|lab|lch|color-mix|color)\s*\([^()]*\)/gi;
+            let prev = "";
+            let out = css;
+            for (let pass = 0; pass < 8 && out !== prev; pass++) {
+              prev = out;
+              out = out.replace(FN, (m) => toHex(m));
+            }
+            return out;
+          };
+
+          // ── c) Patch all <style> textContent ──────────────────────────────
+          // In Next.js dev mode Turbopack injects ALL Tailwind CSS as <style>
+          // tags, so this covers the entire colour palette.
+          clonedDoc.querySelectorAll("style").forEach((s) => {
+            if (s.textContent) s.textContent = fixCss(s.textContent);
+          });
+
+          // ── d) <link> stylesheets — keep them (they're font imports in dev)
+          //    html2canvas fetches them but they won't contain oklch in dev mode.
+
+          // ── e) Safety pass: set inline styles on any element whose computed
+          //    color property still contains a modern color fn (e.g. from a CSS
+          //    custom-property that wasn't inlined in the style tag).
+          const cloneWin = clonedDoc.defaultView ?? window;
+          const needsFix = (v: string | undefined) =>
+            !!v && /\b(?:oklch|lab|lch|color-mix)\s*\(/i.test(v);
+
+          (
+            [
+              "color",
+              "backgroundColor",
+              "borderTopColor",
+              "borderRightColor",
+              "borderBottomColor",
+              "borderLeftColor",
+              "outlineColor",
+              "textDecorationColor",
+            ] as const
+          ).forEach((prop) => {
+            clonedDoc.querySelectorAll<HTMLElement>("*").forEach((node) => {
+              const val = cloneWin.getComputedStyle(node)[
+                prop as keyof CSSStyleDeclaration
+              ] as string | undefined;
+              if (needsFix(val)) {
+                const css = prop.replace(/([A-Z])/g, "-$1").toLowerCase();
+                node.style.setProperty(css, toHex(val!), "important");
+              }
+            });
+          });
+        };
+
+        // Render the DOM element to a canvas at 2× for crisp output
+        const canvas = await html2canvas(el as HTMLElement, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: false,
+          backgroundColor: "#ffffff",
+          logging: false,
+          onclone: (clonedDoc) => {
+            fixModernColors(clonedDoc);
+          },
+        });
+
+        const imgData = canvas.toDataURL("image/jpeg", 0.92);
+        const imgW = canvas.width;
+        const imgH = canvas.height;
+
+        // Scale the captured image to fit the PDF page
+        const ratio = Math.min(pageW / imgW, pageH / imgH);
+        const finalW = imgW * ratio;
+        const finalH = imgH * ratio;
+
+        if (i > 0) pdf.addPage();
+        pdf.addImage(imgData, "JPEG", 0, 0, finalW, finalH);
+      }
+
+      // ── Convert to base64 (strip the data-uri prefix) ────────────────────
+      const pdfBase64 = pdf.output("datauristring").split(",")[1];
+
+      toast.dismiss(sendingToast);
+      const sendToast = toast.loading("Sending email…");
+
+      // ── POST to backend ────────────────────────────────────────────────────
+      const res = await fetch(`${getApiUrl()}/api/warning-letter/send-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recipients: emailList,
+          employee_name: employee?.name ?? "",
+          letter_type: type,
+          pdf_base64: pdfBase64,
+        }),
+      });
+
+      const data = await res.json();
+      toast.dismiss(sendToast);
+
+      if (!res.ok || !data.success) {
+        const msg = data.message || "Failed to send email.";
+        toast.error(`Email Error: ${msg}`);
+        setIsSending(false);
+        return;
+      }
+
+      toast.success(`Letter sent to: ${emailList.join(", ")}`);
+
+      // ── Persist history record ────────────────────────────────────────────
+      try {
+        const warningLevel = entries[0]?.warning_level ?? 1;
+        await fetch(`${getApiUrl()}/api/sent-warning-letters`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            employee_id: employeeId,
+            employee_name: employee?.name ?? "",
+            type: type,
+            warning_level: warningLevel,
+            month: month,
+            year: Number(year),
+            cutoff: cutoff,
+            recipients: emailList,
+            forms_included: selectedForms,
+          }),
+        });
+      } catch (e) {
+        console.error("Failed to save warning letter history:", e);
+      }
+    } catch (err: any) {
+      toast.dismiss();
+      toast.error(`Error: ${err?.message ?? "Unknown error"}`);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleAddRecipient = () => {
