@@ -59,20 +59,41 @@ export default function AdminHeadSidebar() {
     <div
       className={`${isCollapsed ? "w-20" : "w-64"} bg-gradient-to-r from-[#7B0F2B] to-[#A4163A] text-white h-screen sticky top-0 p-4 flex flex-col transition-all duration-300 ease-in-out z-50`}
     >
-      <button
-        onClick={toggleSidebar}
-        className={cn(
-          "mb-4 p-2 rounded-lg hover:bg-white/10 transition-colors flex items-center justify-center",
-          !isCollapsed && "absolute top-4 right-4 z-50",
-        )}
-        title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-      >
-        {isCollapsed ? <PanelLeft size={24} /> : <X size={24} />}
-      </button>
+      {/* Toggle Button - Only visible when expanded at the top right */}
+      {!isCollapsed && (
+        <button
+          onClick={toggleSidebar}
+          className="absolute top-4 right-4 z-50 p-2 rounded-lg hover:bg-white/10 transition-colors flex items-center justify-center"
+          title="Collapse Sidebar"
+        >
+          <X size={24} />
+        </button>
+      )}
 
       {/* Logo */}
-      {!isCollapsed ? (
-        <div className="flex justify-center mb-4 mt-8 px-2">
+      {/* Logo / Toggle Area */}
+      {isCollapsed ? (
+        <button
+          onClick={toggleSidebar}
+          className="flex justify-center mb-6 mt-2 px-1 relative group w-full focus:outline-none"
+          title="Expand Sidebar"
+        >
+          <div className="relative w-[60px] h-[60px] flex items-center justify-center">
+            <Image
+              src="/logo.webp"
+              alt="ABIC Logo"
+              width={60}
+              height={60}
+              priority
+              className="object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.2)] group-hover:scale-0 group-hover:opacity-0 transition-all duration-300"
+            />
+            <div className="absolute inset-0 flex items-center justify-center scale-0 opacity-0 group-hover:scale-110 group-hover:opacity-100 transition-all duration-300">
+              <PanelLeft size={32} className="text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]" />
+            </div>
+          </div>
+        </button>
+      ) : (
+        <div className="flex justify-center mb-6 mt-4 px-2">
           <Image
             src="/logo.webp"
             alt="ABIC Logo"
@@ -80,17 +101,6 @@ export default function AdminHeadSidebar() {
             height={160}
             priority
             className="object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] hover:scale-105 transition-transform duration-300"
-          />
-        </div>
-      ) : (
-        <div className="flex justify-center mb-3 mt-8 px-1">
-          <Image
-            src="/logo.webp"
-            alt="ABIC Logo"
-            width={60}
-            height={60}
-            priority
-            className="object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.2)] hover:scale-110 transition-transform duration-300"
           />
         </div>
       )}
