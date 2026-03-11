@@ -38,7 +38,7 @@ export default function RootLayout({
             unstyled: true,
             classNames: {
               toast: [
-                "flex items-start gap-4 w-full min-w-[360px] max-w-[440px]",
+                "flex items-center gap-4 w-full min-w-[360px] max-w-[440px]",
                 "rounded-2xl px-5 py-4 shadow-2xl",
                 "border border-white/20",
                 "backdrop-blur-md",
@@ -76,12 +76,14 @@ export default function RootLayout({
                 "!text-white rounded-full transition-all",
               ].join(" "),
               actionButton: [
-                "!bg-white/20 !text-white font-bold text-xs px-3 py-1.5",
+                "!bg-white/20 !text-white font-bold text-xs px-4 py-2",
                 "rounded-lg border border-white/30 hover:!bg-white/30 transition-all",
+                "whitespace-nowrap flex-shrink-0 ml-auto",
               ].join(" "),
               cancelButton: [
-                "!bg-white/10 !text-white/70 font-bold text-xs px-3 py-1.5",
+                "!bg-white/10 !text-white/70 font-bold text-xs px-4 py-2",
                 "rounded-lg border border-white/20 hover:!bg-white/20 transition-all",
+                "whitespace-nowrap flex-shrink-0",
               ].join(" "),
             },
           }}
