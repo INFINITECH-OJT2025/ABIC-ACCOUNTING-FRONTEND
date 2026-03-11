@@ -598,8 +598,7 @@ export default function HiringReportPage() {
                   <TableHead className="text-center font-bold text-black border-r-[3px] border-black w-[25%] text-sm px-4 uppercase">Applicant Name</TableHead>
                   <TableHead className="text-center font-bold text-black border-r-[3px] border-black w-[25%] text-sm px-4 uppercase">Position</TableHead>
                   <TableHead className="text-center font-bold text-black border-r-[3px] border-black w-[18%] text-sm px-4 uppercase">Salary</TableHead>
-                  <TableHead className="text-center font-bold text-black border-r-[3px] border-black w-[17%] text-sm px-4 uppercase leading-tight">Start Date</TableHead>
-                  <TableHead className="text-center font-bold text-black w-[15%] text-sm uppercase">Status Source</TableHead>
+                  <TableHead className="text-center font-bold text-black w-[17%] text-sm px-4 uppercase leading-tight">Start Date</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -608,13 +607,12 @@ export default function HiringReportPage() {
                     <TableCell className="border-r-[3px] border-black px-4 font-bold text-black">{row.name}</TableCell>
                     <TableCell className="border-r-[3px] border-black px-4 font-bold text-black">{row.position}</TableCell>
                     <TableCell className="border-r-[3px] border-black px-4 font-bold text-black">P {formatSalary(row.salary)}</TableCell>
-                    <TableCell className="border-r-[3px] border-black px-4 text-center font-bold text-black">{row.startDate || "-"}</TableCell>
-                    <TableCell className="text-center text-xs font-bold text-green-700">Accepted Job Offer</TableCell>
+                    <TableCell className="px-4 text-center font-bold text-black">{row.startDate || "-"}</TableCell>
                   </TableRow>
                 ))}
                 {onboardedRows.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-6">
+                    <TableCell colSpan={4} className="text-center py-6">
                       No onboarded records yet.
                     </TableCell>
                   </TableRow>
