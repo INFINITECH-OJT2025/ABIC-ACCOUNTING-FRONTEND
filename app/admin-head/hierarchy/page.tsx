@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Building2, GitBranch, Plus, ShieldCheck, Users, Clock, X, Save, Edit2 } from "lucide-react"
+import { Building2, GitBranch, Plus, ShieldCheck, Users, Clock, X, Save, Edit2, Trash2 } from "lucide-react"
 import { getApiUrl } from "@/lib/api"
 import { toast } from "sonner"
 
@@ -54,8 +54,8 @@ function NodePill({
   onEdit?: () => void
 }) {
   const styles = {
-    staff: "bg-white text-slate-700 border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300",
-    dept: "bg-white text-slate-700 border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300",
+    staff: "bg-white text-slate-700 border-slate-200/90 shadow-sm hover:shadow-md hover:border-slate-300",
+    dept: "bg-white text-slate-700 border-slate-200/90 shadow-sm hover:shadow-md hover:border-slate-300",
     exec: "bg-gradient-to-r from-violet-600 to-indigo-500 text-white border-transparent shadow-lg shadow-indigo-500/20",
     admin: "bg-gradient-to-r from-rose-500 to-orange-400 text-white border-transparent shadow-lg shadow-rose-500/20",
   }
@@ -64,7 +64,7 @@ function NodePill({
 
   return (
     <div
-      className={`group relative rounded-xl border-2 px-6 py-2.5 text-center text-xs font-bold tracking-wide transition-all duration-200 ${styles[variant]}`}
+      className={`group relative w-full max-w-[280px] rounded-xl border-2 px-4 py-2.5 text-center text-[13px] font-bold leading-tight tracking-wide transition-all duration-200 ${styles[variant]}`}
       style={!isHighRank && color ? { borderLeftColor: color, borderLeftWidth: '4px' } : {}}
     >
       {label}
@@ -80,7 +80,25 @@ function NodePill({
   )
 }
 
-function HierarchyBranch({ node, allNodes, onEdit, execId, adminId }: { node: PositionNode; allNodes: PositionNode[]; onEdit: (node: PositionNode) => void; execId?: string; adminId?: string }) {
+function HierarchyBranch({
+  node,
+  allNodes,
+  onEdit,
+  execId,
+  adminId,
+  pathIds = [],
+  depth = 0,
+}: {
+  node: PositionNode;
+  allNodes: PositionNode[];
+  onEdit: (node: PositionNode) => void;
+  execId?: string;
+  adminId?: string;
+  pathIds?: string[];
+  depth?: number;
+}) {
+  const nextPath = [...pathIds, node.id]
+  const maxDepth = 20
   const children = allNodes.filter((item) => item.parentId === node.id)
 
   const getVariant = (title: string, deptId: string, nodeId?: string) => {
@@ -105,12 +123,23 @@ function HierarchyBranch({ node, allNodes, onEdit, execId, adminId }: { node: Po
         onEdit={() => onEdit(node)}
       />
       {children.length > 0 && (
-        <div className="relative ml-6 border-l-[1.5px] border-slate-200 pl-6">
-          <div className="space-y-4 py-1">
+        <div className="relative ml-3 pl-3 md:ml-4 md:pl-4">
+          <div className="absolute left-0 top-1 bottom-1 w-[2px] bg-slate-300" />
+          <div className="space-y-3 py-1">
             {children.map((child) => (
               <div key={child.id} className="relative">
-                <div className="absolute -left-6 top-5 h-[1.5px] w-6 bg-slate-200" />
-                 <HierarchyBranch node={child} allNodes={allNodes} onEdit={onEdit} execId={execId} adminId={adminId} />
+                <div className="absolute -left-3 top-5 h-[2px] w-3 bg-slate-300 md:-left-4 md:w-4" />
+                {!nextPath.includes(child.id) && depth < maxDepth ? (
+                  <HierarchyBranch
+                    node={child}
+                    allNodes={allNodes}
+                    onEdit={onEdit}
+                    execId={execId}
+                    adminId={adminId}
+                    pathIds={nextPath}
+                    depth={depth + 1}
+                  />
+                ) : null}
               </div>
             ))}
           </div>
@@ -134,6 +163,7 @@ export default function AdminHeadHierarchyPage() {
   const [selectedChildren, setSelectedChildren] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [editingPosition, setEditingPosition] = useState<PositionNode | null>(null)
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
   const [editTitle, setEditTitle] = useState("")
   const [editDepartment, setEditDepartment] = useState("")
   const [editParent, setEditParent] = useState("")
@@ -146,8 +176,61 @@ export default function AdminHeadHierarchyPage() {
     }
   }, [editingPosition])
 
+  const isDescendantOfNode = (candidateId: string, ancestorId: string) => {
+    const childrenMap = positions.reduce<Record<string, string[]>>((acc, pos) => {
+      if (!acc[pos.parentId]) acc[pos.parentId] = []
+      acc[pos.parentId].push(pos.id)
+      return acc
+    }, {})
+
+    const stack = [...(childrenMap[ancestorId] || [])]
+    const visited = new Set<string>()
+
+    while (stack.length > 0) {
+      const current = stack.pop()!
+      if (current === candidateId) return true
+      if (visited.has(current)) continue
+      visited.add(current)
+      const nextChildren = childrenMap[current] || []
+      stack.push(...nextChildren)
+    }
+
+    return false
+  }
+
+  const editParentOptions = useMemo(() => {
+    if (!editingPosition) return []
+
+    return positions.filter((p) => {
+      if (p.id === editingPosition.id) return false
+      if (!(editDepartment === 'core' || p.departmentId === editDepartment || p.departmentId === 'core')) return false
+      // Prevent selecting descendants as parent to avoid hierarchy cycles.
+      if (isDescendantOfNode(p.id, editingPosition.id)) return false
+      return true
+    })
+  }, [positions, editingPosition, editDepartment])
+
   const handleUpdatePosition = async () => {
     if (!editingPosition) return
+
+    const cleanTitle = editTitle.trim()
+    if (!cleanTitle) {
+      toast.error("Position title is required")
+      return
+    }
+
+    if (editParent !== 'root' && isDescendantOfNode(editParent, editingPosition.id)) {
+      toast.error("Invalid parent: you cannot assign a position under its own subordinate.")
+      return
+    }
+
+    const parentId = editParent === 'root' ? null : Number(editParent)
+
+    if (editParent !== 'root' && Number.isNaN(parentId)) {
+      toast.error("Invalid parent selected")
+      return
+    }
+
     setLoading(true)
     try {
       const res = await fetch(`${getApiUrl()}/api/hierarchies/${editingPosition.id}`, {
@@ -157,9 +240,9 @@ export default function AdminHeadHierarchyPage() {
           'Accept': 'application/json'
         },
         body: JSON.stringify({
-          name: editTitle,
+          name: cleanTitle,
           department_id: editDepartment === 'core' ? null : Number(editDepartment),
-          parent_id: editParent === 'root' ? null : Number(editParent)
+          parent_id: parentId
         })
       })
       if (!res.ok) throw new Error('Failed to update position')
@@ -170,6 +253,49 @@ export default function AdminHeadHierarchyPage() {
     } catch (err) {
       console.error(err)
       toast.error("Failed to update position")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeletePosition = async () => {
+    if (!editingPosition) return
+
+    setLoading(true)
+    try {
+      const res = await fetch(`${getApiUrl()}/api/hierarchies/${editingPosition.id}`, {
+        method: 'DELETE',
+        headers: {
+          Accept: 'application/json'
+        }
+      })
+
+      if (res.status === 404) {
+        await fetchData()
+        setIsDeleteConfirmOpen(false)
+        setEditingPosition(null)
+        toast.success('Position was already removed')
+        return
+      }
+
+      if (!res.ok && res.status !== 204) {
+        let errorMessage = 'Failed to delete position'
+        try {
+          const payload = await res.json()
+          if (payload?.message) errorMessage = payload.message
+        } catch {
+          // Ignore parse errors and use fallback message.
+        }
+        throw new Error(errorMessage)
+      }
+
+      await fetchData()
+      setIsDeleteConfirmOpen(false)
+      setEditingPosition(null)
+      toast.success('Position deleted successfully')
+    } catch (err) {
+      console.error(err)
+      toast.error(err instanceof Error ? err.message : 'Failed to delete position')
     } finally {
       setLoading(false)
     }
@@ -260,6 +386,87 @@ export default function AdminHeadHierarchyPage() {
       .sort((a, b) => b.createdAt - a.createdAt)
       .slice(0, 6)
   }, [positions])
+
+  const getDepartmentDisplayRoots = (departmentId: string) => {
+    const deptNodes = positions.filter((item) => item.departmentId === departmentId)
+    if (deptNodes.length === 0) {
+      return { roots: [] as PositionNode[], recoveredCount: 0 }
+    }
+
+    const naturalRoots = deptNodes.filter((item) => {
+      if (adminNode && item.parentId === adminNode.id) return true
+      if (execNode && item.parentId === execNode.id) return true
+      const parent = positions.find((pos) => pos.id === item.parentId)
+      return !parent || parent.departmentId !== departmentId
+    })
+
+    const visited = new Set<string>()
+    const stack = naturalRoots.map((n) => n.id)
+
+    while (stack.length > 0) {
+      const currentId = stack.pop()!
+      if (visited.has(currentId)) continue
+      visited.add(currentId)
+
+      positions.forEach((item) => {
+        if (item.departmentId === departmentId && item.parentId === currentId && !visited.has(item.id)) {
+          stack.push(item.id)
+        }
+      })
+    }
+
+    // If bad/cyclic data exists, expose only one representative root per disconnected cluster.
+    const recoveredNodes = deptNodes.filter((item) => !visited.has(item.id))
+    const recoveredNodeById = new Map(recoveredNodes.map((n) => [n.id, n]))
+    const recoveredAdjacency = new Map<string, string[]>()
+
+    // Initialize all keys first so push operations are always safe.
+    recoveredNodes.forEach((node) => {
+      recoveredAdjacency.set(node.id, [])
+    })
+
+    recoveredNodes.forEach((node) => {
+      if (recoveredNodeById.has(node.parentId)) {
+        recoveredAdjacency.get(node.id)!.push(node.parentId)
+        recoveredAdjacency.get(node.parentId)!.push(node.id)
+      }
+    })
+
+    const componentVisited = new Set<string>()
+    const recoveredRoots: PositionNode[] = []
+
+    recoveredNodes.forEach((startNode) => {
+      if (componentVisited.has(startNode.id)) return
+
+      const queue = [startNode.id]
+      const componentIds: string[] = []
+      componentVisited.add(startNode.id)
+
+      while (queue.length > 0) {
+        const current = queue.shift()!
+        componentIds.push(current)
+        const neighbors = recoveredAdjacency.get(current) || []
+        neighbors.forEach((neighborId) => {
+          if (!componentVisited.has(neighborId)) {
+            componentVisited.add(neighborId)
+            queue.push(neighborId)
+          }
+        })
+      }
+
+      const representative = componentIds
+        .map((id) => recoveredNodeById.get(id))
+        .filter((n): n is PositionNode => Boolean(n))
+        .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id))[0]
+
+      if (representative) recoveredRoots.push(representative)
+    })
+
+    return {
+      roots: [...naturalRoots, ...recoveredRoots],
+      recoveredCount: recoveredNodes.length,
+    }
+  }
 
   const handleOpenShiftModal = (office: Office) => {
     const existing = schedules.find(s => s.office_name === office.name)
@@ -463,11 +670,34 @@ export default function AdminHeadHierarchyPage() {
       })
       if (!hierRes.ok) throw new Error('Failed to create hierarchy link')
 
+      const createdPayload = await hierRes.json()
+      const createdHierarchy = createdPayload?.data || createdPayload
+      const createdId = createdHierarchy?.id?.toString()
+
+      // Insert-between behavior: move selected child under the new position.
+      if (createdId && selectedChildren.length > 0) {
+        const childId = selectedChildren[0]
+        const reparentRes = await fetch(`${getApiUrl()}/api/hierarchies/${childId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            parent_id: Number(createdId)
+          })
+        })
+
+        if (!reparentRes.ok) {
+          toast.error('Position created, but failed to move selected child under it.')
+        }
+      }
+
       // Refresh the entire data to ensure local state is perfectly in sync with DB
       await fetchData()
 
       setPositionTitle("")
-      setSelectedParent("admin-head")
+      setSelectedParent("root")
       setSelectedChildren([])
       toast?.success("Position successfully added to hierarchy.")
     } catch (err) {
@@ -479,7 +709,7 @@ export default function AdminHeadHierarchyPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-10">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 pb-10">
       <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md mb-6">
         <div className="w-full px-4 md:px-8 py-6">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
@@ -514,8 +744,8 @@ export default function AdminHeadHierarchyPage() {
         </div>
       </div>
 
-      <div className="px-4 md:px-8 grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <Card className="xl:col-span-1 border-2 border-[#FFE5EC]">
+      <div className="px-4 md:px-8 grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
+        <Card className="xl:col-span-1 border-2 border-[#FFE5EC] xl:sticky xl:top-4 shadow-sm">
           <CardHeader>
             <CardTitle className="text-[#630C22]">Setup Controls</CardTitle>
           </CardHeader>
@@ -612,7 +842,7 @@ export default function AdminHeadHierarchyPage() {
                   <SelectValue placeholder="Reports to" />
                 </SelectTrigger>
                 <SelectContent>
-                   <SelectItem value="root">{adminNode ? adminNode.title : (execNode ? execNode.title : "Root (Top Level)")}</SelectItem>
+                   <SelectItem value="root">Root (Top Level)</SelectItem>
                   {parentOptions.map((item) => (
                     <SelectItem key={item.id} value={item.id}>{item.title}</SelectItem>
                   ))}
@@ -625,7 +855,9 @@ export default function AdminHeadHierarchyPage() {
                   {parentOptions.length === 0 ? (
                     <p className="text-[10px] text-slate-400 italic text-center py-2">No existing positions in this department.</p>
                   ) : (
-                    parentOptions.map((item) => (
+                    parentOptions
+                      .filter((item) => item.id !== selectedParent)
+                      .map((item) => (
                       <div key={item.id} className="flex items-center space-x-2">
                         <Checkbox
                           id={`child-${item.id}`}
@@ -670,12 +902,12 @@ export default function AdminHeadHierarchyPage() {
           </CardContent>
         </Card>
 
-        <Card className="xl:col-span-2 border-2 border-[#FFE5EC]">
+        <Card className="xl:col-span-2 border-2 border-[#FFE5EC] shadow-sm">
           <CardHeader>
             <CardTitle className="text-[#630C22]">Organization Hierarchy</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-8 overflow-x-auto">
-            <div className="min-w-[940px] space-y-6">
+          <CardContent className="space-y-8 bg-[radial-gradient(circle_at_top,_rgba(164,22,58,0.05),_transparent_50%)]">
+            <div className="space-y-6">
                <div className="flex flex-col items-center">
                 <div className="flex flex-col items-center gap-4">
                   {execNode && (
@@ -704,7 +936,7 @@ export default function AdminHeadHierarchyPage() {
                 )}
               </div>
 
-              <div className="flex justify-center gap-6">
+              <div className="flex flex-wrap justify-center gap-6 rounded-2xl border border-slate-100 bg-white/60 p-4">
                 {positions.filter((item) => 
                   item.departmentId === "core" && 
                   [execNode?.id, adminNode?.id, "root"].includes(item.parentId) && 
@@ -715,7 +947,7 @@ export default function AdminHeadHierarchyPage() {
                 ))}
               </div>
 
-              <div className="space-y-12">
+              <div className="space-y-10">
                 {offices.map((office) => {
                   const officeDepts = departments.filter(d => d.officeId === office.id)
 
@@ -737,21 +969,14 @@ export default function AdminHeadHierarchyPage() {
                         <div className="h-[2px] flex-1 bg-slate-200" />
                       </div>
 
-                      <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {officeDepts.map((department) => {
-                          const roots = positions.filter((item) => {
-                            if (item.departmentId !== department.id) return false
-                             if (adminNode && item.parentId === adminNode.id) return true
-                             if (execNode && item.parentId === execNode.id) return true
-                            // If parent belongs to a different department OR is core, show as root here
-                            const parent = positions.find((pos) => pos.id === item.parentId)
-                            return !parent || parent.departmentId !== department.id
-                          })
+                          const { roots } = getDepartmentDisplayRoots(department.id)
 
                           const headerBg = department.color || '#59D2DE'
 
                           return (
-                            <div key={department.id} className="rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col">
+                            <div key={department.id} className="rounded-2xl bg-white border border-slate-200/70 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col">
                               <div
                                 className="px-6 py-4 border-b border-black/5 flex items-center gap-3 relative overflow-hidden"
                                 style={{ backgroundColor: headerBg }}
@@ -763,15 +988,19 @@ export default function AdminHeadHierarchyPage() {
                                 </span>
                               </div>
 
-                              <div className="p-6 flex-1 bg-slate-50/30">
-                                <div className="space-y-4 relative">
+                              <div className="p-5 md:p-6 flex-1 bg-slate-50/40 overflow-x-hidden">
+                                <div className="space-y-4 relative mx-auto w-fit max-w-full">
                                   {roots.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center py-8 text-center text-slate-400">
                                       <Users className="w-8 h-8 mb-2 opacity-20" />
                                       <p className="text-sm font-medium">No positions assigned</p>
                                     </div>
                                   ) : (
-                                     roots.map((root) => <HierarchyBranch key={root.id} node={root} allNodes={positions} onEdit={setEditingPosition} execId={execNode?.id} adminId={adminNode?.id} />)
+                                     roots.map((root) => (
+                                      <div key={root.id} className="w-fit max-w-full">
+                                        <HierarchyBranch node={root} allNodes={positions} onEdit={setEditingPosition} execId={execNode?.id} adminId={adminNode?.id} />
+                                      </div>
+                                     ))
                                   )}
                                 </div>
                               </div>
@@ -791,7 +1020,7 @@ export default function AdminHeadHierarchyPage() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-6 pt-6 mt-4 border-t border-slate-100">
+            <div className="flex flex-wrap items-center justify-center gap-6 rounded-2xl bg-white/70 p-4 pt-5 mt-2 border border-slate-100">
               <div className="flex items-center gap-3">
                 <span className="text-sm font-bold uppercase tracking-wider text-slate-500">Staff =</span>
                 <div className="h-9 w-24 rounded-xl border-2 border-slate-200 bg-white shadow-sm" />
@@ -800,29 +1029,6 @@ export default function AdminHeadHierarchyPage() {
                 <span className="text-sm font-bold uppercase tracking-wider text-slate-500">Heads =</span>
                 <div className="h-9 w-24 rounded-xl border-2 border-slate-200 bg-white shadow-sm border-l-4 border-l-[#59D2DE]" />
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="px-4 md:px-8 mt-6">
-        <Card className="border-2 border-[#FFE5EC]">
-          <CardHeader>
-            <CardTitle className="text-[#630C22]">Recently Added Positions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-              {recentlyAdded.map((item) => {
-                const department = departments.find((dep) => dep.id === item.departmentId)
-                return (
-                  <div key={item.id} className="rounded-xl border border-slate-200 p-3 bg-white">
-                    <p className="font-bold text-slate-900 uppercase text-xs tracking-wider">{item.title}</p>
-                    <p className="text-[11px] text-slate-400 mt-2 font-semibold uppercase tracking-wider">
-                      {department?.name || "Core Position"}
-                    </p>
-                  </div>
-                )
-              })}
             </div>
           </CardContent>
         </Card>
@@ -940,7 +1146,15 @@ export default function AdminHeadHierarchyPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editingPosition} onOpenChange={(open) => !open && setEditingPosition(null)}>
+      <Dialog
+        open={!!editingPosition}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsDeleteConfirmOpen(false)
+            setEditingPosition(null)
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-[450px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -980,20 +1194,32 @@ export default function AdminHeadHierarchyPage() {
                   <SelectValue placeholder="Select parent" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin-head">Admin Head</SelectItem>
-                  {positions
-                    .filter(p => p.id !== editingPosition?.id && (editDepartment === 'core' || p.departmentId === editDepartment || p.departmentId === 'core'))
-                    .map((item) => (
-                      <SelectItem key={item.id} value={item.id}>{item.title}</SelectItem>
-                    ))
-                  }
+                  <SelectItem value="root">Root (Top Level)</SelectItem>
+                  {editParentOptions.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>{item.title}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingPosition(null)} disabled={loading}>
-              Cancel
+            <Button
+              onClick={() => setIsDeleteConfirmOpen(true)}
+              disabled={loading || !editingPosition}
+              className="mr-auto bg-red-600 hover:bg-red-700 text-white"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete Position
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsDeleteConfirmOpen(false)
+                setEditingPosition(null)
+              }}
+              disabled={loading}
+            >
+              Close
             </Button>
             <Button
               className="bg-[#A4163A] hover:bg-[#7B0F2B] text-white"
@@ -1002,6 +1228,26 @@ export default function AdminHeadHierarchyPage() {
             >
               <Save className="w-4 h-4 mr-2" />
               {loading ? 'Updating...' : 'Update Position'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeleteConfirmOpen && !!editingPosition} onOpenChange={setIsDeleteConfirmOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Delete Position</DialogTitle>
+          </DialogHeader>
+          <div className="text-sm text-slate-600">
+            Delete "{editingPosition?.title}"? Its child positions will be moved to this position&apos;s parent.
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)} disabled={loading}>
+              Cancel
+            </Button>
+            <Button onClick={handleDeletePosition} disabled={loading} className="bg-red-600 hover:bg-red-700 text-white">
+              <Trash2 className="w-4 h-4 mr-2" />
+              {loading ? 'Deleting...' : 'Confirm Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>
