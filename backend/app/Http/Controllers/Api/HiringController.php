@@ -7,6 +7,7 @@ use App\Models\HiringInterview;
 use App\Models\HiringJobOffer;
 use App\Models\HiringRequirementSummary;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class HiringController extends Controller
@@ -441,16 +442,36 @@ class HiringController extends Controller
     public function onboarded()
     {
         try {
-            $items = HiringJobOffer::where('status', 'Accepted')
-                ->orderByDesc('start_date')
-                ->get()
-                ->map(fn (HiringJobOffer $item) => [
-                    'id' => $item->id,
-                    'name' => $item->applicant_name,
-                    'position' => $item->position,
-                    'salary' => $item->salary,
-                    'startDate' => $item->start_date,
-                ]);
+            $rows = DB::table('onboarded_applicants as oa')
+                ->leftJoin('employees as e', 'e.id', '=', 'oa.employee_id')
+                ->leftJoin('hiring_job_offers as hjo', 'hjo.id', '=', 'oa.hiring_job_offer_id')
+                ->select([
+                    'oa.id',
+                    'oa.applicant_name',
+                    'oa.position',
+                    'oa.salary',
+                    'oa.start_date',
+                    'e.first_name',
+                    'e.last_name',
+                    'hjo.applicant_name as offer_applicant_name',
+                    'hjo.position as offer_position',
+                    'hjo.salary as offer_salary',
+                    'hjo.start_date as offer_start_date',
+                ])
+                ->orderByDesc('oa.start_date')
+                ->orderByDesc('oa.onboarded_at')
+                ->get();
+
+            $items = $rows->map(function ($row) {
+                $employeeName = trim(($row->first_name ?? '') . ' ' . ($row->last_name ?? ''));
+                return [
+                    'id' => $row->id,
+                    'name' => trim((string) ($row->applicant_name ?: $row->offer_applicant_name ?: $employeeName)),
+                    'position' => $row->position ?: $row->offer_position,
+                    'salary' => $row->salary ?? $row->offer_salary,
+                    'startDate' => $row->start_date ?: $row->offer_start_date,
+                ];
+            });
 
             return response()->json([
                 'success' => true,

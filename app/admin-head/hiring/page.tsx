@@ -41,9 +41,30 @@ type OnboardedRow = {
   position: string;
   salary: string | null;
   startDate: string;
+  jobOfferId?: number | null;
 };
 
+function normalizePosition(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function normalizeText(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function toOnboardedRow(item: Record<string, unknown>): OnboardedRow {
+  return {
+    id: Number(item.id ?? 0),
+    name: String(item.name ?? item.applicant_name ?? ""),
+    position: String(item.position ?? ""),
+    salary: item.salary ? String(item.salary) : null,
+    startDate: String(item.startDate ?? item.start_date ?? ""),
+    jobOfferId: item.job_offer_id !== undefined && item.job_offer_id !== null ? Number(item.job_offer_id) : null,
+  };
+}
+
 const OFFER_STATUSES: Array<"Pending" | "Accepted" | "Declined"> = ["Pending", "Accepted", "Declined"];
+const MAX_SALARY_INTEGER_DIGITS = 10;
 
 function toSummaryRow(item: Record<string, unknown>): SummaryRow {
   return {
@@ -70,6 +91,18 @@ function toJobOfferRow(item: Record<string, unknown>): JobOfferRow {
   };
 }
 
+function buildOnboardHref(row: JobOfferRow): string {
+  const params = new URLSearchParams({
+    view: "onboard",
+    job_offer_id: String(row.id ?? ""),
+    name: row.name || "",
+    position: row.position || "",
+    onboarding_date: row.startDate || "",
+  });
+
+  return `/admin-head/employee/onboard?${params.toString()}`;
+}
+
 export default function HiringReportPage() {
   const [editingSummaryId, setEditingSummaryId] = useState<number | string | null>(null);
   const [editingJobOfferId, setEditingJobOfferId] = useState<number | string | null>(null);
@@ -85,6 +118,24 @@ export default function HiringReportPage() {
   const [positionOptions, setPositionOptions] = useState<string[]>([""]);
 
   const [searchTerm, setSearchTerm] = useState("");
+
+  const applyOnboardedCountsToSummary = (rows: SummaryRow[], onboarded: OnboardedRow[]): SummaryRow[] => {
+    const onboardedByPosition = onboarded.reduce<Map<string, number>>((acc, item) => {
+      const key = normalizePosition(item.position || "");
+      if (!key) return acc;
+      acc.set(key, (acc.get(key) ?? 0) + 1);
+      return acc;
+    }, new Map<string, number>());
+
+    return rows.map((row) => {
+      const hired = onboardedByPosition.get(normalizePosition(row.position || "")) ?? 0;
+      return {
+        ...row,
+        hired,
+        remaining: Math.max((row.requiredHeadcount || 0) - hired, 0),
+      };
+    });
+  };
 
   const loadData = async () => {
     const apiUrl = getApiUrl();
@@ -117,10 +168,13 @@ export default function HiringReportPage() {
       )
     ).sort((a, b) => a.localeCompare(b));
 
-    setSummaryRows(Array.isArray(summaryJson?.data) ? summaryJson.data.map(toSummaryRow) : []);
+    const nextOnboardedRows = Array.isArray(onboardedJson?.data) ? onboardedJson.data.map(toOnboardedRow) : [];
+    const baseSummaryRows = Array.isArray(summaryJson?.data) ? summaryJson.data.map(toSummaryRow) : [];
+
+    setSummaryRows(applyOnboardedCountsToSummary(baseSummaryRows, nextOnboardedRows));
     setJobOffers(Array.isArray(jobOfferJson?.data) ? jobOfferJson.data.map(toJobOfferRow) : []);
     setJobOfferCandidates(Array.isArray(candidatesJson?.data) ? candidatesJson.data : []);
-    setOnboardedRows(Array.isArray(onboardedJson?.data) ? onboardedJson.data : []);
+    setOnboardedRows(nextOnboardedRows);
     setPositionOptions(["", ...uniquePositions]);
   };
 
@@ -204,7 +258,7 @@ export default function HiringReportPage() {
     const payload = {
       position: row.position,
       required_headcount: row.requiredHeadcount,
-      hired: row.hired,
+      hired: onboardedRows.filter((item) => normalizePosition(item.position || "") === normalizePosition(row.position || "")).length,
       last_update: new Date().toISOString().split("T")[0],
     };
 
@@ -226,13 +280,25 @@ export default function HiringReportPage() {
     const saved = toSummaryRow(json.data ?? {});
     setSummaryRows((prev) => prev.map((item) => (item.id === row.id ? saved : item)));
     setEditingSummaryId(null);
+    await loadData();
   };
 
   const saveJobOffer = async (row: JobOfferRow) => {
     const apiUrl = getApiUrl();
+
+    const normalizedSalary = row.salary === null || row.salary === "" ? null : row.salary;
+    if (normalizedSalary !== null) {
+      const [intPartRaw] = normalizedSalary.split(".");
+      const intPart = (intPartRaw || "").replace(/\D/g, "");
+      if (intPart.length > MAX_SALARY_INTEGER_DIGITS) {
+        window.alert("Salary is too large. Use up to 10 digits before the decimal point.");
+        return;
+      }
+    }
+
     const payload = {
       final_interview_id: row.finalInterviewId,
-      salary: row.salary === null || row.salary === "" ? null : row.salary,
+      salary: normalizedSalary,
       offer_sent: row.offerSent || null,
       response_date: row.responseDate || null,
       status: row.status,
@@ -251,7 +317,24 @@ export default function HiringReportPage() {
           body: JSON.stringify(payload),
         });
 
-    if (!response.ok) return;
+    if (!response.ok) {
+      let message = "Failed to save job offer.";
+      try {
+        const errorJson = await response.json();
+        if (typeof errorJson?.message === "string" && errorJson.message.trim()) {
+          message = errorJson.message;
+        } else if (errorJson?.errors && typeof errorJson.errors === "object") {
+          const firstFieldErrors = Object.values(errorJson.errors)[0];
+          if (Array.isArray(firstFieldErrors) && firstFieldErrors[0]) {
+            message = String(firstFieldErrors[0]);
+          }
+        }
+      } catch {
+        // Keep generic message when response is not JSON.
+      }
+      window.alert(message);
+      return;
+    }
 
     const json = await response.json();
     const saved = toJobOfferRow(json.data ?? {});
@@ -288,6 +371,32 @@ export default function HiringReportPage() {
     if (!needle) return jobOffers;
     return jobOffers.filter((row) => `${row.name} ${row.position}`.toLowerCase().includes(needle));
   }, [jobOffers, searchTerm]);
+
+  const onboardedLookup = useMemo(() => {
+    const set = new Set<string>();
+    onboardedRows.forEach((row) => {
+      if (row.jobOfferId !== null && row.jobOfferId !== undefined) {
+        set.add(`offer:${row.jobOfferId}`);
+      }
+
+      const key = `${normalizeText(row.name)}|${normalizePosition(row.position)}`;
+      if (normalizeText(row.name) && normalizePosition(row.position)) {
+        set.add(`np:${key}`);
+      }
+    });
+    return set;
+  }, [onboardedRows]);
+
+  const isAlreadyOnboarded = (row: JobOfferRow): boolean => {
+    const byOfferId = typeof row.id === "number" ? onboardedLookup.has(`offer:${row.id}`) : false;
+    if (byOfferId) return true;
+
+    const name = normalizeText(row.name);
+    const position = normalizePosition(row.position);
+    if (!name || !position) return false;
+
+    return onboardedLookup.has(`np:${name}|${position}`);
+  };
 
   const totalSummaryHC = filteredSummaryRows.reduce((sum, r) => sum + (r.requiredHeadcount || 0), 0);
   const totalSummaryHired = filteredSummaryRows.reduce((sum, r) => sum + (r.hired || 0), 0);
@@ -353,7 +462,7 @@ export default function HiringReportPage() {
                 <TableRow className="border-b-[3px] border-black hover:bg-transparent bg-slate-50">
                   <TableHead className="text-center font-bold text-black border-r-[3px] border-black w-[30%] text-sm px-4 uppercase">Position</TableHead>
                   <TableHead className="text-center font-bold text-black border-r-[3px] border-black w-[15%] text-[10px] leading-tight uppercase px-2">Required Headcount</TableHead>
-                  <TableHead className="text-center font-bold text-black border-r-[3px] border-black w-[15%] text-[10px] leading-tight uppercase px-2">Hired</TableHead>
+                  <TableHead className="text-center font-bold text-black border-r-[3px] border-black w-[15%] text-[10px] leading-tight uppercase px-2">Hired (Onboarded)</TableHead>
                   <TableHead className="text-center font-bold text-black border-r-[3px] border-black w-[15%] text-[10px] leading-tight uppercase px-2">Remaining Slots</TableHead>
                   <TableHead className="text-center font-bold text-black border-r-[3px] border-black w-[15%] text-[10px] leading-tight uppercase px-2">Last Update</TableHead>
                   <TableHead className="text-center font-bold text-black w-[10%] text-sm uppercase">Action</TableHead>
@@ -403,8 +512,7 @@ export default function HiringReportPage() {
                         <input
                           type="number"
                           value={row.hired}
-                          readOnly={!editable}
-                          onChange={(e) => handleSummaryChange(row.id, "hired", Math.max(parseInt(e.target.value || "0", 10), 0))}
+                          readOnly
                           className="w-full h-full bg-transparent border-none text-center font-semibold text-black focus:outline-none read-only:opacity-80"
                         />
                       </TableCell>
@@ -465,7 +573,7 @@ export default function HiringReportPage() {
                   <TableHead className="text-center font-bold text-black border-r-[3px] border-black w-[12%] text-xs px-2 uppercase leading-tight">Salary Offer</TableHead>
                   <TableHead className="text-center font-bold text-black border-r-[3px] border-black w-[11%] text-[10px] px-1 uppercase leading-tight">Date Offer Sent</TableHead>
                   <TableHead className="text-center font-bold text-black border-r-[3px] border-black w-[11%] text-[10px] px-1 uppercase leading-tight">Date of Response</TableHead>
-                  <TableHead className="text-center font-bold text-black border-r-[3px] border-black w-[13%] text-[9px] uppercase leading-tight px-1">Offer Status</TableHead>
+                  <TableHead className="text-center font-bold text-black border-r-[3px] border-black w-[13%] text-[9px] uppercase leading-tight px-1">Offer Status (Pending/Accepted)</TableHead>
                   <TableHead className="text-center font-bold text-black border-r-[3px] border-black w-[10%] text-[10px] uppercase leading-tight">Start Date</TableHead>
                   <TableHead className="text-center font-bold text-black w-[10%] text-sm uppercase">Action</TableHead>
                 </TableRow>
@@ -473,6 +581,7 @@ export default function HiringReportPage() {
               <TableBody>
                 {filteredJobOffers.map((row) => {
                   const editable = row.isNew || editingJobOfferId === row.id;
+                  const onboarded = isAlreadyOnboarded(row);
 
                   return (
                     <TableRow
@@ -512,7 +621,8 @@ export default function HiringReportPage() {
                             onChange={(e) => {
                               const val = e.target.value.replace(/[^0-9.]/g, "");
                               const parts = val.split(".");
-                              const clean = parts[0] + (parts.length > 1 ? "." + parts[1].slice(0, 2) : "");
+                              const integerPart = parts[0].slice(0, MAX_SALARY_INTEGER_DIGITS);
+                              const clean = integerPart + (parts.length > 1 ? "." + parts[1].slice(0, 2) : "");
                               handleJobOfferChange(row.id, "salary", clean);
                             }}
                             className={`w-full h-12 bg-transparent border-none font-bold text-lg text-black focus:outline-none transition-all rounded px-2 ${
@@ -567,6 +677,27 @@ export default function HiringReportPage() {
                           <button onClick={() => saveJobOffer(row)} className="text-green-700 p-1 hover:bg-slate-100 rounded transition-colors">
                             <Save size={18} />
                           </button>
+                        ) : onboarded ? (
+                          <span className="text-green-700 text-[11px] font-bold uppercase tracking-wide">Onboarded</span>
+                        ) : row.status === "Accepted" ? (
+                          row.startDate ? (
+                            <Link href={buildOnboardHref(row)}>
+                              <button
+                                title="Onboard this applicant"
+                                className="px-2 py-1 text-[10px] font-bold uppercase rounded border border-[#800020] text-[#800020] hover:bg-[#800020] hover:text-white transition-colors"
+                              >
+                                Onboard Applicant
+                              </button>
+                            </Link>
+                          ) : (
+                            <button
+                              disabled
+                              title="Set Start Date first before onboarding."
+                              className="px-2 py-1 text-[10px] font-bold uppercase rounded border border-[#800020] text-[#800020] opacity-50 cursor-not-allowed"
+                            >
+                              Onboard Applicant
+                            </button>
+                          )
                         ) : (
                           <button onClick={() => setEditingJobOfferId(row.id)} className="text-black p-1 hover:bg-slate-100 rounded transition-colors">
                             <Edit2 size={18} />

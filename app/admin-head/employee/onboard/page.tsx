@@ -66,7 +66,7 @@ interface Hierarchy {
   id: number;
   name: string;
   is_custom: boolean;
-  department_id?: number | null;
+  department_id?: number | string | null;
   parent_id?: number | null;
 }
 
@@ -107,6 +107,36 @@ const toIsoDate = (value: unknown): string => {
     return `${year}-${month}-${day}`;
   }
   return "";
+};
+
+const splitFullName = (fullName: string): { first_name: string; last_name: string } => {
+  const cleaned = toPlainString(fullName).replace(/\s+/g, " ").trim();
+  if (!cleaned) return { first_name: "", last_name: "" };
+  const parts = cleaned.split(" ");
+  if (parts.length === 1) return { first_name: parts[0], last_name: "" };
+  return {
+    first_name: parts.slice(0, -1).join(" "),
+    last_name: parts[parts.length - 1],
+  };
+};
+
+const resolveDepartmentFromHierarchy = (
+  positionName: string,
+  positions: Hierarchy[],
+  departments: Department[],
+): string => {
+  const normalizedPosition = toPlainString(positionName).toLowerCase();
+  if (!normalizedPosition) return "";
+
+  const matchedPosition = positions.find(
+    (p) => toPlainString(p.name).toLowerCase() === normalizedPosition,
+  );
+  if (!matchedPosition?.department_id) return "";
+
+  const matchedDepartment = departments.find(
+    (d) => String(d.id) === String(matchedPosition.department_id),
+  );
+  return matchedDepartment ? toPlainString(matchedDepartment.name) : "";
 };
 
 export default function OnboardPage() {
@@ -192,6 +222,11 @@ function OnboardPageContent() {
   const requestedViewParam = searchParams.get("view");
   const rehireParam = searchParams.get("rehire");
   const batchParam = searchParams.get("batch");
+  const prefillNameParam = searchParams.get("name") ?? "";
+  const prefillJobOfferIdParam = searchParams.get("job_offer_id") ?? "";
+  const prefillPositionParam = searchParams.get("position") ?? "";
+  const prefillDepartmentParam = searchParams.get("department") ?? "";
+  const prefillOnboardingDateParam = searchParams.get("onboarding_date") ?? "";
   const isRehireFlow = rehireParam === "1";
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"onboard" | "checklist" | "update-info">(
@@ -258,6 +293,7 @@ function OnboardPageContent() {
   // UI States
   const [isSaving, setIsSaving] = useState(false);
   const [loadingRegions, setLoadingRegions] = useState(false);
+  const [queryPrefillApplied, setQueryPrefillApplied] = useState(false);
   const [loadingProvinces, setLoadingProvinces] = useState(false);
   const [loadingCities, setLoadingCities] = useState(false);
   const [loadingBarangays, setLoadingBarangays] = useState(false);
@@ -678,6 +714,70 @@ function OnboardPageContent() {
     rehireParam,
     batchParam,
   ]);
+
+  useEffect(() => {
+    if (queryPrefillApplied || employeeIdParam) return;
+
+    const hasPrefillData =
+      Boolean(prefillNameParam) ||
+      Boolean(prefillPositionParam) ||
+      Boolean(prefillDepartmentParam) ||
+      Boolean(prefillOnboardingDateParam);
+
+    if (!hasPrefillData) return;
+
+    const nameParts = splitFullName(prefillNameParam);
+    const normalizedPosition = toPlainString(prefillPositionParam);
+    const normalizedDepartmentFromQuery = toPlainString(prefillDepartmentParam);
+    const normalizedOnboardingDate = toIsoDate(prefillOnboardingDateParam);
+
+    let resolvedDepartment = normalizedDepartmentFromQuery;
+    if (!resolvedDepartment) {
+      resolvedDepartment = resolveDepartmentFromHierarchy(
+        normalizedPosition,
+        positions,
+        departments,
+      );
+    }
+
+    setOnboardFormData((prev) => ({
+      ...prev,
+      first_name: nameParts.first_name || prev.first_name,
+      last_name: nameParts.last_name || prev.last_name,
+      position: normalizedPosition || prev.position,
+      department: resolvedDepartment || prev.department,
+      onboarding_date: normalizedOnboardingDate || prev.onboarding_date,
+    }));
+    setView("onboard");
+    setLoading(false);
+    setQueryPrefillApplied(true);
+  }, [
+    queryPrefillApplied,
+    employeeIdParam,
+    prefillNameParam,
+    prefillPositionParam,
+    prefillDepartmentParam,
+    prefillOnboardingDateParam,
+    positions,
+    departments,
+  ]);
+
+  useEffect(() => {
+    if (!onboardFormData.position || positions.length === 0 || departments.length === 0) return;
+
+    const resolvedDepartment = resolveDepartmentFromHierarchy(
+      onboardFormData.position,
+      positions,
+      departments,
+    );
+
+    if (!resolvedDepartment || resolvedDepartment === onboardFormData.department) return;
+
+    setOnboardFormData((prev) => ({
+      ...prev,
+      department: resolvedDepartment,
+    }));
+  }, [onboardFormData.position, onboardFormData.department, positions, departments]);
 
   useEffect(() => {
     if (!regions.length) return;
@@ -1489,6 +1589,9 @@ function OnboardPageContent() {
 
     setIsSaving(true);
     try {
+      const parsedJobOfferId = Number(prefillJobOfferIdParam);
+      const jobOfferId = Number.isInteger(parsedJobOfferId) && parsedJobOfferId > 0 ? parsedJobOfferId : null;
+
       if (isRehireFlow && onboardingEmployeeId) {
         const onboardResponse = await fetch(
           `${getApiUrl()}/api/employees/${encodeURIComponent(onboardingEmployeeId)}/onboard`,
@@ -1569,7 +1672,12 @@ function OnboardPageContent() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ position, department, onboarding_date }),
+          body: JSON.stringify({
+            position,
+            department,
+            onboarding_date,
+            job_offer_id: jobOfferId,
+          }),
         },
       );
 
@@ -1911,11 +2019,12 @@ function OnboardPageContent() {
 
     let extraUpdates = {};
     if (name === "position") {
-      const pos = positions.find((p) => p.name === value);
-      if (pos && pos.department_id) {
-        const dept = departments.find((d) => d.id === pos.department_id);
-        if (dept) extraUpdates = { department: dept.name };
-      }
+      const autoDepartment = resolveDepartmentFromHierarchy(
+        value,
+        positions,
+        departments,
+      );
+      if (autoDepartment) extraUpdates = { department: autoDepartment };
     }
 
     setProgressionFormData((prev) => ({
@@ -2732,14 +2841,12 @@ function OnboardPageContent() {
                         value={onboardFormData.position}
                         onChange={(e) => {
                           const val = e.target.value;
-                          let autoDept = onboardFormData.department;
-                          const pos = positions.find((p) => p.name === val);
-                          if (pos && pos.department_id) {
-                            const dept = departments.find(
-                              (d) => d.id === pos.department_id,
-                            );
-                            if (dept) autoDept = dept.name;
-                          }
+                          const autoDept =
+                            resolveDepartmentFromHierarchy(
+                              val,
+                              positions,
+                              departments,
+                            ) || onboardFormData.department;
                           setOnboardFormData((prev) => ({
                             ...prev,
                             position: val,

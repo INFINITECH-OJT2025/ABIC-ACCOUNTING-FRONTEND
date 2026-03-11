@@ -325,6 +325,7 @@ class EmployeeController extends Controller
                 'position' => 'required|string|max:255',
                 'department' => 'required|string|max:255',
                 'onboarding_date' => 'required|date',
+                'job_offer_id' => 'sometimes|nullable|integer|exists:hiring_job_offers,id',
                 'email_assigned' => 'sometimes|nullable|string|email|max:255',
                 'access_level' => 'sometimes|nullable|string|max:255',
                 'equipment_issued' => 'sometimes|nullable|string',
@@ -344,6 +345,9 @@ class EmployeeController extends Controller
 
             $isRehireProcess = $request->boolean('rehire_process');
             unset($validated['rehire_process']);
+            $jobOfferId = $validated['job_offer_id'] ?? null;
+            unset($validated['job_offer_id']);
+            $jobOffer = null;
 
             if ($isRehireProcess) {
                 $rehiredRecord = $this->saveRehireProfileOnly($employee, $validated);
@@ -355,8 +359,39 @@ class EmployeeController extends Controller
                 ]);
             }
 
+            if ($jobOfferId !== null) {
+                $jobOffer = DB::table('hiring_job_offers')
+                    ->where('id', $jobOfferId)
+                    ->first();
+
+                if (!$jobOffer || $jobOffer->status !== 'Accepted') {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Only accepted job offers can be marked as onboarded.',
+                    ], 422);
+                }
+            }
+
             $employee->update($validated);
             $this->syncLatestRehireProfile($employee);
+
+            if ($jobOffer !== null) {
+                DB::table('onboarded_applicants')->updateOrInsert(
+                    ['hiring_job_offer_id' => $jobOffer->id],
+                    [
+                        'employee_id' => $employee->id,
+                        'final_interview_id' => $jobOffer->final_interview_id,
+                        'applicant_name' => $jobOffer->applicant_name,
+                        'position' => $validated['position'] ?? $jobOffer->position,
+                        'department' => $validated['department'] ?? null,
+                        'salary' => $jobOffer->salary,
+                        'start_date' => $validated['onboarding_date'] ?? $jobOffer->start_date,
+                        'onboarded_at' => now(),
+                        'updated_at' => now(),
+                        'created_at' => now(),
+                    ]
+                );
+            }
 
             // Automatically create a 'Probee' evaluation record upon successful onboarding
             if (in_array($employee->status, ['employed', 'rehired_employee'])) {
