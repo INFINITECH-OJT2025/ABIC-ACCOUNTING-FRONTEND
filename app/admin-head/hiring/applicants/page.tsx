@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Plus, Search, Edit2, Save, ChevronDown, ChevronRight, AlertCircle } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getApiUrl } from "@/lib/api";
 
@@ -31,6 +32,38 @@ type OnboardedRow = {
 };
 
 const INTERVIEW_STATUSES: InterviewStatus[] = ["PENDING", "CONFIRMED", "PASSED", "FAILED"];
+
+const ApplicantsPageSkeleton = () => (
+  <div className="flex-1 flex flex-col animate-pulse">
+    <div className="bg-white border-b border-slate-200 shadow-sm mb-6 overflow-hidden">
+      <div className="w-full px-4 md:px-8 py-6">
+        <div className="space-y-3">
+          <Skeleton className="h-10 w-64 bg-slate-200" />
+          <Skeleton className="h-4 w-96 bg-slate-100" />
+        </div>
+      </div>
+      <div className="border-t border-slate-100 bg-slate-50/50">
+        <div className="w-full px-4 md:px-8 py-3">
+          <div className="flex flex-wrap items-center gap-8">
+            <Skeleton className="h-8 w-64 rounded-lg bg-slate-200" />
+            <Skeleton className="h-10 w-80 rounded-lg bg-slate-100" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div className="px-3 md:px-6 lg:px-8 pb-8 md:pb-12 space-y-10">
+      <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-4 space-y-4">
+        <Skeleton className="h-6 w-72 bg-slate-200" />
+        <Skeleton className="h-44 w-full rounded-lg bg-slate-100" />
+      </div>
+      <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-4 space-y-4">
+        <Skeleton className="h-6 w-64 bg-slate-200" />
+        <Skeleton className="h-36 w-full rounded-lg bg-slate-100" />
+      </div>
+    </div>
+  </div>
+);
 
 function toRow(item: Record<string, unknown>): InterviewRow {
   const rawDate = (item.date as string) ?? "";
@@ -339,68 +372,82 @@ export default function ApplicantsForInterviewPage() {
   const isInitialEditable = (row: InterviewRow) => row.isNew || editingInitialId === row.id;
   const isFinalEditable = (row: InterviewRow) => row.isNew || editingFinalId === row.id;
 
+  if (loading) {
+    return <ApplicantsPageSkeleton />;
+  }
+
   return (
-    <div className="flex flex-col h-full bg-white text-black">
-      <div className="bg-[#800020] text-white pt-6 px-8 pb-0">
-        <h1 className="text-3xl font-bold mb-4">Hiring Report</h1>
-        <div className="flex items-center justify-between">
-          <div className="flex gap-1">
-            <Link href="/admin-head/hiring">
-              <button className="text-white/90 px-6 py-2 font-bold text-xs hover:bg-white/10 transition-colors uppercase">
-                Hiring
-              </button>
-            </Link>
-            <button className="bg-white text-[#800020] px-6 py-2 font-bold rounded-t-md text-xs uppercase">
-              Applicants for Interview
-            </button>
-          </div>
-          <div className="relative mb-2">
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="bg-transparent border border-white/60 rounded-sm py-1.5 px-3 pr-10 text-white text-sm focus:outline-none focus:border-white w-80 h-8"
-              placeholder="Search..."
-            />
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-white/60" size={18} />
+    <div className="min-h-screen bg-gradient-to-br from-stone-50 via-white to-red-50 text-stone-900 font-sans flex flex-col">
+      <div className="bg-gradient-to-r from-[#A4163A] to-[#7B0F2B] text-white shadow-md mb-6">
+        <div className="w-full px-4 md:px-8 py-6">
+          <h1 className="text-2xl md:text-3xl font-bold mb-2">Hiring Report</h1>
+          <p className="text-white/80 text-sm md:text-base">Manage interview applicants and schedules.</p>
+        </div>
+
+        <div className="border-t border-white/10 bg-white/5 backdrop-blur-sm">
+          <div className="w-full px-4 md:px-8 py-3">
+            <div className="flex flex-wrap items-center gap-4 lg:gap-8">
+              <div className="flex items-center bg-white/10 p-1 rounded-lg backdrop-blur-md border border-white/10">
+                <Link href="/admin-head/hiring">
+                  <button className="cursor-pointer px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-200 uppercase tracking-wider text-white/70 hover:text-white hover:bg-white/5">
+                    Hiring
+                  </button>
+                </Link>
+                <button className="cursor-pointer px-4 py-1.5 rounded-md text-xs font-bold transition-all duration-200 uppercase tracking-wider bg-white text-[#A4163A] shadow-md">
+                  Applicants for Interview
+                </button>
+              </div>
+
+              <div className="flex flex-1 flex-wrap items-center gap-3">
+                <div className="relative w-full md:w-[350px]">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-[#A0153E]" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="bg-white border-2 border-[#FFE5EC] text-slate-700 placeholder:text-slate-400 pl-10 h-10 w-full focus:ring-2 focus:ring-[#A0153E] focus:border-[#C9184A] shadow-sm rounded-lg transition-all"
+                    placeholder="Search applicant..."
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-      <div className="h-3 bg-[#E5E7EB]" />
 
-      <main className="flex-1 overflow-y-auto p-10 space-y-12 bg-white font-sans text-black">
-        <div className="border-[3px] border-black rounded-sm shadow-sm overflow-hidden max-w-[1200px]">
+      <main className="flex-1 overflow-y-auto px-3 md:px-6 lg:px-8 pb-8 md:pb-12 space-y-10 text-black">
+        <div className="w-full bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
           <div
             onClick={() => setIsInitialOpen(!isInitialOpen)}
-            className="bg-[#800020] text-white px-4 py-3 flex items-center justify-between border-b-[3px] border-black cursor-pointer hover:bg-[#900025] transition-colors"
+            className="bg-gradient-to-r from-[#4A081A]/10 to-transparent p-4 border-b-2 border-[#630C22] flex items-center justify-between cursor-pointer"
           >
-            <div className="flex items-center gap-3">
-              {isInitialOpen ? <ChevronDown size={20} className="text-white" /> : <ChevronRight size={20} className="text-white" />}
-              <h2 className="font-bold text-sm uppercase tracking-tight select-none">For Initial Interview</h2>
+            <div className="flex items-center gap-3 text-[#4A081A]">
+              {isInitialOpen ? <ChevronDown size={20} className="text-[#4A081A]" /> : <ChevronRight size={20} className="text-[#4A081A]" />}
+              <h2 className="text-xl text-[#4A081A] font-bold select-none">For Initial Interview</h2>
             </div>
             <div
               onClick={(e) => {
                 e.stopPropagation();
                 addInitialRow();
               }}
-              className="bg-white text-[#800020] border-2 border-[#800020] rounded-full p-0.5 w-7 h-7 flex items-center justify-center cursor-pointer hover:bg-slate-100 transition-colors shadow-sm active:scale-95"
+              className="bg-white text-[#A4163A] border-2 border-[#A4163A] rounded-full p-0.5 w-7 h-7 flex items-center justify-center cursor-pointer hover:bg-[#A4163A] hover:text-white transition-colors shadow-sm active:scale-95"
             >
               <Plus size={20} strokeWidth={4} />
             </div>
           </div>
           <div className={isInitialOpen ? "block" : "hidden"}>
-            <Table className="border-collapse">
+            <Table className="border-collapse w-full text-sm">
               <TableHeader>
-                <TableRow className="border-b-[3px] border-black hover:bg-transparent bg-slate-50">
-                  <TableHead className="text-center font-bold text-black border-r-[3px] border-black text-xs uppercase px-4 w-[25%]">Applicant Name</TableHead>
-                  <TableHead className="text-center font-bold text-black border-r-[3px] border-black text-xs uppercase px-4 w-[20%]">Position</TableHead>
-                  <TableHead className="text-center font-bold text-black border-r-[3px] border-black text-xs uppercase px-4 w-[15%]">Interview Date</TableHead>
-                  <TableHead className="text-center font-bold text-black border-r-[3px] border-black text-xs uppercase px-4 w-[15%]">Interview Time</TableHead>
-                  <TableHead className="text-center font-bold text-black border-r-[3px] border-black text-[10px] uppercase px-4 w-[15%] leading-tight">Status</TableHead>
-                  <TableHead className="text-center font-bold text-black text-xs uppercase px-4 w-[10%]">Action</TableHead>
+                <TableRow className="bg-[#FFE5EC]/30 sticky top-0 border-b border-[#FFE5EC] hover:bg-[#FFE5EC]/30">
+                  <TableHead className="px-6 py-4 text-left font-bold text-[#800020] text-sm uppercase tracking-wider">Applicant Name</TableHead>
+                  <TableHead className="px-6 py-4 text-left font-bold text-[#800020] text-sm uppercase tracking-wider">Position</TableHead>
+                  <TableHead className="px-6 py-4 text-left font-bold text-[#800020] text-sm uppercase tracking-wider">Interview Date</TableHead>
+                  <TableHead className="px-6 py-4 text-left font-bold text-[#800020] text-sm uppercase tracking-wider">Interview Time</TableHead>
+                  <TableHead className="px-6 py-4 text-left font-bold text-[#800020] text-sm uppercase tracking-wider">Status</TableHead>
+                  <TableHead className="px-6 py-4 text-right font-bold text-[#800020] text-sm uppercase tracking-wider">Action</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+              <TableBody className="divide-y divide-stone-100">
                 {filteredInitialRows.map((row) => {
                   const editable = isInitialEditable(row);
                   const rowNameError = initialNameErrors[String(row.id)] ?? "";
@@ -410,9 +457,9 @@ export default function ApplicantsForInterviewPage() {
                   return (
                     <TableRow
                       key={row.id}
-                      className={`h-20 border-b-[2px] border-black hover:bg-slate-50/50 last:border-b-0 ${editable ? "bg-amber-50/50" : ""}`}
+                      className={`hover:bg-[#FFE5EC] border-b border-rose-50 transition-colors duration-200 group ${editable ? "bg-amber-50/50" : ""}`}
                     >
-                      <TableCell className="border-r-[3px] border-black p-0 relative">
+                      <TableCell className="px-6 py-4 relative">
                         {editable && rowNameError && (
                           <div className="absolute right-2 top-1 z-10 flex items-center gap-1 text-[11px] font-semibold text-[#ff2d55]">
                             <AlertCircle size={12} />
@@ -432,7 +479,7 @@ export default function ApplicantsForInterviewPage() {
                           placeholder="Name..."
                         />
                       </TableCell>
-                      <TableCell className="border-r-[3px] border-black p-0">
+                      <TableCell className="px-6 py-4">
                         <select
                           value={row.position}
                           disabled={!editable}
@@ -446,7 +493,7 @@ export default function ApplicantsForInterviewPage() {
                           ))}
                         </select>
                       </TableCell>
-                      <TableCell className="border-r-[3px] border-black p-0">
+                      <TableCell className="px-6 py-4">
                         <input
                           type="date"
                           value={row.date || ""}
@@ -455,7 +502,7 @@ export default function ApplicantsForInterviewPage() {
                           className="w-full h-full bg-transparent border-none text-center font-bold text-black focus:outline-none read-only:opacity-80"
                         />
                       </TableCell>
-                      <TableCell className="border-r-[3px] border-black p-0">
+                      <TableCell className="px-6 py-4">
                         <input
                           type="time"
                           value={row.time || ""}
@@ -464,7 +511,7 @@ export default function ApplicantsForInterviewPage() {
                           className="w-full h-full bg-transparent border-none text-center font-bold text-black focus:outline-none read-only:opacity-80"
                         />
                       </TableCell>
-                      <TableCell className="border-r-[3px] border-black p-0">
+                      <TableCell className="px-6 py-4">
                         <select
                           value={row.status}
                           disabled={!editable}
@@ -486,7 +533,7 @@ export default function ApplicantsForInterviewPage() {
                           ))}
                         </select>
                       </TableCell>
-                      <TableCell className="text-center">
+                      <TableCell className="px-6 py-4 text-right">
                         {editable ? (
                           <button
                             onClick={() => saveInitial(row)}
@@ -518,56 +565,44 @@ export default function ApplicantsForInterviewPage() {
           </div>
         </div>
 
-        <div className="border-[3px] border-black rounded-sm shadow-sm overflow-hidden max-w-[1200px]">
+        <div className="w-full bg-white border-2 border-[#FFE5EC] shadow-md overflow-hidden rounded-lg">
           <div
             onClick={() => setIsFinalOpen(!isFinalOpen)}
-            className="bg-[#800020] text-white px-4 py-3 flex items-center justify-between border-b-[3px] border-black cursor-pointer hover:bg-[#900025] transition-colors"
+            className="bg-gradient-to-r from-[#4A081A]/10 to-transparent p-4 border-b-2 border-[#630C22] flex items-center justify-between cursor-pointer"
           >
-            <div className="flex items-center gap-3">
-              {isFinalOpen ? <ChevronDown size={20} className="text-white" /> : <ChevronRight size={20} className="text-white" />}
-              <h2 className="font-bold text-sm uppercase tracking-tight select-none">For Final Interview</h2>
+            <div className="flex items-center gap-3 text-[#4A081A]">
+              {isFinalOpen ? <ChevronDown size={20} className="text-[#4A081A]" /> : <ChevronRight size={20} className="text-[#4A081A]" />}
+              <h2 className="text-xl text-[#4A081A] font-bold select-none">For Final Interview</h2>
             </div>
             <div className="w-7 h-7" />
           </div>
           <div className={isFinalOpen ? "block" : "hidden"}>
-            <Table className="border-collapse">
+            <Table className="border-collapse w-full text-sm">
               <TableHeader>
-                <TableRow className="border-b-[3px] border-black hover:bg-transparent bg-slate-50">
-                  <TableHead className="text-center font-bold text-black border-r-[3px] border-black text-xs uppercase px-4 w-[25%]">Applicant Name</TableHead>
-                  <TableHead className="text-center font-bold text-black border-r-[3px] border-black text-xs uppercase px-4 w-[20%]">Position</TableHead>
-                  <TableHead className="text-center font-bold text-black border-r-[3px] border-black text-xs uppercase px-4 w-[15%]">Interview Date</TableHead>
-                  <TableHead className="text-center font-bold text-black border-r-[3px] border-black text-xs uppercase px-4 w-[15%]">Interview Time</TableHead>
-                  <TableHead className="text-center font-bold text-black border-r-[3px] border-black text-[10px] uppercase px-4 w-[15%] leading-tight">Status</TableHead>
-                  <TableHead className="text-center font-bold text-black text-xs uppercase px-4 w-[10%]">Action</TableHead>
+                <TableRow className="bg-[#FFE5EC]/30 sticky top-0 border-b border-[#FFE5EC] hover:bg-[#FFE5EC]/30">
+                  <TableHead className="px-6 py-4 text-left font-bold text-[#800020] text-sm uppercase tracking-wider">Applicant Name</TableHead>
+                  <TableHead className="px-6 py-4 text-left font-bold text-[#800020] text-sm uppercase tracking-wider">Position</TableHead>
+                  <TableHead className="px-6 py-4 text-left font-bold text-[#800020] text-sm uppercase tracking-wider">Interview Date</TableHead>
+                  <TableHead className="px-6 py-4 text-left font-bold text-[#800020] text-sm uppercase tracking-wider">Interview Time</TableHead>
+                  <TableHead className="px-6 py-4 text-left font-bold text-[#800020] text-sm uppercase tracking-wider">Status</TableHead>
+                  <TableHead className="px-6 py-4 text-right font-bold text-[#800020] text-sm uppercase tracking-wider">Action</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+              <TableBody className="divide-y divide-stone-100">
                 {filteredFinalRows.map((row) => {
                   const editable = isFinalEditable(row);
                   return (
                     <TableRow
                       key={row.id}
-                      className={`h-20 border-b-[2px] border-black hover:bg-slate-50/50 last:border-b-0 ${editable ? "bg-amber-50/50" : ""}`}
+                      className={`hover:bg-[#FFE5EC] border-b border-rose-50 transition-colors duration-200 group ${editable ? "bg-amber-50/50" : ""}`}
                     >
-                      <TableCell className="border-r-[3px] border-black p-0">
-                        <select
-                          value={row.initialInterviewId ?? ""}
-                          disabled={!editable}
-                          onChange={(e) => handleFinalChange(row.id, "initialInterviewId", e.target.value)}
-                          className="w-full h-full bg-transparent border-none appearance-none px-4 font-bold text-black focus:outline-none disabled:opacity-80"
-                        >
-                          <option value="">Select passed initial interview</option>
-                          {finalCandidates.map((candidate) => (
-                            <option key={candidate.id} value={candidate.id}>
-                              {candidate.applicant_name}
-                            </option>
-                          ))}
-                        </select>
+                      <TableCell className="px-6 py-4">
+                        <div className="w-full h-full px-4 flex items-center font-bold text-black">{row.name || "-"}</div>
                       </TableCell>
-                      <TableCell className="border-r-[3px] border-black px-4 font-bold text-black">
+                      <TableCell className="px-6 py-4 font-bold text-black">
                         {row.position || "-"}
                       </TableCell>
-                      <TableCell className="border-r-[3px] border-black p-0">
+                      <TableCell className="px-6 py-4">
                         <input
                           type="date"
                           value={row.date || ""}
@@ -576,7 +611,7 @@ export default function ApplicantsForInterviewPage() {
                           className="w-full h-full bg-transparent border-none text-center font-bold text-black focus:outline-none read-only:opacity-80"
                         />
                       </TableCell>
-                      <TableCell className="border-r-[3px] border-black p-0">
+                      <TableCell className="px-6 py-4">
                         <input
                           type="time"
                           value={row.time || ""}
@@ -585,7 +620,7 @@ export default function ApplicantsForInterviewPage() {
                           className="w-full h-full bg-transparent border-none text-center font-bold text-black focus:outline-none read-only:opacity-80"
                         />
                       </TableCell>
-                      <TableCell className="border-r-[3px] border-black p-0">
+                      <TableCell className="px-6 py-4">
                         <select
                           value={row.status}
                           disabled={!editable}
@@ -607,7 +642,7 @@ export default function ApplicantsForInterviewPage() {
                           ))}
                         </select>
                       </TableCell>
-                      <TableCell className="text-center">
+                      <TableCell className="px-6 py-4 text-right">
                         {editable ? (
                           <button
                             onClick={() => saveFinal(row)}
