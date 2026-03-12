@@ -414,7 +414,6 @@ export default function LeaveCreditsPage() {
             </CardContent>
           </Card>
 
-
           <div className="flex items-start gap-4 p-5 bg-white rounded-xl border-2 border-[#FFE5EC] shadow-sm relative overflow-hidden group">
             <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-[#630C22]" />
             <div className="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
