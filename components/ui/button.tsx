@@ -21,7 +21,7 @@ export const buttonVariants = ({
 
   const variants = {
     default:
-      "bg-gradient-to-r from-[#8B0000] to-[#A52A2A] text-white hover:from-[#700000] hover:to-[#8B1A1A] shadow-lg rounded-md",
+      "bg-white text-[#7B0F2B] hover:bg-rose-50 shadow-lg rounded-md",
     outline:
       "border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md",
     ghost: "hover:bg-accent hover:text-accent-foreground rounded-md",
