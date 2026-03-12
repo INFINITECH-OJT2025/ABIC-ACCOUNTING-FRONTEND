@@ -213,8 +213,10 @@ export default function LeaveCreditsPage() {
                   </thead>
                   <tbody className="divide-y divide-[#FFE5EC]/50 font-medium">
                     {paginatedCredits.length > 0 ? (
-                      paginatedCredits.map((item) => (
-                        <tr>
+                      paginatedCredits.map((item, index) => (
+                        <tr
+                          key={`${item.employee_name}-${item.department ?? "no-department"}-${item.regularization_date ?? "pending"}-${index}`}
+                        >
                           <td className="px-6 py-6">
                             <div>
                               <div className="font-black text-[#4A081A] text-lg lg:text-xl group-hover:text-[#630C22] transition-colors leading-tight">
