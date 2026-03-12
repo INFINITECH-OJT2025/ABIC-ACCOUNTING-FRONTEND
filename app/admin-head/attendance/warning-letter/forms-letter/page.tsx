@@ -1757,11 +1757,23 @@ function FormLetterContent() {
             margin: 0;
             size: A4; /* 210mm × 297mm */
           }
+          html,
+          body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #fff !important;
+          }
           body {
             background: white;
           }
           .print\\:hidden {
             display: none !important;
+          }
+          #form-letter-1,
+          #form-letter-2 {
+            margin-left: auto !important;
+            margin-right: auto !important;
+            box-shadow: none !important;
           }
         }
       `}</style>

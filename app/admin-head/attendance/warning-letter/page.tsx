@@ -1202,6 +1202,22 @@ export default function WarningLetterPage() {
                         ))}
                       </div>
                     </div>
+
+                    <div className="pt-2 flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          router.push(
+                            `/admin-head/attendance/warning-letter/forms-letter?employeeId=${letter.employee_id}&type=${letter.type}&month=${letter.month}&year=${letter.year}&cutoff=${letter.cutoff}&mode=review&letterId=${letter.id}`,
+                          )
+                        }
+                        className="h-8 px-3 text-[10px] font-bold uppercase tracking-wider text-[#A4163A] border-rose-200 hover:bg-rose-50 hover:text-[#7B0F2B]"
+                      >
+                        <FileText className="w-3.5 h-3.5 mr-1.5" />
+                        View Form
+                      </Button>
+                    </div>
                   </div>
                 ))
               )}
