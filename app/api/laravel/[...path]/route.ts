@@ -2,13 +2,36 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const LARAVEL_BASE = process.env.LARAVEL_INTERNAL_URL || 'http://127.0.0.1:8000'
 
+function getCandidateBases() {
+    const candidates = new Set<string>()
+    candidates.add(LARAVEL_BASE)
+
+    try {
+        const parsed = new URL(LARAVEL_BASE)
+        if (parsed.hostname === '127.0.0.1') {
+            parsed.hostname = 'localhost'
+            candidates.add(parsed.toString().replace(/\/$/, ''))
+        } else if (parsed.hostname === 'localhost') {
+            parsed.hostname = '127.0.0.1'
+            candidates.add(parsed.toString().replace(/\/$/, ''))
+        }
+    } catch {
+        // Keep defaults if URL parsing fails.
+    }
+
+    candidates.add('http://127.0.0.1:8000')
+    candidates.add('http://localhost:8000')
+
+    return Array.from(candidates).map((base) => base.replace(/\/$/, ''))
+}
+
 async function handler(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
     const { path } = await params
     const targetPath = '/' + path.join('/')
 
     // Preserve query string
     const searchParams = request.nextUrl.searchParams.toString()
-    const targetUrl = `${LARAVEL_BASE}${targetPath}${searchParams ? '?' + searchParams : ''}`
+    const targetSuffix = `${targetPath}${searchParams ? '?' + searchParams : ''}`
 
     // Forward relevant headers (drop host)
     const headers: Record<string, string> = {
@@ -27,34 +50,47 @@ async function handler(request: NextRequest, { params }: { params: Promise<{ pat
         body = await request.text()
     }
 
-    try {
-        const response = await fetch(targetUrl, {
-            method: request.method,
-            headers,
-            body,
-        })
+    const candidateBases = getCandidateBases()
+    let lastError: unknown = null
 
-        const responseBuffer = await response.arrayBuffer()
-        const outHeaders = new Headers()
-        const contentType = response.headers.get('Content-Type') || 'application/json'
-        outHeaders.set('Content-Type', contentType)
-        const contentDisposition = response.headers.get('Content-Disposition')
-        if (contentDisposition) outHeaders.set('Content-Disposition', contentDisposition)
-        const cacheControl = response.headers.get('Cache-Control')
-        if (cacheControl) outHeaders.set('Cache-Control', cacheControl)
-        outHeaders.set('Access-Control-Allow-Origin', '*')
+    for (const base of candidateBases) {
+        const targetUrl = `${base}${targetSuffix}`
 
-        return new NextResponse(responseBuffer, {
-            status: response.status,
-            headers: outHeaders,
-        })
-    } catch (error) {
-        console.error('[Laravel Proxy] Error:', error)
-        return NextResponse.json(
-            { success: false, message: 'Could not connect to Laravel backend at ' + targetUrl },
-            { status: 502 }
-        )
+        try {
+            const response = await fetch(targetUrl, {
+                method: request.method,
+                headers,
+                body,
+            })
+
+            const responseBuffer = await response.arrayBuffer()
+            const outHeaders = new Headers()
+            const contentType = response.headers.get('Content-Type') || 'application/json'
+            outHeaders.set('Content-Type', contentType)
+            const contentDisposition = response.headers.get('Content-Disposition')
+            if (contentDisposition) outHeaders.set('Content-Disposition', contentDisposition)
+            const cacheControl = response.headers.get('Cache-Control')
+            if (cacheControl) outHeaders.set('Cache-Control', cacheControl)
+            outHeaders.set('Access-Control-Allow-Origin', '*')
+
+            return new NextResponse(responseBuffer, {
+                status: response.status,
+                headers: outHeaders,
+            })
+        } catch (error) {
+            lastError = error
+            console.error('[Laravel Proxy] Error connecting to:', targetUrl, error)
+        }
     }
+
+    return NextResponse.json(
+        {
+            success: false,
+            message: `Could not connect to Laravel backend. Tried: ${candidateBases.join(', ')}`,
+            error: lastError instanceof Error ? lastError.message : 'Unknown error',
+        },
+        { status: 502 }
+    )
 }
 
 export const GET = handler

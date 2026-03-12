@@ -7,6 +7,7 @@ import {
   Badge,
   Input
 } from '@/components/ui'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select,
   SelectContent,
@@ -112,6 +113,41 @@ const EMPTY_SCORES: Record<CriteriaId, string> = {
   grooming: '',
   communication: ''
 }
+
+const EvaluationFormSkeleton = () => (
+  <div className="min-h-screen bg-slate-50 py-10 px-4 animate-pulse">
+    <div className="max-w-[850px] mx-auto mb-4 flex justify-between">
+      <Skeleton className="h-10 w-24 bg-white border border-slate-200 shadow-sm" />
+      <div className="flex gap-2">
+        <Skeleton className="h-10 w-32 bg-white border border-slate-200 shadow-sm" />
+        <Skeleton className="h-10 w-32 bg-white border border-slate-200 shadow-sm" />
+        <Skeleton className="h-10 w-40 bg-white border border-slate-200 shadow-sm" />
+      </div>
+    </div>
+    <div className="max-w-[850px] mx-auto bg-white shadow-sm p-[60px] border border-slate-200 space-y-10">
+      <div className="text-center space-y-4">
+        <Skeleton className="h-8 w-80 mx-auto bg-slate-200" />
+        <Skeleton className="h-8 w-64 mx-auto bg-slate-100" />
+      </div>
+      <div className="space-y-4 pt-6 border-t border-slate-100">
+        <Skeleton className="h-6 w-full bg-slate-50" />
+        <Skeleton className="h-6 w-full bg-slate-50" />
+        <Skeleton className="h-6 w-full bg-slate-50" />
+      </div>
+      <div className="space-y-8">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="flex gap-4 items-start pt-4 border-t border-slate-100">
+            <div className="flex-1 space-y-3">
+              <Skeleton className="h-5 w-48 bg-slate-200" />
+              <Skeleton className="h-4 w-full bg-slate-50" />
+            </div>
+            <Skeleton className="h-10 w-24 bg-slate-100 rounded-lg" />
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+)
 
 function EvaluateEmployeeForm() {
   const router = useRouter()
@@ -497,15 +533,14 @@ function EvaluateEmployeeForm() {
     if (Object.values(scores).some(s => s === '')) return toast.error('Please complete all rating criteria')
     if (!isEditMode) return toast.error('Click Edit Evaluation first to modify and save')
     if (!agreement) return toast.error('Please select agree or disagree')
-    if (!remarks.trim()) return toast.error('Please enter comments / remarks')
-    if (!ratedBy.trim()) return toast.error('Please enter the name of who rated this')
-    if (!reviewedBy.trim()) return toast.error('Please enter the name of who reviewed this')
-    if (!approvedBy.trim()) return toast.error('Please enter the name of who approved this')
 
     setIsSubmitting(true)
     try {
       const computedRemarks = totalScore >= 31 ? 'Passed' : 'Failed'
-      const derivedStatus = recommendation === 'yes' ? 'Regular' : 'Probee'
+      // Regular/Regularized must only happen after manual regularization date input on monitoring page.
+      const derivedStatus = computedRemarks === 'Passed'
+        ? 'For Recommendation'
+        : (evaluationContext.isSecond ? 'Failed' : 'Probee')
 
       const payload = {
         employee_id: selectedEmployeeId,
@@ -523,13 +558,7 @@ function EvaluateEmployeeForm() {
         [`${evaluationContext.isSecond ? 'reviewed_by_2' : 'reviewed_by'}`]: reviewedBy.trim() || undefined,
         [`${evaluationContext.isSecond ? 'approved_by_2' : 'approved_by'}`]: approvedBy.trim() || undefined,
         status: derivedStatus,
-        regularization_date: recommendation === 'yes' ? format(new Date(), 'yyyy-MM-dd') : undefined
-      }
-
-      // If it's the first eval and they passed, automatically fail the second one to skip it
-      if (evaluationContext.targetScore === 'score_1' && computedRemarks === 'Passed') {
-        payload.score_2 = 0
-        payload.remarks_2 = 'Failed'
+        regularization_date: undefined
       }
 
       const response = await fetch(`${getApiUrl()}/api/evaluations`, {
@@ -553,7 +582,7 @@ function EvaluateEmployeeForm() {
   }
 
   if (loading) {
-    return <div className="min-h-screen bg-white flex items-center justify-center">Loading...</div>
+    return <EvaluationFormSkeleton />
   }
 
   const firstEvaluationDate = selectedEmployee
@@ -1067,10 +1096,10 @@ function EvaluateEmployeeForm() {
 
         {/* Manager Signatures */}
         <div className="mb-10">
-          <div className="font-bold uppercase mb-2 text-red-600 text-[12px]">Manager Approval Signatures <span className="text-xs">(Required)</span></div>
-          <div className="grid grid-cols-2 gap-x-20 gap-y-2 bg-red-50 border border-red-200 p-4">
+          <div className="font-bold uppercase mb-2 text-[12px]">Manager Approval Signatures</div>
+          <div className="grid grid-cols-2 gap-x-20 gap-y-2 bg-slate-50 border border-slate-200 p-4">
             <div className="flex gap-2 items-center">
-              <span className="min-w-[80px] font-semibold">Rated by: <span className="text-red-600">*</span></span>
+              <span className="min-w-[80px] font-semibold">Rated by:</span>
               <input 
                 type="text" 
                 className="flex-1 border-b border-black bg-transparent outline-none disabled:text-slate-500 disabled:cursor-not-allowed text-[13px]"
@@ -1086,7 +1115,7 @@ function EvaluateEmployeeForm() {
             </div>
             
             <div className="flex gap-2 items-center">
-              <span className="min-w-[80px] font-semibold">Reviewed by: <span className="text-red-600">*</span></span>
+              <span className="min-w-[80px] font-semibold">Reviewed by:</span>
               <input 
                 type="text" 
                 className="flex-1 border-b border-black bg-transparent outline-none disabled:text-slate-500 disabled:cursor-not-allowed text-[13px]"
@@ -1102,7 +1131,7 @@ function EvaluateEmployeeForm() {
             </div>
             
             <div className="flex gap-2 items-center">
-              <span className="min-w-[80px] font-semibold">Approved by: <span className="text-red-600">*</span></span>
+              <span className="min-w-[80px] font-semibold">Approved by:</span>
               <input 
                 type="text" 
                 className="flex-1 border-b border-black bg-transparent outline-none disabled:text-slate-500 disabled:cursor-not-allowed text-[13px]"
@@ -1128,7 +1157,7 @@ function EvaluateEmployeeForm() {
 
 export default function EvaluateEmployeePage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-200 py-10 px-4 font-serif flex items-center justify-center">Loading evaluation form...</div>}>
+    <Suspense fallback={<EvaluationFormSkeleton />}>
       <EvaluateEmployeeForm />
     </Suspense>
   )

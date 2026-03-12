@@ -91,7 +91,7 @@ class EvaluationController extends Controller
 
         $payload = $this->buildPdfPayload($employee, $evaluation, $viewMode);
 
-        // Long bond paper: 8.5in x 13in (portrait)
+        // A4 paper (portrait)
         $pdf = Pdf::loadView('pdf.evaluation', $payload)->setPaper('a4', 'portrait');
         $filename = 'evaluation_' . $employee->id . '_' . now()->format('Ymd_His') . '.pdf';
 
@@ -118,7 +118,7 @@ class EvaluationController extends Controller
             }
 
             $payload = $this->buildPdfPayload($employee, $evaluation, $viewMode);
-            // Long bond paper: 8.5in x 13in (portrait)
+            // A4 paper (portrait)
             $pdf = Pdf::loadView('pdf.evaluation', $payload)->setPaper('a4', 'portrait');
             $pdfBinary = $pdf->output();
             $filename = 'evaluation_' . $employee->id . '.pdf';

@@ -4,42 +4,45 @@
     <meta charset="UTF-8">
     <title>Performance Appraisal</title>
     <style>
-        @page { margin: 20px 22px; }
-        body { font-family: "Times New Roman", serif; font-size: 10pt; color: #000; line-height: 1.0; margin: 0; padding: 0; }
-        .doc, .doc * { font-family: "Times New Roman", serif !important; font-size: 10pt !important; line-height: 1.0 !important; }
+        @page { margin: 14px 16px; }
+        body { font-family: "Times New Roman", serif; font-size: 10pt; color: #000; line-height: 1.1; margin: 0; padding: 0; }
+        .doc, .doc * { font-family: "Times New Roman", serif !important; font-size: 10pt !important; line-height: 1.1 !important; }
         .doc { width: 100%; max-width: 700px; margin: 0 auto; }
         .header { text-align: center; margin-bottom: 8px; margin-top: 0; padding: 4px 0; }
-        .company { color: #c42020; font-weight: 700; font-size: 19px; letter-spacing: 0.3px; margin-bottom: 5px; }
+        .company { color: #000; font-weight: 700; font-size: 19px; letter-spacing: 0.3px; margin-bottom: 5px; }
         .title { font-weight: 700; font-size: 16px; letter-spacing: 0.5px; margin-top: 5px; }
         .meta { margin-bottom: 8px; }
         .meta-row { margin-bottom: 3px; white-space: nowrap; }
-        .meta-label { font-weight: 700; display: inline-block; min-width: 145px; font-size: 10px; }
-        .meta-value-line { display: inline-block; width: auto; max-width: 78%; border-bottom: 1px solid #000; vertical-align: bottom; padding-right: 4px; }
-        .meta-value { color: #c42020; font-weight: 700; font-size: 10px; }
+        .meta-label { font-weight: 700; display: inline-block; width: 170px; font-size: 10px; padding-right: 8px; box-sizing: border-box; }
+        .meta-value-line { display: inline-block; width: auto; max-width: 72%; border-bottom: 1px solid #000; vertical-align: bottom; padding: 0 4px 1px 2px; box-sizing: border-box; }
+        .meta-value { color: #000; font-weight: 700; font-size: 10px; }
         .eval-tag { color: #708090; font-style: italic; font-size: 8.5px; margin-left: 5px; }
 
-        table.criteria { width: 100%; border-collapse: collapse; margin-top: 6px; }
-        table.criteria th { font-size: 10px; text-align: center; text-decoration: underline; padding-bottom: 3px; }
+        table.criteria { width: 100%; border-collapse: collapse; margin-top: 6px; table-layout: fixed; }
+        table.criteria th { font-size: 10px; text-align: center; text-decoration: underline; padding-bottom: 4px; }
         table.criteria td { vertical-align: top; padding: 4px 0; }
-        .criterion-title { font-weight: 700; font-size: 10px; margin-bottom: 0; }
-        .criterion-desc { margin-left: 8px; font-size: 8.5px; line-height: 1.3; }
-        .rating-cell { width: 30%; text-align: center; vertical-align: middle; }
-        .rating-line { border-bottom: 1px solid #000; min-height: 14px; line-height: 14px; font-size: 12px; font-weight: 700; }
+        .criterion-title { font-weight: 700; font-size: 10px; margin-bottom: 1px; text-indent: 0; }
+        .criterion-desc { margin-left: 12px; font-size: 8.5px; line-height: 1.2; text-align: left; }
+        .rating-cell { width: 26%; text-align: center; vertical-align: middle; }
+        .rating-line { border-bottom: 1px solid #000; min-height: 14px; line-height: 14px; font-size: 12px; font-weight: 700; width: 78%; margin: 0 auto; }
 
-        .total-block { margin-top: 6px; text-align: right; font-weight: 700; font-size: 11px; }
-        .total-value-line { display: inline-block; min-width: 130px; border-bottom: 1px solid #000; text-align: center; margin-left: 6px; font-size: 12px; line-height: 16px; }
-        .agreement { margin-top: 8px; margin-bottom: 8px; font-size: 9px; line-height: 1.25; }
+        .total-row { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 6px; }
+        .total-label-cell { width: 74%; text-align: right; font-weight: 700; font-size: 11px; padding-right: 6px; vertical-align: middle; }
+        .total-score-cell { width: 26%; text-align: center; vertical-align: middle; }
+        .total-value-line { display: block; width: 78%; border-bottom: 1px solid #000; text-align: center; margin: 0 auto; font-size: 12px; line-height: 16px; min-height: 14px; }
+        .agreement { margin-top: 10px; margin-bottom: 10px; font-size: 9px; line-height: 1.28; }
 
-        .sign-row { width: 100%; border-collapse: collapse; margin-top: 8px; margin-bottom: 10px; }
-        .sign-row td { width: 50%; vertical-align: middle; padding-bottom: 2px; }
-        .line-label { font-weight: 700; font-size: 10px; }
-        .line { border-bottom: 1px solid #000; display: inline-block; width: 65%; margin-left: 5px; min-height: 12px; vertical-align: middle; }
+        .sign-row { width: 100%; border-collapse: collapse; margin-top: 9px; margin-bottom: 12px; }
+        .sign-row td { width: 50%; vertical-align: middle; padding-bottom: 2px; white-space: nowrap; }
+        .line-label { font-weight: 700; font-size: 10px; display: inline-block; white-space: nowrap; }
+        .line { border-bottom: 1px solid #000; display: inline-block; width: 55%; margin-left: 5px; min-height: 12px; vertical-align: middle; }
+        .signature-line { width: 36%; margin-left: 4px; }
         .date-label { color: #000; font-weight: 700; margin-right: 4px; font-size: 10px; }
-        .date-value { color: #c42020; font-weight: 700; font-size: 10px; }
+        .date-value { color: #000; font-weight: 700; font-size: 10px; }
 
         .subhead { font-weight: 700; margin-top: 8px; margin-bottom: 4px; font-size: 10px; }
-        .list { font-size: 9px; margin-left: 20px; line-height: 1.3; margin-top: 2px; margin-bottom: 4px; }
-        .recommend { margin-top: 8px; margin-bottom: 8px; font-weight: 700; font-size: 10px; }
+        .list { font-size: 9px; margin-left: 20px; line-height: 1.3; margin-top: 2px; margin-bottom: 5px; }
+        .recommend { margin-top: 9px; margin-bottom: 9px; font-weight: 700; font-size: 10px; }
         .box { display: inline-block; width: 10px; height: 10px; border: 1px solid #000; margin: 0 4px 0 7px; position: relative; vertical-align: middle; }
         .box.checked::after {
             content: '';
@@ -53,15 +56,18 @@
             transform: rotate(45deg);
         }
 
-        .bottom-block { margin-top: 8px; }
-        .comments-title { margin-top: 8px; margin-bottom: 4px; font-weight: 700; font-size: 10px; }
-        .comments-box { border: 1px solid #000; min-height: 145px; margin-top: 4px; padding: 6px; font-size: 9px; line-height: 1.25; }
+        .bottom-block { margin-top: 11px; }
+        .comments-title { margin-top: 9px; margin-bottom: 5px; font-weight: 700; font-size: 10px; }
+        .comments-line { border-bottom: 1px solid #000; min-height: 14px; line-height: 14px; margin-top: 2px; padding: 0 2px; font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-        .manager { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 0; }
-        .manager td { width: 50%; padding-bottom: 4px; vertical-align: middle; font-size: 8.5px; }
-        .manager-label { display: inline-block; min-width: 52px; font-size: 8.5px; }
-        .manager-line { border-bottom: 1px solid #000; display: inline-block; width: 65%; margin-left: 4px; min-height: 12px; line-height: 12px; vertical-align: middle; position: relative; padding: 0 2px; }
-        .manager-name { color: #c42020; font-weight: 700; font-size: 8.5px; white-space: nowrap; max-width: 145px; overflow: hidden; text-overflow: ellipsis; }
+        .manager { width: 100%; border-collapse: collapse; margin-top: 11px; margin-bottom: 0; }
+        .manager td { width: 50%; padding-bottom: 6px; vertical-align: middle; font-size: 8.5px; }
+        .manager-field { white-space: nowrap; }
+        .manager-label { display: inline-block; width: 64px; font-size: 8.5px; }
+        .manager-date-label { display: inline-block; width: 36px; font-size: 8.5px; }
+        .manager-line { border-bottom: 1px solid #000; display: inline-block; width: 74%; margin-left: 4px; min-height: 12px; line-height: 12px; vertical-align: middle; position: relative; padding: 0 2px; }
+        .manager-date-line { width: 70%; }
+        .manager-name { color: #000; font-weight: 700; font-size: 8.5px; white-space: nowrap; max-width: 145px; overflow: hidden; text-overflow: ellipsis; }
         .page-break { page-break-before: always; }
     </style>
 </head>
@@ -107,9 +113,12 @@
             </thead>
             <tbody>
                 @foreach($criteria as $criterion)
+                    @php
+                        $criterionLabel = preg_replace('/^\d+\.\s*/', '', $criterion['label']);
+                    @endphp
                     <tr>
                         <td>
-                            <div class="criterion-title">{{ $criterion['label'] }}</div>
+                            <div class="criterion-title">{{ $loop->iteration }}. {{ $criterionLabel }}</div>
                             <div class="criterion-desc">{{ $criterion['desc'] }}</div>
                         </td>
                         <td class="rating-cell">
@@ -120,9 +129,12 @@
             </tbody>
         </table>
 
-        <div class="total-block">
-            TOTAL SCORE <span class="total-value-line">{{ $evaluation->score_1 ?? '' }}</span>
-        </div>
+        <table class="total-row">
+            <tr>
+                <td class="total-label-cell">TOTAL SCORE</td>
+                <td class="total-score-cell"><span class="total-value-line">{{ $evaluation->score_1 ?? '' }}</span></td>
+            </tr>
+        </table>
 
         <div class="agreement">
             The above appraisal was discussed with me by my superior and I
@@ -134,7 +146,7 @@
             <tr>
                 <td>
                     <span class="line-label">SIGNATURE OF EMPLOYEE:</span>
-                    <span class="line">&nbsp;</span>
+                    <span class="line signature-line">&nbsp;</span>
                 </td>
                 <td>
                     <span style="color:#000; font-weight:700; text-decoration:none;">DATE:</span>
@@ -168,20 +180,20 @@
 
         <div class="bottom-block">
             <div class="comments-title">COMMENTS / REMARKS:</div>
-            <div class="comments-box">{{ ($firstResult ?? 'N/A') . ': ' . ($evaluation->comment_1 ?? '-') }}</div>
+            <div class="comments-line">{{ ($firstResult ?? 'N/A') . ': ' . ($evaluation->comment_1 ?? '-') }}</div>
 
             <table class="manager">
                 <tr>
-                    <td><span class="manager-label">Rated by:</span><span class="manager-line"><span class="manager-name">{{ $evaluation->rated_by ? substr($evaluation->rated_by, 0, 25) : '' }}</span></span></td>
-                    <td><span class="manager-label">Date:</span><span class="manager-line" style="width:50%;"></span></td>
+                    <td class="manager-field"><span class="manager-label">Rated by:</span><span class="manager-line"><span class="manager-name">{{ $evaluation->rated_by ? substr($evaluation->rated_by, 0, 25) : '' }}</span></span></td>
+                    <td class="manager-field"><span class="manager-date-label">Date:</span><span class="manager-line manager-date-line"></span></td>
                 </tr>
                 <tr>
-                    <td><span class="manager-label">Reviewed by:</span><span class="manager-line"><span class="manager-name">{{ $evaluation->reviewed_by ? substr($evaluation->reviewed_by, 0, 25) : '' }}</span></span></td>
-                    <td><span class="manager-label">Date:</span><span class="manager-line" style="width:50%;"></span></td>
+                    <td class="manager-field"><span class="manager-label">Reviewed by:</span><span class="manager-line"><span class="manager-name">{{ $evaluation->reviewed_by ? substr($evaluation->reviewed_by, 0, 25) : '' }}</span></span></td>
+                    <td class="manager-field"><span class="manager-date-label">Date:</span><span class="manager-line manager-date-line"></span></td>
                 </tr>
                 <tr>
-                    <td><span class="manager-label">Approved by:</span><span class="manager-line"><span class="manager-name">{{ $evaluation->approved_by ? substr($evaluation->approved_by, 0, 25) : '' }}</span></span></td>
-                    <td><span class="manager-label">Date:</span><span class="manager-line" style="width:50%;"></span></td>
+                    <td class="manager-field"><span class="manager-label">Approved by:</span><span class="manager-line"><span class="manager-name">{{ $evaluation->approved_by ? substr($evaluation->approved_by, 0, 25) : '' }}</span></span></td>
+                    <td class="manager-field"><span class="manager-date-label">Date:</span><span class="manager-line manager-date-line"></span></td>
                 </tr>
             </table>
         </div>
@@ -222,9 +234,12 @@
             </thead>
             <tbody>
                 @foreach($criteria as $criterion)
+                    @php
+                        $criterionLabel = preg_replace('/^\d+\.\s*/', '', $criterion['label']);
+                    @endphp
                     <tr>
                         <td>
-                            <div class="criterion-title">{{ $criterion['label'] }}</div>
+                            <div class="criterion-title">{{ $loop->iteration }}. {{ $criterionLabel }}</div>
                             <div class="criterion-desc">{{ $criterion['desc'] }}</div>
                         </td>
                         <td class="rating-cell">
@@ -235,9 +250,12 @@
             </tbody>
         </table>
 
-        <div class="total-block">
-            TOTAL SCORE <span class="total-value-line">{{ $evaluation->score_2 ?? '' }}</span>
-        </div>
+        <table class="total-row">
+            <tr>
+                <td class="total-label-cell">TOTAL SCORE</td>
+                <td class="total-score-cell"><span class="total-value-line">{{ $evaluation->score_2 ?? '' }}</span></td>
+            </tr>
+        </table>
 
         <div class="agreement">
             The above appraisal was discussed with me by my superior and I
@@ -249,7 +267,7 @@
             <tr>
                 <td>
                     <span class="line-label">SIGNATURE OF EMPLOYEE:</span>
-                    <span class="line">&nbsp;</span>
+                    <span class="line signature-line">&nbsp;</span>
                 </td>
                 <td>
                     <span style="color:#000; font-weight:700; text-decoration:none;">DATE:</span>
@@ -283,20 +301,20 @@
 
         <div class="bottom-block">
             <div class="comments-title">COMMENTS / REMARKS:</div>
-            <div class="comments-box">{{ ($secondResult ?? 'N/A') . ': ' . ($evaluation->comment_2 ?? '-') }}</div>
+            <div class="comments-line">{{ ($secondResult ?? 'N/A') . ': ' . ($evaluation->comment_2 ?? '-') }}</div>
 
             <table class="manager">
                 <tr>
-                    <td><span class="manager-label">Rated by:</span><span class="manager-line"><span class="manager-name">{{ $evaluation->rated_by_2 ? substr($evaluation->rated_by_2, 0, 25) : '' }}</span></span></td>
-                    <td><span class="manager-label">Date:</span><span class="manager-line" style="width:50%;"></span></td>
+                    <td class="manager-field"><span class="manager-label">Rated by:</span><span class="manager-line"><span class="manager-name">{{ $evaluation->rated_by_2 ? substr($evaluation->rated_by_2, 0, 25) : '' }}</span></span></td>
+                    <td class="manager-field"><span class="manager-date-label">Date:</span><span class="manager-line manager-date-line"></span></td>
                 </tr>
                 <tr>
-                    <td><span class="manager-label">Reviewed by:</span><span class="manager-line"><span class="manager-name">{{ $evaluation->reviewed_by_2 ? substr($evaluation->reviewed_by_2, 0, 25) : '' }}</span></span></td>
-                    <td><span class="manager-label">Date:</span><span class="manager-line" style="width:50%;"></span></td>
+                    <td class="manager-field"><span class="manager-label">Reviewed by:</span><span class="manager-line"><span class="manager-name">{{ $evaluation->reviewed_by_2 ? substr($evaluation->reviewed_by_2, 0, 25) : '' }}</span></span></td>
+                    <td class="manager-field"><span class="manager-date-label">Date:</span><span class="manager-line manager-date-line"></span></td>
                 </tr>
                 <tr>
-                    <td><span class="manager-label">Approved by:</span><span class="manager-line"><span class="manager-name">{{ $evaluation->approved_by_2 ? substr($evaluation->approved_by_2, 0, 25) : '' }}</span></span></td>
-                    <td><span class="manager-label">Date:</span><span class="manager-line" style="width:50%;"></span></td>
+                    <td class="manager-field"><span class="manager-label">Approved by:</span><span class="manager-line"><span class="manager-name">{{ $evaluation->approved_by_2 ? substr($evaluation->approved_by_2, 0, 25) : '' }}</span></span></td>
+                    <td class="manager-field"><span class="manager-date-label">Date:</span><span class="manager-line manager-date-line"></span></td>
                 </tr>
             </table>
         </div>
