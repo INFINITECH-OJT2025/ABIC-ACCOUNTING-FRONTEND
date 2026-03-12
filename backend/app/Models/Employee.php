@@ -46,8 +46,8 @@ class Employee extends Model
         return $this->hasOne(Evaluation::class, 'employee_id', 'id');
     }
 
-    public function officeSupplyTransactionsRequested(): HasMany
+    public function leaveEntries()
     {
-        return $this->hasMany(OfficeSupplyTransaction::class, 'requested_by_employee_id', 'id');
+        return $this->hasMany(LeaveEntry::class, 'employee_id', 'id');
     }
 }

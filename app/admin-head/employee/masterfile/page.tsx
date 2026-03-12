@@ -60,6 +60,7 @@ interface Employee {
   last_name: string;
   email: string;
   position: string;
+  user_profile?: string | null;
   status:
     | "pending"
     | "employed"
@@ -97,6 +98,29 @@ interface Department {
   name: string;
 }
 
+const getInitials = (firstName?: string, lastName?: string) =>
+  `${String(firstName ?? "").trim().charAt(0)}${String(lastName ?? "").trim().charAt(0)}`.toUpperCase();
+
+const toEmployeeProfileImageUrl = (profileRef?: string | null) => {
+  const normalized = String(profileRef ?? "").trim();
+  if (!normalized) return "";
+  if (/^https?:\/\//i.test(normalized)) return normalized;
+  if (/^\/api\/laravel\/api\/directory\/images\/file\//i.test(normalized)) {
+    return normalized;
+  }
+  if (/^\/api\/directory\/images\/file\//i.test(normalized)) {
+    return `${getApiUrl()}${normalized}`;
+  }
+
+  const encodedPath = normalized
+    .split("/")
+    .filter(Boolean)
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+
+  return `${getApiUrl()}/api/directory/images/file/${encodedPath}`;
+};
+
 const statusBadgeColors = {
   pending: "bg-amber-50 text-amber-700 border-amber-200",
   employed: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -118,6 +142,25 @@ const statusLabels = {
   termination_pending: "Pending Termination",
   resignation_pending: "Pending Resignation",
 };
+
+const nameFields = new Set([
+  "first_name",
+  "last_name",
+  "middle_name",
+  "mlast_name",
+  "mfirst_name",
+  "mmiddle_name",
+  "flast_name",
+  "ffirst_name",
+  "fmiddle_name",
+]);
+
+const governmentIdFields = new Set([
+  "sss_number",
+  "philhealth_number",
+  "pagibig_number",
+  "tin_number",
+]);
 
 const DetailSkeleton = () => (
   <div className="w-full flex-1 flex flex-col animate-pulse">
@@ -286,6 +329,8 @@ export default function MasterfilePage() {
   const [isEditingPermanent, setIsEditingPermanent] = useState(false);
   const [isEditingEmployment, setIsEditingEmployment] = useState(false);
   const [isEditingPersonal, setIsEditingPersonal] = useState(false);
+  const [isEditingAll, setIsEditingAll] = useState(false);
+  const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
   const [editFormData, setEditFormData] = useState<Partial<EmployeeDetails>>(
     {},
   );
@@ -315,6 +360,29 @@ export default function MasterfilePage() {
   // Position & Department Dropdown State
   const [positions, setPositions] = useState<Hierarchy[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const MAX_ONBOARDING_BATCH = 8;
+
+  const normalizeBatchId = (value: unknown): number => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return 1;
+    return Math.min(MAX_ONBOARDING_BATCH, Math.max(1, Math.trunc(numeric)));
+  };
+
+  const getDisplayBatchId = (emp: any, fallbackBatchId?: number): number => {
+    const localSavedBatch = rehireBatchProgress[String(emp?.id ?? "")];
+    if (
+      emp?.status === "rehire_pending" &&
+      Number.isFinite(localSavedBatch) &&
+      localSavedBatch >= 1 &&
+      localSavedBatch <= MAX_ONBOARDING_BATCH
+    ) {
+      return localSavedBatch;
+    }
+
+    return normalizeBatchId(
+      fallbackBatchId ?? emp?.current_onboarding_batch ?? 1,
+    );
+  };
 
   const loadRehireBatchProgress = () => {
     try {
@@ -323,7 +391,7 @@ export default function MasterfilePage() {
       const next: Record<string, number> = {};
       Object.entries(parsed || {}).forEach(([id, value]) => {
         const batch = Number(value);
-        if (Number.isFinite(batch) && batch >= 1 && batch <= 7) {
+        if (Number.isFinite(batch) && batch >= 1 && batch <= MAX_ONBOARDING_BATCH) {
           next[String(id)] = batch;
         }
       });
@@ -352,6 +420,42 @@ export default function MasterfilePage() {
     confirmText: "Confirm",
     hideCancel: false,
   });
+  const [imagePreview, setImagePreview] = useState<{
+    isOpen: boolean;
+    src: string;
+    alt: string;
+  }>({
+    isOpen: false,
+    src: "",
+    alt: "",
+  });
+
+  const openImagePreview = (src: string, alt: string) => {
+    const normalizedSrc = String(src ?? "").trim();
+    if (!normalizedSrc) return;
+    setImagePreview({
+      isOpen: true,
+      src: normalizedSrc,
+      alt: String(alt ?? "Profile image"),
+    });
+  };
+
+  const closeImagePreview = () => {
+    setImagePreview({ isOpen: false, src: "", alt: "" });
+  };
+
+  useEffect(() => {
+    if (!imagePreview.isOpen) return;
+
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeImagePreview();
+      }
+    };
+
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [imagePreview.isOpen]);
 
   useEffect(() => {
     fetchEmployees();
@@ -513,6 +617,18 @@ export default function MasterfilePage() {
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     const { name, value } = e.target;
+
+    if (nameFields.has(name)) {
+      const cleanedName = value.replace(/[^A-Za-z\s]/g, "").slice(0, 50);
+      setEditFormData((prev) => ({ ...prev, [name]: cleanedName }));
+      return;
+    }
+
+    if (governmentIdFields.has(name)) {
+      const cleanedGovId = value.replace(/[^0-9-]/g, "").slice(0, 50);
+      setEditFormData((prev) => ({ ...prev, [name]: cleanedGovId }));
+      return;
+    }
 
     // Validation for mobile number: only numbers, max 10 digits
     if (name === "mobile_number") {
@@ -700,6 +816,215 @@ export default function MasterfilePage() {
     }
   };
 
+  const openGlobalEditMode = async () => {
+    if (!selectedEmployee) return;
+
+    setEditFormData({ ...selectedEmployee });
+    setIsEditingEmployment(true);
+    setIsEditingPersonal(true);
+    setIsEditingContact(true);
+    setIsEditingCurrent(true);
+    setIsEditingPermanent(true);
+    setIsEditingAll(true);
+
+    try {
+      if (selectedEmployee.region) {
+        const region = regions.find((r) => r.name === selectedEmployee.region);
+        if (region) {
+          await fetchProvinces(region.code);
+          if (selectedEmployee.province) {
+            const province = provinces.find(
+              (p) => p.name === selectedEmployee.province,
+            );
+            if (province) {
+              await fetchCities(province.code);
+              if (selectedEmployee.city_municipality) {
+                const city = cities.find(
+                  (c) => c.name === selectedEmployee.city_municipality,
+                );
+                if (city) await fetchBarangays(city.code);
+              }
+            }
+          }
+        }
+      }
+
+      if (selectedEmployee.perm_region) {
+        const region = regions.find(
+          (r) => r.name === selectedEmployee.perm_region,
+        );
+        if (region) {
+          await fetchProvinces(region.code, true);
+          if (selectedEmployee.perm_province) {
+            const province = provinces.find(
+              (p) => p.name === selectedEmployee.perm_province,
+            );
+            if (province) {
+              await fetchCities(province.code, true);
+              if (selectedEmployee.perm_city_municipality) {
+                const city = cities.find(
+                  (c) => c.name === selectedEmployee.perm_city_municipality,
+                );
+                if (city) await fetchBarangays(city.code, true);
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to preload address dropdowns:", error);
+    }
+  };
+
+  const closeGlobalEditMode = () => {
+    setIsEditingAll(false);
+    setIsEditingEmployment(false);
+    setIsEditingPersonal(false);
+    setIsEditingContact(false);
+    setIsEditingCurrent(false);
+    setIsEditingPermanent(false);
+    setEditFormData({});
+  };
+
+  const handleSaveAllEdits = async () => {
+    if (!selectedEmployee) return;
+
+    const nameLabels: Record<string, string> = {
+      first_name: "First Name",
+      last_name: "Last Name",
+      middle_name: "Middle Name",
+      mlast_name: "Mother's Last Name",
+      mfirst_name: "Mother's First Name",
+      mmiddle_name: "Mother's Middle Name",
+      flast_name: "Father's Last Name",
+      ffirst_name: "Father's First Name",
+      fmiddle_name: "Father's Middle Name",
+    };
+
+    for (const field of nameFields) {
+      const rawValue = editFormData[field];
+      const text = String(rawValue ?? "").trim();
+      if (!text) continue;
+
+      if (text.length > 50) {
+        toast.error(`${nameLabels[field] || "Name"} must not exceed 50 characters`);
+        return;
+      }
+
+      if (!/^[A-Za-z\s]+$/.test(text)) {
+        toast.error(`${nameLabels[field] || "Name"} must contain letters and spaces only`);
+        return;
+      }
+    }
+
+    const mobile = String(editFormData.mobile_number ?? "").trim();
+    if (!/^\d{10}$/.test(mobile)) {
+      toast.error("Mobile number must be exactly 10 digits");
+      return;
+    }
+
+    const govIdLabels: Record<string, string> = {
+      sss_number: "SSS No.",
+      philhealth_number: "PhilHealth No.",
+      pagibig_number: "Pag-IBIG No.",
+      tin_number: "TIN",
+    };
+
+    for (const field of governmentIdFields) {
+      const rawValue = editFormData[field];
+      const text = String(rawValue ?? "").trim();
+      if (!text) continue;
+
+      if (!/^(?=.*\d)[0-9-]+$/.test(text)) {
+        toast.error(`${govIdLabels[field] || "Government ID"} must include at least one number and use '-' only as special character`);
+        return;
+      }
+    }
+
+    setIsActionLoading(true);
+    try {
+      const response = await fetch(
+        `${getApiUrl()}/api/employees/${selectedEmployee.id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(editFormData),
+        },
+      );
+
+      const data = await response.json();
+      if (data.success) {
+        toast.success("Employee information updated successfully");
+        setSelectedEmployee({ ...selectedEmployee, ...editFormData });
+        closeGlobalEditMode();
+        fetchEmployees();
+      } else {
+        toast.error(data.message || "Failed to update employee information");
+      }
+    } catch (error) {
+      console.error("Error saving employee information:", error);
+      toast.error("Network Error");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleDetailProfileImageUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select a valid image file");
+      event.target.value = "";
+      return;
+    }
+
+    const maxBytes = 20 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      toast.error("Image size must be 20MB or less");
+      event.target.value = "";
+      return;
+    }
+
+    setUploadingProfileImage(true);
+    try {
+      const formData = new FormData();
+      formData.append("sectionCode", "user_profile");
+      formData.append("file", file);
+
+      const response = await fetch("/api/directory/upload-image", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data?.public_id) {
+        throw new Error(
+          data?.message ||
+            `Failed to upload profile image (HTTP ${response.status})`,
+        );
+      }
+
+      setEditFormData((prev) => ({
+        ...prev,
+        user_profile: data.public_id,
+      }));
+      toast.success("Profile image uploaded");
+    } catch (error) {
+      console.error("Error uploading profile image:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to upload profile image",
+      );
+    } finally {
+      setUploadingProfileImage(false);
+      event.target.value = "";
+    }
+  };
+
   const fetchEmployees = async () => {
     loadRehireBatchProgress();
     setFetchError(null);
@@ -792,7 +1117,16 @@ export default function MasterfilePage() {
                 ).getTime();
                 return bTime - aTime;
               });
-            const checklist = checklistMatches[0];
+            const rehireChecklistMatches = checklistMatches.filter(
+              (c: any) =>
+                String(c?.type ?? "")
+                  .trim()
+                  .toLowerCase() === "rehire",
+            );
+            const checklist =
+              emp?.status === "rehire_pending"
+                ? (rehireChecklistMatches[0] ?? checklistMatches[0])
+                : checklistMatches[0];
             const termination = terminationsList
               .filter((t: any) => {
                 const idMatch = String(t?.employee_id ?? "") === String(emp.id);
@@ -859,9 +1193,7 @@ export default function MasterfilePage() {
               const doneCount = tasks.filter(
                 (t: any) => String(t?.status ?? "").toUpperCase() === "DONE",
               ).length;
-              const checklistStatus = String(
-                checklist?.status ?? "",
-              ).toUpperCase();
+              const checklistStatus = String(checklist?.status ?? "").toUpperCase();
               const checklistUpdatedAt = new Date(
                 checklist?.updated_at ?? checklist?.created_at ?? 0,
               ).getTime();
@@ -886,9 +1218,7 @@ export default function MasterfilePage() {
                   isComplete:
                     checklistBelongsToCurrentRehire &&
                     doneCount === tasks.length &&
-                    tasks.length > 0 &&
-                    (enhancedEmp.status !== "rehire_pending" ||
-                      checklistStatus === "DONE"),
+                    tasks.length > 0,
                 },
               };
             }
@@ -1010,11 +1340,13 @@ export default function MasterfilePage() {
     // Primary check: Has the employee completed the onboarding process by clicking "Complete & Finish"?
     if (!emp.onboarding_completed) {
       // Use the explicitly saved batch ID from the database if available
-      const batchId = emp.current_onboarding_batch || 1;
+      const batchId = normalizeBatchId(emp.current_onboarding_batch);
+      const batchLabel =
+        batchLabelById[batchId] || batchLabelById[1] || "Employee Details";
 
       return {
         isComplete: false,
-        status: `BATCH ${batchId}: ${batchLabelById[batchId].toUpperCase()}`,
+        status: `BATCH ${batchId}: ${batchLabel.toUpperCase()}`,
         batchId,
       };
     }
@@ -1025,7 +1357,7 @@ export default function MasterfilePage() {
         emp.status === "rehire_pending"
           ? "PENDING: COMPLETE & FINISH REHIRE"
           : "READY TO EMPLOY",
-      batchId: 7,
+      batchId: MAX_ONBOARDING_BATCH,
     };
   };
 
@@ -1037,6 +1369,7 @@ export default function MasterfilePage() {
     5: "Family Information",
     6: "Permanent Address",
     7: "Current Address",
+    8: "Profile Picture",
   };
 
   const handleSetAsEmployed = async () => {
@@ -1543,14 +1876,14 @@ export default function MasterfilePage() {
                           checkCompleteness(employee as any);
                         const isFullyComplete =
                           isComplete && checklistTasksComplete;
-                        const savedBatchId =
-                          rehireBatchProgress[String(employee.id)];
-                        const displayBatchId =
-                          isRehirePending && Number.isFinite(savedBatchId)
-                            ? savedBatchId
-                            : batchId;
+                        const displayBatchId = getDisplayBatchId(
+                          employee,
+                          batchId,
+                        );
                         const batchLabel =
                           batchLabelById[displayBatchId] || "Employee Details";
+                        const unresolvedBatchStatus = `BATCH ${displayBatchId}: ${batchLabel.toUpperCase()}`;
+                        const isPendingDataEntry = checklistTasksComplete && !isComplete;
 
                         // For termination, it's not complete until status changes to 'terminated' or 'resigned' in the db
                         const displayStatus =
@@ -1588,20 +1921,36 @@ export default function MasterfilePage() {
                             {/* Top Row: Employee Info + Review Button */}
                             <div className="flex justify-between items-start gap-3 mb-4">
                               <div className="flex items-center gap-3 flex-1 min-w-0">
-                                <div
-                                  className={`w-14 h-14 md:w-16 md:h-16 min-w-[3.5rem] md:min-w-[4rem] rounded-xl flex items-center justify-center text-xl md:text-2xl font-bold transition-colors duration-200 shadow-sm ${
-                                    isTerminationPending
-                                      ? "bg-rose-100 text-rose-700 group-hover:bg-rose-500 group-hover:text-white"
-                                      : isFullyComplete
-                                        ? "bg-emerald-100 text-emerald-700 group-hover:bg-emerald-500 group-hover:text-white"
-                                        : isRehirePending
-                                          ? "bg-blue-100 text-blue-700 group-hover:bg-blue-500 group-hover:text-white"
-                                          : "bg-orange-100 text-orange-700 group-hover:bg-orange-500 group-hover:text-white"
-                                  }`}
-                                >
-                                  {employee.first_name.charAt(0)}
-                                  {employee.last_name.charAt(0)}
-                                </div>
+                                {employee.user_profile ? (
+                                  <img
+                                    src={toEmployeeProfileImageUrl(employee.user_profile)}
+                                    alt={`${employee.first_name} ${employee.last_name}`}
+                                    className="w-14 h-14 md:w-16 md:h-16 min-w-[3.5rem] md:min-w-[4rem] rounded-xl object-cover shadow-sm border border-slate-200 cursor-zoom-in"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openImagePreview(
+                                        toEmployeeProfileImageUrl(
+                                          employee.user_profile,
+                                        ),
+                                        `${employee.first_name} ${employee.last_name}`,
+                                      );
+                                    }}
+                                  />
+                                ) : (
+                                  <div
+                                    className={`w-14 h-14 md:w-16 md:h-16 min-w-[3.5rem] md:min-w-[4rem] rounded-xl flex items-center justify-center text-xl md:text-2xl font-bold transition-colors duration-200 shadow-sm ${
+                                      isTerminationPending
+                                        ? "bg-rose-100 text-rose-700 group-hover:bg-rose-500 group-hover:text-white"
+                                        : isFullyComplete
+                                          ? "bg-emerald-100 text-emerald-700 group-hover:bg-emerald-500 group-hover:text-white"
+                                          : isRehirePending
+                                            ? "bg-blue-100 text-blue-700 group-hover:bg-blue-500 group-hover:text-white"
+                                            : "bg-orange-100 text-orange-700 group-hover:bg-orange-500 group-hover:text-white"
+                                    }`}
+                                  >
+                                    {getInitials(employee.first_name, employee.last_name)}
+                                  </div>
+                                )}
                                 <div className="overflow-hidden flex flex-col justify-center min-w-0 flex-1">
                                   <p className="font-semibold text-[#4A081A] text-[10px] uppercase tracking-wider mb-1 truncate opacity-60">
                                     {employee.position || "No Position"}
@@ -1744,15 +2093,18 @@ export default function MasterfilePage() {
                                   >
                                     {!checklistTasksComplete
                                       ? "PENDING: onboarding process"
-                                      : !isComplete
-                                        ? status
+                                      : isPendingDataEntry
+                                        ? "PENDING: EMPLOYEE DATA ENTRY"
                                         : isRehirePending
                                           ? "PENDING: COMPLETE & FINISH REHIRE"
                                           : "PENDING: ONBOARDING CHECKLIST"}
                                   </Badge>
-                                  {employee.onboarding_tasks && (
+                                  {employee.onboarding_tasks &&
+                                    (isPendingDataEntry ||
+                                      (!checklistTasksComplete &&
+                                        !isPendingDataEntry)) && (
                                     <span className="text-[9px] font-bold text-slate-500 whitespace-nowrap">
-                                      {checklistTasksComplete
+                                      {isPendingDataEntry
                                         ? `Batch ${displayBatchId}: ${batchLabel}`
                                         : `Tasks: ${employee.onboarding_tasks.done}/${employee.onboarding_tasks.total}`}
                                     </span>
@@ -1815,6 +2167,39 @@ export default function MasterfilePage() {
 
                     {/* Actions */}
                     <div className="flex items-center gap-3">
+                      {selectedEmployee &&
+                        (isEditingAll ? (
+                          <>
+                            <button
+                              onClick={closeGlobalEditMode}
+                              disabled={isActionLoading}
+                              className="bg-white/10 text-white border border-white/40 hover:bg-white/20 transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-4 rounded-lg disabled:opacity-50 cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={handleSaveAllEdits}
+                              disabled={isActionLoading}
+                              className="bg-white text-[#7B0F2B] border border-[#7B0F2B] hover:bg-[#FDF2F5] transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-6 rounded-lg flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                            >
+                              {isActionLoading ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Save className="w-4 h-4" />
+                              )}
+                              <span>Save All</span>
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={openGlobalEditMode}
+                            className="bg-white text-[#7B0F2B] border border-[#7B0F2B] hover:bg-[#FDF2F5] transition-all duration-200 text-sm font-bold uppercase tracking-wider h-10 px-6 rounded-lg flex items-center gap-2 cursor-pointer"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                            <span>Edit</span>
+                          </button>
+                        ))}
+
                       <button
                         onClick={() => setViewMode("list")}
                         disabled={isDetailLoading}
@@ -1834,10 +2219,40 @@ export default function MasterfilePage() {
                       <div className="flex flex-wrap items-center gap-4 md:gap-6">
                         {/* Employee Badge */}
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center text-lg font-bold">
-                            {selectedEmployee?.first_name?.charAt(0)}
-                            {selectedEmployee?.last_name?.charAt(0)}
-                          </div>
+                          {(isEditingAll
+                            ? editFormData.user_profile
+                            : selectedEmployee?.user_profile) ? (
+                            <img
+                              src={toEmployeeProfileImageUrl(
+                                String(
+                                  (isEditingAll
+                                    ? editFormData.user_profile
+                                    : selectedEmployee.user_profile) || "",
+                                ),
+                              )}
+                              alt={`${selectedEmployee?.first_name} ${selectedEmployee?.last_name}`}
+                              className="w-10 h-10 rounded-full object-cover border border-white/30 cursor-zoom-in"
+                              onClick={() =>
+                                openImagePreview(
+                                  toEmployeeProfileImageUrl(
+                                    String(
+                                      (isEditingAll
+                                        ? editFormData.user_profile
+                                        : selectedEmployee.user_profile) || "",
+                                    ),
+                                  ),
+                                  `${selectedEmployee.first_name} ${selectedEmployee.last_name}`,
+                                )
+                              }
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center text-lg font-bold">
+                              {getInitials(
+                                selectedEmployee?.first_name,
+                                selectedEmployee?.last_name,
+                              )}
+                            </div>
+                          )}
                           <div>
                             <p className="text-sm font-bold text-white/70 uppercase tracking-wider">
                               Employee
@@ -1846,6 +2261,40 @@ export default function MasterfilePage() {
                               {selectedEmployee?.first_name}{" "}
                               {selectedEmployee?.last_name}
                             </p>
+                            {isEditingAll && (
+                              <div className="mt-2 flex items-center gap-2">
+                                <label
+                                  htmlFor="masterfile_profile_upload"
+                                  className="inline-flex items-center h-7 px-2.5 rounded-md bg-white text-[#7B0F2B] border border-white/70 text-[11px] font-bold cursor-pointer hover:bg-[#FDF2F5]"
+                                >
+                                  {uploadingProfileImage
+                                    ? "Uploading..."
+                                    : "Upload Photo"}
+                                </label>
+                                <input
+                                  id="masterfile_profile_upload"
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleDetailProfileImageUpload}
+                                  disabled={uploadingProfileImage || isActionLoading}
+                                  className="hidden"
+                                />
+                                {Boolean(editFormData.user_profile) && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setEditFormData((prev) => ({
+                                        ...prev,
+                                        user_profile: "",
+                                      }))
+                                    }
+                                    className="inline-flex items-center h-7 px-2.5 rounded-md bg-white/10 border border-white/40 text-white text-[11px] font-bold hover:bg-white/20"
+                                  >
+                                    Remove
+                                  </button>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -1963,48 +2412,7 @@ export default function MasterfilePage() {
                                 <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
                                 Employment Information
                               </h3>
-                              <div className="flex gap-2">
-                                {isEditingEmployment ? (
-                                  <>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() =>
-                                        setIsEditingEmployment(false)
-                                      }
-                                      className="h-8 text-slate-500 hover:text-slate-700"
-                                    >
-                                      <X className="w-4 h-4 mr-1" /> Cancel
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      onClick={() =>
-                                        handleSaveSection("employment")
-                                      }
-                                      disabled={isActionLoading}
-                                      className="h-8 bg-[#630C22] hover:bg-[#800020] text-white"
-                                    >
-                                      {isActionLoading ? (
-                                        <Loader2 className="w-4 h-4 animate-spin mr-1" />
-                                      ) : (
-                                        <Save className="w-4 h-4 mr-1" />
-                                      )}{" "}
-                                      Save
-                                    </Button>
-                                  </>
-                                ) : (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() =>
-                                      toggleEditSection("employment")
-                                    }
-                                    className="h-8 text-[#630C22] hover:bg-[#630C22]/10 font-bold"
-                                  >
-                                    <Edit2 className="w-4 h-4 mr-1" /> Edit
-                                  </Button>
-                                )}
-                              </div>
+                              <div />
                             </div>
                             <div className="p-6">
                               {isEditingEmployment ? (
@@ -2142,48 +2550,7 @@ export default function MasterfilePage() {
                                 <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
                                 Personal Information
                               </h3>
-                              <div className="flex gap-2">
-                                {isEditingPersonal ? (
-                                  <>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() =>
-                                        setIsEditingPersonal(false)
-                                      }
-                                      className="h-8 text-slate-500 hover:text-slate-700"
-                                    >
-                                      <X className="w-4 h-4 mr-1" /> Cancel
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      onClick={() =>
-                                        handleSaveSection("personal")
-                                      }
-                                      disabled={isActionLoading}
-                                      className="h-8 bg-[#630C22] hover:bg-[#800020] text-white"
-                                    >
-                                      {isActionLoading ? (
-                                        <Loader2 className="w-4 h-4 animate-spin mr-1" />
-                                      ) : (
-                                        <Save className="w-4 h-4 mr-1" />
-                                      )}{" "}
-                                      Save
-                                    </Button>
-                                  </>
-                                ) : (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() =>
-                                      toggleEditSection("personal")
-                                    }
-                                    className="h-8 text-[#630C22] hover:bg-[#630C22]/10 font-bold"
-                                  >
-                                    <Edit2 className="w-4 h-4 mr-1" /> Edit
-                                  </Button>
-                                )}
-                              </div>
+                              <div />
                             </div>
                             <div className="p-6">
                               {isEditingPersonal ? (
@@ -2365,44 +2732,7 @@ export default function MasterfilePage() {
                                 <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
                                 Contact Information
                               </h3>
-                              <div className="flex gap-2">
-                                {isEditingContact ? (
-                                  <>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => setIsEditingContact(false)}
-                                      className="h-8 text-slate-500 hover:text-slate-700"
-                                    >
-                                      <X className="w-4 h-4 mr-1" /> Cancel
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      onClick={() =>
-                                        handleSaveSection("contact")
-                                      }
-                                      disabled={isActionLoading}
-                                      className="h-8 bg-[#630C22] hover:bg-[#800020] text-white"
-                                    >
-                                      {isActionLoading ? (
-                                        <Loader2 className="w-4 h-4 animate-spin mr-1" />
-                                      ) : (
-                                        <Save className="w-4 h-4 mr-1" />
-                                      )}{" "}
-                                      Save
-                                    </Button>
-                                  </>
-                                ) : (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => toggleEditSection("contact")}
-                                    className="h-8 text-[#630C22] hover:bg-[#630C22]/10 font-bold"
-                                  >
-                                    <Edit2 className="w-4 h-4 mr-1" /> Edit
-                                  </Button>
-                                )}
-                              </div>
+                              <div />
                             </div>
                             <div className="p-6">
                               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
@@ -2471,48 +2801,7 @@ export default function MasterfilePage() {
                                   <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
                                   Current Address
                                 </h3>
-                                <div className="flex gap-2">
-                                  {isEditingCurrent ? (
-                                    <>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() =>
-                                          setIsEditingCurrent(false)
-                                        }
-                                        className="h-8 text-slate-500 hover:text-slate-700"
-                                      >
-                                        <X className="w-4 h-4 mr-1" /> Cancel
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        onClick={() =>
-                                          handleSaveSection("current")
-                                        }
-                                        disabled={isActionLoading}
-                                        className="h-8 bg-[#630C22] hover:bg-[#800020] text-white"
-                                      >
-                                        {isActionLoading ? (
-                                          <Loader2 className="w-4 h-4 animate-spin mr-1" />
-                                        ) : (
-                                          <Save className="w-4 h-4 mr-1" />
-                                        )}{" "}
-                                        Save
-                                      </Button>
-                                    </>
-                                  ) : (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() =>
-                                        toggleEditSection("current")
-                                      }
-                                      className="h-8 text-[#630C22] hover:bg-[#630C22]/10 font-bold"
-                                    >
-                                      <Edit2 className="w-4 h-4 mr-1" /> Edit
-                                    </Button>
-                                  )}
-                                </div>
+                                <div />
                               </div>
                               <div className="p-6">
                                 {isEditingCurrent ? (
@@ -2722,48 +3011,7 @@ export default function MasterfilePage() {
                                   <span className="w-1 h-5 bg-[#630C22] rounded-full"></span>
                                   Permanent Address
                                 </h3>
-                                <div className="flex gap-2">
-                                  {isEditingPermanent ? (
-                                    <>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() =>
-                                          setIsEditingPermanent(false)
-                                        }
-                                        className="h-8 text-slate-500 hover:text-slate-700"
-                                      >
-                                        <X className="w-4 h-4 mr-1" /> Cancel
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        onClick={() =>
-                                          handleSaveSection("permanent")
-                                        }
-                                        disabled={isActionLoading}
-                                        className="h-8 bg-[#630C22] hover:bg-[#800020] text-white"
-                                      >
-                                        {isActionLoading ? (
-                                          <Loader2 className="w-4 h-4 animate-spin mr-1" />
-                                        ) : (
-                                          <Save className="w-4 h-4 mr-1" />
-                                        )}{" "}
-                                        Save
-                                      </Button>
-                                    </>
-                                  ) : (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() =>
-                                        toggleEditSection("permanent")
-                                      }
-                                      className="h-8 text-[#630C22] hover:bg-[#630C22]/10 font-bold"
-                                    >
-                                      <Edit2 className="w-4 h-4 mr-1" /> Edit
-                                    </Button>
-                                  )}
-                                </div>
+                                <div />
                               </div>
                               <div className="p-6">
                                 {isEditingPermanent ? (
@@ -3032,16 +3280,45 @@ export default function MasterfilePage() {
                                       Mother's Maiden Name
                                     </p>
                                     <div className="grid grid-cols-2 gap-4 pl-3 border-l-2 border-[#FFE5EC]">
-                                      <DetailItem
-                                        label="Last Name"
-                                        value={selectedEmployee.mlast_name}
-                                        required
-                                      />
-                                      <DetailItem
-                                        label="First Name"
-                                        value={selectedEmployee.mfirst_name}
-                                        required
-                                      />
+                                      {isEditingAll ? (
+                                        <>
+                                          <div className="space-y-1.5">
+                                            <label className="text-xs font-bold text-slate-500 uppercase">
+                                              Last Name
+                                            </label>
+                                            <Input
+                                              name="mlast_name"
+                                              value={editFormData.mlast_name || ""}
+                                              onChange={handleEditChange}
+                                              className="h-9"
+                                            />
+                                          </div>
+                                          <div className="space-y-1.5">
+                                            <label className="text-xs font-bold text-slate-500 uppercase">
+                                              First Name
+                                            </label>
+                                            <Input
+                                              name="mfirst_name"
+                                              value={editFormData.mfirst_name || ""}
+                                              onChange={handleEditChange}
+                                              className="h-9"
+                                            />
+                                          </div>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <DetailItem
+                                            label="Last Name"
+                                            value={selectedEmployee.mlast_name}
+                                            required
+                                          />
+                                          <DetailItem
+                                            label="First Name"
+                                            value={selectedEmployee.mfirst_name}
+                                            required
+                                          />
+                                        </>
+                                      )}
                                     </div>
                                   </div>
                                   <div>
@@ -3049,14 +3326,43 @@ export default function MasterfilePage() {
                                       Father's Name
                                     </p>
                                     <div className="grid grid-cols-2 gap-4 pl-3 border-l-2 border-[#FFE5EC]">
-                                      <DetailItem
-                                        label="Last Name"
-                                        value={selectedEmployee.flast_name}
-                                      />
-                                      <DetailItem
-                                        label="First Name"
-                                        value={selectedEmployee.ffirst_name}
-                                      />
+                                      {isEditingAll ? (
+                                        <>
+                                          <div className="space-y-1.5">
+                                            <label className="text-xs font-bold text-slate-500 uppercase">
+                                              Last Name
+                                            </label>
+                                            <Input
+                                              name="flast_name"
+                                              value={editFormData.flast_name || ""}
+                                              onChange={handleEditChange}
+                                              className="h-9"
+                                            />
+                                          </div>
+                                          <div className="space-y-1.5">
+                                            <label className="text-xs font-bold text-slate-500 uppercase">
+                                              First Name
+                                            </label>
+                                            <Input
+                                              name="ffirst_name"
+                                              value={editFormData.ffirst_name || ""}
+                                              onChange={handleEditChange}
+                                              className="h-9"
+                                            />
+                                          </div>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <DetailItem
+                                            label="Last Name"
+                                            value={selectedEmployee.flast_name}
+                                          />
+                                          <DetailItem
+                                            label="First Name"
+                                            value={selectedEmployee.ffirst_name}
+                                          />
+                                        </>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
@@ -3072,22 +3378,73 @@ export default function MasterfilePage() {
                               </div>
                               <div className="p-6">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
-                                  <DetailItem
-                                    label="SSS No."
-                                    value={selectedEmployee.sss_number}
-                                  />
-                                  <DetailItem
-                                    label="PhilHealth No."
-                                    value={selectedEmployee.philhealth_number}
-                                  />
-                                  <DetailItem
-                                    label="Pag-IBIG No."
-                                    value={selectedEmployee.pagibig_number}
-                                  />
-                                  <DetailItem
-                                    label="TIN"
-                                    value={selectedEmployee.tin_number}
-                                  />
+                                  {isEditingAll ? (
+                                    <>
+                                      <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">
+                                          SSS No.
+                                        </label>
+                                        <Input
+                                          name="sss_number"
+                                          value={editFormData.sss_number || ""}
+                                          onChange={handleEditChange}
+                                          className="h-9"
+                                        />
+                                      </div>
+                                      <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">
+                                          PhilHealth No.
+                                        </label>
+                                        <Input
+                                          name="philhealth_number"
+                                          value={editFormData.philhealth_number || ""}
+                                          onChange={handleEditChange}
+                                          className="h-9"
+                                        />
+                                      </div>
+                                      <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">
+                                          Pag-IBIG No.
+                                        </label>
+                                        <Input
+                                          name="pagibig_number"
+                                          value={editFormData.pagibig_number || ""}
+                                          onChange={handleEditChange}
+                                          className="h-9"
+                                        />
+                                      </div>
+                                      <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">
+                                          TIN
+                                        </label>
+                                        <Input
+                                          name="tin_number"
+                                          value={editFormData.tin_number || ""}
+                                          onChange={handleEditChange}
+                                          className="h-9"
+                                        />
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <DetailItem
+                                        label="SSS No."
+                                        value={selectedEmployee.sss_number}
+                                      />
+                                      <DetailItem
+                                        label="PhilHealth No."
+                                        value={selectedEmployee.philhealth_number}
+                                      />
+                                      <DetailItem
+                                        label="Pag-IBIG No."
+                                        value={selectedEmployee.pagibig_number}
+                                      />
+                                      <DetailItem
+                                        label="TIN"
+                                        value={selectedEmployee.tin_number}
+                                      />
+                                    </>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -3175,6 +3532,32 @@ export default function MasterfilePage() {
         hideCancel={confirmModal.hideCancel}
         isLoading={isUpdating}
       />
+
+      {imagePreview.isOpen && (
+        <div
+          className="fixed inset-0 z-[120] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={closeImagePreview}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Profile image preview"
+        >
+          <button
+            type="button"
+            onClick={closeImagePreview}
+            className="absolute top-4 right-4 text-white/90 hover:text-white bg-black/40 hover:bg-black/60 rounded-full p-2 transition-colors"
+            aria-label="Close image preview"
+          >
+            <X className="w-5 h-5" />
+          </button>
+
+          <img
+            src={imagePreview.src}
+            alt={imagePreview.alt}
+            className="max-w-[92vw] max-h-[88vh] w-auto h-auto rounded-xl border border-white/20 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }

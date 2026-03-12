@@ -122,6 +122,7 @@ Route::delete('/admin-head/attendance/tardiness/{id}', [TardinessEntryController
 
 // Leave Routes
 use App\Http\Controllers\Api\LeaveController;
+Route::get('/leaves/credits', [LeaveController::class, 'getLeaveCredits']);
 Route::apiResource('leaves', LeaveController::class);
 
 // Warning Letter Template Routes
