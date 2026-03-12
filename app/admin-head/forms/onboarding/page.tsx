@@ -12,6 +12,7 @@ import {
 import { Card } from "@/components/ui/card"
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import { TextFieldStatus } from '@/components/ui/text-field-status'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -43,6 +44,7 @@ import { toast } from 'sonner'
 type TaskStatus = 'DONE' | 'PENDING'
 type RecordStatusFilter = 'ALL' | TaskStatus
 type RecordSort = 'NAME_ASC' | 'NAME_DESC' | 'UPDATED_DESC' | 'UPDATED_ASC'
+type SaveScope = 'CURRENT' | 'SAME_TASKS' | 'SELECTED' | 'ALL'
 
 
 interface ChecklistTask {
@@ -198,7 +200,8 @@ function OnboardingChecklistPageContent() {
   const targetName = searchParams.get('name')
   const editMode = true
   const [saving, setSaving] = useState(false)
-  const [taskIdToDelete, setTaskIdToDelete] = useState<number | null>(null)
+  const [selectedTaskIds, setSelectedTaskIds] = useState<number[]>([])
+  const [taskIdsToDelete, setTaskIdsToDelete] = useState<number[]>([])
   const [dragTaskId, setDragTaskId] = useState<number | null>(null)
   const [dragOverTaskId, setDragOverTaskId] = useState<number | null>(null)
   const [recentlyMovedTaskId, setRecentlyMovedTaskId] = useState<number | null>(null)
@@ -210,6 +213,8 @@ function OnboardingChecklistPageContent() {
   const [unsavedPromptOpen, setUnsavedPromptOpen] = useState(false)
   const [pendingDepartmentSelection, setPendingDepartmentSelection] = useState<string | null>(null)
   const [pendingNavigationUrl, setPendingNavigationUrl] = useState<string | null>(null)
+  const [saveScope, setSaveScope] = useState<SaveScope>('CURRENT')
+  const [selectedSaveDepartmentIds, setSelectedSaveDepartmentIds] = useState<number[]>([])
   const {
     records,
     setRecords,
@@ -240,19 +245,6 @@ function OnboardingChecklistPageContent() {
     setSelectedDepartmentId(departmentMatch?.id ?? null)
   }, [employeeInfo?.department, departmentsData])
 
-  useEffect(() => {
-    if (loading) return
-    if (employeeInfo) return
-    const firstDepartment = departmentOptions[0]
-    if (!firstDepartment) return
-    const blank = buildBlankRecord(firstDepartment)
-    setEmployeeInfo(blank)
-    setTasks([])
-    const departmentMatch = departmentsData.find((item) => item.name === firstDepartment)
-    setSelectedDepartmentId(departmentMatch?.id ?? null)
-  }, [loading, employeeInfo, departmentOptions, departmentsData])
-
-
   const completionPercentage = useMemo(() => {
     if (tasks.length === 0) return 0;
     const doneTasks = tasks.filter(t => t.status === 'DONE').length;
@@ -276,7 +268,101 @@ function OnboardingChecklistPageContent() {
   const departmentSelectOptions = useMemo(() => {
     const current = employeeInfo?.department?.trim()
     return [...new Set([...(current ? [current] : []), ...departmentOptions])]
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
   }, [employeeInfo?.department, departmentOptions])
+
+  const departmentIdByName = useMemo(() => {
+    const map = new Map<string, number>()
+    departmentsData.forEach((row) => map.set(String(row.name || '').trim().toLowerCase(), row.id))
+    return map
+  }, [departmentsData])
+
+  const departmentNameById = useMemo(() => {
+    const map = new Map<number, string>()
+    departmentsData.forEach((row) => map.set(row.id, row.name))
+    return map
+  }, [departmentsData])
+
+  const currentDepartmentId = useMemo(() => {
+    const departmentName = String(employeeInfo?.department || '').trim().toLowerCase()
+    if (!departmentName) return null
+    return selectedDepartmentId ?? departmentIdByName.get(departmentName) ?? null
+  }, [employeeInfo?.department, selectedDepartmentId, departmentIdByName])
+
+  const buildTaskSignature = (taskRows: ChecklistTask[]) => JSON.stringify(
+    taskRows
+      .map((row) => String(row.task || '').trim().toLowerCase())
+      .filter((task) => task.length > 0)
+  )
+
+  const sameTaskDepartmentIds = useMemo(() => {
+    if (!employeeInfo?.department) return currentDepartmentId ? [currentDepartmentId] : []
+    const currentDepartmentName = String(employeeInfo.department).trim().toLowerCase()
+    const currentSavedRecord = records.find((record) => String(record.department || '').trim().toLowerCase() === currentDepartmentName)
+    const signature = buildTaskSignature(currentSavedRecord?.tasks ?? [])
+
+    const ids = records
+      .filter((record) => buildTaskSignature(record.tasks) === signature)
+      .map((record) => departmentIdByName.get(String(record.department || '').trim().toLowerCase()) ?? null)
+      .filter((id): id is number => Number.isFinite(id))
+
+    if (currentDepartmentId !== null && !ids.includes(currentDepartmentId)) {
+      ids.push(currentDepartmentId)
+    }
+    return [...new Set(ids)]
+  }, [employeeInfo?.department, records, departmentIdByName, currentDepartmentId])
+
+  const resolvedSaveTargetDepartmentIds = useMemo(() => {
+    const ensureCurrentIncluded = (ids: number[]) => {
+      if (currentDepartmentId === null) return [...new Set(ids)]
+      return [...new Set([...ids, currentDepartmentId])]
+    }
+
+    if (saveScope === 'ALL') {
+      return ensureCurrentIncluded(departmentsData.map((row) => row.id))
+    }
+    if (saveScope === 'SAME_TASKS') {
+      return ensureCurrentIncluded(sameTaskDepartmentIds)
+    }
+    if (saveScope === 'SELECTED') {
+      return ensureCurrentIncluded(selectedSaveDepartmentIds)
+    }
+    return currentDepartmentId !== null ? [currentDepartmentId] : []
+  }, [saveScope, departmentsData, sameTaskDepartmentIds, selectedSaveDepartmentIds, currentDepartmentId])
+
+  const resolvedSaveTargetNames = useMemo(
+    () =>
+      resolvedSaveTargetDepartmentIds
+        .map((id) => departmentNameById.get(id))
+        .filter((name): name is string => typeof name === 'string' && name.length > 0),
+    [resolvedSaveTargetDepartmentIds, departmentNameById]
+  )
+
+  const toggleSaveDepartmentSelection = (departmentId: number, checked: boolean) => {
+    setSelectedSaveDepartmentIds((prev) => {
+      if (checked) return prev.includes(departmentId) ? prev : [...prev, departmentId]
+      return prev.filter((id) => id !== departmentId)
+    })
+  }
+
+  const selectedTaskIdSet = useMemo(() => new Set(selectedTaskIds), [selectedTaskIds])
+  const allTaskIds = useMemo(() => tasks.map((row) => row.id), [tasks])
+  const allTasksSelected = tasks.length > 0 && selectedTaskIds.length === tasks.length
+
+  useEffect(() => {
+    setSelectedTaskIds((prev) => prev.filter((id) => allTaskIds.includes(id)))
+    setTaskIdsToDelete((prev) => prev.filter((id) => allTaskIds.includes(id)))
+  }, [allTaskIds])
+
+  useEffect(() => {
+    setSelectedTaskIds([])
+    setTaskIdsToDelete([])
+  }, [employeeInfo?.department])
+
+  useEffect(() => {
+    if (currentDepartmentId === null) return
+    setSelectedSaveDepartmentIds((prev) => (prev.includes(currentDepartmentId) ? prev : [currentDepartmentId, ...prev]))
+  }, [currentDepartmentId])
 
   const departmentTemplateRecords = useMemo(() => {
     const parseTime = (value: string) => {
@@ -294,6 +380,16 @@ function OnboardingChecklistPageContent() {
     })
     return Array.from(latestByDepartment.values()).sort((a, b) => a.department.localeCompare(b.department))
   }, [records])
+
+  const departmentTaskCountMap = useMemo(() => {
+    const counts = new Map<string, number>()
+    departmentTemplateRecords.forEach(({ department, record }) => {
+      const key = String(department || '').trim().toLowerCase()
+      const taskCount = record.tasks.filter((row) => String(row.task || '').trim().length > 0).length
+      counts.set(key, taskCount)
+    })
+    return counts
+  }, [departmentTemplateRecords])
 
 
   const filteredAndSortedRecords = useMemo(() => {
@@ -495,9 +591,24 @@ function OnboardingChecklistPageContent() {
   }
 
 
-  const removeTask = (id: number) => {
-    setTasks(tasks.filter(t => t.id !== id));
-  };
+  const queueTaskDeletion = (ids: number[]) => {
+    const uniqueIds = [...new Set(ids)].filter((id) => allTaskIds.includes(id))
+    if (uniqueIds.length === 0) return
+    setTaskIdsToDelete(uniqueIds)
+  }
+
+  const toggleTaskSelection = (id: number, checked: boolean) => {
+    setSelectedTaskIds((prev) => {
+      if (checked) {
+        return prev.includes(id) ? prev : [...prev, id]
+      }
+      return prev.filter((value) => value !== id)
+    })
+  }
+
+  const toggleSelectAllTasks = (checked: boolean) => {
+    setSelectedTaskIds(checked ? allTaskIds : [])
+  }
 
 
   const updateTaskText = (id: number, text: string) => {
@@ -524,6 +635,15 @@ function OnboardingChecklistPageContent() {
     const timer = setTimeout(() => setRecentlyMovedTaskId(null), 220)
     return () => clearTimeout(timer)
   }, [recentlyMovedTaskId])
+
+  const buildPayloadTasks = (taskRows: ChecklistTask[]) =>
+    taskRows
+      .map((row, index) => ({
+        task: row.task.trim(),
+        sort_order: index + 1,
+        is_active: true,
+      }))
+      .filter((row) => row.task.length > 0)
 
 
   const persistTaskStatus = async (updatedTasks: ChecklistTask[], previousTasks: ChecklistTask[]) => {
@@ -573,30 +693,29 @@ function OnboardingChecklistPageContent() {
     }
   };
 
-
-  const handleSave = async (): Promise<boolean> => {
+  const persistTemplateTasks = async (
+    taskRows: ChecklistTask[],
+    options?: {
+      successMessage?: string
+      failureTitle?: string
+      successPosition?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left'
+      targetDepartmentIds?: number[]
+    }
+  ): Promise<boolean> => {
     if (!employeeInfo) return false
 
+    const successMessage = options?.successMessage ?? 'Checklist template saved successfully!'
+    const failureTitle = options?.failureTitle ?? 'Save Failed'
+    const successPosition = options?.successPosition ?? 'top-right'
+    const targetDepartmentIds = [...new Set(options?.targetDepartmentIds ?? (currentDepartmentId !== null ? [currentDepartmentId] : []))]
 
     try {
       setSaving(true)
-      const departmentName = String(employeeInfo.department || '').trim()
-      const departmentId = selectedDepartmentId ?? departmentsData.find((row) => row.name === departmentName)?.id ?? null
-      if (!departmentId) {
-        throw new Error('Please select a valid department before saving.')
+      if (targetDepartmentIds.length === 0) {
+        throw new Error('Please select at least one department to save.')
       }
 
-      const payloadTasks = tasks
-        .map((row, index) => ({
-          task: row.task.trim(),
-          sort_order: index + 1,
-          is_active: true,
-        }))
-        .filter((row) => row.task.length > 0)
-
-      if (payloadTasks.length === 0) {
-        throw new Error('Please add at least one checklist task before saving.')
-      }
+      const payloadTasks = buildPayloadTasks(taskRows)
 
       const tasksValidation = checklistTemplateTasksSchema.safeParse(payloadTasks)
       if (!tasksValidation.success) {
@@ -621,46 +740,117 @@ function OnboardingChecklistPageContent() {
         return false
       }
 
-      const payload = {
-        department_id: departmentId,
-        checklist_type: 'ONBOARDING',
-        tasks: payloadTasks,
+      const saveResults = await Promise.all(
+        targetDepartmentIds.map(async (departmentId) => {
+          const payload = {
+            department_id: departmentId,
+            checklist_type: 'ONBOARDING',
+            tasks: payloadTasks,
+          }
+
+          try {
+            const response = await fetch(`${getApiUrl()}/api/department-checklist-templates`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+              },
+              body: JSON.stringify(payload),
+            })
+            await ensureOkResponse(response, `Unable to save checklist for ${departmentNameById.get(departmentId) ?? 'selected department'}.`)
+            const result = await response.json()
+            return {
+              ok: true as const,
+              departmentId,
+              updated: normalizeTemplateRecord(result?.data),
+            }
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to save checklist'
+            return {
+              ok: false as const,
+              departmentId,
+              message,
+            }
+          }
+        })
+      )
+
+      const successful = saveResults.filter((result): result is { ok: true; departmentId: number; updated: OnboardingRecord } => result.ok)
+      const failed = saveResults.filter((result): result is { ok: false; departmentId: number; message: string } => !result.ok)
+
+      if (successful.length === 0) {
+        throw new Error(failed[0]?.message || 'Unable to save the checklist template.')
       }
 
-
-      const response = await fetch(`${getApiUrl()}/api/department-checklist-templates`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      })
-
-
-      await ensureOkResponse(response, 'Unable to save the checklist template.')
-
-
-      const result = await response.json()
-      const updated = normalizeTemplateRecord(result?.data)
-      setSelectedDepartmentId(departmentId)
-      setEmployeeInfo(updated)
-      setTasks(updated.tasks)
+      const successfulByDepartment = new Map(successful.map((result) => [result.updated.department, result.updated]))
       setRecords((prev) => {
-        const remaining = prev.filter((record) => record.department !== updated.department)
-        return [...remaining, updated].sort((a, b) => a.department.localeCompare(b.department))
+        const remaining = prev.filter((record) => !successfulByDepartment.has(record.department))
+        return [...remaining, ...successful.map((result) => result.updated)].sort((a, b) => a.department.localeCompare(b.department))
       })
-      toast.success('Checklist template saved successfully!', { position: 'top-right' })
-      return true
+
+      const currentUpdated = successful.find((result) => result.departmentId === currentDepartmentId)?.updated
+      if (currentUpdated) {
+        setEmployeeInfo(currentUpdated)
+        setTasks(currentUpdated.tasks)
+        const matchedDepartmentId = departmentIdByName.get(String(currentUpdated.department || '').trim().toLowerCase()) ?? null
+        setSelectedDepartmentId(matchedDepartmentId)
+      }
+
+      if (failed.length > 0) {
+        const failedNames = failed
+          .map((result) => departmentNameById.get(result.departmentId))
+          .filter((name): name is string => typeof name === 'string' && name.length > 0)
+        toast.warning('Saved with partial failures', {
+          description: failedNames.length > 0 ? `Failed: ${failedNames.join(', ')}` : 'Some checklists could not be saved.',
+        })
+      } else {
+        toast.success(successMessage, { position: successPosition })
+      }
+
+      return failed.length === 0
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save updates'
-      toast.error('Save Failed', {
+      toast.error(failureTitle, {
         description: message,
       })
       return false
     } finally {
       setSaving(false)
     }
+  }
+
+  const removeSelectedTasks = async () => {
+    if (taskIdsToDelete.length === 0) return
+
+    const idsToDelete = new Set(taskIdsToDelete)
+    const previousTasks = tasks
+    const previousSelectedTaskIds = selectedTaskIds
+    const updatedTasks = previousTasks.filter((row) => !idsToDelete.has(row.id))
+    const deletedCount = previousTasks.length - updatedTasks.length
+    if (deletedCount === 0) {
+      setTaskIdsToDelete([])
+      return
+    }
+
+    setTasks(updatedTasks)
+    setSelectedTaskIds((prev) => prev.filter((id) => !idsToDelete.has(id)))
+    setTaskIdsToDelete([])
+
+    const success = await persistTemplateTasks(updatedTasks, {
+      successMessage: deletedCount === 1 ? 'Task deleted successfully.' : `${deletedCount} tasks deleted successfully.`,
+      failureTitle: 'Delete Failed',
+      targetDepartmentIds: currentDepartmentId !== null ? [currentDepartmentId] : [],
+    })
+
+    if (!success) {
+      setTasks(previousTasks)
+      setSelectedTaskIds(previousSelectedTaskIds)
+    }
+  }
+
+
+  const handleSave = async (): Promise<boolean> => {
+    return persistTemplateTasks(tasks, { targetDepartmentIds: resolvedSaveTargetDepartmentIds })
   }
 
   const handleSaveAndContinue = async () => {
@@ -788,24 +978,32 @@ function OnboardingChecklistPageContent() {
                       <CommandList>
                         <CommandEmpty>No department found.</CommandEmpty>
                         <CommandGroup>
-                          {departmentSelectOptions.map((department) => (
-                            <CommandItem
-                              key={department}
-                              value={department}
-                              onSelect={() => {
-                                requestDepartmentChange(department)
-                                setOpen(false)
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  String(employeeInfo?.department || '').trim() === department ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              {department}
-                            </CommandItem>
-                          ))}
+                          {departmentSelectOptions.map((department) => {
+                            const departmentTaskCount = departmentTaskCountMap.get(String(department || '').trim().toLowerCase()) ?? 0
+                            return (
+                              <CommandItem
+                                key={department}
+                                value={department}
+                                onSelect={() => {
+                                  requestDepartmentChange(department)
+                                  setOpen(false)
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    String(employeeInfo?.department || '').trim() === department ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex w-full items-center justify-between gap-2">
+                                  <span className="truncate">{department}</span>
+                                  <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                                    {departmentTaskCount}
+                                  </span>
+                                </div>
+                              </CommandItem>
+                            )
+                          })}
                         </CommandGroup>
                       </CommandList>
                     </Command>
@@ -864,6 +1062,16 @@ function OnboardingChecklistPageContent() {
               <Button onClick={addTask} size="sm" className="bg-[#A4163A] hover:bg-[#800020] text-white font-black text-xs h-9 px-6 rounded-xl shadow-md active:scale-95 transition-all">
                 <Plus className="w-3.5 h-3.5 mr-2" /> ADD ROW
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => queueTaskDeletion(selectedTaskIds)}
+                disabled={selectedTaskIds.length === 0 || saving}
+                className="border-rose-200 text-rose-700 hover:bg-rose-50 font-black text-xs h-9 px-4 rounded-xl"
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-2" />
+                DELETE SELECTED ({selectedTaskIds.length})
+              </Button>
               <Separator orientation="vertical" className="h-4 bg-slate-200" />
               <p className="text-[8px] font-black text-slate-300 uppercase tracking-[0.2em] italic">
                 ADMINISTRATION FRAMEWORK - ABIC HR
@@ -891,6 +1099,15 @@ function OnboardingChecklistPageContent() {
           <Table>
             <TableHeader className="bg-[#FFE5EC]/40">
               <TableRow className="border-b border-[#FFE5EC] hover:bg-transparent">
+                <TableHead className="w-[70px] text-center font-black text-[#800020] uppercase tracking-[0.12em] text-[12px] py-3">
+                  <Checkbox
+                    checked={allTasksSelected ? true : selectedTaskIds.length > 0 ? "indeterminate" : false}
+                    onCheckedChange={(checked) => toggleSelectAllTasks(checked === true)}
+                    disabled={tasks.length === 0 || saving}
+                    aria-label="Select all tasks"
+                    className="mx-auto"
+                  />
+                </TableHead>
                 <TableHead className="font-black text-[#800020] uppercase tracking-[0.12em] text-[12px] py-3">
                   <span>Required Onboarding Tasks</span>
                   <p className="mt-1 text-[10px] normal-case font-semibold tracking-normal text-[#800020]/70">
@@ -939,6 +1156,15 @@ function OnboardingChecklistPageContent() {
                     recentlyMovedTaskId === item.id ? "bg-rose-50/40" : ""
                   )}
                 >
+                  <TableCell className="py-2.5 text-center">
+                    <Checkbox
+                      checked={selectedTaskIdSet.has(item.id)}
+                      onCheckedChange={(checked) => toggleTaskSelection(item.id, checked === true)}
+                      aria-label="Select task"
+                      disabled={saving}
+                      className="mx-auto"
+                    />
+                  </TableCell>
                   <TableCell className="py-2.5">
                     {editMode ? (
                       <div className="flex items-start gap-2">
@@ -999,7 +1225,8 @@ function OnboardingChecklistPageContent() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => setTaskIdToDelete(item.id)}
+                      onClick={() => queueTaskDeletion([item.id])}
+                      disabled={saving}
                       className="h-7 w-7 text-slate-300 hover:text-rose-500 transition-colors rounded-lg group-hover:bg-rose-50"
                     >
                       <Trash2 className="h-5.5 w-5.5" />
@@ -1011,7 +1238,7 @@ function OnboardingChecklistPageContent() {
 
               {tasks.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={2} className="py-24 text-center">
+                  <TableCell colSpan={3} className="py-24 text-center">
                     <ClipboardList className="w-12 h-12 text-slate-200 mx-auto mb-4" />
                     <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">No tasks initialized</p>
                     <Button onClick={() => setStartChecklistOpen(true)} variant="outline" size="sm" className="mt-4 border-[#FFE5EC] text-[#A4163A] font-black h-9 rounded-xl">
@@ -1061,11 +1288,94 @@ function OnboardingChecklistPageContent() {
           </AlertDialogHeader>
           <div className="rounded-xl border border-[#FFE5EC] bg-rose-50/30 p-4 text-sm font-semibold text-slate-700">
             Tasks to save: {tasks.filter((row) => row.task.trim().length > 0).length}
+            <p className="mt-1 text-xs font-bold text-slate-500">
+              Target checklists: {resolvedSaveTargetDepartmentIds.length}
+            </p>
+          </div>
+          <div className="rounded-xl border border-[#FFE5EC] bg-white p-4 space-y-3">
+            <p className="text-xs font-black uppercase tracking-wider text-[#A4163A]">Save Scope</p>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={saveScope === 'CURRENT' ? 'default' : 'outline'}
+                className={cn("h-9 text-[11px] font-black", saveScope === 'CURRENT' ? 'bg-[#A4163A] text-white hover:bg-[#800020]' : '')}
+                onClick={() => setSaveScope('CURRENT')}
+              >
+                This Checklist
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={saveScope === 'SAME_TASKS' ? 'default' : 'outline'}
+                className={cn("h-9 text-[11px] font-black", saveScope === 'SAME_TASKS' ? 'bg-[#A4163A] text-white hover:bg-[#800020]' : '')}
+                onClick={() => setSaveScope('SAME_TASKS')}
+              >
+                Same Tasks
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={saveScope === 'SELECTED' ? 'default' : 'outline'}
+                className={cn("h-9 text-[11px] font-black", saveScope === 'SELECTED' ? 'bg-[#A4163A] text-white hover:bg-[#800020]' : '')}
+                onClick={() => setSaveScope('SELECTED')}
+              >
+                Selected
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={saveScope === 'ALL' ? 'default' : 'outline'}
+                className={cn("h-9 text-[11px] font-black", saveScope === 'ALL' ? 'bg-[#A4163A] text-white hover:bg-[#800020]' : '')}
+                onClick={() => setSaveScope('ALL')}
+              >
+                All Checklists
+              </Button>
+            </div>
+
+            {saveScope === 'SAME_TASKS' && (
+              <p className="text-xs font-semibold text-slate-600">
+                Saves to checklists that currently have the exact same tasks.
+              </p>
+            )}
+
+            {saveScope === 'SELECTED' && (
+              <div className="max-h-44 overflow-auto rounded-lg border border-slate-200 p-2 space-y-1">
+                {departmentsData.map((department) => (
+                  <label
+                    key={department.id}
+                    className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    <Checkbox
+                      checked={selectedSaveDepartmentIds.includes(department.id)}
+                      onCheckedChange={(checked) => toggleSaveDepartmentSelection(department.id, checked === true)}
+                    />
+                    <span>{department.name}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {resolvedSaveTargetNames.length === 0 ? (
+              <p className="text-xs text-slate-500">No target checklist selected.</p>
+            ) : resolvedSaveTargetNames.length === 1 ? (
+              <p className="text-xs text-slate-500">Target: {resolvedSaveTargetNames[0]}</p>
+            ) : (
+              <div className="text-xs text-slate-500">
+                <p className="font-semibold">Targets:</p>
+                <ol className="mt-1 max-h-28 list-decimal space-y-0.5 overflow-auto pl-5">
+                  {resolvedSaveTargetNames.map((departmentName) => (
+                    <li key={departmentName}>{departmentName}</li>
+                  ))}
+                </ol>
+              </div>
+            )}
           </div>
           <AlertDialogFooter className="flex-col sm:flex-row gap-3 mt-2">
             <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-emerald-600 text-white hover:bg-emerald-700"
+              disabled={saving || resolvedSaveTargetDepartmentIds.length === 0}
               onClick={async () => {
                 setSaveConfirmOpen(false)
                 await handleSave()
@@ -1112,15 +1422,13 @@ function OnboardingChecklistPageContent() {
       />
 
       <DeleteTaskDialog
-        open={taskIdToDelete !== null}
+        open={taskIdsToDelete.length > 0}
         onOpenChange={(open) => {
-          if (!open) setTaskIdToDelete(null)
+          if (!open) setTaskIdsToDelete([])
         }}
-        onCancel={() => setTaskIdToDelete(null)}
-        onDelete={() => {
-          if (taskIdToDelete !== null) removeTask(taskIdToDelete)
-          setTaskIdToDelete(null)
-        }}
+        onCancel={() => setTaskIdsToDelete([])}
+        onDelete={() => void removeSelectedTasks()}
+        taskCount={taskIdsToDelete.length}
       />
     </div>
   )

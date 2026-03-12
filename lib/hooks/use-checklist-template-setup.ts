@@ -137,19 +137,6 @@ export function useChecklistTemplateSetup<TTask, TRecord extends { name: string;
     setSelectedDepartmentId(departmentMatch?.id ?? null)
   }, [templatesQuery.isLoading, optionsQuery.isLoading, employeeInfo, departmentOptions, departmentsData, buildBlankRecord])
 
-  // Reconcile tasks from fetched records if a transient blank initialization happened first.
-  useEffect(() => {
-    if (!employeeInfo?.department) return
-    if (tasks.length > 0) return
-    const matched = records.find(
-      (row) => String(row.department || "").trim().toLowerCase() === String(employeeInfo.department || "").trim().toLowerCase()
-    )
-    if (!matched || matched.tasks.length === 0) return
-
-    setEmployeeInfo(matched)
-    setTasks(matched.tasks)
-  }, [employeeInfo, tasks.length, records])
-
   return {
     records,
     setRecords,

@@ -73,6 +73,7 @@ type DeleteTaskDialogProps = {
   onOpenChange: (open: boolean) => void
   onCancel: () => void
   onDelete: () => void
+  taskCount?: number
 }
 
 export function DeleteTaskDialog({
@@ -80,8 +81,10 @@ export function DeleteTaskDialog({
   onOpenChange,
   onCancel,
   onDelete,
+  taskCount = 1,
 }: DeleteTaskDialogProps) {
   const titleRef = useRef<HTMLHeadingElement | null>(null)
+  const isBatchDelete = taskCount > 1
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -98,10 +101,12 @@ export function DeleteTaskDialog({
             <TriangleAlert className="h-6 w-6" />
           </div>
           <AlertDialogTitle ref={titleRef} tabIndex={-1} className={modalTokens.title}>
-            Delete this task?
+            {isBatchDelete ? `Delete ${taskCount} tasks?` : "Delete this task?"}
           </AlertDialogTitle>
           <AlertDialogDescription className={modalTokens.description}>
-            This task will be removed from the current checklist.
+            {isBatchDelete
+              ? "These tasks will be removed from the current checklist."
+              : "This task will be removed from the current checklist."}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className={modalTokens.footer}>
@@ -109,7 +114,7 @@ export function DeleteTaskDialog({
             Cancel
           </AlertDialogCancel>
           <AlertDialogAction className={buttonTokens.danger} onClick={onDelete}>
-            Delete Task
+            {isBatchDelete ? "Delete Tasks" : "Delete Task"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

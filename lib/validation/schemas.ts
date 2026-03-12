@@ -15,7 +15,6 @@ export const checklistTemplateTasksSchema = z
       is_active: z.boolean().optional(),
     })
   )
-  .min(1)
 
 export const onboardingRecordSchema = z.object({
   name: z
