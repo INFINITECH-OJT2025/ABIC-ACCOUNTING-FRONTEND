@@ -2008,7 +2008,7 @@ function OnboardPageContent() {
       return;
     }
 
-    // 4. Gov IDs Limit (20) & Numbers Only
+    // 4. Gov IDs Limit (20) & Numbers/Hyphen Only
     if (
       [
         "sss_number",
@@ -2017,8 +2017,8 @@ function OnboardPageContent() {
         "tin_number",
       ].includes(name)
     ) {
-      const numericValue = value.replace(/\D/g, "").slice(0, 20);
-      setProgressionFormData((prev) => ({ ...prev, [name]: numericValue }));
+      const govIdValue = value.replace(/[^0-9-]/g, "").slice(0, 20);
+      setProgressionFormData((prev) => ({ ...prev, [name]: govIdValue }));
       return;
     }
 
@@ -2206,6 +2206,11 @@ function OnboardPageContent() {
 
   const isCurrentBatchValid = () => {
     const data = progressionFormData;
+    const isValidGovernmentId = (value: unknown) => {
+      const normalized = String(value ?? "").trim();
+      if (!normalized) return true;
+      return /^(?=.*\d)[0-9-]+$/.test(normalized);
+    };
     switch (currentBatch) {
       case 1:
         return !!data.position && !!data.date_hired;
@@ -2224,7 +2229,12 @@ function OnboardPageContent() {
           !!data.mobile_number && !!data.email && emailRegex.test(data.email)
         );
       case 4:
-        return true;
+        return (
+          isValidGovernmentId(data.sss_number) &&
+          isValidGovernmentId(data.philhealth_number) &&
+          isValidGovernmentId(data.pagibig_number) &&
+          isValidGovernmentId(data.tin_number)
+        );
       case 5:
         return true;
       case 6:
@@ -3634,67 +3644,147 @@ function OnboardPageContent() {
                     {currentBatch === 4 && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
-                          <Label
-                            htmlFor="sss_number"
-                            className="text-sm font-semibold"
-                          >
-                            SSS Number
-                          </Label>
+                          <div className="flex justify-between items-center">
+                            <Label
+                              htmlFor="sss_number"
+                              className="text-sm font-semibold"
+                            >
+                              SSS Number
+                            </Label>
+                            {progressionFormData.sss_number &&
+                              !/^(?=.*\d)[0-9-]+$/.test(
+                                progressionFormData.sss_number,
+                              ) && (
+                                <div className="flex items-center gap-1 text-[10px] text-rose-500 font-bold animate-in fade-in slide-in-from-right-1">
+                                  <AlertCircle className="w-3 h-3" />
+                                  Invalid Format
+                                </div>
+                              )}
+                          </div>
                           <Input
                             id="sss_number"
                             name="sss_number"
                             value={progressionFormData.sss_number || ""}
                             onChange={handleProgressionChange}
                             maxLength={20}
-                            className="font-medium"
+                            className={cn(
+                              "font-medium transition-all duration-300",
+                              progressionFormData.sss_number &&
+                                !/^(?=.*\d)[0-9-]+$/.test(
+                                  progressionFormData.sss_number,
+                                )
+                                ? "border-rose-400 focus-visible:ring-rose-400 bg-rose-50/30"
+                                : progressionFormData.sss_number &&
+                                    "border-emerald-400 focus-visible:ring-emerald-400 bg-emerald-50/30",
+                            )}
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label
-                            htmlFor="philhealth_number"
-                            className="text-sm font-semibold"
-                          >
-                            PhilHealth Number
-                          </Label>
+                          <div className="flex justify-between items-center">
+                            <Label
+                              htmlFor="philhealth_number"
+                              className="text-sm font-semibold"
+                            >
+                              PhilHealth Number
+                            </Label>
+                            {progressionFormData.philhealth_number &&
+                              !/^(?=.*\d)[0-9-]+$/.test(
+                                progressionFormData.philhealth_number,
+                              ) && (
+                                <div className="flex items-center gap-1 text-[10px] text-rose-500 font-bold animate-in fade-in slide-in-from-right-1">
+                                  <AlertCircle className="w-3 h-3" />
+                                  Invalid Format
+                                </div>
+                              )}
+                          </div>
                           <Input
                             id="philhealth_number"
                             name="philhealth_number"
                             value={progressionFormData.philhealth_number || ""}
                             onChange={handleProgressionChange}
                             maxLength={20}
-                            className="font-medium"
+                            className={cn(
+                              "font-medium transition-all duration-300",
+                              progressionFormData.philhealth_number &&
+                                !/^(?=.*\d)[0-9-]+$/.test(
+                                  progressionFormData.philhealth_number,
+                                )
+                                ? "border-rose-400 focus-visible:ring-rose-400 bg-rose-50/30"
+                                : progressionFormData.philhealth_number &&
+                                    "border-emerald-400 focus-visible:ring-emerald-400 bg-emerald-50/30",
+                            )}
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label
-                            htmlFor="pagibig_number"
-                            className="text-sm font-semibold"
-                          >
-                            Pag-IBIG Number
-                          </Label>
+                          <div className="flex justify-between items-center">
+                            <Label
+                              htmlFor="pagibig_number"
+                              className="text-sm font-semibold"
+                            >
+                              Pag-IBIG Number
+                            </Label>
+                            {progressionFormData.pagibig_number &&
+                              !/^(?=.*\d)[0-9-]+$/.test(
+                                progressionFormData.pagibig_number,
+                              ) && (
+                                <div className="flex items-center gap-1 text-[10px] text-rose-500 font-bold animate-in fade-in slide-in-from-right-1">
+                                  <AlertCircle className="w-3 h-3" />
+                                  Invalid Format
+                                </div>
+                              )}
+                          </div>
                           <Input
                             id="pagibig_number"
                             name="pagibig_number"
                             value={progressionFormData.pagibig_number || ""}
                             onChange={handleProgressionChange}
                             maxLength={20}
-                            className="font-medium"
+                            className={cn(
+                              "font-medium transition-all duration-300",
+                              progressionFormData.pagibig_number &&
+                                !/^(?=.*\d)[0-9-]+$/.test(
+                                  progressionFormData.pagibig_number,
+                                )
+                                ? "border-rose-400 focus-visible:ring-rose-400 bg-rose-50/30"
+                                : progressionFormData.pagibig_number &&
+                                    "border-emerald-400 focus-visible:ring-emerald-400 bg-emerald-50/30",
+                            )}
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label
-                            htmlFor="tin_number"
-                            className="text-sm font-semibold"
-                          >
-                            TIN Number
-                          </Label>
+                          <div className="flex justify-between items-center">
+                            <Label
+                              htmlFor="tin_number"
+                              className="text-sm font-semibold"
+                            >
+                              TIN Number
+                            </Label>
+                            {progressionFormData.tin_number &&
+                              !/^(?=.*\d)[0-9-]+$/.test(
+                                progressionFormData.tin_number,
+                              ) && (
+                                <div className="flex items-center gap-1 text-[10px] text-rose-500 font-bold animate-in fade-in slide-in-from-right-1">
+                                  <AlertCircle className="w-3 h-3" />
+                                  Invalid Format
+                                </div>
+                              )}
+                          </div>
                           <Input
                             id="tin_number"
                             name="tin_number"
                             value={progressionFormData.tin_number || ""}
                             onChange={handleProgressionChange}
                             maxLength={20}
-                            className="font-medium"
+                            className={cn(
+                              "font-medium transition-all duration-300",
+                              progressionFormData.tin_number &&
+                                !/^(?=.*\d)[0-9-]+$/.test(
+                                  progressionFormData.tin_number,
+                                )
+                                ? "border-rose-400 focus-visible:ring-rose-400 bg-rose-50/30"
+                                : progressionFormData.tin_number &&
+                                    "border-emerald-400 focus-visible:ring-emerald-400 bg-emerald-50/30",
+                            )}
                           />
                         </div>
                       </div>
