@@ -790,8 +790,13 @@ function FormLetterContent() {
           setEntries(filtered);
         }
       } else {
-        const leaveRes = await fetch(`${getApiUrl()}/api/leaves`);
+        const [leaveRes, creditsRes] = await Promise.all([
+          fetch(`${getApiUrl()}/api/leaves`),
+          fetch(`${getApiUrl()}/api/leaves/credits`),
+        ]);
         const leaveData = await leaveRes.json();
+        const creditsData = await creditsRes.json();
+
         if (leaveData.success) {
           const empLeaves = leaveData.data.filter(
             (e: any) =>
@@ -801,25 +806,53 @@ function FormLetterContent() {
               new Date(e.start_date).getFullYear() === Number(year),
           );
 
+          const creditsMap = new Map<string, any>();
+          if (creditsData.success) {
+            creditsData.data.forEach((c: any) => creditsMap.set(String(c.employee_id), c));
+          }
+
+          const runningCredits = { vl: 15, sl: 15 };
+          const creditInfo = creditsMap.get(String(employeeId));
+          const isEligible = creditInfo?.has_one_year_regular;
+
           // Group by month and cutoff to identify qualifying incidents (>= 3 days)
+          // We must process ALL leaves for the year to correctly deduct credits chronologically
+          const yearLeavesSorted = [...empLeaves].sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
+          
           const leaveGroups = new Map<string, any>();
-          empLeaves.forEach((e: any) => {
+          yearLeavesSorted.forEach((e: any) => {
             const date = new Date(e.start_date);
             const m = date.getMonth();
             const day = date.getDate();
             const co = day <= 15 ? "cutoff1" : "cutoff2";
             const key = `${MONTHS[m]}-${co}`;
 
+            let daysToCharge = Number(e.number_of_days);
+            if (isEligible) {
+              const remarks = String(e.remarks || "").toLowerCase();
+              if (remarks.includes("sick")) {
+                const deduct = Math.min(daysToCharge, runningCredits.sl);
+                runningCredits.sl -= deduct;
+                daysToCharge -= deduct;
+              } else if (remarks.includes("vacation")) {
+                const deduct = Math.min(daysToCharge, runningCredits.vl);
+                runningCredits.vl -= deduct;
+                daysToCharge -= deduct;
+              }
+            }
+
             if (!leaveGroups.has(key)) {
               leaveGroups.set(key, {
                 ...e,
                 month: MONTHS[m],
                 cutoff: co,
-                total_days: Number(e.number_of_days),
+                total_days: daysToCharge,
+                actual_total_days: Number(e.number_of_days),
               });
             } else {
               const existing = leaveGroups.get(key);
-              existing.total_days += Number(e.number_of_days);
+              existing.total_days += daysToCharge;
+              existing.actual_total_days += Number(e.number_of_days);
               if (new Date(e.start_date) < new Date(existing.start_date)) {
                 existing.start_date = e.start_date;
               }

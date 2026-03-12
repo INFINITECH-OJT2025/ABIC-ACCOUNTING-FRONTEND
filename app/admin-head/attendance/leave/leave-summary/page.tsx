@@ -44,6 +44,7 @@ export default function LeaveSummaryPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [leaves, setLeaves] = useState<LeaveEntry[]>([]);
+  const [credits, setCredits] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const MONTHS = [
@@ -65,8 +66,9 @@ export default function LeaveSummaryPage() {
     Promise.all([
       fetch(`${getApiUrl()}/api/employees`).then((r) => r.json()),
       fetch(`${getApiUrl()}/api/leaves`).then((r) => r.json()),
+      fetch(`${getApiUrl()}/api/leaves/credits`).then((r) => r.json()),
     ])
-      .then(([empData, leaveData]) => {
+      .then(([empData, leaveData, creditsData]) => {
         if (empData.success) {
           setEmployees(
             empData.data.map((e: any) => ({
@@ -78,6 +80,9 @@ export default function LeaveSummaryPage() {
         }
         if (leaveData.success) {
           setLeaves(leaveData.data ?? []);
+        }
+        if (creditsData.success) {
+          setCredits(creditsData.data ?? []);
         }
       })
       .catch(console.error)
@@ -94,7 +99,15 @@ export default function LeaveSummaryPage() {
       stats[emp.id] = { employee: emp, months: Array(12).fill(0), total: 0 };
     });
 
-    leaves.forEach((leave) => {
+    const creditsMap = new Map<string, any>();
+    credits.forEach((c) => creditsMap.set(String(c.employee_id), c));
+
+    const runningCredits = new Map<string, { vl: number; sl: number }>();
+
+    // Sort leaves chronologically to deduct correctly
+    const sortedLeaves = [...leaves].sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
+
+    sortedLeaves.forEach((leave) => {
       // Include only Approved leaves (not Pending, not Declined)
       const isApproved = !["Pending", "Declined"].includes(leave.approved_by);
       if (!isApproved) return;
@@ -104,7 +117,7 @@ export default function LeaveSummaryPage() {
       if (date.getFullYear() !== selectedYear) return;
 
       const month = date.getMonth(); // 0-11
-      const empId = leave.employee_id;
+      const empId = String(leave.employee_id);
 
       if (!stats[empId]) {
         stats[empId] = {
@@ -114,9 +127,31 @@ export default function LeaveSummaryPage() {
         };
       }
 
-      const days = Number(leave.number_of_days) || 0;
-      stats[empId].months[month] += days;
-      stats[empId].total += days;
+      const creditInfo = creditsMap.get(empId);
+      const isEligible = creditInfo?.has_one_year_regular;
+      
+      let daysToCount = Number(leave.number_of_days) || 0;
+      
+      if (isEligible) {
+        if (!runningCredits.has(empId)) {
+          runningCredits.set(empId, { vl: 15, sl: 15 });
+        }
+        const running = runningCredits.get(empId)!;
+        const remarks = String((leave as any).remarks || "").toLowerCase();
+        
+        if (remarks.includes("sick")) {
+          const deduct = Math.min(daysToCount, running.sl);
+          running.sl -= deduct;
+          daysToCount -= deduct;
+        } else if (remarks.includes("vacation")) {
+          const deduct = Math.min(daysToCount, running.vl);
+          running.vl -= deduct;
+          daysToCount -= deduct;
+        }
+      }
+
+      stats[empId].months[month] += daysToCount;
+      stats[empId].total += daysToCount;
     });
 
     let result = Object.values(stats);
