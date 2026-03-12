@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\LeaveEntry;
+use App\Models\Employee;
 use Illuminate\Http\Request;
+use Carbon\Carbon;
 
 class LeaveController extends Controller
 {
@@ -128,6 +130,68 @@ class LeaveController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to delete leave entry: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function getLeaveCredits()
+    {
+        try {
+            $employees = Employee::with(['evaluation', 'leaveEntries' => function ($query) {
+                $query->whereYear('start_date', date('Y'));
+            }])->get();
+
+            $data = $employees->map(function ($employee) {
+                $regularizationDate = $employee->evaluation?->regularization_date;
+                $hasOneYearRegular = false;
+                $vlCredits = 0;
+                $slCredits = 0;
+
+                if ($regularizationDate) {
+                    $regDate = Carbon::parse($regularizationDate);
+                    $oneYearAfterReg = $regDate->copy()->addYear();
+
+                    if (now()->greaterThanOrEqualTo($oneYearAfterReg)) {
+                        $hasOneYearRegular = true;
+                        // Grant 15 days for the current year
+                        $vlCredits = 15;
+                        $slCredits = 15;
+                    }
+                }
+
+                $usedVL = $employee->leaveEntries
+                    ->where('remarks', 'Vacation Leave')
+                    ->whereNotIn('approved_by', ['Pending', 'Declined'])
+                    ->sum('number_of_days');
+
+                $usedSL = $employee->leaveEntries
+                    ->where('remarks', 'Sick Leave')
+                    ->whereNotIn('approved_by', ['Pending', 'Declined'])
+                    ->sum('number_of_days');
+
+                return [
+                    'employee_id' => $employee->id,
+                    'employee_name' => "{$employee->first_name} {$employee->last_name}",
+                    'department' => $employee->department,
+                    'regularization_date' => $regularizationDate,
+                    'has_one_year_regular' => $hasOneYearRegular,
+                    'vl_total' => $vlCredits,
+                    'sl_total' => $slCredits,
+                    'vl_used' => (float)$usedVL,
+                    'sl_used' => (float)$usedSL,
+                    'vl_balance' => max(0, $vlCredits - $usedVL),
+                    'sl_balance' => max(0, $slCredits - $usedSL),
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch leave credits: ' . $e->getMessage(),
             ], 500);
         }
     }
