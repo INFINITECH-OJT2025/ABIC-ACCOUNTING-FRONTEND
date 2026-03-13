@@ -1,7 +1,7 @@
 //Side
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import {
   ChevronDown,
@@ -47,6 +47,7 @@ export default function AdminHeadSidebar() {
   const [isHiringOpen, setIsHiringOpen] = useState(false);
   const [logoError, setLogoError] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const router = useRouter();
 
   const toggleSidebar = () => setIsCollapsed(!isCollapsed);
@@ -55,6 +56,40 @@ export default function AdminHeadSidebar() {
     // Perform any logout logic here (e.g., clearing tokens)
     router.push("/logout");
   };
+
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      try {
+        const response = await fetch('/api/laravel/api/activity-logs/unread-count');
+        const result = await response.json();
+        if (response.ok && result?.success) {
+          setUnreadCount(Number(result?.data?.count ?? 0));
+        }
+      } catch {
+        // Ignore sidebar counter failures.
+      }
+    };
+
+    void fetchUnreadCount();
+    const intervalId = setInterval(fetchUnreadCount, 30000);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    const onUnreadChanged = (event: Event) => {
+      const customEvent = event as CustomEvent<{ count: number }>;
+      if (typeof customEvent.detail?.count === 'number') {
+        setUnreadCount(customEvent.detail.count);
+      }
+    };
+
+    window.addEventListener('activity-log-unread-changed', onUnreadChanged as EventListener);
+
+    return () => {
+      window.removeEventListener('activity-log-unread-changed', onUnreadChanged as EventListener);
+    };
+  }, []);
 
   return (
     <div
@@ -147,8 +182,20 @@ export default function AdminHeadSidebar() {
           >
             <Activity size={22} className="shrink-0" />
             {!isCollapsed && (
-              <span className="font-medium whitespace-nowrap">
-                ACTIVITY LOGS
+              <div className="flex items-center gap-2">
+                <span className="font-medium whitespace-nowrap">
+                  ACTIVITY LOGS
+                </span>
+                {unreadCount > 0 && (
+                  <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-white px-1.5 py-0.5 text-[10px] font-bold leading-none text-[#7B0F2B]">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </div>
+            )}
+            {isCollapsed && unreadCount > 0 && (
+              <span className="absolute right-4 top-2 inline-flex min-w-5 items-center justify-center rounded-full bg-white px-1 py-0.5 text-[10px] font-bold leading-none text-[#7B0F2B]">
+                {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}
           </Link>
