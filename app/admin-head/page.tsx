@@ -362,19 +362,6 @@ export default function AdminHeadActivityLogsPage() {
 							</div>
 						</div>
 						
-						{selectedLog.metadata && Object.keys(selectedLog.metadata).length > 0 && (
-							<div className="pt-6 border-t border-slate-100">
-								<h3 className="text-sm font-black uppercase tracking-widest text-slate-900 mb-4 flex items-center gap-2">
-									<Filter className="h-4 w-4" />
-									Extended Metadata
-								</h3>
-								<div className="bg-slate-950 rounded-2xl p-6 overflow-x-auto shadow-inner">
-									<pre className="text-emerald-400 font-mono text-sm leading-relaxed">
-										{JSON.stringify(selectedLog.metadata, null, 2)}
-									</pre>
-								</div>
-							</div>
-						)}
 					</div>
 				</div>
 			</section>
